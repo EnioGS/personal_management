@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
 import { useChatPanelStore } from '@/store/chat-panel-store'
 import { useChatStore } from '@/store/chat-store'
+import { useVaultStore } from '@/store/vault-store'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -32,6 +33,7 @@ export function ChatPanel() {
   const messages = useChatStore((s) => s.messages)
   const isSending = useChatStore((s) => s.isSending)
   const sendMessage = useChatStore((s) => s.sendMessage)
+  const isUnlocked = useVaultStore((s) => s.passphrase !== null)
 
   const [draft, setDraft] = useState('')
   const [dragOffset, setDragOffset] = useState<number | null>(null)
@@ -121,7 +123,11 @@ export function ChatPanel() {
                 key={message.id}
                 className={cn(
                   'max-w-[85%] rounded-md px-3 py-2 text-sm',
-                  message.role === 'user' ? 'self-end bg-brand text-brand-foreground' : 'self-start bg-muted',
+                  message.isError
+                    ? 'self-start bg-destructive/10 text-destructive'
+                    : message.role === 'user'
+                      ? 'self-end bg-brand text-brand-foreground'
+                      : 'self-start bg-muted',
                 )}
               >
                 {message.content}
@@ -130,25 +136,29 @@ export function ChatPanel() {
           </div>
         </ScrollArea>
 
-        <form
-          className="flex gap-2 border-t p-3"
-          onSubmit={(e) => {
-            e.preventDefault()
-            if (!draft.trim() || isSending) return
-            void sendMessage(draft.trim())
-            setDraft('')
-          }}
-        >
-          <Input
-            placeholder={t('panel.inputPlaceholder')}
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            disabled={isSending}
-          />
-          <Button type="submit" disabled={!draft.trim() || isSending}>
-            {t('panel.send')}
-          </Button>
-        </form>
+        {isUnlocked ? (
+          <form
+            className="flex gap-2 border-t p-3"
+            onSubmit={(e) => {
+              e.preventDefault()
+              if (!draft.trim() || isSending) return
+              void sendMessage(draft.trim())
+              setDraft('')
+            }}
+          >
+            <Input
+              placeholder={t('panel.inputPlaceholder')}
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              disabled={isSending}
+            />
+            <Button type="submit" disabled={!draft.trim() || isSending}>
+              {t('panel.send')}
+            </Button>
+          </form>
+        ) : (
+          <p className="text-muted-foreground border-t p-3 text-sm">{t('panel.locked')}</p>
+        )}
       </div>
     </div>
   )

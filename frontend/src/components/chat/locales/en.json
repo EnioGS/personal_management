@@ -4,6 +4,7 @@
     "heading": "Assistant",
     "emptyState": "No messages yet.",
     "inputPlaceholder": "Message the assistant…",
-    "send": "Send"
+    "send": "Send",
+    "locked": "Unlock your vault (Vault → Get Started) to chat."
   }
 }

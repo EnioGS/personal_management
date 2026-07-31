@@ -1,3 +1,4 @@
+import { assistantConfigTable } from '@/lib/assistant-config-db'
 import { assistantPromptsTable } from '@/lib/assistant-prompts-db'
 import { decryptJson } from '@/lib/crypto/envelope'
 import type { EncryptedRow } from '@/lib/secure-store/create-encrypted-table'
@@ -19,6 +20,7 @@ const TABLES = {
   contributions: contributionsTable,
   notes: notesTable,
   assistantPrompts: assistantPromptsTable,
+  assistantConfig: assistantConfigTable,
 } as const
 
 export type VaultTableKey = keyof typeof TABLES

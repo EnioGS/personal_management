@@ -93,6 +93,7 @@ describe('vault-file', () => {
         contributions: [],
         notes: [],
         assistantPrompts: [],
+        assistantConfig: [],
       },
     }
 

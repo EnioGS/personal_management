@@ -4,6 +4,7 @@
     "heading": "Assistente",
     "emptyState": "Nenhuma mensagem ainda.",
     "inputPlaceholder": "Mensagem para o assistente…",
-    "send": "Enviar"
+    "send": "Enviar",
+    "locked": "Desbloqueie seu cofre (Cofre → Começar) para conversar."
   }
 }

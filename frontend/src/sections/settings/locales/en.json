@@ -22,6 +22,10 @@
   },
   "assistant": {
     "heading": "Assistant",
+    "connectionLabel": "Connection",
+    "connectionDescription": "Uses OpenRouter (openrouter.ai) — one key, many models. The key is stored encrypted, like everything else in the vault.",
+    "apiKeyPlaceholder": "OpenRouter API key",
+    "modelPlaceholder": "Model (e.g. openai/gpt-4o-mini)",
     "systemPromptLabel": "System prompt",
     "systemPromptDescription": "Sent to the model at the start of every conversation. Not translated — always saved and used in whatever language you write it in.",
     "save": "Save"
