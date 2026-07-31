@@ -12,6 +12,8 @@ import notesEn from '@/sections/notes/locales/en.json'
 import notesPt from '@/sections/notes/locales/pt.json'
 import settingsEn from '@/sections/settings/locales/en.json'
 import settingsPt from '@/sections/settings/locales/pt.json'
+import vaultEn from '@/sections/vault/locales/en.json'
+import vaultPt from '@/sections/vault/locales/pt.json'
 
 /**
  * Adding a section with its own translated strings: create its
@@ -20,10 +22,24 @@ import settingsPt from '@/sections/settings/locales/pt.json'
  */
 void i18next.use(initReactI18next).init({
   resources: {
-    en: { common: commonEn, notes: notesEn, finances: financesEn, investments: investmentsEn, settings: settingsEn },
-    pt: { common: commonPt, notes: notesPt, finances: financesPt, investments: investmentsPt, settings: settingsPt },
+    en: {
+      common: commonEn,
+      vault: vaultEn,
+      notes: notesEn,
+      finances: financesEn,
+      investments: investmentsEn,
+      settings: settingsEn,
+    },
+    pt: {
+      common: commonPt,
+      vault: vaultPt,
+      notes: notesPt,
+      finances: financesPt,
+      investments: investmentsPt,
+      settings: settingsPt,
+    },
   },
-  ns: ['common', 'notes', 'finances', 'investments', 'settings'],
+  ns: ['common', 'vault', 'notes', 'finances', 'investments', 'settings'],
   defaultNS: 'common',
   lng: readInitialLocale(),
   fallbackLng: 'pt',

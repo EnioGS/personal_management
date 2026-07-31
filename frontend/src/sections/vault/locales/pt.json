@@ -1,0 +1,44 @@
+{
+  "section": {
+    "label": "Cofre"
+  },
+  "items": {
+    "getStarted": "Começar",
+    "about": "Sobre"
+  },
+  "getStarted": {
+    "heading": "Começar",
+    "passphrasePlaceholder": "Frase-senha",
+    "newButton": "Novo",
+    "importButton": "Importar",
+    "continueButton": "Continuar",
+    "exportButton": "Exportar",
+    "fileDescription": "Cofre do Personal Management",
+    "newDialog": {
+      "title": "Criar um novo cofre",
+      "wipeWarning": "Isso apagará permanentemente todos os dados existentes neste navegador. Certifique-se de já ter exportado um backup.",
+      "confirmPassphrasePlaceholder": "Confirme a frase-senha",
+      "confirmAction": "Criar cofre",
+      "cancelAction": "Cancelar"
+    },
+    "importWipeDialog": {
+      "title": "Substituir dados existentes?",
+      "description": "Importar vai apagar permanentemente todos os dados existentes neste navegador e substituí-los pelo arquivo importado.",
+      "confirmAction": "Continuar",
+      "cancelAction": "Cancelar"
+    }
+  },
+  "errors": {
+    "title": "Algo não está certo",
+    "passphraseLength": "A frase-senha deve ter entre 8 e 16 caracteres.",
+    "passphraseMismatch": "As frases-senha não coincidem.",
+    "wrongPassphrase": "Essa frase-senha não corresponde aos dados deste cofre.",
+    "malformedFile": "Este arquivo não é uma exportação de cofre válida.",
+    "ok": "OK"
+  },
+  "about": {
+    "heading": "Sobre",
+    "description": "Uma ferramenta de gestão pessoal para acompanhar e organizar o dia a dia — compromissos, notas, planos, gastos e investimentos. Local-first e criptografado: seus dados ficam na sua máquina, nunca em um servidor.",
+    "githubLabel": "Ver no GitHub"
+  }
+}

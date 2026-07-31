@@ -4,7 +4,6 @@ import { sections } from '@/sections'
 import { useUiStore } from '@/store/ui-store'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { BrandMark } from './brand-mark'
 
 export function ActivityBar() {
   const { t } = useTranslation()
@@ -27,12 +26,20 @@ export function ActivityBar() {
             aria-pressed={isActive}
             onClick={() => selectSection(section.id)}
             className={cn(
-              'relative size-[3.375rem] text-sidebar-foreground/70 hover:text-sidebar-foreground',
-              isActive && 'bg-sidebar-accent text-sidebar-foreground',
+              'relative size-[3.375rem]',
+              section.brand
+                ? 'rounded-lg bg-brand text-brand-foreground hover:bg-brand/90 hover:text-brand-foreground'
+                : 'text-sidebar-foreground/70 hover:text-sidebar-foreground',
+              isActive && !section.brand && 'bg-sidebar-accent text-sidebar-foreground',
             )}
           >
             {isActive && (
-              <span className="absolute inset-y-1.5 left-0 w-0.5 rounded-full bg-brand" />
+              <span
+                className={cn(
+                  'absolute inset-y-1.5 left-0 w-0.5 rounded-full',
+                  section.brand ? 'bg-brand-foreground' : 'bg-brand',
+                )}
+              />
             )}
             <section.icon className="size-[1.875rem]" />
           </Button>
@@ -44,7 +51,6 @@ export function ActivityBar() {
 
   return (
     <div className="flex h-full w-18 shrink-0 flex-col items-center border-r bg-sidebar py-2">
-      <BrandMark />
       <nav className="flex flex-col items-center gap-1">
         {sections.filter((s) => !s.pinned).map(renderSectionButton)}
       </nav>

@@ -1,0 +1,44 @@
+{
+  "section": {
+    "label": "Vault"
+  },
+  "items": {
+    "getStarted": "Get Started",
+    "about": "About"
+  },
+  "getStarted": {
+    "heading": "Get Started",
+    "passphrasePlaceholder": "Passphrase",
+    "newButton": "New",
+    "importButton": "Import",
+    "continueButton": "Continue",
+    "exportButton": "Export",
+    "fileDescription": "Personal Management Vault",
+    "newDialog": {
+      "title": "Create a new vault",
+      "wipeWarning": "This will permanently delete all existing data in this browser. Make sure you've exported a backup first.",
+      "confirmPassphrasePlaceholder": "Confirm passphrase",
+      "confirmAction": "Create vault",
+      "cancelAction": "Cancel"
+    },
+    "importWipeDialog": {
+      "title": "Replace existing data?",
+      "description": "Importing will permanently delete all existing data in this browser and replace it with the imported file.",
+      "confirmAction": "Continue",
+      "cancelAction": "Cancel"
+    }
+  },
+  "errors": {
+    "title": "Something's not right",
+    "passphraseLength": "Passphrase must be between 8 and 16 characters.",
+    "passphraseMismatch": "Passphrases do not match.",
+    "wrongPassphrase": "That passphrase doesn't match this vault's data.",
+    "malformedFile": "This file isn't a valid vault export.",
+    "ok": "OK"
+  },
+  "about": {
+    "heading": "About",
+    "description": "A personal management tool to track, update, and stay on top of day-to-day life — obligations, notes, plans, spending, and investments. Local-first and encrypted: your data stays on your machine, never a server.",
+    "githubLabel": "View on GitHub"
+  }
+}

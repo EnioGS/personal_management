@@ -18,4 +18,6 @@ export interface AppSection {
   items: AppSectionItem[]
   /** Rendered at the bottom of the activity bar, visually separated (e.g. Settings). */
   pinned?: boolean
+  /** Rendered as a colored logo-style box instead of a plain icon (see activity-bar.tsx). */
+  brand?: boolean
 }

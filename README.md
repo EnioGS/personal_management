@@ -27,6 +27,7 @@ Two things it optimizes for:
 │   │   ├── sections/          # feature registry — the extensibility mechanism
 │   │   │   ├── types.ts
 │   │   │   ├── index.ts       # aggregates all sections into one array
+│   │   │   ├── vault/         # brand-mark section: Get Started (unlock/new/import/export) + About
 │   │   │   ├── notes/         # notes.section.ts + panel/store/secure-db + locales/
 │   │   │   ├── finances/      # spending/income — charts + editable table + CSV, per option
 │   │   │   ├── investments/   # variable/fixed income (transaction ledger) + contributions
@@ -44,6 +45,8 @@ Two things it optimizes for:
 │   │   │   ├── csv.ts                    # CSV export/import + validation
 │   │   │   ├── aggregations.ts           # chart data-shaping (buckets, running totals)
 │   │   │   ├── current-value.ts          # investment position value from transaction history
+│   │   │   ├── vault-file.ts             # whole-vault export/import (.pmvault), passphrase verification
+│   │   │   ├── file-io.ts                # save-file picker (Chromium) with a download fallback
 │   │   │   ├── utils.ts       # cn() helper (shadcn convention)
 │   │   │   └── locale.ts      # Locale type, storage key, Intl locale-tag mapping
 │   │   ├── i18n.ts            # i18next init — registers every namespace's resources
@@ -86,7 +89,13 @@ Two things it optimizes for:
 - Dockerfiles colocated per component, not a shared `deploy/`.
 - Two-level, VSCode-style navigation as a data-driven registry
   (`src/sections/`), replacing shadcn/ui's `Sidebar`.
-- Reskinning is two files — `brand-mark.tsx` + two CSS tokens.
+- Reskinning is two files — `vault/vault.section.ts` (icon) + two CSS tokens.
+- The brand-mark icon is a real, clickable section (`vault`), not decoration
+  — it's the default landing section, holding vault unlock/setup (Get
+  Started) and project info (About).
+- Whole-vault backup is one encrypted file (`.pmvault`), not per-table CSV —
+  since every row is already encrypted, exporting the raw rows needs no
+  extra encryption layer to satisfy "only readable with the passphrase."
 - No backend by design — data stays local-first or in private storage the
   user controls, not a third-party-hosted service.
 - Encrypted storage is one generic factory (`lib/secure-store/`) plus a
