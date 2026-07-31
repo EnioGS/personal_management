@@ -34,9 +34,9 @@
   --sidebar-ring: oklch(0.708 0 0);
 
   /* Brand identity — the only "personality" color in an otherwise neutral palette.
-     Reskinning this template for a specific product: change these two tokens
-     (here and in .dark below) and swap the icon in components/layout/brand-mark.tsx. */
-  --brand: oklch(0.55 0.2 264);
+     Reskinning this: change these two tokens (here and in .dark below) and
+     swap the icon in components/layout/brand-mark.tsx. */
+  --brand: oklch(0.55 0.09 150);
   --brand-foreground: oklch(0.985 0 0);
 }
 
@@ -69,7 +69,7 @@
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
 
-  --brand: oklch(0.65 0.2 264);
+  --brand: oklch(0.65 0.1 150);
   --brand-foreground: oklch(0.145 0 0);
 }
 

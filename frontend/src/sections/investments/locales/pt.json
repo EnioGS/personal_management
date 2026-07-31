@@ -1,0 +1,22 @@
+{
+  "section": {
+    "label": "Investimentos"
+  },
+  "items": {
+    "overview": "Visão Geral",
+    "variableIncome": "Renda Variável",
+    "fixedIncome": "Renda Fixa",
+    "contributions": "Aportes"
+  },
+  "columns": {
+    "date": "Data",
+    "asset": "Ativo",
+    "type": "Tipo",
+    "quantity": "Quantidade",
+    "price": "Preço",
+    "note": "Observação",
+    "destination": "Destino",
+    "amount": "Valor",
+    "total": "Total"
+  }
+}

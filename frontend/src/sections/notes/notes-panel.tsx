@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { LockButton, UnlockGate } from '@/components/layout/unlock-gate'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -9,48 +10,24 @@ import { useLocaleStore } from '@/store/locale-store'
 import { useNotesStore } from './notes-store'
 
 export function NotesPanel() {
+  return (
+    <UnlockGate>
+      <NotesContent />
+    </UnlockGate>
+  )
+}
+
+function NotesContent() {
   const { t } = useTranslation(['notes', 'common'])
   const locale = useLocaleStore((s) => s.locale)
-  const { passphrase, notes, isLoading, unlock, lock, addNote, deleteNote } = useNotesStore()
-  const [passphraseInput, setPassphraseInput] = useState('')
+  const { items: notes, isLoading, addItem, deleteItem } = useNotesStore()
   const [draft, setDraft] = useState('')
-
-  if (!passphrase) {
-    return (
-      <div className="flex h-full flex-col items-center justify-center gap-4 p-8 text-center">
-        <div>
-          <h2 className="text-lg font-medium">{t('unlock.title')}</h2>
-          <p className="text-muted-foreground text-sm">{t('unlock.description')}</p>
-        </div>
-        <form
-          className="flex w-full max-w-sm gap-2"
-          onSubmit={(e) => {
-            e.preventDefault()
-            if (passphraseInput) void unlock(passphraseInput)
-          }}
-        >
-          <Input
-            type="password"
-            placeholder={t('unlock.passphrasePlaceholder')}
-            value={passphraseInput}
-            onChange={(e) => setPassphraseInput(e.target.value)}
-            autoFocus
-          />
-          <Button type="submit" disabled={!passphraseInput}>
-            {t('unlock.button')}
-          </Button>
-        </form>
-      </div>
-    )
-  }
 
   return (
     <div className="flex h-full flex-col gap-4 p-4">
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-medium">{t('heading')}</h2>
-        <Button variant="ghost" size="sm" onClick={lock}>
-          {t('lockButton')}
-        </Button>
+        <LockButton />
       </div>
 
       <form
@@ -58,7 +35,7 @@ export function NotesPanel() {
         onSubmit={(e) => {
           e.preventDefault()
           if (!draft.trim()) return
-          void addNote(draft.trim())
+          void addItem({ text: draft.trim() })
           setDraft('')
         }}
       >
@@ -86,7 +63,7 @@ export function NotesPanel() {
                   {new Date(note.createdAt).toLocaleString(INTL_LOCALE_TAG[locale])}
                 </p>
               </div>
-              <Button variant="ghost" size="icon" onClick={() => void deleteNote(note.id)}>
+              <Button variant="ghost" size="icon" onClick={() => void deleteItem(note.id)}>
                 <Trash2 className="size-4" />
               </Button>
             </div>

@@ -16,4 +16,6 @@ export interface AppSection {
   labelKey: string
   icon: LucideIcon
   items: AppSectionItem[]
+  /** Rendered at the bottom of the activity bar, visually separated (e.g. Settings). */
+  pinned?: boolean
 }

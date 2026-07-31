@@ -5,14 +5,7 @@
   "items": {
     "allNotes": "Todas as Notas"
   },
-  "unlock": {
-    "title": "Desbloqueie suas notas",
-    "description": "As notas são criptografadas (AES-GCM) e armazenadas somente no IndexedDB deste navegador.",
-    "passphrasePlaceholder": "Frase-senha",
-    "button": "Desbloquear"
-  },
   "heading": "Notas",
-  "lockButton": "Bloquear",
   "notePlaceholder": "Escreva uma nota…",
   "addButton": "Adicionar",
   "emptyState": "Nenhuma nota ainda."

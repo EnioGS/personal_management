@@ -1,0 +1,22 @@
+{
+  "section": {
+    "label": "Investments"
+  },
+  "items": {
+    "overview": "Overview",
+    "variableIncome": "Variable Income",
+    "fixedIncome": "Fixed Income",
+    "contributions": "Contributions"
+  },
+  "columns": {
+    "date": "Date",
+    "asset": "Asset",
+    "type": "Type",
+    "quantity": "Quantity",
+    "price": "Price",
+    "note": "Note",
+    "destination": "Destination",
+    "amount": "Amount",
+    "total": "Total"
+  }
+}

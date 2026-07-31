@@ -1,3 +1,22 @@
 {
-  "loading": "Loading…"
+  "loading": "Loading…",
+  "comingSoon": "Coming soon.",
+  "unlock": {
+    "title": "Unlock your data",
+    "description": "Your data is encrypted (AES-GCM) and stored only in this browser's IndexedDB.",
+    "passphrasePlaceholder": "Passphrase",
+    "button": "Unlock",
+    "lockButton": "Lock"
+  },
+  "table": {
+    "add": "Add",
+    "delete": "Delete",
+    "noRows": "No rows yet.",
+    "exportCsv": "Export CSV",
+    "importCsv": "Import CSV",
+    "importDescription": "Upload a CSV file matching this table's columns. Rows are validated before import.",
+    "importValidCount": "{{count}} row(s) ready to import.",
+    "importRowError": "Row {{row}}: {{message}}",
+    "importConfirm": "Import {{count}} row(s)"
+  }
 }

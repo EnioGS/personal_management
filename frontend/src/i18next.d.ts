@@ -1,5 +1,7 @@
 import 'i18next'
 import type common from '@/locales/common/en.json'
+import type finances from '@/sections/finances/locales/en.json'
+import type investments from '@/sections/investments/locales/en.json'
 import type notes from '@/sections/notes/locales/en.json'
 import type settings from '@/sections/settings/locales/en.json'
 
@@ -11,6 +13,8 @@ declare module 'i18next' {
     resources: {
       common: typeof common
       notes: typeof notes
+      finances: typeof finances
+      investments: typeof investments
       settings: typeof settings
     }
   }

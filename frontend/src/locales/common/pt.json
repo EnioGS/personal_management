@@ -1,3 +1,22 @@
 {
-  "loading": "Carregando…"
+  "loading": "Carregando…",
+  "comingSoon": "Em breve.",
+  "unlock": {
+    "title": "Desbloqueie seus dados",
+    "description": "Seus dados são criptografados (AES-GCM) e armazenados somente no IndexedDB deste navegador.",
+    "passphrasePlaceholder": "Frase-senha",
+    "button": "Desbloquear",
+    "lockButton": "Bloquear"
+  },
+  "table": {
+    "add": "Adicionar",
+    "delete": "Excluir",
+    "noRows": "Nenhum registro ainda.",
+    "exportCsv": "Exportar CSV",
+    "importCsv": "Importar CSV",
+    "importDescription": "Envie um arquivo CSV com as colunas desta tabela. As linhas são validadas antes da importação.",
+    "importValidCount": "{{count}} linha(s) pronta(s) para importar.",
+    "importRowError": "Linha {{row}}: {{message}}",
+    "importConfirm": "Importar {{count}} linha(s)"
+  }
 }

@@ -1,0 +1,17 @@
+{
+  "section": {
+    "label": "Finanças"
+  },
+  "items": {
+    "overview": "Visão Geral",
+    "spending": "Gastos",
+    "income": "Receitas"
+  },
+  "columns": {
+    "date": "Data",
+    "category": "Categoria",
+    "source": "Origem",
+    "amount": "Valor",
+    "note": "Observação"
+  }
+}

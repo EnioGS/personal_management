@@ -1,0 +1,17 @@
+{
+  "section": {
+    "label": "Finances"
+  },
+  "items": {
+    "overview": "Overview",
+    "spending": "Spending",
+    "income": "Income"
+  },
+  "columns": {
+    "date": "Date",
+    "category": "Category",
+    "source": "Source",
+    "amount": "Amount",
+    "note": "Note"
+  }
+}

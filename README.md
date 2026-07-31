@@ -20,19 +20,30 @@ Two things it optimizes for:
 ├── frontend/                  # Vite + React + TypeScript + Tailwind + shadcn/ui
 │   ├── src/
 │   │   ├── components/
-│   │   │   ├── ui/            # shadcn/ui primitives (button, resizable, tooltip, ...)
-│   │   │   └── layout/        # activity-bar / secondary-bar / app-shell / brand-mark
+│   │   │   ├── ui/            # shadcn/ui primitives (button, resizable, table, chart, ...)
+│   │   │   ├── charts/        # thin Recharts wrappers (line/bar/pie) + the shared color palette
+│   │   │   ├── data-table/    # editable table + CSV import/export, schema-driven
+│   │   │   └── layout/        # activity-bar / secondary-bar / app-shell / chart-table-panel / unlock-gate
 │   │   ├── sections/          # feature registry — the extensibility mechanism
 │   │   │   ├── types.ts
 │   │   │   ├── index.ts       # aggregates all sections into one array
 │   │   │   ├── notes/         # notes.section.ts + panel/store/secure-db + locales/
+│   │   │   ├── finances/      # spending/income — charts + editable table + CSV, per option
+│   │   │   ├── investments/   # variable/fixed income (transaction ledger) + contributions
 │   │   │   └── settings/      # settings.section.ts + appearance/general panels + locales/
 │   │   ├── store/
 │   │   │   ├── ui-store.ts     # active section/item, secondary-bar collapsed state
+│   │   │   ├── vault-store.ts  # shared unlock passphrase — one unlock for every encrypted section
 │   │   │   ├── theme-store.ts  # light/dark/system theme
 │   │   │   └── locale-store.ts # pt/en language
 │   │   ├── locales/common/    # shared strings not owned by one section
 │   │   ├── lib/
+│   │   │   ├── crypto/envelope.ts        # PBKDF2 → AES-GCM primitives, shared by every section
+│   │   │   ├── secure-store/             # generic encrypted-table + Zustand-store factories
+│   │   │   ├── table-schema.ts           # column schema driving tables, CSV, and add-row forms
+│   │   │   ├── csv.ts                    # CSV export/import + validation
+│   │   │   ├── aggregations.ts           # chart data-shaping (buckets, running totals)
+│   │   │   ├── current-value.ts          # investment position value from transaction history
 │   │   │   ├── utils.ts       # cn() helper (shadcn convention)
 │   │   │   └── locale.ts      # Locale type, storage key, Intl locale-tag mapping
 │   │   ├── i18n.ts            # i18next init — registers every namespace's resources
@@ -61,7 +72,10 @@ Two things it optimizes for:
 - **Frontend**: Vite + React + TypeScript + Tailwind CSS v4 + shadcn/ui —
   fast to build with, sober default look.
 - **Local-first encrypted storage**: Dexie (IndexedDB) + Web Crypto + Zustand
-  — for client-side data that should stay off any backend.
+  — for client-side data that should stay off any backend. One shared
+  passphrase unlocks every encrypted section (see [Decisions](#decisions)).
+- **Charts**: Recharts via shadcn/ui's `chart` wrapper; `@tanstack/react-table`
+  for editable data tables; `papaparse` for CSV import/export.
 - **i18n**: react-i18next, default Portuguese, namespace-per-section.
 - **Testing**: Vitest, colocated with the code it covers.
 - **Containerization**: Docker, one multi-stage Dockerfile (dev / production
@@ -75,6 +89,9 @@ Two things it optimizes for:
 - Reskinning is two files — `brand-mark.tsx` + two CSS tokens.
 - No backend by design — data stays local-first or in private storage the
   user controls, not a third-party-hosted service.
+- Encrypted storage is one generic factory (`lib/secure-store/`) plus a
+  shared vault passphrase (`store/vault-store.ts`), not per-section crypto —
+  every new section that needs encrypted local data reuses both.
 - CI intentionally minimal: lint + test + build, frontend only for now.
 - Agent commits carry no AI attribution.
 - Dual deployment (Docker anywhere + GitHub Pages) from one build output.
