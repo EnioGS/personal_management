@@ -1,6 +1,7 @@
-import { useRef, useState, type PointerEvent } from 'react'
-import { GripVertical, Trash2 } from 'lucide-react'
+import { useRef, useState, type ChangeEvent, type DragEvent, type PointerEvent } from 'react'
+import { GripVertical, Paperclip, Trash2, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { readAttachedFile } from '@/lib/chat-attachments'
 import { cn } from '@/lib/utils'
 import { useChatPanelStore } from '@/store/chat-panel-store'
 import { useChatStore } from '@/store/chat-store'
@@ -34,13 +35,54 @@ export function ChatPanel() {
   const isSending = useChatStore((s) => s.isSending)
   const sendMessage = useChatStore((s) => s.sendMessage)
   const clearMessages = useChatStore((s) => s.clearMessages)
+  const attachments = useChatStore((s) => s.attachments)
+  const addAttachment = useChatStore((s) => s.addAttachment)
+  const removeAttachment = useChatStore((s) => s.removeAttachment)
+  const pushError = useChatStore((s) => s.pushError)
   const isUnlocked = useVaultStore((s) => s.passphrase !== null)
 
   const [draft, setDraft] = useState('')
   const [dragOffset, setDragOffset] = useState<number | null>(null)
+  const [isDraggingFileOver, setIsDraggingFileOver] = useState(false)
   const dragStartX = useRef(0)
   const dragStartOpen = useRef(isOpen)
   const didDrag = useRef(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  async function handleFilesSelected(files: FileList | File[]) {
+    for (const file of Array.from(files)) {
+      const result = await readAttachedFile(file)
+      if ('error' in result) pushError(result.error)
+      else addAttachment(result.attachment)
+    }
+  }
+
+  function handleFileInputChange(e: ChangeEvent<HTMLInputElement>) {
+    // `e.target.files` is a live FileList — snapshot it into a real array before
+    // resetting `value` (needed so re-selecting the same file still fires onChange),
+    // otherwise the reset empties the very list we're about to read.
+    const files = Array.from(e.target.files ?? [])
+    e.target.value = ''
+    if (files.length > 0) void handleFilesSelected(files)
+  }
+
+  function handleDragOver(e: DragEvent<HTMLDivElement>) {
+    if (!isUnlocked) return
+    e.preventDefault()
+    setIsDraggingFileOver(true)
+  }
+
+  function handleDragLeave(e: DragEvent<HTMLDivElement>) {
+    if (e.currentTarget.contains(e.relatedTarget as Node | null)) return
+    setIsDraggingFileOver(false)
+  }
+
+  function handleDrop(e: DragEvent<HTMLDivElement>) {
+    if (!isUnlocked) return
+    e.preventDefault()
+    setIsDraggingFileOver(false)
+    if (e.dataTransfer.files.length > 0) void handleFilesSelected(e.dataTransfer.files)
+  }
 
   const closedTranslate = PANEL_WIDTH - HANDLE_WIDTH
 
@@ -120,7 +162,19 @@ export function ChatPanel() {
           <GripVertical className={cn('size-4', hasUnread ? 'text-brand-foreground' : 'text-sidebar-foreground/70')} />
         </div>
 
-        <div className="ml-7 flex h-full flex-1 flex-col border-l bg-sidebar shadow-lg" onClick={markInteracted}>
+        <div
+          className="relative ml-7 flex h-full flex-1 flex-col border-l bg-sidebar shadow-lg"
+          onClick={markInteracted}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+        >
+          {isDraggingFileOver && (
+            <div className="border-brand bg-brand/10 text-brand pointer-events-none absolute inset-0 z-20 m-2 flex items-center justify-center rounded-md border-2 border-dashed text-sm font-medium">
+              {t('panel.dropHint')}
+            </div>
+          )}
+
           <div className="flex items-center justify-between border-b p-3">
             <h2 className="text-sm font-medium">{t('panel.heading')}</h2>
             <Button
@@ -135,7 +189,7 @@ export function ChatPanel() {
             </Button>
           </div>
 
-          <ScrollArea className="flex-1">
+          <ScrollArea className="min-h-0 flex-1">
             <div className="flex flex-col gap-2 p-3">
               {messages.length === 0 && <p className="text-muted-foreground text-sm">{t('panel.emptyState')}</p>}
               {messages.map((message) => (
@@ -157,25 +211,65 @@ export function ChatPanel() {
           </ScrollArea>
 
           {isUnlocked ? (
-            <form
-              className="flex gap-2 border-t p-3"
-              onSubmit={(e) => {
-                e.preventDefault()
-                if (!draft.trim() || isSending) return
-                void sendMessage(draft.trim())
-                setDraft('')
-              }}
-            >
-              <Input
-                placeholder={t('panel.inputPlaceholder')}
-                value={draft}
-                onChange={(e) => setDraft(e.target.value)}
-                disabled={isSending}
-              />
-              <Button type="submit" disabled={!draft.trim() || isSending}>
-                {t('panel.send')}
-              </Button>
-            </form>
+            <>
+              {attachments.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 border-t px-3 pt-3">
+                  {attachments.map((attachment) => (
+                    <span
+                      key={attachment.id}
+                      className="bg-muted flex items-center gap-1 rounded-full py-1 pr-1 pl-2.5 text-xs"
+                    >
+                      {attachment.name}
+                      <button
+                        type="button"
+                        aria-label={t('panel.removeAttachment')}
+                        onClick={() => removeAttachment(attachment.id)}
+                        className="hover:bg-background/60 rounded-full p-0.5"
+                      >
+                        <X className="size-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              <form
+                className={cn('flex gap-2 p-3', attachments.length === 0 && 'border-t')}
+                onSubmit={(e) => {
+                  e.preventDefault()
+                  if (!draft.trim() || isSending) return
+                  void sendMessage(draft.trim())
+                  setDraft('')
+                }}
+              >
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".txt,.md"
+                  multiple
+                  className="hidden"
+                  onChange={handleFileInputChange}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  aria-label={t('panel.attachButton')}
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <Paperclip className="size-4" />
+                </Button>
+                <Input
+                  placeholder={t('panel.inputPlaceholder')}
+                  value={draft}
+                  onChange={(e) => setDraft(e.target.value)}
+                  disabled={isSending}
+                />
+                <Button type="submit" disabled={!draft.trim() || isSending}>
+                  {t('panel.send')}
+                </Button>
+              </form>
+            </>
           ) : (
             <p className="text-muted-foreground border-t p-3 text-sm">{t('panel.locked')}</p>
           )}
