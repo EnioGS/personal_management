@@ -83,82 +83,92 @@ export function ChatPanel() {
   const translate = dragOffset !== null ? clamp(baseTranslate + dragOffset, 0, closedTranslate) : baseTranslate
 
   return (
-    <div
-      className={cn('fixed inset-y-0 right-0 z-40 flex', dragOffset === null && 'transition-transform duration-200 ease-out')}
-      style={{ width: PANEL_WIDTH, transform: `translateX(${translate}px)` }}
-    >
+    // Outer window is fixed at exactly PANEL_WIDTH, right at the screen edge, and never
+    // itself moves — `overflow-hidden` here is what actually clips the sliding content
+    // below to this box. Relying on the browser to clip a `fixed` element at the
+    // viewport edge isn't a real guarantee (the earlier table-panel bug was exactly
+    // this class of issue), so the boundary is explicit instead of assumed.
+    <div className="fixed inset-y-0 right-0 z-40 overflow-hidden" style={{ width: PANEL_WIDTH }}>
       <div
-        role="button"
-        tabIndex={0}
-        aria-label={t('panel.toggle')}
-        aria-pressed={isOpen}
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        onKeyDown={(e) => {
-          if (e.key !== 'Enter' && e.key !== ' ') return
-          e.preventDefault()
-          markInteracted()
-          if (isOpen) close()
-          else open()
-        }}
         className={cn(
-          'absolute top-1/2 left-0 z-10 flex h-32 w-7 -translate-y-1/2 cursor-grab touch-none items-center justify-center rounded-l-md border border-r-0 select-none active:cursor-grabbing',
-          hasUnread ? 'bg-brand' : 'bg-border',
+          'absolute inset-y-0 left-0 flex',
+          dragOffset === null && 'transition-transform duration-200 ease-out',
         )}
+        style={{ width: PANEL_WIDTH, transform: `translateX(${translate}px)` }}
       >
-        <GripVertical className={cn('size-4', hasUnread ? 'text-brand-foreground' : 'text-sidebar-foreground/70')} />
-      </div>
-
-      <div className="flex h-full w-full flex-col border-l bg-sidebar shadow-lg" onClick={markInteracted}>
-        <div className="border-b p-3">
-          <h2 className="text-sm font-medium">{t('panel.heading')}</h2>
+        <div
+          role="button"
+          tabIndex={0}
+          aria-label={t('panel.toggle')}
+          aria-pressed={isOpen}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onKeyDown={(e) => {
+            if (e.key !== 'Enter' && e.key !== ' ') return
+            e.preventDefault()
+            markInteracted()
+            if (isOpen) close()
+            else open()
+          }}
+          className={cn(
+            'absolute top-1/2 left-0 z-10 flex h-32 w-7 -translate-y-1/2 cursor-grab touch-none items-center justify-center rounded-l-md border border-r-0 select-none active:cursor-grabbing',
+            hasUnread ? 'bg-brand' : 'bg-border',
+          )}
+        >
+          <GripVertical className={cn('size-4', hasUnread ? 'text-brand-foreground' : 'text-sidebar-foreground/70')} />
         </div>
 
-        <ScrollArea className="flex-1">
-          <div className="flex flex-col gap-2 p-3">
-            {messages.length === 0 && <p className="text-muted-foreground text-sm">{t('panel.emptyState')}</p>}
-            {messages.map((message) => (
-              <div
-                key={message.id}
-                className={cn(
-                  'max-w-[85%] rounded-md px-3 py-2 text-sm',
-                  message.isError
-                    ? 'self-start bg-destructive/10 text-destructive'
-                    : message.role === 'user'
-                      ? 'self-end bg-brand text-brand-foreground'
-                      : 'self-start bg-muted',
-                )}
-              >
-                {message.content}
-              </div>
-            ))}
+        <div className="ml-7 flex h-full flex-1 flex-col border-l bg-sidebar shadow-lg" onClick={markInteracted}>
+          <div className="border-b p-3">
+            <h2 className="text-sm font-medium">{t('panel.heading')}</h2>
           </div>
-        </ScrollArea>
 
-        {isUnlocked ? (
-          <form
-            className="flex gap-2 border-t p-3"
-            onSubmit={(e) => {
-              e.preventDefault()
-              if (!draft.trim() || isSending) return
-              void sendMessage(draft.trim())
-              setDraft('')
-            }}
-          >
-            <Input
-              placeholder={t('panel.inputPlaceholder')}
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              disabled={isSending}
-            />
-            <Button type="submit" disabled={!draft.trim() || isSending}>
-              {t('panel.send')}
-            </Button>
-          </form>
-        ) : (
-          <p className="text-muted-foreground border-t p-3 text-sm">{t('panel.locked')}</p>
-        )}
+          <ScrollArea className="flex-1">
+            <div className="flex flex-col gap-2 p-3">
+              {messages.length === 0 && <p className="text-muted-foreground text-sm">{t('panel.emptyState')}</p>}
+              {messages.map((message) => (
+                <div
+                  key={message.id}
+                  className={cn(
+                    'max-w-[85%] rounded-md px-3 py-2 text-sm',
+                    message.isError
+                      ? 'self-start bg-destructive/10 text-destructive'
+                      : message.role === 'user'
+                        ? 'self-end bg-brand text-brand-foreground'
+                        : 'self-start bg-muted',
+                  )}
+                >
+                  {message.content}
+                </div>
+              ))}
+            </div>
+          </ScrollArea>
+
+          {isUnlocked ? (
+            <form
+              className="flex gap-2 border-t p-3"
+              onSubmit={(e) => {
+                e.preventDefault()
+                if (!draft.trim() || isSending) return
+                void sendMessage(draft.trim())
+                setDraft('')
+              }}
+            >
+              <Input
+                placeholder={t('panel.inputPlaceholder')}
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                disabled={isSending}
+              />
+              <Button type="submit" disabled={!draft.trim() || isSending}>
+                {t('panel.send')}
+              </Button>
+            </form>
+          ) : (
+            <p className="text-muted-foreground border-t p-3 text-sm">{t('panel.locked')}</p>
+          )}
+        </div>
       </div>
     </div>
   )
