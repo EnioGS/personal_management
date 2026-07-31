@@ -1,12 +1,15 @@
-# Web Project Template
+# Personal Management
 
-A reusable starting point for personal web projects: a frontend, a backend,
-and the glue (Docker Compose, env config, CI) to run them together. Meant to
-be cloned/forked per-project, then adapted — not a framework you depend on.
+A personal management tool: a frontend and the glue (Docker Compose, env
+config, CI) to track, update, and stay on top of day-to-day life —
+obligations, notes, future plans, spending/credit cards/investments, and
+other similar things. No backend by design — data stays local-first (see
+[Backend](#backend)).
 
 Two things it optimizes for:
-- **Flexible/quick to adapt** — minimal opinions outside the frontend, so a
-  new project can swap pieces without fighting the template.
+- **Extensible by area** — each aspect of personal life (notes, finances,
+  plans, obligations, ...) plugs in as a self-contained section, so new
+  areas can be added without fighting the architecture.
 - **Sober design language** — a neutral, VSCode-inspired visual structure
   (icon sidebar, panels, no flashy color) rather than a "branded" UI kit look.
 
@@ -40,7 +43,7 @@ Two things it optimizes for:
 │   ├── nginx.conf             # serves the production static build
 │   ├── components.json        # shadcn/ui config (style, aliases, neutral base color)
 │   └── .nvmrc                 # pinned Node version
-├── backend/                    # empty — stack intentionally not chosen yet
+├── backend/                    # empty — no backend by design, see adr/0009
 ├── adr/                        # architecture decision records (Nygard format)
 ├── .github/workflows/
 │   ├── frontend-ci.yml        # lint + test + build on push/PR touching frontend/
@@ -56,34 +59,25 @@ Two things it optimizes for:
 ## Stack
 
 - **Frontend**: Vite + React + TypeScript + Tailwind CSS v4 + shadcn/ui —
-  fast to build with, sober default look. [adr/0001](adr/0001-frontend-stack-vite-react-tailwind-shadcn.md)
+  fast to build with, sober default look.
 - **Local-first encrypted storage**: Dexie (IndexedDB) + Web Crypto + Zustand
   — for client-side data that should stay off any backend.
-  [adr/0002](adr/0002-local-first-encrypted-storage.md)
 - **i18n**: react-i18next, default Portuguese, namespace-per-section.
-  [adr/0003](adr/0003-i18n-react-i18next.md)
 - **Testing**: Vitest, colocated with the code it covers.
-  [adr/0004](adr/0004-testing-vitest.md)
 - **Containerization**: Docker, one multi-stage Dockerfile (dev / production
-  via nginx). [adr/0005](adr/0005-docker-multistage-nginx.md)
+  via nginx).
 
 ## Decisions
 
 - Dockerfiles colocated per component, not a shared `deploy/`.
-  [adr/0006](adr/0006-colocate-dockerfiles-per-component.md)
 - Two-level, VSCode-style navigation as a data-driven registry
   (`src/sections/`), replacing shadcn/ui's `Sidebar`.
-  [adr/0007](adr/0007-two-level-navigation-registry.md)
 - Reskinning is two files — `brand-mark.tsx` + two CSS tokens.
-  [adr/0008](adr/0008-reskinning-two-files.md)
-- Backend stack deferred on purpose.
-  [adr/0009](adr/0009-backend-stack-deferred.md)
+- No backend by design — data stays local-first or in private storage the
+  user controls, not a third-party-hosted service.
 - CI intentionally minimal: lint + test + build, frontend only for now.
-  [adr/0010](adr/0010-ci-minimal-scope.md)
 - Agent commits carry no AI attribution.
-  [adr/0011](adr/0011-agent-commit-convention.md)
 - Dual deployment (Docker anywhere + GitHub Pages) from one build output.
-  [adr/0012](adr/0012-dual-deployment-docker-github-pages.md)
 
 See [adr/](adr/) for the full reasoning behind these and the stack choices
 above.
@@ -101,9 +95,13 @@ Tests: `npm run test` (Vitest, also part of CI).
 
 ## Backend
 
-Not started. Once a stack is chosen: add `backend/Dockerfile` (co-located,
-matching the frontend's layout), then uncomment the `backend` service block
-in `docker-compose.yml`.
+None by design. Data stays local-first — encrypted client-side storage (see
+Stack above) — or, if remote persistence is ever needed, targets private
+storage the user controls (self-hosted, private cloud bucket) rather than a
+conventional application backend. See
+[adr/0009](adr/0009-no-backend-privacy-first.md). `backend/` stays empty and
+the `backend` service in `docker-compose.yml` stays commented out unless
+that changes.
 
 ## Docker Compose
 
@@ -117,7 +115,7 @@ docker compose up --build
 
 ## Deployment
 
-Two independent paths — see [adr/0012](adr/0012-dual-deployment-docker-github-pages.md):
+Two independent paths:
 
 - **Docker, anywhere Docker runs**:
   ```bash
@@ -133,17 +131,10 @@ Two independent paths — see [adr/0012](adr/0012-dual-deployment-docker-github-
 ## Environment variables
 
 See `.env.example` — `BUILD_TARGET`/`FRONTEND_CONTAINER_PORT` (Docker stage
-selection), `FRONTEND_PORT`, `BACKEND_PORT`, `DATABASE_URL` placeholder, etc.
-Copy it to `.env`, which is gitignored.
+selection), `FRONTEND_PORT`, etc. Copy it to `.env`, which is gitignored.
 
 ## License
 
-[GNU AGPL-3.0](LICENSE) — see [adr/0013](adr/0013-license-agpl-3-0.md) for
-the reasoning.
+[GNU AGPL-3.0](LICENSE).
 
 Copyright (C) 2026 EnioGS
-
-## Open items / next steps
-
-- Pick a backend stack, add `backend/Dockerfile`, restore the compose service.
-- Extend CI once the backend exists.

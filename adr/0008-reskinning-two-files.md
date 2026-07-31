@@ -6,8 +6,7 @@ Accepted
 
 ## Context
 
-As a template meant to be reused across many projects, adapting the visual
-identity (logo mark, brand color) for a specific product needs to be trivial
+Adapting the visual identity (logo mark, brand color) needs to be trivial
 and hard to get wrong by missing a spot.
 
 ## Decision

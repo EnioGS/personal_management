@@ -1,6 +1,6 @@
 services:
   frontend:
-    image: template_web-frontend-${BUILD_TARGET:-dev}
+    image: personal_management-frontend-${BUILD_TARGET:-dev}
     build:
       context: ./frontend
       dockerfile: Dockerfile
@@ -16,7 +16,8 @@ services:
       - ./frontend:/app
       - /app/node_modules
 
-  # backend: stack not chosen yet. Add backend/Dockerfile, then uncomment.
+  # backend: none by design (see adr/0009-no-backend-privacy-first.md).
+  # Left here only in case a private-storage sync service is ever needed.
   # backend:
   #   build:
   #     context: ./backend

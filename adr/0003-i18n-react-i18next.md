@@ -6,11 +6,11 @@ Accepted
 
 ## Context
 
-The template needs to support multiple languages (initially English and
-Portuguese, default Portuguese) in a way that's convenient to expand as the
-template is used in real projects, using the standard approach the industry
-uses for React apps — rather than reinventing pluralization, interpolation,
-and translator-tooling compatibility from scratch.
+The app needs to support multiple languages (initially English and
+Portuguese, default Portuguese) in a way that's convenient to expand as it
+grows, using the standard approach the industry uses for React apps —
+rather than reinventing pluralization, interpolation, and translator-tooling
+compatibility from scratch.
 
 ## Decision
 

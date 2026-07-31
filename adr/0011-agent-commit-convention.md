@@ -20,6 +20,5 @@ any push.
 ## Consequences
 
 Git history reads as if written entirely by the owner. Because these
-instruction files are gitignored, this convention doesn't propagate
-automatically to clones of this template — each new project needs its own
-copy if the same convention is wanted there.
+instruction files are gitignored, a fresh clone of this repo won't have them
+by default — they'd need to be recreated.

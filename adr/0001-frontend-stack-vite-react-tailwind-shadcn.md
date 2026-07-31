@@ -6,7 +6,7 @@ Accepted
 
 ## Context
 
-This template needs a frontend stack that is quick to build with, widely
+This project needs a frontend stack that is quick to build with, widely
 known, and matches a sober, neutral, VSCode-inspired visual language rather
 than a heavily "branded" UI kit look. A significant share of the logic and
 data handling is expected to live client-side (see the local-first storage
@@ -25,5 +25,5 @@ buys nothing for an app meant to be mostly client-rendered.
 
 Fast local dev loop (Vite HMR), a large ecosystem, and a component library
 that needs no restyling to fit the "sober" brief. Tradeoff: no built-in
-routing or SSR — a future project needing either adds it explicitly (e.g.
-react-router), it isn't assumed by the template.
+routing or SSR — added explicitly if/when needed (e.g. react-router), not
+assumed upfront.

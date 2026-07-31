@@ -7,7 +7,7 @@ Accepted
 ## Context
 
 CI should catch real regressions without becoming a maintenance burden
-disproportionate to the template's current size, and shouldn't reference a
+disproportionate to the project's current size, and shouldn't reference a
 backend that doesn't exist yet.
 
 ## Decision

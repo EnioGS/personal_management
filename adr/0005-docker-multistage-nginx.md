@@ -16,7 +16,7 @@ duplicating the shared `npm install` step.
 stage (static build served by nginx), both descending from a shared `deps`
 stage so dependency installation is cached across both.
 `docker-compose.yml`'s `build.target` reads `BUILD_TARGET` from `.env`, and
-the image is tagged per-target (`template_web-frontend-${BUILD_TARGET}`) so
+the image is tagged per-target (`personal_management-frontend-${BUILD_TARGET}`) so
 switching targets can't silently reuse a stale image built from the other
 stage — a real bug caught during testing of this exact setup.
 

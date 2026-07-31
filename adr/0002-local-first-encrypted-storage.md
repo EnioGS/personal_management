@@ -6,11 +6,12 @@ Accepted
 
 ## Context
 
-A meaningful part of this template's expected use involves logic and data
+A meaningful part of this project's expected use involves logic and data
 entry happening entirely in the browser, and some of that data may be
 sensitive and only need to live on the user's machine, never touching a
-backend. Reinventing this pattern per-project would be wasted, error-prone
-effort — encryption is easy to get subtly wrong.
+backend. Rolling this pattern by hand for each new area (finances,
+investments, ...) would be wasted, error-prone effort — encryption is easy
+to get subtly wrong.
 
 ## Decision
 
@@ -23,7 +24,7 @@ loop: unlock → add → encrypted write → decrypted read-back.
 
 ## Consequences
 
-Sensitive data never needs to reach a backend, and future projects get a
+Sensitive data never needs to reach a backend, and future sections get a
 tested (see the testing decision) encryption pattern instead of rolling their
 own. This protects data at rest (disk/backup snooping) but explicitly does
 **not** protect against XSS — a page-level attacker can read whatever the app

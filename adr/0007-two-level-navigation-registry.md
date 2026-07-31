@@ -7,7 +7,7 @@ Accepted — supersedes an initial implementation built on shadcn/ui's
 
 ## Context
 
-The template's UI paradigm needed to be an icon-only "activity bar" that
+This app's UI paradigm needed to be an icon-only "activity bar" that
 selects a section, driving a labeled "secondary bar" of items within that
 section, which in turn determines the main content — matching VSCode's
 structure. The initial implementation used shadcn/ui's `Sidebar` component,

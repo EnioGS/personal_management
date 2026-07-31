@@ -6,7 +6,7 @@ Accepted
 
 ## Context
 
-The template should support going from "runs on my machine" to "viewable
+This project should support going from "runs on my machine" to "viewable
 online" with minimal friction as a first step (GitHub Pages, essentially
 free), while remaining portable to more capable/custom infrastructure later
 (a VPS, Railway, Fly, Heroku's container mode) without being rebuilt from
@@ -20,8 +20,8 @@ decision) works anywhere Docker runs; `.github/workflows/deploy-pages.yml`
 builds and publishes straight to GitHub Pages with no container involved.
 Vite's `base` is set from `VITE_BASE_PATH` at build time, computed in the
 Pages workflow as `/${{ github.event.repository.name }}/` so it self-adjusts
-for whatever a project cloned from this template is named (GitHub Pages
-project sites serve from a subpath, not the domain root).
+to match this repo's actual name (GitHub Pages project sites serve from a
+subpath, not the domain root).
 
 ## Consequences
 
