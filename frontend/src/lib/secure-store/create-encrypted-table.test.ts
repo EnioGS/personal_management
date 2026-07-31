@@ -47,6 +47,25 @@ describe('createEncryptedTable', () => {
     expect(after.some((r) => r?.b === value.b)).toBe(false)
   })
 
+  it('updates a record in place, preserving its id and createdAt', async () => {
+    const passphrase = `pw-${crypto.randomUUID()}`
+    const marker = crypto.randomUUID()
+    await table.add(passphrase, { a: 1, b: `${marker}-original` })
+
+    const before = await table.list(passphrase)
+    const original = before.find((r) => r?.b === `${marker}-original`)
+    expect(original).toBeTruthy()
+
+    await table.update(passphrase, original!.id, { a: 2, b: `${marker}-updated` })
+    const after = await table.list(passphrase)
+    const updated = after.find((r) => r?.id === original!.id)
+
+    expect(updated?.b).toBe(`${marker}-updated`)
+    expect(updated?.a).toBe(2)
+    expect(updated?.createdAt).toBe(original!.createdAt)
+    expect(after.some((r) => r?.b === `${marker}-original`)).toBe(false)
+  })
+
   it('bulkAdd round-trips multiple records', async () => {
     const passphrase = `pw-${crypto.randomUUID()}`
     const marker = crypto.randomUUID()

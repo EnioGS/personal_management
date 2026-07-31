@@ -4,7 +4,8 @@
   },
   "items": {
     "appearance": "Aparência",
-    "general": "Geral"
+    "general": "Geral",
+    "assistant": "Assistente"
   },
   "appearance": {
     "heading": "Aparência",
@@ -18,5 +19,11 @@
     "languageLabel": "Idioma",
     "portuguese": "Português",
     "english": "Inglês"
+  },
+  "assistant": {
+    "heading": "Assistente",
+    "systemPromptLabel": "Prompt do sistema",
+    "systemPromptDescription": "Enviado ao modelo no início de cada conversa. Não é traduzido — sempre salvo e usado no idioma em que você escrevê-lo.",
+    "save": "Salvar"
   }
 }

@@ -1,0 +1,9 @@
+{
+  "panel": {
+    "toggle": "Abrir/fechar o chat do assistente",
+    "heading": "Assistente",
+    "emptyState": "Nenhuma mensagem ainda.",
+    "inputPlaceholder": "Mensagem para o assistente…",
+    "send": "Enviar"
+  }
+}

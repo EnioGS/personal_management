@@ -1,0 +1,9 @@
+{
+  "panel": {
+    "toggle": "Toggle assistant chat",
+    "heading": "Assistant",
+    "emptyState": "No messages yet.",
+    "inputPlaceholder": "Message the assistant…",
+    "send": "Send"
+  }
+}

@@ -1,5 +1,6 @@
 import 'i18next'
 import type common from '@/locales/common/en.json'
+import type chat from '@/components/chat/locales/en.json'
 import type finances from '@/sections/finances/locales/en.json'
 import type investments from '@/sections/investments/locales/en.json'
 import type notes from '@/sections/notes/locales/en.json'
@@ -13,6 +14,7 @@ declare module 'i18next' {
     defaultNS: 'common'
     resources: {
       common: typeof common
+      chat: typeof chat
       vault: typeof vault
       notes: typeof notes
       finances: typeof finances

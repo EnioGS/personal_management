@@ -44,9 +44,15 @@ export function createEncryptedTable<T>(table: EntityTable<EncryptedRow, 'id'>) 
     )
   }
 
+  /** In-place edit — preserves the row's original createdAt, unlike delete-then-add. */
+  async function update(passphrase: string, id: number, value: T): Promise<void> {
+    const envelope = await encryptJson(passphrase, value)
+    await table.update(id, envelope)
+  }
+
   async function remove(id: number): Promise<void> {
     await table.delete(id)
   }
 
-  return { add, bulkAdd, list, remove }
+  return { add, bulkAdd, list, remove, update }
 }
