@@ -1,0 +1,29 @@
+services:
+  frontend:
+    image: template_web-frontend-${BUILD_TARGET:-dev}
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: ${BUILD_TARGET:-dev}
+    ports:
+      - "${FRONTEND_PORT:-5173}:${FRONTEND_CONTAINER_PORT:-5173}"
+    env_file:
+      - .env
+    # Bind mounts below are only meaningful for the dev target (hot reload).
+    # They're harmless no-ops for the production target: that stage is
+    # nginx serving a pre-built /usr/share/nginx/html, not /app.
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+
+  # backend: stack not chosen yet. Add backend/Dockerfile, then uncomment.
+  # backend:
+  #   build:
+  #     context: ./backend
+  #     dockerfile: Dockerfile
+  #   ports:
+  #     - "${BACKEND_PORT}:${BACKEND_PORT}"
+  #   env_file:
+  #     - .env
+  #   volumes:
+  #     - ./backend:/app

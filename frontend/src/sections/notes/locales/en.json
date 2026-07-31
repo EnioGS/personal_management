@@ -1,0 +1,19 @@
+{
+  "section": {
+    "label": "Notes"
+  },
+  "items": {
+    "allNotes": "All Notes"
+  },
+  "unlock": {
+    "title": "Unlock your notes",
+    "description": "Notes are encrypted (AES-GCM) and stored only in this browser's IndexedDB.",
+    "passphrasePlaceholder": "Passphrase",
+    "button": "Unlock"
+  },
+  "heading": "Notes",
+  "lockButton": "Lock",
+  "notePlaceholder": "Write a note…",
+  "addButton": "Add",
+  "emptyState": "No notes yet."
+}

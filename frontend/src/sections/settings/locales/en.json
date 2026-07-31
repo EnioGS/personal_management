@@ -1,0 +1,22 @@
+{
+  "section": {
+    "label": "Settings"
+  },
+  "items": {
+    "appearance": "Appearance",
+    "general": "General"
+  },
+  "appearance": {
+    "heading": "Appearance",
+    "themeLabel": "Theme",
+    "light": "Light",
+    "dark": "Dark",
+    "system": "System"
+  },
+  "general": {
+    "heading": "General",
+    "languageLabel": "Language",
+    "portuguese": "Portuguese",
+    "english": "English"
+  }
+}
