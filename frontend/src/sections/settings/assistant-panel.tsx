@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { LockButton, UnlockGate } from '@/components/layout/unlock-gate'
 import { Button } from '@/components/ui/button'
@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { CONFIG_KEY, DEFAULT_MODEL, useAssistantConfigStore } from '@/lib/assistant-config'
 import { DEFAULT_SYSTEM_PROMPT, SYSTEM_PROMPT_KEY, useAssistantPromptsStore } from '@/lib/assistant-prompts'
+import { cn } from '@/lib/utils'
 
 export function AssistantPanel() {
   return (
@@ -88,6 +89,8 @@ function SystemPromptSection() {
   const { t } = useTranslation('settings')
   const { items, isLoading, addItem, updateItem } = useAssistantPromptsStore()
   const [draft, setDraft] = useState<string | null>(null)
+  const [isFocused, setIsFocused] = useState(false)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   const systemPromptRow = items.find((item) => item.key === SYSTEM_PROMPT_KEY)
 
@@ -100,6 +103,21 @@ function SystemPromptSection() {
     }
   }, [isLoading, draft, systemPromptRow])
 
+  // Collapsed to one line unless focused, then grows to fit the full text —
+  // measured via scrollHeight rather than relying solely on field-sizing:
+  // content (already on the base Textarea), since that alone always shows
+  // full content rather than collapsing again once focus is lost.
+  useEffect(() => {
+    const el = textareaRef.current
+    if (!el) return
+    if (isFocused) {
+      el.style.height = 'auto'
+      el.style.height = `${el.scrollHeight}px`
+    } else {
+      el.style.height = ''
+    }
+  }, [isFocused, draft])
+
   async function handleSave() {
     if (draft === null) return
     if (systemPromptRow) {
@@ -110,15 +128,18 @@ function SystemPromptSection() {
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-2">
+    <div className="flex flex-col gap-2">
       <div>
         <p className="text-sm font-medium">{t('assistant.systemPromptLabel')}</p>
         <p className="text-muted-foreground text-xs">{t('assistant.systemPromptDescription')}</p>
       </div>
       <Textarea
+        ref={textareaRef}
         value={draft ?? ''}
         onChange={(e) => setDraft(e.target.value)}
-        className="min-h-40 flex-1 resize-none font-mono text-sm"
+        onFocus={() => setIsFocused(true)}
+        onBlur={() => setIsFocused(false)}
+        className={cn('resize-none font-mono text-sm', !isFocused && 'h-9 min-h-0 overflow-hidden')}
         disabled={draft === null}
       />
       <div>
