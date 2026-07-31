@@ -6,7 +6,7 @@ export interface ChatAttachment {
 }
 
 const MAX_ATTACHMENT_BYTES = 2 * 1024 * 1024 // 2MB
-const ALLOWED_EXTENSIONS = ['.txt', '.md']
+const ALLOWED_EXTENSIONS = ['.txt', '.md', '.csv']
 
 function extensionOf(filename: string): string {
   const dotIndex = filename.lastIndexOf('.')
@@ -14,7 +14,9 @@ function extensionOf(filename: string): string {
 }
 
 function mimeForExtension(extension: string): string {
-  return extension === '.md' ? 'text/markdown' : 'text/plain'
+  if (extension === '.md') return 'text/markdown'
+  if (extension === '.csv') return 'text/csv'
+  return 'text/plain'
 }
 
 /**
@@ -24,7 +26,7 @@ function mimeForExtension(extension: string): string {
 export async function readAttachedFile(file: File): Promise<{ attachment: ChatAttachment } | { error: string }> {
   const extension = extensionOf(file.name)
   if (!ALLOWED_EXTENSIONS.includes(extension)) {
-    return { error: `"${file.name}": only .txt and .md files are supported.` }
+    return { error: `"${file.name}": only .txt, .md, and .csv files are supported.` }
   }
   if (file.size > MAX_ATTACHMENT_BYTES) {
     return { error: `"${file.name}" is too large (max ${MAX_ATTACHMENT_BYTES / (1024 * 1024)}MB).` }
@@ -48,5 +50,5 @@ export async function readAttachedFile(file: File): Promise<{ attachment: ChatAt
 export function formatAttachmentsForPrompt(attachments: ChatAttachment[]): string {
   if (attachments.length === 0) return ''
   const lines = attachments.map((a) => `- id: ${a.id}, name: "${a.name}", type: "${a.type}"`)
-  return `\n\nCurrently attached files (use read_text_file with the id to read one):\n${lines.join('\n')}`
+  return `\n\nCurrently attached files (use read_text_file for .txt/.md, or read_csv for .csv, with the id):\n${lines.join('\n')}`
 }

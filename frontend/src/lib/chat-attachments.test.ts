@@ -28,10 +28,19 @@ describe('readAttachedFile', () => {
     expect('attachment' in result).toBe(true)
   })
 
+  it('accepts a .csv file', async () => {
+    const result = await readAttachedFile(makeFile('data.csv', 'a,b,c\n1,2,3'))
+    expect('attachment' in result).toBe(true)
+    if ('attachment' in result) {
+      expect(result.attachment.type).toBe('text/csv')
+      expect(result.attachment.content).toBe('a,b,c\n1,2,3')
+    }
+  })
+
   it('rejects unsupported extensions', async () => {
-    const result = await readAttachedFile(makeFile('data.csv', 'a,b,c'))
+    const result = await readAttachedFile(makeFile('data.json', '{}'))
     expect('error' in result).toBe(true)
-    if ('error' in result) expect(result.error).toContain('only .txt and .md files')
+    if ('error' in result) expect(result.error).toContain('only .txt, .md, and .csv files')
   })
 
   it('rejects files over the size cap', async () => {

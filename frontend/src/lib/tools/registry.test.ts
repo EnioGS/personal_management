@@ -9,6 +9,10 @@ describe('findTool', () => {
   it('returns undefined for an unknown name', () => {
     expect(findTool('does_not_exist')).toBeUndefined()
   })
+
+  it('registers all three tools', () => {
+    expect(toolRegistry.map((t) => t.name)).toEqual(['read_text_file', 'read_csv', 'write_to_table'])
+  })
 })
 
 describe('toolsForRequest', () => {
