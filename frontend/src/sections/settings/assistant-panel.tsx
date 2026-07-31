@@ -4,7 +4,7 @@ import { LockButton, UnlockGate } from '@/components/layout/unlock-gate'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
-import { CONFIG_KEY, DEFAULT_MODEL, useAssistantConfigStore } from '@/lib/assistant-config'
+import { CONFIG_KEY, DEFAULT_MODEL, DEV_API_KEY, useAssistantConfigStore } from '@/lib/assistant-config'
 import { DEFAULT_SYSTEM_PROMPT, SYSTEM_PROMPT_KEY, useAssistantPromptsStore } from '@/lib/assistant-prompts'
 import { cn } from '@/lib/utils'
 
@@ -39,9 +39,11 @@ function ConnectionSection() {
 
   const configRow = items.find((item) => item.key === CONFIG_KEY)
 
+  const usingDevFallback = !configRow?.apiKey && !!DEV_API_KEY
+
   useEffect(() => {
     if (apiKeyDraft === null && modelDraft === null && !isLoading) {
-      setApiKeyDraft(configRow?.apiKey ?? '')
+      setApiKeyDraft(configRow?.apiKey || DEV_API_KEY || '')
       setModelDraft(configRow?.model ?? DEFAULT_MODEL)
     }
   }, [isLoading, apiKeyDraft, modelDraft, configRow])
@@ -69,6 +71,7 @@ function ConnectionSection() {
           onChange={(e) => setApiKeyDraft(e.target.value)}
           disabled={!ready}
         />
+        {usingDevFallback && <p className="text-muted-foreground text-xs">{t('assistant.apiKeyFromEnv')}</p>}
         <Input
           placeholder={t('assistant.modelPlaceholder')}
           value={modelDraft ?? ''}

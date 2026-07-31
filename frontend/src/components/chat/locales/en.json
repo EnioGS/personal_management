@@ -2,6 +2,7 @@
   "panel": {
     "toggle": "Toggle assistant chat",
     "heading": "Assistant",
+    "clearHistory": "Clear conversation",
     "emptyState": "No messages yet.",
     "inputPlaceholder": "Message the assistant…",
     "send": "Send",

@@ -1,5 +1,5 @@
 import { useRef, useState, type PointerEvent } from 'react'
-import { GripVertical } from 'lucide-react'
+import { GripVertical, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
 import { useChatPanelStore } from '@/store/chat-panel-store'
@@ -33,6 +33,7 @@ export function ChatPanel() {
   const messages = useChatStore((s) => s.messages)
   const isSending = useChatStore((s) => s.isSending)
   const sendMessage = useChatStore((s) => s.sendMessage)
+  const clearMessages = useChatStore((s) => s.clearMessages)
   const isUnlocked = useVaultStore((s) => s.passphrase !== null)
 
   const [draft, setDraft] = useState('')
@@ -120,8 +121,18 @@ export function ChatPanel() {
         </div>
 
         <div className="ml-7 flex h-full flex-1 flex-col border-l bg-sidebar shadow-lg" onClick={markInteracted}>
-          <div className="border-b p-3">
+          <div className="flex items-center justify-between border-b p-3">
             <h2 className="text-sm font-medium">{t('panel.heading')}</h2>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              aria-label={t('panel.clearHistory')}
+              disabled={messages.length === 0}
+              onClick={() => clearMessages()}
+            >
+              <Trash2 className="size-4" />
+            </Button>
           </div>
 
           <ScrollArea className="flex-1">

@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { CONFIG_KEY, DEFAULT_MODEL, useAssistantConfigStore } from '@/lib/assistant-config'
+import { CONFIG_KEY, DEFAULT_MODEL, DEV_API_KEY, useAssistantConfigStore } from '@/lib/assistant-config'
 import { DEFAULT_SYSTEM_PROMPT, SYSTEM_PROMPT_KEY, useAssistantPromptsStore } from '@/lib/assistant-prompts'
 import { sendChatCompletion, type OpenRouterMessage } from '@/lib/openrouter'
 import { useVaultStore } from '@/store/vault-store'
@@ -16,6 +16,7 @@ interface ChatState {
   messages: ChatMessage[]
   isSending: boolean
   sendMessage: (text: string) => Promise<void>
+  clearMessages: () => void
 }
 
 /**
@@ -37,7 +38,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
       }
 
       const config = useAssistantConfigStore.getState().items.find((item) => item.key === CONFIG_KEY)
-      if (!config?.apiKey) {
+      const apiKey = config?.apiKey || DEV_API_KEY
+      if (!apiKey) {
         throw new Error('No API key configured — add one in Settings → Assistant.')
       }
 
@@ -49,7 +51,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         ...[...priorMessages, userMessage].map((m) => ({ role: m.role, content: m.content }) as OpenRouterMessage),
       ]
 
-      const replyText = await sendChatCompletion(config.apiKey, config.model || DEFAULT_MODEL, apiMessages)
+      const replyText = await sendChatCompletion(apiKey, config?.model || DEFAULT_MODEL, apiMessages)
       const assistantMessage: ChatMessage = { id: crypto.randomUUID(), role: 'assistant', content: replyText }
       set({ messages: [...get().messages, assistantMessage], isSending: false })
     } catch (err) {
@@ -60,4 +62,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     if (!useChatPanelStore.getState().isOpen) useChatPanelStore.getState().markUnread()
   },
+
+  clearMessages: () => set({ messages: [] }),
 }))
