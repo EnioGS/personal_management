@@ -3,7 +3,9 @@ import { useTranslation } from 'react-i18next'
 import { LockButton, UnlockGate } from '@/components/layout/unlock-gate'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
+import { groupAssistantModelsByProvider } from '@/lib/assistant-models'
 import { CONFIG_KEY, DEFAULT_MODEL, DEV_API_KEY, useAssistantConfigStore } from '@/lib/assistant-config'
 import { DEFAULT_SYSTEM_PROMPT, SYSTEM_PROMPT_KEY, useAssistantPromptsStore } from '@/lib/assistant-prompts'
 import { cn } from '@/lib/utils'
@@ -72,12 +74,23 @@ function ConnectionSection() {
           disabled={!ready}
         />
         {usingDevFallback && <p className="text-muted-foreground text-xs">{t('assistant.apiKeyFromEnv')}</p>}
-        <Input
-          placeholder={t('assistant.modelPlaceholder')}
-          value={modelDraft ?? ''}
-          onChange={(e) => setModelDraft(e.target.value)}
-          disabled={!ready}
-        />
+        <Select value={modelDraft ?? undefined} onValueChange={setModelDraft} disabled={!ready}>
+          <SelectTrigger className="w-full">
+            <SelectValue placeholder={t('assistant.modelPlaceholder')} />
+          </SelectTrigger>
+          <SelectContent>
+            {groupAssistantModelsByProvider().map((group) => (
+              <SelectGroup key={group.provider}>
+                <SelectLabel>{group.provider}</SelectLabel>
+                {group.models.map((model) => (
+                  <SelectItem key={model.id} value={model.id}>
+                    {model.id}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
       <div>
         <Button type="button" onClick={() => void handleSave()} disabled={!ready}>

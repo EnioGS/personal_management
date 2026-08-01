@@ -20,8 +20,16 @@ function buildDescription(): string {
   return (
     "Appends one or more rows to a table in the user's finance/investment records. " +
     'Writes immediately — the user can review, edit, or delete rows afterward in the app UI. ' +
-    'Dates must be ISO 8601 strings (e.g. "2026-07-31") or epoch milliseconds; numbers must be numeric. ' +
-    'Rows that fail validation are skipped and reported back; valid rows in the same call are still written.\n' +
+    'Dates must be ISO 8601 strings (e.g. "2026-07-31") or epoch milliseconds; numbers must be plain ' +
+    'numeric values — strip currency symbols, thousands separators, and locale decimal commas first. ' +
+    'For a column with a fixed set of allowed values, if the source data uses different wording, map it ' +
+    'yourself to the closest matching allowed value (e.g. "Supermercado" or "Mercado" → "Alimentação") ' +
+    'rather than passing the original text through unchanged — only the exact allowed values will be accepted. ' +
+    'Whenever you make a judgment call like this (mapping a category, reformatting a date, cleaning up a ' +
+    'number, choosing which of several similar source columns to use), briefly say so in your reply so the ' +
+    'user can correct it if your interpretation was wrong — do not apply silent guesses. ' +
+    'Rows that still fail validation after your best mapping attempt are skipped and reported back; valid ' +
+    'rows in the same call are still written.\n' +
     `Available tables and their columns:\n${tableDocs}`
   )
 }

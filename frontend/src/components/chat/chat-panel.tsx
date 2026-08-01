@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 
-const PANEL_WIDTH = 384
+const PANEL_WIDTH = 768
 const HANDLE_WIDTH = 28
 const DRAG_THRESHOLD = 60
 
@@ -143,10 +143,10 @@ export function ChatPanel() {
     // below to this box. Relying on the browser to clip a `fixed` element at the
     // viewport edge isn't a real guarantee (the earlier table-panel bug was exactly
     // this class of issue), so the boundary is explicit instead of assumed.
-    <div className="fixed inset-y-0 right-0 z-40 overflow-hidden" style={{ width: PANEL_WIDTH }}>
+    <div className="pointer-events-none fixed inset-y-0 right-0 z-40 overflow-hidden" style={{ width: PANEL_WIDTH }}>
       <div
         className={cn(
-          'absolute inset-y-0 left-0 flex',
+          'pointer-events-auto absolute inset-y-0 left-0 flex',
           dragOffset === null && 'transition-transform duration-200 ease-out',
         )}
         style={{ width: PANEL_WIDTH, transform: `translateX(${translate}px)` }}
@@ -209,15 +209,25 @@ export function ChatPanel() {
                   <div
                     key={message.id}
                     className={cn(
-                      'max-w-[85%] rounded-md px-3 py-2 text-sm',
-                      message.isError
-                        ? 'self-start bg-destructive/10 text-destructive'
-                        : message.role === 'user'
-                          ? 'self-end bg-brand text-brand-foreground'
-                          : 'self-start bg-muted',
+                      'flex max-w-[85%] flex-col gap-0.5',
+                      message.role === 'user' ? 'self-end items-end' : 'self-start items-start',
                     )}
                   >
-                    {message.content}
+                    {message.role === 'assistant' && !message.isError && message.model && (
+                      <span className="text-muted-foreground px-1 text-[10px]">{message.model}</span>
+                    )}
+                    <div
+                      className={cn(
+                        'rounded-md px-3 py-2 text-sm',
+                        message.isError
+                          ? 'bg-destructive/10 text-destructive'
+                          : message.role === 'user'
+                            ? 'bg-brand text-brand-foreground'
+                            : 'bg-muted',
+                      )}
+                    >
+                      {message.content}
+                    </div>
                   </div>
                 ))}
                 {isSending && (

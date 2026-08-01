@@ -8,7 +8,7 @@ export interface AssistantConfig {
 }
 
 export const CONFIG_KEY = 'default'
-export const DEFAULT_MODEL = 'openai/gpt-4o-mini'
+export const DEFAULT_MODEL = 'openai/gpt-5.5'
 
 /**
  * Dev-only convenience, read from .env's VITE_OPENROUTER_API_KEY: lets a saved

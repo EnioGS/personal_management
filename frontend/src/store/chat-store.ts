@@ -13,6 +13,8 @@ export interface ChatMessage {
   role: 'user' | 'assistant'
   content: string
   isError?: boolean
+  /** The exact model string sent to OpenRouter for this reply — absent on error bubbles. */
+  model?: string
 }
 
 export type ChatStatus = { type: 'idle' } | ConversationStatus
@@ -69,15 +71,21 @@ export const useChatStore = create<ChatState>((set, get) => ({
       // text history + system prompt + current attachments. A follow-up question about the
       // same file re-calls the (cheap, local) tool rather than the model "remembering" —
       // a deliberate v1 simplification.
+      const modelUsed = config?.model || DEFAULT_MODEL
       const replyText = await runConversation({
         apiKey,
-        model: config?.model || DEFAULT_MODEL,
+        model: modelUsed,
         messages: apiMessages,
         context: { attachments },
         tools: toolsForRequest(),
         onStatus: (status) => set({ status }),
       })
-      const assistantMessage: ChatMessage = { id: crypto.randomUUID(), role: 'assistant', content: replyText }
+      const assistantMessage: ChatMessage = {
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: replyText,
+        model: modelUsed,
+      }
       set({ messages: [...get().messages, assistantMessage], isSending: false, status: { type: 'idle' } })
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Something went wrong talking to the assistant.'

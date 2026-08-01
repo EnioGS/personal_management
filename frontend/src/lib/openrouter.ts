@@ -22,6 +22,14 @@ interface OpenRouterResponseMessage {
   tool_calls?: OpenRouterToolCall[]
 }
 
+/**
+ * Without an explicit cap, OpenRouter reserves credit against the model's own default
+ * output budget (which can be very large for some models) before the request even runs —
+ * a low-balance key gets a 402 even for a short reply. Capping this keeps behavior
+ * consistent regardless of which model is selected.
+ */
+const MAX_RESPONSE_TOKENS = 4096
+
 /** Sends one request and returns the raw response message — callers decide whether to loop on tool_calls. */
 export async function requestChatMessage(
   apiKey: string,
@@ -35,7 +43,12 @@ export async function requestChatMessage(
       Authorization: `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify(tools && tools.length > 0 ? { model, messages, tools } : { model, messages }),
+    body: JSON.stringify({
+      model,
+      messages,
+      max_tokens: MAX_RESPONSE_TOKENS,
+      ...(tools && tools.length > 0 ? { tools } : {}),
+    }),
   })
 
   if (!response.ok) {
