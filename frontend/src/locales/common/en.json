@@ -2,10 +2,7 @@
   "loading": "Loading…",
   "comingSoon": "Coming soon.",
   "unlock": {
-    "title": "Unlock your data",
-    "description": "Your data is encrypted (AES-GCM) and stored only in this browser's IndexedDB.",
-    "passphrasePlaceholder": "Passphrase",
-    "button": "Unlock",
+    "lockedMessage": "Unlock your vault (Vault → Get Started) to view this.",
     "lockButton": "Lock"
   },
   "table": {

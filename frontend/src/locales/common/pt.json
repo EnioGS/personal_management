@@ -2,10 +2,7 @@
   "loading": "Carregando…",
   "comingSoon": "Em breve.",
   "unlock": {
-    "title": "Desbloqueie seus dados",
-    "description": "Seus dados são criptografados (AES-GCM) e armazenados somente no IndexedDB deste navegador.",
-    "passphrasePlaceholder": "Frase-senha",
-    "button": "Desbloquear",
+    "lockedMessage": "Desbloqueie seu cofre (Cofre → Começar) para ver isto.",
     "lockButton": "Bloquear"
   },
   "table": {
