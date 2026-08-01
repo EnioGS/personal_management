@@ -81,6 +81,29 @@ describe('runConversation', () => {
     expect(toolMsg?.content).toContain('unknown tool')
   })
 
+  it('reports waiting/tool status in order via onStatus', async () => {
+    const requestFn = vi
+      .fn()
+      .mockResolvedValueOnce(toolCallMessage('call_1', 'read_text_file', { fileId: 'f1' }))
+      .mockResolvedValueOnce(textMessage('done'))
+    const statuses: unknown[] = []
+
+    await runConversation({
+      apiKey: 'k',
+      model: 'm',
+      messages: baseMessages,
+      context,
+      requestFn,
+      onStatus: (status) => statuses.push(status),
+    })
+
+    expect(statuses).toEqual([
+      { type: 'waiting' },
+      { type: 'tool', name: 'read_text_file' },
+      { type: 'waiting' },
+    ])
+  })
+
   it('injects an error result for malformed tool-call arguments JSON and continues the loop', async () => {
     const malformed = {
       role: 'assistant' as const,

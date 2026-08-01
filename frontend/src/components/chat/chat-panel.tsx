@@ -1,5 +1,5 @@
-import { useRef, useState, type ChangeEvent, type DragEvent, type PointerEvent } from 'react'
-import { GripVertical, Paperclip, Trash2, X } from 'lucide-react'
+import { useEffect, useRef, useState, type ChangeEvent, type DragEvent, type PointerEvent } from 'react'
+import { GripVertical, Hourglass, Paperclip, Trash2, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { readAttachedFile } from '@/lib/chat-attachments'
 import { cn } from '@/lib/utils'
@@ -33,6 +33,7 @@ export function ChatPanel() {
   const markInteracted = useChatPanelStore((s) => s.markInteracted)
   const messages = useChatStore((s) => s.messages)
   const isSending = useChatStore((s) => s.isSending)
+  const status = useChatStore((s) => s.status)
   const sendMessage = useChatStore((s) => s.sendMessage)
   const clearMessages = useChatStore((s) => s.clearMessages)
   const attachments = useChatStore((s) => s.attachments)
@@ -48,6 +49,17 @@ export function ChatPanel() {
   const dragStartOpen = useRef(isOpen)
   const didDrag = useRef(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const scrollAreaRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    // Scroll only the message list's own viewport directly — `scrollIntoView` walks up
+    // and can adjust *every* scrollable ancestor's scroll position along the way,
+    // including this panel's own outer `overflow-hidden` clipping wrapper (invisible,
+    // no scrollbar, but still programmatically scrollable), which visually fights the
+    // transform-based open/close positioning. A direct, targeted scroll has no such risk.
+    const viewport = scrollAreaRef.current?.querySelector<HTMLDivElement>('[data-slot="scroll-area-viewport"]')
+    viewport?.scrollTo({ top: viewport.scrollHeight, behavior: 'smooth' })
+  }, [messages, status])
 
   async function handleFilesSelected(files: FileList | File[]) {
     for (const file of Array.from(files)) {
@@ -189,26 +201,36 @@ export function ChatPanel() {
             </Button>
           </div>
 
-          <ScrollArea className="min-h-0 flex-1">
-            <div className="flex flex-col gap-2 p-3">
-              {messages.length === 0 && <p className="text-muted-foreground text-sm">{t('panel.emptyState')}</p>}
-              {messages.map((message) => (
-                <div
-                  key={message.id}
-                  className={cn(
-                    'max-w-[85%] rounded-md px-3 py-2 text-sm',
-                    message.isError
-                      ? 'self-start bg-destructive/10 text-destructive'
-                      : message.role === 'user'
-                        ? 'self-end bg-brand text-brand-foreground'
-                        : 'self-start bg-muted',
-                  )}
-                >
-                  {message.content}
-                </div>
-              ))}
-            </div>
-          </ScrollArea>
+          <div ref={scrollAreaRef} className="min-h-0 flex-1">
+            <ScrollArea className="h-full">
+              <div className="flex flex-col gap-2 p-3">
+                {messages.length === 0 && <p className="text-muted-foreground text-sm">{t('panel.emptyState')}</p>}
+                {messages.map((message) => (
+                  <div
+                    key={message.id}
+                    className={cn(
+                      'max-w-[85%] rounded-md px-3 py-2 text-sm',
+                      message.isError
+                        ? 'self-start bg-destructive/10 text-destructive'
+                        : message.role === 'user'
+                          ? 'self-end bg-brand text-brand-foreground'
+                          : 'self-start bg-muted',
+                    )}
+                  >
+                    {message.content}
+                  </div>
+                ))}
+                {isSending && (
+                  <div className="text-muted-foreground flex max-w-[85%] items-center gap-2 self-start rounded-md bg-muted px-3 py-2 text-sm">
+                    <Hourglass className="size-4 animate-spin" />
+                    {status.type === 'tool'
+                      ? t('panel.statusUsingTool', { name: status.name })
+                      : t('panel.statusWaiting')}
+                  </div>
+                )}
+              </div>
+            </ScrollArea>
+          </div>
 
           {isUnlocked ? (
             <>

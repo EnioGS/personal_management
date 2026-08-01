@@ -4,7 +4,7 @@ import { DEFAULT_SYSTEM_PROMPT, SYSTEM_PROMPT_KEY, useAssistantPromptsStore } fr
 import { formatAttachmentsForPrompt, type ChatAttachment } from '@/lib/chat-attachments'
 import type { OpenRouterMessage } from '@/lib/openrouter'
 import { toolsForRequest } from '@/lib/tools/registry'
-import { runConversation } from '@/lib/tools/run-conversation'
+import { runConversation, type ConversationStatus } from '@/lib/tools/run-conversation'
 import { useVaultStore } from '@/store/vault-store'
 import { useChatPanelStore } from './chat-panel-store'
 
@@ -15,10 +15,13 @@ export interface ChatMessage {
   isError?: boolean
 }
 
+export type ChatStatus = { type: 'idle' } | ConversationStatus
+
 interface ChatState {
   messages: ChatMessage[]
   attachments: ChatAttachment[]
   isSending: boolean
+  status: ChatStatus
   sendMessage: (text: string) => Promise<void>
   clearMessages: () => void
   addAttachment: (attachment: ChatAttachment) => void
@@ -34,11 +37,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
   messages: [],
   attachments: [],
   isSending: false,
+  status: { type: 'idle' },
 
   sendMessage: async (text) => {
     const userMessage: ChatMessage = { id: crypto.randomUUID(), role: 'user', content: text }
     const priorMessages = get().messages
-    set({ messages: [...priorMessages, userMessage], isSending: true })
+    set({ messages: [...priorMessages, userMessage], isSending: true, status: { type: 'waiting' } })
 
     try {
       if (!useVaultStore.getState().passphrase) {
@@ -71,13 +75,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
         messages: apiMessages,
         context: { attachments },
         tools: toolsForRequest(),
+        onStatus: (status) => set({ status }),
       })
       const assistantMessage: ChatMessage = { id: crypto.randomUUID(), role: 'assistant', content: replyText }
-      set({ messages: [...get().messages, assistantMessage], isSending: false })
+      set({ messages: [...get().messages, assistantMessage], isSending: false, status: { type: 'idle' } })
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Something went wrong talking to the assistant.'
       const errorMessage: ChatMessage = { id: crypto.randomUUID(), role: 'assistant', content: message, isError: true }
-      set({ messages: [...get().messages, errorMessage], isSending: false })
+      set({ messages: [...get().messages, errorMessage], isSending: false, status: { type: 'idle' } })
     }
 
     if (!useChatPanelStore.getState().isOpen) useChatPanelStore.getState().markUnread()

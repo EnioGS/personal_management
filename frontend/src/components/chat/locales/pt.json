@@ -9,6 +9,8 @@
     "locked": "Desbloqueie seu cofre (Cofre → Começar) para conversar.",
     "attachButton": "Anexar um arquivo",
     "dropHint": "Solte arquivos .txt ou .md aqui",
-    "removeAttachment": "Remover anexo"
+    "removeAttachment": "Remover anexo",
+    "statusWaiting": "Aguardando resposta…",
+    "statusUsingTool": "Usando ferramenta: {{name}}…"
   }
 }

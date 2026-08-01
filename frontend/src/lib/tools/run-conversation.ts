@@ -4,6 +4,8 @@ import type { ToolContext } from './types'
 
 type RequestFn = typeof requestChatMessage
 
+export type ConversationStatus = { type: 'waiting' } | { type: 'tool'; name: string }
+
 export interface RunConversationArgs {
   apiKey: string
   model: string
@@ -12,6 +14,7 @@ export interface RunConversationArgs {
   tools?: OpenRouterTool[]
   maxIterations?: number
   requestFn?: RequestFn
+  onStatus?: (status: ConversationStatus) => void
 }
 
 /**
@@ -26,10 +29,12 @@ export async function runConversation({
   tools,
   maxIterations = 5,
   requestFn = requestChatMessage,
+  onStatus,
 }: RunConversationArgs): Promise<string> {
   const conversation = [...messages]
 
   for (let iteration = 0; iteration < maxIterations; iteration++) {
+    onStatus?.({ type: 'waiting' })
     const message = await requestFn(apiKey, model, conversation, tools)
 
     if (!message.tool_calls || message.tool_calls.length === 0) {
@@ -40,6 +45,7 @@ export async function runConversation({
     conversation.push({ role: 'assistant', content: message.content, tool_calls: message.tool_calls })
 
     for (const toolCall of message.tool_calls) {
+      onStatus?.({ type: 'tool', name: toolCall.function.name })
       const result = await executeToolCall(toolCall, context)
       conversation.push({ role: 'tool', content: result, tool_call_id: toolCall.id })
     }
