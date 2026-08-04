@@ -48,16 +48,16 @@ Zustand so it's unit-testable with a stubbed request function. Adding a
 tool is one new `ToolDefinition` file plus one array entry — nothing else
 in the loop, the request plumbing, or the UI needs to change.
 
-`write_to_table` (the one tool with side effects — it writes rows into
-Finances/Investments tables) discovers which tables it may write to, and
-their column schemas, from `lib/tools/writable-tables.ts` rather than
-hardcoding them — a future table added to Finances/Investments needs one
-entry there to be picked up, both by the tool's validation logic and by the
-description text sent to the model. It writes immediately (no plan-then-
-confirm staging step) and reports back per-row validation failures so
-partial success is visible; the user reviews/edits/deletes afterward via
-the existing table UI, same as any manual edit. Notes is intentionally
-excluded from writable tables.
+`write_to_table`, and the later `read_table`/`update_table_rows`/
+`delete_table_rows`/`restore_table_rows` tools (adr/0018), discover which
+tables they may touch, and their column schemas, from
+`lib/tools/writable-tables.ts` rather than hardcoding them — a future table
+added to Finances/Investments needs one entry there to be picked up, both by
+each tool's validation logic and by the description text sent to the model.
+`write_to_table` writes immediately (no plan-then-confirm staging step) and
+reports back per-row validation failures so partial success is visible; the
+user reviews/edits/deletes afterward via the existing table UI, same as any
+manual edit. Notes is intentionally excluded from writable tables.
 
 ## Consequences
 

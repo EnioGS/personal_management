@@ -89,8 +89,9 @@ Two things it optimizes for:
   for editable data tables; `papaparse` for CSV import/export.
 - **Assistant**: a global chat panel calling OpenRouter (openrouter.ai) directly
   from the browser with a user-supplied API key — no backend in the loop. Tool
-  calling lets the model read attached files and write rows into Finances/
-  Investments tables; see `lib/tools/` and [Decisions](#decisions) below.
+  calling lets the model read attached files, and read/write/correct/flag rows
+  in Finances/Investments tables; see `lib/tools/` and [Decisions](#decisions)
+  below.
 - **i18n**: react-i18next, default Portuguese, namespace-per-section.
 - **Testing**: Vitest, colocated with the code it covers.
 - **Containerization**: Docker, one multi-stage Dockerfile (dev / production
@@ -121,6 +122,11 @@ Two things it optimizes for:
   columns from a small registry (`lib/tools/writable-tables.ts`) instead of
   hardcoding them, so a new Finances/Investments table is picked up
   automatically.
+- Nothing the assistant does to existing Finances/Investments rows is ever a
+  hard delete or in-place overwrite — a `deleted` soft-flag column marks rows
+  for removal (faded, not hidden, in the table UI) or the original of a
+  correction. Only the user can permanently purge flagged rows, via a
+  confirm-first button in each table.
 - CI intentionally minimal: lint + test + build, frontend only for now.
 - Agent commits carry no AI attribution.
 - Dual deployment (Docker anywhere + GitHub Pages) from one build output.
