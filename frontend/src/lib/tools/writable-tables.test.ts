@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
+import { useVaultStore } from '@/store/vault-store'
 import { findWritableTable, writableTables } from './writable-tables'
 
 describe('writableTables', () => {
@@ -27,5 +28,28 @@ describe('writableTables', () => {
 describe('findWritableTable', () => {
   it('returns undefined for an unknown key', () => {
     expect(findWritableTable('does_not_exist')).toBeUndefined()
+  })
+})
+
+describe('each table exposes items/addItem/addItems/updateItem', () => {
+  beforeEach(() => {
+    useVaultStore.getState().lock()
+  })
+
+  it('every registered table has items/addItem/addItems/updateItem on its store', () => {
+    for (const t of writableTables) {
+      const state = t.useStore.getState()
+      expect(Array.isArray(state.items)).toBe(true)
+      expect(typeof state.addItem).toBe('function')
+      expect(typeof state.addItems).toBe('function')
+      expect(typeof state.updateItem).toBe('function')
+    }
+  })
+
+  it("spending's addItem resolves the new row's numeric id", async () => {
+    useVaultStore.getState().unlock(`pw-${crypto.randomUUID()}`)
+    const spending = findWritableTable('spending')!
+    const id = await spending.useStore.getState().addItem({ date: Date.now(), category: 'Outros', amount: 1 })
+    expect(typeof id).toBe('number')
   })
 })

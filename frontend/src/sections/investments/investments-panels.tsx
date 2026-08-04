@@ -5,6 +5,7 @@ import { AppLineChart } from '@/components/charts/line-chart'
 import { AppPieChart } from '@/components/charts/pie-chart'
 import { CsvExportButton } from '@/components/data-table/csv-export-button'
 import { CsvImportDialog } from '@/components/data-table/csv-import-dialog'
+import { DeleteFlaggedRowsButton } from '@/components/data-table/delete-flagged-rows-button'
 import { EditableDataTable } from '@/components/data-table/editable-data-table'
 import { ChartTablePanel } from '@/components/layout/chart-table-panel'
 import { LockButton, UnlockGate } from '@/components/layout/unlock-gate'
@@ -29,8 +30,10 @@ function OverviewContent() {
   const { t } = useTranslation('investments')
   const { items: variableItems } = useVariableIncomeStore()
   const { items: fixedItems } = useFixedIncomeStore()
+  const visibleVariableItems = variableItems.filter((t) => !t.deleted)
+  const visibleFixedItems = fixedItems.filter((t) => !t.deleted)
 
-  const lineData = runningPositionOverTime([...variableItems, ...fixedItems])
+  const lineData = runningPositionOverTime([...visibleVariableItems, ...visibleFixedItems])
   const variableTotal = allocationPieData(variableItems).reduce((sum, d) => sum + d.value, 0)
   const fixedTotal = allocationPieData(fixedItems).reduce((sum, d) => sum + d.value, 0)
   const pieData = [
@@ -58,12 +61,13 @@ function OverviewContent() {
 }
 
 function allocationPieData(items: Transaction[]) {
-  const assets = [...new Set(items.map((t) => t.asset))]
+  const visibleItems = items.filter((t) => !t.deleted)
+  const assets = [...new Set(visibleItems.map((t) => t.asset))]
   return assets
     .map((asset, i) => ({
       key: asset,
       label: asset,
-      value: getCurrentValue(asset, items),
+      value: getCurrentValue(asset, visibleItems),
       color: CATEGORICAL_PALETTE[i % CATEGORICAL_PALETTE.length],
     }))
     .filter((slice) => slice.value > 0)
@@ -77,6 +81,7 @@ function TransactionLedgerPanel({
   addItem,
   addItems,
   deleteItem,
+  deleteItems,
 }: {
   id: string
   title: string
@@ -85,8 +90,10 @@ function TransactionLedgerPanel({
   addItem: (row: Transaction) => void
   addItems: (rows: Transaction[]) => void
   deleteItem: (id: number) => void
+  deleteItems: (ids: number[]) => void
 }) {
-  const lineData = runningPositionOverTime(items)
+  const visibleItems = items.filter((t) => !t.deleted)
+  const lineData = runningPositionOverTime(visibleItems)
   const pieData = allocationPieData(items)
 
   return (
@@ -119,6 +126,10 @@ function TransactionLedgerPanel({
                 <>
                   <CsvExportButton rows={items} schema={transactionSchema} filename={`${id}.csv`} />
                   <CsvImportDialog schema={transactionSchema} onImport={(rows) => void addItems(rows)} />
+                  <DeleteFlaggedRowsButton
+                    flaggedCount={items.filter((r) => r.deleted).length}
+                    onConfirm={() => deleteItems(items.filter((r) => r.deleted).map((r) => r.id))}
+                  />
                 </>
               }
             />
@@ -139,7 +150,7 @@ export function VariableIncomePanel() {
 
 function VariableIncomeContent() {
   const { t } = useTranslation('investments')
-  const { items, addItem, addItems, deleteItem } = useVariableIncomeStore()
+  const { items, addItem, addItems, deleteItem, deleteItems } = useVariableIncomeStore()
   return (
     <TransactionLedgerPanel
       id="variableIncome"
@@ -149,6 +160,7 @@ function VariableIncomeContent() {
       addItem={addItem}
       addItems={addItems}
       deleteItem={deleteItem}
+      deleteItems={deleteItems}
     />
   )
 }
@@ -163,7 +175,7 @@ export function FixedIncomePanel() {
 
 function FixedIncomeContent() {
   const { t } = useTranslation('investments')
-  const { items, addItem, addItems, deleteItem } = useFixedIncomeStore()
+  const { items, addItem, addItems, deleteItem, deleteItems } = useFixedIncomeStore()
   return (
     <TransactionLedgerPanel
       id="fixedIncome"
@@ -173,6 +185,7 @@ function FixedIncomeContent() {
       addItem={addItem}
       addItems={addItems}
       deleteItem={deleteItem}
+      deleteItems={deleteItems}
     />
   )
 }
@@ -187,10 +200,11 @@ export function ContributionsPanel() {
 
 function ContributionsContent() {
   const { t } = useTranslation('investments')
-  const { items, addItem, addItems, deleteItem } = useContributionsStore()
+  const { items, addItem, addItems, deleteItem, deleteItems } = useContributionsStore()
+  const visibleItems = items.filter((r) => !r.deleted)
 
-  const barData = bucketByMonth(items, 'date', 'amount').map((d) => ({ month: d.month, amount: d.total }))
-  const total = items.reduce((sum, row) => sum + row.amount, 0)
+  const barData = bucketByMonth(visibleItems, 'date', 'amount').map((d) => ({ month: d.month, amount: d.total }))
+  const total = visibleItems.reduce((sum, row) => sum + row.amount, 0)
 
   return (
     <div className="flex h-full flex-col">
@@ -226,6 +240,10 @@ function ContributionsContent() {
                 <>
                   <CsvExportButton rows={items} schema={contributionsSchema} filename="contributions.csv" />
                   <CsvImportDialog schema={contributionsSchema} onImport={(rows) => void addItems(rows)} />
+                  <DeleteFlaggedRowsButton
+                    flaggedCount={items.filter((r) => r.deleted).length}
+                    onConfirm={() => void deleteItems(items.filter((r) => r.deleted).map((r) => r.id))}
+                  />
                 </>
               }
             />

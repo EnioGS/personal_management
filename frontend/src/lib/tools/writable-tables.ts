@@ -1,3 +1,4 @@
+import type { DecryptedRow } from '@/lib/secure-store/create-encrypted-table'
 import type { TableSchema } from '@/lib/table-schema'
 import { contributionsSchema, useContributionsStore } from '@/sections/investments/contributions-store'
 import { transactionSchema } from '@/sections/investments/transaction-schema'
@@ -7,7 +8,12 @@ import { incomeSchema, useIncomeStore } from '@/sections/finances/income-store'
 import { spendingSchema, useSpendingStore } from '@/sections/finances/spending-store'
 
 interface ListStoreLike<T> {
-  getState: () => { addItems: (values: T[]) => Promise<void> }
+  getState: () => {
+    items: DecryptedRow<T>[]
+    addItem: (value: T) => Promise<number>
+    addItems: (values: T[]) => Promise<void>
+    updateItem: (id: number, value: T) => Promise<void>
+  }
 }
 
 export interface WritableTable<T = any> {

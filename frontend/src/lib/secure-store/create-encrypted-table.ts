@@ -54,5 +54,9 @@ export function createEncryptedTable<T>(table: EntityTable<EncryptedRow, 'id'>) 
     await table.delete(id)
   }
 
-  return { add, bulkAdd, list, remove, update }
+  async function removeMany(ids: number[]): Promise<void> {
+    await table.bulkDelete(ids)
+  }
+
+  return { add, bulkAdd, list, remove, removeMany, update }
 }

@@ -10,8 +10,16 @@ describe('findTool', () => {
     expect(findTool('does_not_exist')).toBeUndefined()
   })
 
-  it('registers all three tools', () => {
-    expect(toolRegistry.map((t) => t.name)).toEqual(['read_text_file', 'read_csv', 'write_to_table'])
+  it('registers all seven tools', () => {
+    expect(toolRegistry.map((t) => t.name)).toEqual([
+      'read_text_file',
+      'read_csv',
+      'write_to_table',
+      'read_table',
+      'update_table_rows',
+      'delete_table_rows',
+      'restore_table_rows',
+    ])
   })
 })
 

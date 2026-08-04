@@ -14,6 +14,11 @@
     "importDescription": "Envie um arquivo CSV com as colunas desta tabela. As linhas são validadas antes da importação.",
     "importValidCount": "{{count}} linha(s) pronta(s) para importar.",
     "importRowError": "Linha {{row}}: {{message}}",
-    "importConfirm": "Importar {{count}} linha(s)"
+    "importConfirm": "Importar {{count}} linha(s)",
+    "deleteFlagged": "Excluir linhas sinalizadas ({{count}})",
+    "deleteFlaggedDialogTitle": "Excluir permanentemente {{count}} linha(s) sinalizada(s)?",
+    "deleteFlaggedDialogDescription": "Isso as remove definitivamente — não pode ser desfeito. Linhas sinalizadas pelo assistente continuam recuperáveis (via Restaurar) até que isso seja feito.",
+    "deleteFlaggedDialogCancel": "Cancelar",
+    "deleteFlaggedDialogConfirm": "Excluir definitivamente"
   }
 }
