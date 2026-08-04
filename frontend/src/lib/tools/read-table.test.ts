@@ -53,22 +53,29 @@ describe('readTableTool', () => {
     expect(result).toContain('true') // the flagged row's deleted column
   })
 
-  it('rejects an unscoped read once filtered rows exceed the cap', async () => {
-    unlock()
-    const rows = Array.from({ length: 201 }, (_, i) => ({
-      date: Date.parse('2026-01-01') + i * 86_400_000,
-      category: 'Outros' as const,
-      amount: 1,
-    }))
-    await useSpendingStore.getState().addItems(rows)
+  it(
+    'rejects an unscoped read once filtered rows exceed the cap',
+    async () => {
+      unlock()
+      const rows = Array.from({ length: 201 }, (_, i) => ({
+        date: Date.parse('2026-01-01') + i * 86_400_000,
+        category: 'Outros' as const,
+        amount: 1,
+      }))
+      await useSpendingStore.getState().addItems(rows)
 
-    const result = await readTableTool.execute({ table: 'spending' }, context)
-    expect(result).toContain('too many to return at once')
+      const result = await readTableTool.execute({ table: 'spending' }, context)
+      expect(result).toContain('too many to return at once')
 
-    const scopedResult = await readTableTool.execute(
-      { table: 'spending', dateFrom: '2026-01-01', dateTo: '2027-01-01' },
-      context,
-    )
-    expect(scopedResult).toContain('too many to return at once')
-  })
+      const scopedResult = await readTableTool.execute(
+        { table: 'spending', dateFrom: '2026-01-01', dateTo: '2027-01-01' },
+        context,
+      )
+      expect(scopedResult).toContain('too many to return at once')
+    },
+    // 201 rows each go through a real, deliberately-expensive PBKDF2 (250k iterations) key
+    // derivation (lib/crypto/envelope.ts) — comfortably fast locally, but slow CI runners can
+    // exceed Vitest's default 5s test timeout purely on this test's unusually large row count.
+    30_000,
+  )
 })
