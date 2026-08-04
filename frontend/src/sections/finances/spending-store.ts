@@ -9,6 +9,8 @@ export type SpendingRow = {
   category: string
   amount: number
   note?: string
+  /** Soft-delete flag — not a visible column (no ColumnDef), set only via the assistant's tools or the app UI. */
+  deleted?: boolean
 }
 
 export const SPENDING_CATEGORIES = ['Alimentação', 'Contas', 'Transporte', 'Lazer', 'Saúde', 'Outros'] as const

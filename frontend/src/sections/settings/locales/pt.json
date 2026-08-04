@@ -4,7 +4,8 @@
   },
   "items": {
     "appearance": "Aparência",
-    "general": "Geral"
+    "general": "Geral",
+    "assistant": "Assistente"
   },
   "appearance": {
     "heading": "Aparência",
@@ -18,5 +19,16 @@
     "languageLabel": "Idioma",
     "portuguese": "Português",
     "english": "Inglês"
+  },
+  "assistant": {
+    "heading": "Assistente",
+    "connectionLabel": "Conexão",
+    "connectionDescription": "Usa o OpenRouter (openrouter.ai) — uma chave, vários modelos. A chave é armazenada criptografada, como tudo mais no cofre.",
+    "apiKeyPlaceholder": "Chave de API do OpenRouter",
+    "apiKeyFromEnv": "Preenchido a partir do seu .env local (VITE_OPENROUTER_API_KEY) — clique em Salvar para guardá-la no cofre, ou edite aqui para usar outra chave.",
+    "modelPlaceholder": "Selecione um modelo",
+    "systemPromptLabel": "Prompt do sistema",
+    "systemPromptDescription": "Enviado ao modelo no início de cada conversa. Não é traduzido — sempre salvo e usado no idioma em que você escrevê-lo.",
+    "save": "Salvar"
   }
 }

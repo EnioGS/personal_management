@@ -85,7 +85,16 @@ describe('vault-file', () => {
     const valid: VaultExportFile = {
       version: VAULT_EXPORT_VERSION,
       exportedAt: Date.now(),
-      tables: { spending: [], income: [], variableIncome: [], fixedIncome: [], contributions: [], notes: [] },
+      tables: {
+        spending: [],
+        income: [],
+        variableIncome: [],
+        fixedIncome: [],
+        contributions: [],
+        notes: [],
+        assistantPrompts: [],
+        assistantConfig: [],
+      },
     }
 
     it('accepts a well-formed export', () => {

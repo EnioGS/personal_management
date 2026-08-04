@@ -7,6 +7,8 @@ export type IncomeRow = {
   source: string
   amount: number
   note?: string
+  /** Soft-delete flag — not a visible column (no ColumnDef), set only via the assistant's tools or the app UI. */
+  deleted?: boolean
 }
 
 export const INCOME_SOURCES = ['Salário', 'Freelance', 'Investimentos', 'Outros'] as const

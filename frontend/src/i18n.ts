@@ -4,6 +4,8 @@ import { readInitialLocale } from '@/lib/locale'
 
 import commonEn from '@/locales/common/en.json'
 import commonPt from '@/locales/common/pt.json'
+import chatEn from '@/components/chat/locales/en.json'
+import chatPt from '@/components/chat/locales/pt.json'
 import financesEn from '@/sections/finances/locales/en.json'
 import financesPt from '@/sections/finances/locales/pt.json'
 import investmentsEn from '@/sections/investments/locales/en.json'
@@ -24,6 +26,7 @@ void i18next.use(initReactI18next).init({
   resources: {
     en: {
       common: commonEn,
+      chat: chatEn,
       vault: vaultEn,
       notes: notesEn,
       finances: financesEn,
@@ -32,6 +35,7 @@ void i18next.use(initReactI18next).init({
     },
     pt: {
       common: commonPt,
+      chat: chatPt,
       vault: vaultPt,
       notes: notesPt,
       finances: financesPt,
@@ -39,7 +43,7 @@ void i18next.use(initReactI18next).init({
       settings: settingsPt,
     },
   },
-  ns: ['common', 'vault', 'notes', 'finances', 'investments', 'settings'],
+  ns: ['common', 'chat', 'vault', 'notes', 'finances', 'investments', 'settings'],
   defaultNS: 'common',
   lng: readInitialLocale(),
   fallbackLng: 'pt',

@@ -84,7 +84,10 @@ export function EditableDataTable<T extends Record<string, unknown>>({
               </TableRow>
             )}
             {table.getRowModel().rows.map((row) => (
-              <TableRow key={row.id}>
+              <TableRow
+                key={row.id}
+                className={(row.original as Record<string, unknown>).deleted ? 'opacity-50' : undefined}
+              >
                 {row.getVisibleCells().map((cell) => (
                   <TableCell key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</TableCell>
                 ))}

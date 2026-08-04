@@ -7,9 +7,11 @@ interface EncryptedListState<T> {
   items: DecryptedRow<T>[]
   isLoading: boolean
   refresh: () => Promise<void>
-  addItem: (value: T) => Promise<void>
+  addItem: (value: T) => Promise<number>
   addItems: (values: T[]) => Promise<void>
+  updateItem: (id: number, value: T) => Promise<void>
   deleteItem: (id: number) => Promise<void>
+  deleteItems: (ids: number[]) => Promise<void>
 }
 
 /**
@@ -35,9 +37,10 @@ export function createEncryptedListStore<T>(table: EntityTable<EncryptedRow, 'id
 
     addItem: async (value) => {
       const { passphrase } = useVaultStore.getState()
-      if (!passphrase) return
-      await api.add(passphrase, value)
+      if (!passphrase) return -1
+      const id = await api.add(passphrase, value)
       await get().refresh()
+      return id
     },
 
     addItems: async (values) => {
@@ -47,8 +50,20 @@ export function createEncryptedListStore<T>(table: EntityTable<EncryptedRow, 'id
       await get().refresh()
     },
 
+    updateItem: async (id, value) => {
+      const { passphrase } = useVaultStore.getState()
+      if (!passphrase) return
+      await api.update(passphrase, id, value)
+      await get().refresh()
+    },
+
     deleteItem: async (id) => {
       await api.remove(id)
+      await get().refresh()
+    },
+
+    deleteItems: async (ids) => {
+      await api.removeMany(ids)
       await get().refresh()
     },
   }))

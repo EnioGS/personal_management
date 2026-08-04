@@ -2,10 +2,7 @@
   "loading": "Loading…",
   "comingSoon": "Coming soon.",
   "unlock": {
-    "title": "Unlock your data",
-    "description": "Your data is encrypted (AES-GCM) and stored only in this browser's IndexedDB.",
-    "passphrasePlaceholder": "Passphrase",
-    "button": "Unlock",
+    "lockedMessage": "Unlock your vault (Vault → Get Started) to view this.",
     "lockButton": "Lock"
   },
   "table": {
@@ -17,6 +14,11 @@
     "importDescription": "Upload a CSV file matching this table's columns. Rows are validated before import.",
     "importValidCount": "{{count}} row(s) ready to import.",
     "importRowError": "Row {{row}}: {{message}}",
-    "importConfirm": "Import {{count}} row(s)"
+    "importConfirm": "Import {{count}} row(s)",
+    "deleteFlagged": "Delete flagged rows ({{count}})",
+    "deleteFlaggedDialogTitle": "Permanently delete {{count}} flagged row(s)?",
+    "deleteFlaggedDialogDescription": "This removes them for good — this cannot be undone. Rows flagged by the assistant stay recoverable (via Restore) until you do this.",
+    "deleteFlaggedDialogCancel": "Cancel",
+    "deleteFlaggedDialogConfirm": "Delete permanently"
   }
 }

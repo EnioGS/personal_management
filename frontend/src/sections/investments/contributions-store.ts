@@ -6,6 +6,8 @@ export type Contribution = {
   date: number
   amount: number
   destination: string
+  /** Soft-delete flag — not a visible column (no ColumnDef), set only via the assistant's tools or the app UI. */
+  deleted?: boolean
 }
 
 export const CONTRIBUTION_DESTINATIONS = ['Renda Variável', 'Renda Fixa', 'Outros'] as const

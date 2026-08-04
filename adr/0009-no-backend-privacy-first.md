@@ -30,3 +30,13 @@ No server-side attack surface or third-party data custodian to trust. Any
 future feature needing sync/remote storage must be designed against a
 private storage target the user controls, not a conventional REST/GraphQL
 backend. `docker-compose.yml` and CI stay frontend-only until that happens.
+
+One deliberate, opt-in exception: the chat assistant (`lib/openrouter.ts`,
+`lib/tools/`) calls OpenRouter directly from the browser using a key the
+user supplies themselves — nothing is proxied through infrastructure this
+project runs. It's still not a "backend" in the sense this ADR is about
+(no server we operate, no data custodian we choose on the user's behalf),
+but it is the one place data the user actively sends to the assistant
+(messages, attached file contents, and any rows a tool call writes) leaves
+the device, and only when the user has configured an API key and chosen to
+use the feature.

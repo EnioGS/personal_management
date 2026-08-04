@@ -23,6 +23,7 @@ Two things it optimizes for:
 │   │   │   ├── ui/            # shadcn/ui primitives (button, resizable, table, chart, ...)
 │   │   │   ├── charts/        # thin Recharts wrappers (line/bar/pie) + the shared color palette
 │   │   │   ├── data-table/    # editable table + CSV import/export, schema-driven
+│   │   │   ├── chat/          # global chat panel (mounted at app root, not a section)
 │   │   │   └── layout/        # activity-bar / secondary-bar / app-shell / chart-table-panel / unlock-gate
 │   │   ├── sections/          # feature registry — the extensibility mechanism
 │   │   │   ├── types.ts
@@ -31,12 +32,14 @@ Two things it optimizes for:
 │   │   │   ├── notes/         # notes.section.ts + panel/store/secure-db + locales/
 │   │   │   ├── finances/      # spending/income — charts + editable table + CSV, per option
 │   │   │   ├── investments/   # variable/fixed income (transaction ledger) + contributions
-│   │   │   └── settings/      # settings.section.ts + appearance/general panels + locales/
+│   │   │   └── settings/      # settings.section.ts + appearance/general/assistant panels + locales/
 │   │   ├── store/
 │   │   │   ├── ui-store.ts     # active section/item, secondary-bar collapsed state
 │   │   │   ├── vault-store.ts  # shared unlock passphrase — one unlock for every encrypted section
 │   │   │   ├── theme-store.ts  # light/dark/system theme
-│   │   │   └── locale-store.ts # pt/en language
+│   │   │   ├── locale-store.ts # pt/en language
+│   │   │   ├── chat-store.ts   # chat messages/attachments/status, drives the tool-calling loop
+│   │   │   └── chat-panel-store.ts # chat panel open/closed + unread state
 │   │   ├── locales/common/    # shared strings not owned by one section
 │   │   ├── lib/
 │   │   │   ├── crypto/envelope.ts        # PBKDF2 → AES-GCM primitives, shared by every section
@@ -47,6 +50,11 @@ Two things it optimizes for:
 │   │   │   ├── current-value.ts          # investment position value from transaction history
 │   │   │   ├── vault-file.ts             # whole-vault export/import (.pmvault), passphrase verification
 │   │   │   ├── file-io.ts                # save-file picker (Chromium) with a download fallback
+│   │   │   ├── openrouter.ts             # OpenRouter chat-completions client (incl. tool-calling wire format)
+│   │   │   ├── chat-attachments.ts       # validates/reads .txt/.md/.csv files attached to a chat message
+│   │   │   ├── assistant-config.ts       # API key/model (assistant-models.json is the pickable model list)
+│   │   │   ├── assistant-prompts.ts      # editable system prompt (not translated, see adr/0016)
+│   │   │   ├── tools/                    # tool-calling: registry.ts + one file per tool + run-conversation.ts loop
 │   │   │   ├── utils.ts       # cn() helper (shadcn convention)
 │   │   │   └── locale.ts      # Locale type, storage key, Intl locale-tag mapping
 │   │   ├── i18n.ts            # i18next init — registers every namespace's resources
@@ -79,6 +87,11 @@ Two things it optimizes for:
   passphrase unlocks every encrypted section (see [Decisions](#decisions)).
 - **Charts**: Recharts via shadcn/ui's `chart` wrapper; `@tanstack/react-table`
   for editable data tables; `papaparse` for CSV import/export.
+- **Assistant**: a global chat panel calling OpenRouter (openrouter.ai) directly
+  from the browser with a user-supplied API key — no backend in the loop. Tool
+  calling lets the model read attached files, and read/write/correct/flag rows
+  in Finances/Investments tables; see `lib/tools/` and [Decisions](#decisions)
+  below.
 - **i18n**: react-i18next, default Portuguese, namespace-per-section.
 - **Testing**: Vitest, colocated with the code it covers.
 - **Containerization**: Docker, one multi-stage Dockerfile (dev / production
@@ -101,6 +114,19 @@ Two things it optimizes for:
 - Encrypted storage is one generic factory (`lib/secure-store/`) plus a
   shared vault passphrase (`store/vault-store.ts`), not per-section crypto —
   every new section that needs encrypted local data reuses both.
+- The chat assistant is a global overlay (`components/chat/`), not a
+  section — it stays available regardless of which section/item is active.
+- Tools the assistant can call are a flat registry (`lib/tools/registry.ts`):
+  adding one is a single new `ToolDefinition` file plus one array entry,
+  nothing else changes. `write_to_table` discovers writable tables and their
+  columns from a small registry (`lib/tools/writable-tables.ts`) instead of
+  hardcoding them, so a new Finances/Investments table is picked up
+  automatically.
+- Nothing the assistant does to existing Finances/Investments rows is ever a
+  hard delete or in-place overwrite — a `deleted` soft-flag column marks rows
+  for removal (faded, not hidden, in the table UI) or the original of a
+  correction. Only the user can permanently purge flagged rows, via a
+  confirm-first button in each table.
 - CI intentionally minimal: lint + test + build, frontend only for now.
 - Agent commits carry no AI attribution.
 - Dual deployment (Docker anywhere + GitHub Pages) from one build output.

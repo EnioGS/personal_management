@@ -47,6 +47,42 @@ describe('createEncryptedTable', () => {
     expect(after.some((r) => r?.b === value.b)).toBe(false)
   })
 
+  it('updates a record in place, preserving its id and createdAt', async () => {
+    const passphrase = `pw-${crypto.randomUUID()}`
+    const marker = crypto.randomUUID()
+    await table.add(passphrase, { a: 1, b: `${marker}-original` })
+
+    const before = await table.list(passphrase)
+    const original = before.find((r) => r?.b === `${marker}-original`)
+    expect(original).toBeTruthy()
+
+    await table.update(passphrase, original!.id, { a: 2, b: `${marker}-updated` })
+    const after = await table.list(passphrase)
+    const updated = after.find((r) => r?.id === original!.id)
+
+    expect(updated?.b).toBe(`${marker}-updated`)
+    expect(updated?.a).toBe(2)
+    expect(updated?.createdAt).toBe(original!.createdAt)
+    expect(after.some((r) => r?.b === `${marker}-original`)).toBe(false)
+  })
+
+  it('removeMany deletes only the given ids', async () => {
+    const passphrase = `pw-${crypto.randomUUID()}`
+    const marker = crypto.randomUUID()
+    const ids = await table.bulkAdd(passphrase, [
+      { a: 1, b: `${marker}-x` },
+      { a: 2, b: `${marker}-y` },
+      { a: 3, b: `${marker}-z` },
+    ])
+
+    await table.removeMany([ids[0], ids[1]])
+    const after = await table.list(passphrase)
+    const remaining = after.filter((r) => r?.b.startsWith(marker))
+
+    expect(remaining).toHaveLength(1)
+    expect(remaining[0]?.b).toBe(`${marker}-z`)
+  })
+
   it('bulkAdd round-trips multiple records', async () => {
     const passphrase = `pw-${crypto.randomUUID()}`
     const marker = crypto.randomUUID()

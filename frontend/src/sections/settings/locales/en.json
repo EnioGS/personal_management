@@ -4,7 +4,8 @@
   },
   "items": {
     "appearance": "Appearance",
-    "general": "General"
+    "general": "General",
+    "assistant": "Assistant"
   },
   "appearance": {
     "heading": "Appearance",
@@ -18,5 +19,16 @@
     "languageLabel": "Language",
     "portuguese": "Portuguese",
     "english": "English"
+  },
+  "assistant": {
+    "heading": "Assistant",
+    "connectionLabel": "Connection",
+    "connectionDescription": "Uses OpenRouter (openrouter.ai) — one key, many models. The key is stored encrypted, like everything else in the vault.",
+    "apiKeyPlaceholder": "OpenRouter API key",
+    "apiKeyFromEnv": "Filled in from your local .env (VITE_OPENROUTER_API_KEY) — click Save to store it in the vault, or edit it here to use a different key.",
+    "modelPlaceholder": "Select a model",
+    "systemPromptLabel": "System prompt",
+    "systemPromptDescription": "Sent to the model at the start of every conversation. Not translated — always saved and used in whatever language you write it in.",
+    "save": "Save"
   }
 }

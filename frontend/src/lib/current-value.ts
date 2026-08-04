@@ -7,6 +7,8 @@ export type Transaction = {
   quantity: number
   price: number
   note?: string
+  /** Soft-delete flag — not a visible column (no ColumnDef), set only via the assistant's tools or the app UI. */
+  deleted?: boolean
 }
 
 /**

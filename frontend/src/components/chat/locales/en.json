@@ -1,0 +1,16 @@
+{
+  "panel": {
+    "toggle": "Toggle assistant chat",
+    "heading": "Assistant",
+    "clearHistory": "Clear conversation",
+    "emptyState": "No messages yet.",
+    "inputPlaceholder": "Message the assistant…",
+    "send": "Send",
+    "locked": "Unlock your vault (Vault → Get Started) to chat.",
+    "attachButton": "Attach a file",
+    "dropHint": "Drop .txt or .md files here",
+    "removeAttachment": "Remove attachment",
+    "statusWaiting": "Waiting for a response…",
+    "statusUsingTool": "Using tool: {{name}}…"
+  }
+}

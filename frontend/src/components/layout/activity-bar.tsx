@@ -28,18 +28,19 @@ export function ActivityBar() {
             className={cn(
               'relative size-[3.375rem]',
               section.brand
-                ? 'rounded-lg bg-brand text-brand-foreground hover:bg-brand/90 hover:text-brand-foreground'
+                ? cn(
+                    'rounded-lg bg-brand text-brand-foreground hover:bg-brand-hover hover:text-brand-foreground dark:hover:bg-brand-hover',
+                    // Active state reuses the hover color instead of the generic accent-line
+                    // indicator below — a separate thin line reads as a rendering glitch on
+                    // top of an already-colored, rounded brand box.
+                    isActive && 'bg-brand-hover dark:bg-brand-hover',
+                  )
                 : 'text-sidebar-foreground/70 hover:text-sidebar-foreground',
               isActive && !section.brand && 'bg-sidebar-accent text-sidebar-foreground',
             )}
           >
-            {isActive && (
-              <span
-                className={cn(
-                  'absolute inset-y-1.5 left-0 w-0.5 rounded-full',
-                  section.brand ? 'bg-brand-foreground' : 'bg-brand',
-                )}
-              />
+            {isActive && !section.brand && (
+              <span className="bg-brand absolute inset-y-1.5 left-0 w-0.5 rounded-full" />
             )}
             <section.icon className="size-[1.875rem]" />
           </Button>
