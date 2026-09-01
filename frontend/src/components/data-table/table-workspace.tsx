@@ -5,6 +5,7 @@ import { CsvImportDialog } from '@/components/data-table/csv-import-dialog'
 import { DeleteFlaggedRowsButton } from '@/components/data-table/delete-flagged-rows-button'
 import { EditableDataTable } from '@/components/data-table/editable-data-table'
 import { AddTableDialog } from '@/components/data-table/add-table-dialog'
+import { TableMenu } from '@/components/data-table/table-menu'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { entriesForTable, useEntriesStore, useTableDefsStore } from '@/lib/model/model-stores'
 import { TABLE_KIND_SCHEMAS } from '@/lib/model/table-kinds'
@@ -27,6 +28,8 @@ export function TableWorkspace({ workspaceId, kinds }: TableWorkspaceProps) {
   const { t } = useTranslation()
   const tableDefs = useTableDefsStore((s) => s.items)
   const addTable = useTableDefsStore((s) => s.addItem)
+  const updateTable = useTableDefsStore((s) => s.updateItem)
+  const deleteTable = useTableDefsStore((s) => s.deleteItem)
   const entries = useEntriesStore((s) => s.items)
   const addEntry = useEntriesStore((s) => s.addItem)
   const addEntries = useEntriesStore((s) => s.addItems)
@@ -46,6 +49,16 @@ export function TableWorkspace({ workspaceId, kinds }: TableWorkspaceProps) {
   const schema = active ? TABLE_KIND_SCHEMAS[active.kind] : []
   const flagged = rows.filter((row) => row.deleted)
 
+  // Deleting a table takes its rows with it — nothing else can reach an entry once its
+  // tableId no longer resolves to a definition, so leaving them behind would only be
+  // silent, unreachable storage rather than a real safety net.
+  async function handleDeleteTable() {
+    if (!active) return
+    const ids = entriesForTable(entries, active.id).map((row) => row.id)
+    if (ids.length > 0) await deleteEntries(ids)
+    await deleteTable(active.id)
+  }
+
   const selector = (
     <div className="flex items-center gap-1.5">
       {available.length > 0 && (
@@ -64,6 +77,16 @@ export function TableWorkspace({ workspaceId, kinds }: TableWorkspaceProps) {
             ))}
           </SelectContent>
         </Select>
+      )}
+      {active && (
+        <TableMenu
+          tableName={active.name}
+          onRename={(name) => {
+            const { id, createdAt: _createdAt, ...def } = active
+            void updateTable(id, { ...def, name })
+          }}
+          onDelete={() => void handleDeleteTable()}
+        />
       )}
       <AddTableDialog kinds={kinds} onCreate={(table) => void addTable(table)} />
     </div>

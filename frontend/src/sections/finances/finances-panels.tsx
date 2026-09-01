@@ -6,17 +6,19 @@ import { CATEGORICAL_PALETTE, DOMAIN_COLOR } from '@/components/charts/chart-col
 import { ChartTablePanel } from '@/components/layout/chart-table-panel'
 import { TableWorkspace } from '@/components/data-table/table-workspace'
 import { bucketByMonth, formatDateLabel, formatMonthLabel, groupByKey, runningBalance } from '@/lib/aggregations'
+import type { TableKind } from '@/lib/model/types'
 import { useActiveTableEntries, useEntriesOfKinds } from '@/lib/model/use-model-data'
 
-/** Kinds that hold money movements, in the order a workspace should offer them. */
-const MONEY_KINDS = ['generic', 'bankLedger', 'cardLedger'] as const
+/** Every kind that represents money moving, in the order Overview should roll them up. */
+const MONEY_KINDS: TableKind[] = ['bankLedger', 'generic', 'cardLedger']
 
 export function OverviewPanel() {
   const { t } = useTranslation('finances')
-  const rows = useEntriesOfKinds(['generic', 'bankLedger', 'cardLedger'])
+  const rows = useEntriesOfKinds(MONEY_KINDS)
 
-  // Until dashboards land (Phase 5), Overview reads every money table at once so it
-  // reflects the same data the leaf panels write, rather than a stale snapshot.
+  // Rolls up every money table at once, so Overview reflects the same data the leaf
+  // panels write rather than a stale snapshot of just one of them. Only bankLedger
+  // entries carry a real direction; generic and card spend count as outgoing.
   const { incoming, outgoing } = useMemo(() => {
     const incoming: { date: number; amount: number }[] = []
     const outgoing: { date: number; amount: number }[] = []
@@ -45,12 +47,25 @@ export function OverviewPanel() {
   )
 }
 
-function MoneyPanel({ workspaceId, label, color }: { workspaceId: string; label: string; color: typeof DOMAIN_COLOR.spending }) {
-  const rows = useActiveTableEntries(workspaceId, [...MONEY_KINDS])
+/** One workspace's chart+table, driven by whichever table kind that workspace holds. */
+function LedgerPanel({
+  workspaceId,
+  kind,
+  label,
+  color,
+  categoryField = 'category',
+}: {
+  workspaceId: string
+  kind: TableKind
+  label: string
+  color: typeof DOMAIN_COLOR.spending
+  categoryField?: string
+}) {
+  const rows = useActiveTableEntries(workspaceId, [kind])
   const visible = rows.filter((row) => !row.deleted)
 
   const lineData = bucketByMonth(visible, 'date', 'amount').map((d) => ({ month: d.month, amount: d.total }))
-  const pieData = groupByKey(visible, 'category', 'amount').map((d, i) => ({
+  const pieData = groupByKey(visible, categoryField, 'amount').map((d, i) => ({
     key: d.label,
     label: d.label,
     value: d.value,
@@ -73,19 +88,29 @@ function MoneyPanel({ workspaceId, label, color }: { workspaceId: string; label:
               <AppPieChart data={pieData} />
             </div>
           }
-          table={<TableWorkspace workspaceId={workspaceId} kinds={[...MONEY_KINDS]} />}
+          table={<TableWorkspace workspaceId={workspaceId} kinds={[kind]} />}
         />
       </div>
     </div>
   )
 }
 
-export function SpendingPanel() {
+/** Per-account bank statement: money in and out for whichever account's table is selected. */
+export function MovementsPanel() {
   const { t } = useTranslation('finances')
-  return <MoneyPanel workspaceId="spending" label={t('items.spending')} color={DOMAIN_COLOR.spending} />
+  return (
+    <LedgerPanel workspaceId="movements" kind="bankLedger" label={t('items.movements')} color={DOMAIN_COLOR.movements} />
+  )
 }
 
-export function IncomePanel() {
+/** All outgoing money that isn't a bank account's own statement or a card's own ledger. */
+export function SpendingPanel() {
   const { t } = useTranslation('finances')
-  return <MoneyPanel workspaceId="income" label={t('items.income')} color={DOMAIN_COLOR.income} />
+  return <LedgerPanel workspaceId="spending" kind="generic" label={t('items.spending')} color={DOMAIN_COLOR.spending} />
+}
+
+/** Credit-card focus: one table per card. */
+export function CardsPanel() {
+  const { t } = useTranslation('finances')
+  return <LedgerPanel workspaceId="cards" kind="cardLedger" label={t('items.cards')} color={DOMAIN_COLOR.cards} />
 }

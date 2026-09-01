@@ -24,7 +24,15 @@
     "noAccountsYet": "Nenhuma conta ainda — adicione uma em Configurações, ou crie a tabela agora e vincule depois.",
     "noCardsYet": "Nenhum cartão ainda — adicione um em Configurações, ou crie a tabela agora e vincule depois.",
     "addTableConfirm": "Criar tabela",
-    "noTablesYet": "Nenhuma tabela aqui ainda. Crie uma para começar a registrar dados."
+    "noTablesYet": "Nenhuma tabela aqui ainda. Crie uma para começar a registrar dados.",
+    "tableMenu": "Opções da tabela",
+    "renameTable": "Renomear",
+    "renameTableConfirm": "Renomear",
+    "deleteTable": "Excluir tabela",
+    "deleteTableDialogTitle": "Excluir \"{{name}}\"?",
+    "deleteTableDialogDescription": "Isso exclui permanentemente a tabela e todas as suas linhas. Não pode ser desfeito.",
+    "deleteTableConfirm": "Excluir tabela",
+    "addTableCancel": "Cancelar"
   },
   "columns": {
     "date": "Data",

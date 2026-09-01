@@ -4,8 +4,9 @@
   },
   "items": {
     "overview": "Overview",
+    "movements": "Movements",
     "spending": "Spending",
-    "income": "Income"
+    "cards": "Cards"
   },
   "columns": {
     "date": "Date",

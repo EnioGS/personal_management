@@ -22,11 +22,12 @@ export const CATEGORICAL_PALETTE: ThemedColor[] = [
 
 /** Fixed per-domain identity colors, reused everywhere that series appears (Overview + its own leaf chart). */
 export const DOMAIN_COLOR = {
-  income: CATEGORICAL_PALETTE[0],
+  movements: CATEGORICAL_PALETTE[0],
   spending: CATEGORICAL_PALETTE[1],
   variableIncome: CATEGORICAL_PALETTE[2],
   fixedIncome: CATEGORICAL_PALETTE[3],
   contributions: CATEGORICAL_PALETTE[4],
   /** The rollup/overview metric (running balance, combined portfolio value) — distinct from any single domain above. */
   balance: CATEGORICAL_PALETTE[5],
+  cards: CATEGORICAL_PALETTE[6],
 } as const

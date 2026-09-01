@@ -4,8 +4,9 @@
   },
   "items": {
     "overview": "Visão Geral",
+    "movements": "Movimentações",
     "spending": "Gastos",
-    "income": "Receitas"
+    "cards": "Cartões"
   },
   "columns": {
     "date": "Data",

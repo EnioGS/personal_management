@@ -24,7 +24,15 @@
     "noAccountsYet": "No accounts yet — add one in Settings, or create the table now and link it later.",
     "noCardsYet": "No cards yet — add one in Settings, or create the table now and link it later.",
     "addTableConfirm": "Create table",
-    "noTablesYet": "No tables here yet. Create one to start entering data."
+    "noTablesYet": "No tables here yet. Create one to start entering data.",
+    "tableMenu": "Table options",
+    "renameTable": "Rename",
+    "renameTableConfirm": "Rename",
+    "deleteTable": "Delete table",
+    "deleteTableDialogTitle": "Delete \"{{name}}\"?",
+    "deleteTableDialogDescription": "This permanently deletes the table and every row in it. This cannot be undone.",
+    "deleteTableConfirm": "Delete table",
+    "addTableCancel": "Cancel"
   },
   "columns": {
     "date": "Date",
