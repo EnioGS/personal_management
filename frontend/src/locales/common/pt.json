@@ -2,9 +2,7 @@
   "loading": "Carregando…",
   "comingSoon": "Em breve.",
   "table": {
-    "add": "Adicionar",
     "delete": "Excluir",
-    "noRows": "Nenhum registro ainda.",
     "exportCsv": "Exportar CSV",
     "importCsv": "Importar CSV",
     "importDescription": "Envie um arquivo CSV com as colunas desta tabela. As linhas são validadas antes da importação.",

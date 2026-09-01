@@ -20,7 +20,7 @@ export function CsvExportButton<T extends Record<string, unknown>>({
     <Button
       type="button"
       variant="outline"
-      size="sm"
+      size="xs"
       onClick={() => {
         const csv = exportCsv(rows, schema)
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
@@ -32,7 +32,7 @@ export function CsvExportButton<T extends Record<string, unknown>>({
         URL.revokeObjectURL(url)
       }}
     >
-      <Download className="size-4" />
+      <Download className="size-3.5" />
       {t('table.exportCsv')}
     </Button>
   )

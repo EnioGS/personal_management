@@ -39,8 +39,8 @@ export function CsvImportDialog<T extends Record<string, unknown>>({ schema, onI
       }}
     >
       <DialogTrigger asChild>
-        <Button type="button" variant="outline" size="sm">
-          <Upload className="size-4" />
+        <Button type="button" variant="outline" size="xs">
+          <Upload className="size-3.5" />
           {t('table.importCsv')}
         </Button>
       </DialogTrigger>

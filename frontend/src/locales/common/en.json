@@ -2,9 +2,7 @@
   "loading": "Loading…",
   "comingSoon": "Coming soon.",
   "table": {
-    "add": "Add",
     "delete": "Delete",
-    "noRows": "No rows yet.",
     "exportCsv": "Export CSV",
     "importCsv": "Import CSV",
     "importDescription": "Upload a CSV file matching this table's columns. Rows are validated before import.",

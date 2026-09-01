@@ -23,7 +23,7 @@ Two things it optimizes for:
 │   │   ├── components/
 │   │   │   ├── ui/            # shadcn/ui primitives (button, resizable, table, chart, ...)
 │   │   │   ├── charts/        # thin Recharts wrappers (line/bar/pie) + the shared color palette
-│   │   │   ├── data-table/    # editable table + CSV import/export, schema-driven
+│   │   │   ├── data-table/    # table with an inline draft row for adding data + CSV import/export
 │   │   │   ├── chat/          # global chat panel (mounted at app root, not a section)
 │   │   │   └── layout/        # activity-bar / secondary-bar / app-shell / chart-table-panel
 │   │   ├── sections/          # feature registry — the extensibility mechanism
@@ -31,7 +31,7 @@ Two things it optimizes for:
 │   │   │   ├── index.ts       # aggregates all sections into one array
 │   │   │   ├── vault/         # brand-mark section: Data (export/import/clear) + About
 │   │   │   ├── notes/         # notes.section.ts + panel/store/notes-db + locales/
-│   │   │   ├── finances/      # spending/income — charts + editable table + CSV, per option
+│   │   │   ├── finances/      # spending/income — charts + a table with inline row entry + CSV, per option
 │   │   │   ├── investments/   # variable/fixed income (transaction ledger) + contributions
 │   │   │   └── settings/      # settings.section.ts + appearance/general/assistant panels + locales/
 │   │   ├── store/
@@ -43,7 +43,7 @@ Two things it optimizes for:
 │   │   ├── locales/common/    # shared strings not owned by one section
 │   │   ├── lib/
 │   │   │   ├── local-store/              # generic Dexie-table + Zustand-store factories
-│   │   │   ├── table-schema.ts           # column schema driving tables, CSV, and add-row forms
+│   │   │   ├── table-schema.ts           # column schema driving tables, CSV, and the draft-row inputs
 │   │   │   ├── csv.ts                    # CSV export/import + validation
 │   │   │   ├── aggregations.ts           # chart data-shaping (buckets, running totals)
 │   │   │   ├── current-value.ts          # investment position value from transaction history
@@ -132,6 +132,11 @@ Two things it optimizes for:
   for removal (faded, not hidden, in the table UI) or the original of a
   correction. Only the user can permanently purge flagged rows, via a
   confirm-first button in each table.
+- Every table adds rows through an always-present, faded draft row at the
+  bottom instead of a separate add-row form — it promotes itself into a
+  real row once its required columns hold valid values, then resets. See
+  adr/0021, which also covers the denser table chrome (smaller text,
+  shorter header row) this made room for.
 - CI intentionally minimal: lint + test + build, frontend only for now.
 - Agent commits carry no AI attribution.
 - Dual deployment (Docker anywhere + GitHub Pages) from one build output.

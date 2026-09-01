@@ -25,8 +25,8 @@ export function DeleteFlaggedRowsButton({ flaggedCount, onConfirm }: DeleteFlagg
   return (
     <AlertDialog>
       <AlertDialogTrigger asChild>
-        <Button type="button" variant="outline" size="sm" disabled={flaggedCount === 0}>
-          <Trash2 className="size-4" />
+        <Button type="button" variant="outline" size="xs" disabled={flaggedCount === 0}>
+          <Trash2 className="size-3.5" />
           {t('table.deleteFlagged', { count: flaggedCount })}
         </Button>
       </AlertDialogTrigger>
