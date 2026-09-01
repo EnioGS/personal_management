@@ -1,24 +1,35 @@
+import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { AppLineChart } from '@/components/charts/line-chart'
 import { AppPieChart } from '@/components/charts/pie-chart'
 import { CATEGORICAL_PALETTE, DOMAIN_COLOR } from '@/components/charts/chart-colors'
-import { CsvExportButton } from '@/components/data-table/csv-export-button'
-import { CsvImportDialog } from '@/components/data-table/csv-import-dialog'
-import { DeleteFlaggedRowsButton } from '@/components/data-table/delete-flagged-rows-button'
-import { EditableDataTable } from '@/components/data-table/editable-data-table'
 import { ChartTablePanel } from '@/components/layout/chart-table-panel'
+import { TableWorkspace } from '@/components/data-table/table-workspace'
 import { bucketByMonth, formatDateLabel, formatMonthLabel, groupByKey, runningBalance } from '@/lib/aggregations'
-import { incomeSchema, useIncomeStore } from './income-store'
-import { spendingSchema, useSpendingStore } from './spending-store'
+import { useActiveTableEntries, useEntriesOfKinds } from '@/lib/model/use-model-data'
+
+/** Kinds that hold money movements, in the order a workspace should offer them. */
+const MONEY_KINDS = ['generic', 'bankLedger', 'cardLedger'] as const
 
 export function OverviewPanel() {
   const { t } = useTranslation('finances')
-  const { items: spending } = useSpendingStore()
-  const { items: income } = useIncomeStore()
-  const visibleSpending = spending.filter((r) => !r.deleted)
-  const visibleIncome = income.filter((r) => !r.deleted)
+  const rows = useEntriesOfKinds(['generic', 'bankLedger', 'cardLedger'])
 
-  const balanceData = runningBalance(visibleIncome, visibleSpending)
+  // Until dashboards land (Phase 5), Overview reads every money table at once so it
+  // reflects the same data the leaf panels write, rather than a stale snapshot.
+  const { incoming, outgoing } = useMemo(() => {
+    const incoming: { date: number; amount: number }[] = []
+    const outgoing: { date: number; amount: number }[] = []
+    for (const row of rows) {
+      if (row.deleted) continue
+      const amount = typeof row.amount === 'number' ? row.amount : 0
+      const date = typeof row.date === 'number' ? row.date : 0
+      ;(row.direction === 'in' ? incoming : outgoing).push({ date, amount })
+    }
+    return { incoming, outgoing }
+  }, [rows])
+
+  const balanceData = runningBalance(incoming, outgoing)
 
   return (
     <div className="flex h-full flex-col gap-4 p-4">
@@ -34,13 +45,12 @@ export function OverviewPanel() {
   )
 }
 
-export function SpendingPanel() {
-  const { t } = useTranslation('finances')
-  const { items, addItem, addItems, deleteItem, deleteItems } = useSpendingStore()
-  const visibleItems = items.filter((r) => !r.deleted)
+function MoneyPanel({ workspaceId, label, color }: { workspaceId: string; label: string; color: typeof DOMAIN_COLOR.spending }) {
+  const rows = useActiveTableEntries(workspaceId, [...MONEY_KINDS])
+  const visible = rows.filter((row) => !row.deleted)
 
-  const lineData = bucketByMonth(visibleItems, 'date', 'amount').map((d) => ({ month: d.month, amount: d.total }))
-  const pieData = groupByKey(visibleItems, 'category', 'amount').map((d, i) => ({
+  const lineData = bucketByMonth(visible, 'date', 'amount').map((d) => ({ month: d.month, amount: d.total }))
+  const pieData = groupByKey(visible, 'category', 'amount').map((d, i) => ({
     key: d.label,
     label: d.label,
     value: d.value,
@@ -51,91 +61,31 @@ export function SpendingPanel() {
     <div className="flex h-full flex-col">
       <div className="min-h-0 flex-1">
         <ChartTablePanel
-          id="spending"
+          id={workspaceId}
           chart={
             <div className="grid h-full grid-cols-2 gap-4 p-4">
               <AppLineChart
                 data={lineData}
                 xKey="month"
                 xFormatter={formatMonthLabel}
-                series={[{ key: 'amount', label: t('items.spending'), color: DOMAIN_COLOR.spending }]}
+                series={[{ key: 'amount', label, color }]}
               />
               <AppPieChart data={pieData} />
             </div>
           }
-          table={
-            <EditableDataTable
-              schema={spendingSchema}
-              rows={items}
-              onAddRow={(row) => void addItem(row)}
-              onDeleteRow={(id) => void deleteItem(id)}
-              actions={
-                <>
-                  <CsvExportButton rows={items} schema={spendingSchema} filename="spending.csv" />
-                  <CsvImportDialog schema={spendingSchema} onImport={(rows) => void addItems(rows)} />
-                  <DeleteFlaggedRowsButton
-                    flaggedCount={items.filter((r) => r.deleted).length}
-                    onConfirm={() => void deleteItems(items.filter((r) => r.deleted).map((r) => r.id))}
-                  />
-                </>
-              }
-            />
-          }
+          table={<TableWorkspace workspaceId={workspaceId} kinds={[...MONEY_KINDS]} />}
         />
       </div>
     </div>
   )
 }
 
+export function SpendingPanel() {
+  const { t } = useTranslation('finances')
+  return <MoneyPanel workspaceId="spending" label={t('items.spending')} color={DOMAIN_COLOR.spending} />
+}
+
 export function IncomePanel() {
   const { t } = useTranslation('finances')
-  const { items, addItem, addItems, deleteItem, deleteItems } = useIncomeStore()
-  const visibleItems = items.filter((r) => !r.deleted)
-
-  const lineData = bucketByMonth(visibleItems, 'date', 'amount').map((d) => ({ month: d.month, amount: d.total }))
-  const pieData = groupByKey(visibleItems, 'source', 'amount').map((d, i) => ({
-    key: d.label,
-    label: d.label,
-    value: d.value,
-    color: CATEGORICAL_PALETTE[i % CATEGORICAL_PALETTE.length],
-  }))
-
-  return (
-    <div className="flex h-full flex-col">
-      <div className="min-h-0 flex-1">
-        <ChartTablePanel
-          id="income"
-          chart={
-            <div className="grid h-full grid-cols-2 gap-4 p-4">
-              <AppLineChart
-                data={lineData}
-                xKey="month"
-                xFormatter={formatMonthLabel}
-                series={[{ key: 'amount', label: t('items.income'), color: DOMAIN_COLOR.income }]}
-              />
-              <AppPieChart data={pieData} />
-            </div>
-          }
-          table={
-            <EditableDataTable
-              schema={incomeSchema}
-              rows={items}
-              onAddRow={(row) => void addItem(row)}
-              onDeleteRow={(id) => void deleteItem(id)}
-              actions={
-                <>
-                  <CsvExportButton rows={items} schema={incomeSchema} filename="income.csv" />
-                  <CsvImportDialog schema={incomeSchema} onImport={(rows) => void addItems(rows)} />
-                  <DeleteFlaggedRowsButton
-                    flaggedCount={items.filter((r) => r.deleted).length}
-                    onConfirm={() => void deleteItems(items.filter((r) => r.deleted).map((r) => r.id))}
-                  />
-                </>
-              }
-            />
-          }
-        />
-      </div>
-    </div>
-  )
+  return <MoneyPanel workspaceId="income" label={t('items.income')} color={DOMAIN_COLOR.income} />
 }

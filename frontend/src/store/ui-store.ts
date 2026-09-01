@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { sections } from '@/sections'
+import { DEFAULT_SECTION_ID } from '@/sections/default-section'
 
 /**
  * How much of the secondary bar is showing. Clicking the active section's
@@ -17,15 +17,19 @@ interface UiState {
   activeSectionId: string
   /** sectionId -> last-selected itemId. Fallback-to-first-item logic lives in consumers. */
   activeItemBySection: Record<string, string>
+  /** workspaceId -> last-selected table row id, so switching panels comes back where you were. */
+  activeTableByWorkspace: Record<string, number>
   secondaryBarMode: SecondaryBarMode
   selectSection: (id: string) => void
   selectItem: (sectionId: string, itemId: string) => void
+  selectTable: (workspaceId: string, tableId: number) => void
   setSecondaryBarMode: (mode: SecondaryBarMode) => void
 }
 
 export const useUiStore = create<UiState>((set, get) => ({
-  activeSectionId: sections[0].id,
+  activeSectionId: DEFAULT_SECTION_ID,
   activeItemBySection: {},
+  activeTableByWorkspace: {},
   secondaryBarMode: 'expanded',
 
   selectSection: (id) => {
@@ -39,6 +43,9 @@ export const useUiStore = create<UiState>((set, get) => ({
 
   selectItem: (sectionId, itemId) =>
     set((s) => ({ activeItemBySection: { ...s.activeItemBySection, [sectionId]: itemId } })),
+
+  selectTable: (workspaceId, tableId) =>
+    set((s) => ({ activeTableByWorkspace: { ...s.activeTableByWorkspace, [workspaceId]: tableId } })),
 
   setSecondaryBarMode: (mode) => set({ secondaryBarMode: mode }),
 }))

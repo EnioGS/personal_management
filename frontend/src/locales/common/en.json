@@ -13,7 +13,18 @@
     "deleteFlaggedDialogTitle": "Permanently delete {{count}} flagged row(s)?",
     "deleteFlaggedDialogDescription": "This removes them for good — this cannot be undone. Rows flagged by the assistant stay recoverable (via Restore) until you do this.",
     "deleteFlaggedDialogCancel": "Cancel",
-    "deleteFlaggedDialogConfirm": "Delete permanently"
+    "deleteFlaggedDialogConfirm": "Delete permanently",
+    "addTable": "New table",
+    "addTableTitle": "New table",
+    "addTableDescription": "Its kind fixes which columns it has. Instances are unlimited — one per card or account, for example.",
+    "tableName": "Name",
+    "tableKind": "Kind",
+    "tableAccount": "Account",
+    "tableCard": "Card",
+    "noAccountsYet": "No accounts yet — add one in Settings, or create the table now and link it later.",
+    "noCardsYet": "No cards yet — add one in Settings, or create the table now and link it later.",
+    "addTableConfirm": "Create table",
+    "noTablesYet": "No tables here yet. Create one to start entering data."
   },
   "columns": {
     "date": "Date",

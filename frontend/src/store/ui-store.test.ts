@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { sections } from '@/sections'
+import { DEFAULT_SECTION_ID } from '@/sections/default-section'
 import { useUiStore } from './ui-store'
 
 const initialState = useUiStore.getState()
@@ -9,6 +10,10 @@ beforeEach(() => {
 })
 
 describe('ui-store', () => {
+  it('opens on the first registered section — the standalone default must not drift', () => {
+    expect(DEFAULT_SECTION_ID).toBe(sections[0].id)
+  })
+
   it('defaults to the first registered section, expanded, with no remembered items', () => {
     const state = useUiStore.getState()
     expect(state.activeSectionId).toBe(sections[0].id)

@@ -13,7 +13,18 @@
     "deleteFlaggedDialogTitle": "Excluir permanentemente {{count}} linha(s) sinalizada(s)?",
     "deleteFlaggedDialogDescription": "Isso as remove definitivamente — não pode ser desfeito. Linhas sinalizadas pelo assistente continuam recuperáveis (via Restaurar) até que isso seja feito.",
     "deleteFlaggedDialogCancel": "Cancelar",
-    "deleteFlaggedDialogConfirm": "Excluir definitivamente"
+    "deleteFlaggedDialogConfirm": "Excluir definitivamente",
+    "addTable": "Nova tabela",
+    "addTableTitle": "Nova tabela",
+    "addTableDescription": "O tipo define quais colunas ela tem. A quantidade é ilimitada — uma por cartão ou conta, por exemplo.",
+    "tableName": "Nome",
+    "tableKind": "Tipo",
+    "tableAccount": "Conta",
+    "tableCard": "Cartão",
+    "noAccountsYet": "Nenhuma conta ainda — adicione uma em Configurações, ou crie a tabela agora e vincule depois.",
+    "noCardsYet": "Nenhum cartão ainda — adicione um em Configurações, ou crie a tabela agora e vincule depois.",
+    "addTableConfirm": "Criar tabela",
+    "noTablesYet": "Nenhuma tabela aqui ainda. Crie uma para começar a registrar dados."
   },
   "columns": {
     "date": "Data",
