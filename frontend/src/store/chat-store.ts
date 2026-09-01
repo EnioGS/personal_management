@@ -88,7 +88,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       set({ messages: [...get().messages, errorMessage], isSending: false, status: { type: 'idle' } })
     }
 
-    if (!useChatPanelStore.getState().isOpen) useChatPanelStore.getState().markUnread()
+    if (useChatPanelStore.getState().panelWidth === 0) useChatPanelStore.getState().markUnread()
   },
 
   clearMessages: () => set({ messages: [], attachments: [] }),

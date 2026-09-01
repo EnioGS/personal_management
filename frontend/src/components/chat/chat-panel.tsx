@@ -3,19 +3,13 @@ import { GripVertical, Hourglass, Paperclip, Trash2, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { readAttachedFile } from '@/lib/chat-attachments'
 import { cn } from '@/lib/utils'
-import { useChatPanelStore } from '@/store/chat-panel-store'
+import { useChatPanelStore, MAX_PANEL_WIDTH } from '@/store/chat-panel-store'
 import { useChatStore } from '@/store/chat-store'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 
-const PANEL_WIDTH = 768
-const HANDLE_WIDTH = 28
-const DRAG_THRESHOLD = 60
-
-function clamp(value: number, min: number, max: number) {
-  return Math.min(Math.max(value, min), max)
-}
+const DRAG_THRESHOLD = 10
 
 /**
  * Global chat overlay — mounted once at the app root (see App.tsx), not inside
@@ -25,10 +19,10 @@ function clamp(value: number, min: number, max: number) {
  */
 export function ChatPanel() {
   const { t } = useTranslation('chat')
-  const isOpen = useChatPanelStore((s) => s.isOpen)
+  const panelWidth = useChatPanelStore((s) => s.panelWidth)
   const hasUnread = useChatPanelStore((s) => s.hasUnread)
-  const open = useChatPanelStore((s) => s.open)
-  const close = useChatPanelStore((s) => s.close)
+  const setPanelWidth = useChatPanelStore((s) => s.setPanelWidth)
+  const togglePanel = useChatPanelStore((s) => s.togglePanel)
   const markInteracted = useChatPanelStore((s) => s.markInteracted)
   const messages = useChatStore((s) => s.messages)
   const isSending = useChatStore((s) => s.isSending)
@@ -44,9 +38,14 @@ export function ChatPanel() {
   const [dragOffset, setDragOffset] = useState<number | null>(null)
   const [isDraggingFileOver, setIsDraggingFileOver] = useState(false)
   const dragStartX = useRef(0)
-  const dragStartOpen = useRef(isOpen)
+  const dragStartWidth = useRef(panelWidth)
   const didDrag = useRef(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Sync dragStartWidth with current panelWidth when panel width changes
+  useEffect(() => {
+    dragStartWidth.current = panelWidth
+  }, [panelWidth])
   const scrollAreaRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -92,12 +91,10 @@ export function ChatPanel() {
     if (e.dataTransfer.files.length > 0) void handleFilesSelected(e.dataTransfer.files)
   }
 
-  const closedTranslate = PANEL_WIDTH - HANDLE_WIDTH
-
   function handlePointerDown(e: PointerEvent<HTMLDivElement>) {
     e.currentTarget.setPointerCapture(e.pointerId)
     dragStartX.current = e.clientX
-    dragStartOpen.current = isOpen
+    dragStartWidth.current = panelWidth
     didDrag.current = false
     setDragOffset(0)
   }
@@ -116,42 +113,39 @@ export function ChatPanel() {
     markInteracted()
 
     if (!didDrag.current) {
-      if (isOpen) close()
-      else open()
+      togglePanel()
       return
     }
 
-    if (dragStartOpen.current) {
-      if (delta > DRAG_THRESHOLD) close()
-      else open()
+    const newWidth = Math.max(0, Math.min(MAX_PANEL_WIDTH, dragStartWidth.current - delta))
+    if (Math.abs(delta) > DRAG_THRESHOLD) {
+      setPanelWidth(newWidth)
     } else {
-      if (delta < -DRAG_THRESHOLD) open()
-      else close()
+      setPanelWidth(dragStartWidth.current)
     }
   }
 
-  const baseTranslate = isOpen ? 0 : closedTranslate
-  const translate = dragOffset !== null ? clamp(baseTranslate + dragOffset, 0, closedTranslate) : baseTranslate
+  // When dragging, show the proposed width; otherwise use the stored width
+  const displayWidth = dragOffset !== null ? Math.max(0, Math.min(MAX_PANEL_WIDTH, panelWidth - dragOffset)) : panelWidth
+  const translate = MAX_PANEL_WIDTH - displayWidth
 
   return (
-    // Outer window is fixed at exactly PANEL_WIDTH, right at the screen edge, and never
-    // itself moves — `overflow-hidden` here is what actually clips the sliding content
-    // below to this box. Relying on the browser to clip a `fixed` element at the
-    // viewport edge isn't a real guarantee (the earlier table-panel bug was exactly
-    // this class of issue), so the boundary is explicit instead of assumed.
-    <div className="pointer-events-none fixed inset-y-0 right-0 z-40 overflow-hidden" style={{ width: PANEL_WIDTH }}>
+    // Outer window fixed at MAX_PANEL_WIDTH, right at the screen edge. Only the
+    // displayWidth portion is visible due to overflow-hidden; the rest is off-screen.
+    // The grip handle stays visible on the left edge even when fully closed.
+    <div className="pointer-events-none fixed inset-y-0 right-0 z-40 overflow-hidden" style={{ width: MAX_PANEL_WIDTH }}>
       <div
         className={cn(
           'pointer-events-auto absolute inset-y-0 left-0 flex',
           dragOffset === null && 'transition-transform duration-200 ease-out',
         )}
-        style={{ width: PANEL_WIDTH, transform: `translateX(${translate}px)` }}
+        style={{ width: MAX_PANEL_WIDTH, transform: `translateX(${translate}px)` }}
       >
         <div
           role="button"
           tabIndex={0}
           aria-label={t('panel.toggle')}
-          aria-pressed={isOpen}
+          aria-pressed={panelWidth > 0}
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
@@ -159,8 +153,7 @@ export function ChatPanel() {
             if (e.key !== 'Enter' && e.key !== ' ') return
             e.preventDefault()
             markInteracted()
-            if (isOpen) close()
-            else open()
+            togglePanel()
           }}
           className={cn(
             'absolute top-1/2 left-0 z-10 flex h-32 w-7 -translate-y-1/2 cursor-grab touch-none items-center justify-center rounded-l-md border border-r-0 select-none active:cursor-grabbing',
