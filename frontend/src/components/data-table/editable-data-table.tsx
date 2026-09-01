@@ -1,13 +1,17 @@
-import { useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { flexRender, getCoreRowModel, useReactTable, type ColumnDef as TanstackColumnDef } from '@tanstack/react-table'
 import { Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { coerceValue } from '@/lib/csv'
 import type { StoredRow } from '@/lib/local-store/create-local-table'
 import type { ColumnDef, TableSchema } from '@/lib/table-schema'
+
+/** Idle time after the last edit before a complete draft row auto-commits (see below). */
+const COMMIT_DEBOUNCE_MS = 500
 
 interface EditableDataTableProps<T extends Record<string, unknown>> {
   schema: TableSchema<T>
@@ -99,14 +103,24 @@ export function EditableDataTable<T extends Record<string, unknown>>({
   }
 
   // The draft row promotes itself into a real row the moment every required column has
-  // a valid value — there's no separate "confirm" step, matching how the rest of the row
-  // is entered directly into the table rather than through a form.
-  function tryCommitDraft() {
-    const row = buildRowFromDraft()
-    if (!row) return
-    onAddRow(row)
-    setDraft({})
-  }
+  // held a valid value for COMMIT_DEBOUNCE_MS — there's no separate "confirm" step, and
+  // no dependency on focus/blur (a dropdown's popup isn't a DOM descendant of the row, so
+  // that wouldn't work reliably for the 'select' cells below). The debounce is what keeps
+  // this from firing mid-keystroke: typing "1" then "0" into an amount field would
+  // otherwise commit after the very first, already-numeric digit.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const row = buildRowFromDraft()
+      if (!row) return
+      onAddRow(row)
+      setDraft({})
+    }, COMMIT_DEBOUNCE_MS)
+    return () => clearTimeout(timer)
+    // Deliberately keyed on `draft` alone: `onAddRow` is typically a fresh inline callback
+    // on every parent render (e.g. `onAddRow={(row) => addItem(row)}`), and adding it here
+    // would reset this timer on every unrelated parent re-render, not just on real edits.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draft])
 
   return (
     <div className="flex h-full flex-col gap-2 p-2">
@@ -137,17 +151,8 @@ export function EditableDataTable<T extends Record<string, unknown>>({
             ))}
 
             {/* Always-present entry row, faded until it holds a complete, valid row — then
-                it commits (see tryCommitDraft) and this same row resets to empty for the next one. */}
-            <TableRow
-              className="opacity-60 focus-within:opacity-100"
-              onBlur={(e) => {
-                if (e.currentTarget.contains(e.relatedTarget as Node | null)) return
-                tryCommitDraft()
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') tryCommitDraft()
-              }}
-            >
+                it commits (see the effect above) and this same row resets to empty for the next one. */}
+            <TableRow className="opacity-60 focus-within:opacity-100">
               {schema.map((col) => (
                 <TableCell key={String(col.key)} className="p-1">
                   <DraftCell
@@ -188,15 +193,25 @@ function DraftCell<T>({
   )
 
   if (col.type === 'select') {
+    // The app's own (Radix-based) Select, not a native <select>: a native dropdown's popup
+    // is rendered by the OS toolkit on at least Linux, which ignores the page's theme
+    // entirely — this one renders in the DOM like everything else, so it's always readable.
+    // Always pass a defined string, never undefined — switching value between a real
+    // string and undefined flips Select between controlled/uncontrolled, which makes
+    // Radix's internal state stick to its last real value instead of clearing on reset.
     return (
-      <select aria-label={label} className={className} value={value} onChange={(e) => onChange(e.target.value)}>
-        <option value="" disabled hidden />
-        {col.options?.map((option) => (
-          <option key={option} value={option}>
-            {col.format ? col.format(option as T[keyof T]) : option}
-          </option>
-        ))}
-      </select>
+      <Select value={value} onValueChange={onChange}>
+        <SelectTrigger aria-label={label} className={cn(className, 'justify-between')}>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {col.options?.map((option) => (
+            <SelectItem key={option} value={option} className="text-xs">
+              {col.format ? col.format(option as T[keyof T]) : option}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
     )
   }
 
