@@ -1,0 +1,37 @@
+ID,Data da compra,Estabelecimento,Categoria,Valor (R$),Forma de pagamento,Parcela,Observações
+1,05/01/2026,Supermercado Pao de Acucar,Supermercado,"R$ 189,90",Crédito,1/1,Compras do mês
+2,06/01/2026,Uber,Transporte urbano,"R$ 23,50",Débito,1/1,
+3,08/01/2026,Netflix,Assinaturas e Streaming,"R$ 39,90",Crédito,1/1,Mensalidade
+4,10/01/2026,Farmácia Droga Raia,Farmácia e Saúde,"R$ 67,80",Débito,1/1,Remédios
+5,12/01/2026,Restaurante Sabor Caseiro,Alimentação fora de casa,"R$ 82,00",Crédito,1/1,Almoço com equipe
+6,14/01/2026,Posto Ipiranga,Transporte urbano,"R$ 150,00",Crédito,1/1,Combustível
+7,15/01/2026,Companhia de Luz,Contas de casa,"R$ 245,30",Débito,1/1,Energia elétrica
+8,16/01/2026,Cinemark,Lazer e Entretenimento,"R$ 56,00",Crédito,1/1,Cinema com a família
+9,18/01/2026,iFood,Alimentação fora de casa,"R$ 45,90",Crédito,1/1,Jantar
+10,20/01/2026,Condomínio Edifício Ipê,Contas de casa,"R$ 620,00",Débito,1/1,
+11,22/01/2026,Spotify,Assinaturas e Streaming,"R$ 21,90",Crédito,1/1,
+12,24/01/2026,99,Transporte urbano,"R$ 18,20",Débito,1/1,
+13,25/01/2026,Drogaria São Paulo,Farmácia e Saúde,"R$ 34,50",Débito,1/1,
+14,27/01/2026,Academia Smart Fit,Farmácia e Saúde,"R$ 99,90",Crédito,1/1,Mensalidade academia
+15,28/01/2026,Internet Vivo Fibra,Contas de casa,"R$ 99,90",Débito,1/1,
+16,30/01/2026,Livraria Cultura,Lazer e Entretenimento,"R$ 78,40",Crédito,2/2,Livros
+17,02/02/2026,Supermercado Extra,Supermercado,"R$ 210,75",Crédito,1/1,
+18,03/02/2026,Uber,Transporte urbano,"R$ 27,00",Débito,1/1,
+19,05/02/2026,Consulta médica Dr. Almeida,Farmácia e Saúde,"R$ 350,00",Crédito,1/1,Consulta cardiologista
+20,07/02/2026,Restaurante Tempero Mineiro,Alimentação fora de casa,"R$ 63,50",Débito,1/1,
+21,09/02/2026,Netflix,Assinaturas e Streaming,"R$ 39,90",Crédito,1/1,
+22,10/02/2026,Companhia de Luz,Contas de casa,"R$ 198,10",Débito,1/1,Energia elétrica
+23,12/02/2026,Posto Shell,Transporte urbano,"R$ 140,00",Crédito,1/1,Combustível
+24,14/02/2026,Presente Aniversário,Diversos,"R$ 120,00",Crédito,1/1,Presente para amigo
+25,15/02/2026,Condomínio Edifício Ipê,Contas de casa,"R$ 620,00",Débito,1/1,
+26,17/02/2026,iFood,Alimentação fora de casa,"R$ 38,00",Crédito,1/1,
+27,19/02/2026,Farmácia Pague Menos,Farmácia e Saúde,"R$ 52,30",Débito,1/1,
+28,21/02/2026,Teatro Municipal,Lazer e Entretenimento,"R$ 90,00",Crédito,1/1,Peça de teatro
+29,23/02/2026,99,Transporte urbano,"R$ 15,60",Débito,1/1,
+30,25/02/2026,Internet Vivo Fibra,Contas de casa,"R$ 99,90",Débito,1/1,
+31,26/02/2026,Assinatura revista,Diversos,"R$ 29,90",Crédito,1/1,
+32,28/02/2026,Supermercado Pao de Acucar,Supermercado,"R$ 175,20",Crédito,1/1,
+33,02/03/2026,Spotify,Assinaturas e Streaming,"R$ 21,90",Crédito,1/1,
+34,04/03/2026,Uber,Transporte urbano,"R$ 31,40",Débito,1/1,
+35,06/03/2026,Restaurante Sabor Caseiro,Alimentação fora de casa,"R$ 74,00",Crédito,1/1,
+36,08/03/2026,Companhia de Luz,Contas de casa,"R$ 233,00",Débito,1/1,Energia elétrica
