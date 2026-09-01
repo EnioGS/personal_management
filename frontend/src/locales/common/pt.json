@@ -14,5 +14,29 @@
     "deleteFlaggedDialogDescription": "Isso as remove definitivamente — não pode ser desfeito. Linhas sinalizadas pelo assistente continuam recuperáveis (via Restaurar) até que isso seja feito.",
     "deleteFlaggedDialogCancel": "Cancelar",
     "deleteFlaggedDialogConfirm": "Excluir definitivamente"
+  },
+  "columns": {
+    "date": "Data",
+    "category": "Categoria",
+    "description": "Descrição",
+    "amount": "Valor",
+    "direction": "Tipo",
+    "note": "Observação",
+    "asset": "Ativo",
+    "transactionType": "Operação",
+    "quantity": "Quantidade",
+    "price": "Preço",
+    "destination": "Destino"
+  },
+  "tableKinds": {
+    "bankLedger": "Extrato bancário",
+    "cardLedger": "Cartão de crédito",
+    "investmentLedger": "Carteira de investimentos",
+    "contributions": "Aportes",
+    "generic": "Tabela genérica"
+  },
+  "direction": {
+    "in": "Entrada",
+    "out": "Saída"
   }
 }

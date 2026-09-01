@@ -14,5 +14,29 @@
     "deleteFlaggedDialogDescription": "This removes them for good — this cannot be undone. Rows flagged by the assistant stay recoverable (via Restore) until you do this.",
     "deleteFlaggedDialogCancel": "Cancel",
     "deleteFlaggedDialogConfirm": "Delete permanently"
+  },
+  "columns": {
+    "date": "Date",
+    "category": "Category",
+    "description": "Description",
+    "amount": "Amount",
+    "direction": "Type",
+    "note": "Note",
+    "asset": "Asset",
+    "transactionType": "Operation",
+    "quantity": "Quantity",
+    "price": "Price",
+    "destination": "Destination"
+  },
+  "tableKinds": {
+    "bankLedger": "Bank statement",
+    "cardLedger": "Credit card",
+    "investmentLedger": "Investment ledger",
+    "contributions": "Contributions",
+    "generic": "Generic table"
+  },
+  "direction": {
+    "in": "In",
+    "out": "Out"
   }
 }
