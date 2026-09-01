@@ -95,6 +95,23 @@ describe('createCategoryResolver', () => {
     expect(createCategoryResolver([PIX], rules, 'cardLedger')('PIX joao').categoryId).toBeNull()
   })
 
+  it('resolves a value spelled exactly like a category name, even with no rule for it', () => {
+    const resolve = createCategoryResolver([PIX], [])
+
+    expect(resolve('PIX')).toEqual({ label: 'PIX', categoryId: 1 })
+    expect(resolve('pix')).toEqual({ label: 'PIX', categoryId: 1 }) // case-insensitive
+  })
+
+  it('prefers an explicit rule over the exact-name fallback when both could apply', () => {
+    const resolve = createCategoryResolver(
+      [PIX, SALARY],
+      [rule(1, { categoryId: 2, match: 'equals', pattern: 'PIX' })],
+    )
+
+    // A rule renaming "PIX" to Salário should win over PIX's own exact-name match.
+    expect(resolve('PIX').label).toBe('Salário')
+  })
+
   it('treats a non-string raw value as empty', () => {
     const resolve = createCategoryResolver([PIX], [rule(1, { categoryId: 1, pattern: 'pix' })])
 

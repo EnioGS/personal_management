@@ -5,7 +5,9 @@
   "items": {
     "appearance": "Appearance",
     "general": "General",
-    "assistant": "Assistant"
+    "assistant": "Assistant",
+    "accountsCards": "Accounts & Cards",
+    "categories": "Categories"
   },
   "appearance": {
     "themeLabel": "Theme",
@@ -27,5 +29,76 @@
     "systemPromptLabel": "System prompt",
     "systemPromptDescription": "Sent to the model at the start of every conversation. Not translated — always saved and used in whatever language you write it in.",
     "save": "Save"
+  },
+  "accountsCards": {
+    "accountsHeading": "Bank accounts",
+    "accountsDescription": "Each account can have its own Movimentações table (its statement, in and out).",
+    "addAccount": "Add account",
+    "addAccountConfirm": "Add account",
+    "accountName": "Name",
+    "accountKind": "Kind",
+    "accountKinds": {
+      "checking": "Checking",
+      "savings": "Savings",
+      "cash": "Cash",
+      "broker": "Broker"
+    },
+    "institution": "Institution",
+    "noAccounts": "No accounts yet.",
+    "archive": "Archive",
+    "unarchive": "Restore",
+    "deleteAccount": "Delete account",
+    "deleteAccountDialogTitle": "Delete \"{{name}}\"?",
+    "deleteAccountDialogDescription": "This permanently deletes the account. This cannot be undone.",
+    "deleteAccountConfirm": "Delete account",
+    "deleteBlockedHasDependents": "Has a card or table linked to it — archive it instead, or remove those first.",
+    "cancel": "Cancel",
+    "cardsHeading": "Credit cards",
+    "cardsDescription": "Every card belongs to one account, the one its invoice is paid from.",
+    "addCard": "Add card",
+    "addCardConfirm": "Add card",
+    "cardName": "Name",
+    "cardAccount": "Account",
+    "cardLimit": "Limit",
+    "addAccountFirst": "Add a bank account first — a card always belongs to one.",
+    "noCards": "No cards yet.",
+    "deleteCard": "Delete card",
+    "deleteCardDialogTitle": "Delete \"{{name}}\"?",
+    "deleteCardDialogDescription": "This permanently deletes the card. This cannot be undone.",
+    "deleteCardConfirm": "Delete card"
+  },
+  "categories": {
+    "unclassifiedHeading": "Unclassified values",
+    "unclassifiedDescription": "Values found in your data that no rule resolves to a category yet.",
+    "unclassifiedCount": "{{count}} entr(y/ies)",
+    "assignToExisting": "Choose a category",
+    "assign": "Assign",
+    "promote": "New category",
+    "categoriesHeading": "Categories",
+    "categoriesDescription": "The canonical list. Deleting one also removes the rules that point at it.",
+    "newCategoryPlaceholder": "New category name",
+    "addCategory": "Add",
+    "noCategories": "No categories yet.",
+    "deleteCategory": "Delete \"{{name}}\"",
+    "rulesHeading": "Normalization rules",
+    "rulesDescription": "Maps raw values onto a category — evaluated top to bottom, first match wins.",
+    "addRule": "New rule",
+    "addRuleConfirm": "Add rule",
+    "rulePattern": "Pattern",
+    "ruleMatch": "Match",
+    "matchTypes": {
+      "contains": "Contains",
+      "equals": "Equals",
+      "startsWith": "Starts with",
+      "regex": "Regex"
+    },
+    "caseSensitive": "Case-sensitive",
+    "ruleCategory": "Category",
+    "noRules": "No rules yet.",
+    "moveUp": "Move up",
+    "moveDown": "Move down",
+    "deleteRule": "Delete rule",
+    "deleteRuleDialogTitle": "Delete this rule?",
+    "deleteRuleDialogDescription": "Values it matched go back to unclassified — nothing else changes."
   }
 }

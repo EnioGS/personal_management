@@ -5,7 +5,9 @@
   "items": {
     "appearance": "Aparência",
     "general": "Geral",
-    "assistant": "Assistente"
+    "assistant": "Assistente",
+    "accountsCards": "Contas e Cartões",
+    "categories": "Categorias"
   },
   "appearance": {
     "themeLabel": "Tema",
@@ -27,5 +29,76 @@
     "systemPromptLabel": "Prompt do sistema",
     "systemPromptDescription": "Enviado ao modelo no início de cada conversa. Não é traduzido — sempre salvo e usado no idioma em que você escrevê-lo.",
     "save": "Salvar"
+  },
+  "accountsCards": {
+    "accountsHeading": "Contas bancárias",
+    "accountsDescription": "Cada conta pode ter sua própria tabela em Movimentações (o extrato, entradas e saídas).",
+    "addAccount": "Adicionar conta",
+    "addAccountConfirm": "Adicionar conta",
+    "accountName": "Nome",
+    "accountKind": "Tipo",
+    "accountKinds": {
+      "checking": "Conta corrente",
+      "savings": "Poupança",
+      "cash": "Dinheiro",
+      "broker": "Corretora"
+    },
+    "institution": "Instituição",
+    "noAccounts": "Nenhuma conta ainda.",
+    "archive": "Arquivar",
+    "unarchive": "Restaurar",
+    "deleteAccount": "Excluir conta",
+    "deleteAccountDialogTitle": "Excluir \"{{name}}\"?",
+    "deleteAccountDialogDescription": "Isso exclui permanentemente a conta. Não pode ser desfeito.",
+    "deleteAccountConfirm": "Excluir conta",
+    "deleteBlockedHasDependents": "Tem um cartão ou tabela vinculados — arquive em vez de excluir, ou remova-os primeiro.",
+    "cancel": "Cancelar",
+    "cardsHeading": "Cartões de crédito",
+    "cardsDescription": "Todo cartão pertence a uma conta, a que paga a fatura.",
+    "addCard": "Adicionar cartão",
+    "addCardConfirm": "Adicionar cartão",
+    "cardName": "Nome",
+    "cardAccount": "Conta",
+    "cardLimit": "Limite",
+    "addAccountFirst": "Adicione uma conta bancária primeiro — todo cartão pertence a uma.",
+    "noCards": "Nenhum cartão ainda.",
+    "deleteCard": "Excluir cartão",
+    "deleteCardDialogTitle": "Excluir \"{{name}}\"?",
+    "deleteCardDialogDescription": "Isso exclui permanentemente o cartão. Não pode ser desfeito.",
+    "deleteCardConfirm": "Excluir cartão"
+  },
+  "categories": {
+    "unclassifiedHeading": "Valores não classificados",
+    "unclassifiedDescription": "Valores encontrados nos seus dados que nenhuma regra ainda resolve para uma categoria.",
+    "unclassifiedCount": "{{count}} lançamento(s)",
+    "assignToExisting": "Escolha uma categoria",
+    "assign": "Atribuir",
+    "promote": "Nova categoria",
+    "categoriesHeading": "Categorias",
+    "categoriesDescription": "A lista canônica. Excluir uma também remove as regras que apontam para ela.",
+    "newCategoryPlaceholder": "Nome da nova categoria",
+    "addCategory": "Adicionar",
+    "noCategories": "Nenhuma categoria ainda.",
+    "deleteCategory": "Excluir \"{{name}}\"",
+    "rulesHeading": "Regras de normalização",
+    "rulesDescription": "Mapeiam valores brutos para uma categoria — avaliadas de cima para baixo, a primeira que combinar vence.",
+    "addRule": "Nova regra",
+    "addRuleConfirm": "Adicionar regra",
+    "rulePattern": "Padrão",
+    "ruleMatch": "Tipo",
+    "matchTypes": {
+      "contains": "Contém",
+      "equals": "Igual a",
+      "startsWith": "Começa com",
+      "regex": "Regex"
+    },
+    "caseSensitive": "Diferenciar maiúsculas/minúsculas",
+    "ruleCategory": "Categoria",
+    "noRules": "Nenhuma regra ainda.",
+    "moveUp": "Mover para cima",
+    "moveDown": "Mover para baixo",
+    "deleteRule": "Excluir regra",
+    "deleteRuleDialogTitle": "Excluir esta regra?",
+    "deleteRuleDialogDescription": "Os valores que ela combinava voltam a ficar não classificados — nada mais muda."
   }
 }
