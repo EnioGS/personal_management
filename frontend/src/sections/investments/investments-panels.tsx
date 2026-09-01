@@ -15,8 +15,6 @@ import { transactionSchema } from './transaction-schema'
 import { useFixedIncomeStore } from './fixed-income-store'
 import { useVariableIncomeStore } from './variable-income-store'
 
-const currency = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
-
 export function OverviewPanel() {
   const { t } = useTranslation('investments')
   const { items: variableItems } = useVariableIncomeStore()
@@ -163,7 +161,6 @@ export function ContributionsPanel() {
   const visibleItems = items.filter((r) => !r.deleted)
 
   const barData = bucketByMonth(visibleItems, 'date', 'amount').map((d) => ({ month: d.month, amount: d.total }))
-  const total = visibleItems.reduce((sum, row) => sum + row.amount, 0)
 
   return (
     <div className="flex h-full flex-col">
@@ -171,18 +168,13 @@ export function ContributionsPanel() {
         <ChartTablePanel
           id="contributions"
           chart={
-            <div className="flex h-full flex-col gap-2 p-4">
-              <p className="text-muted-foreground text-sm">
-                {t('columns.total')}: <span className="text-foreground font-medium">{currency.format(total)}</span>
-              </p>
-              <div className="min-h-0 flex-1">
-                <AppBarChart
-                  data={barData}
-                  xKey="month"
-                  xFormatter={formatMonthLabel}
-                  series={{ key: 'amount', label: t('items.contributions'), color: DOMAIN_COLOR.contributions }}
-                />
-              </div>
+            <div className="h-full p-4">
+              <AppBarChart
+                data={barData}
+                xKey="month"
+                xFormatter={formatMonthLabel}
+                series={{ key: 'amount', label: t('items.contributions'), color: DOMAIN_COLOR.contributions }}
+              />
             </div>
           }
           table={

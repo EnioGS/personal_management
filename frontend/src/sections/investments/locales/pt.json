@@ -16,7 +16,6 @@
     "price": "Preço",
     "note": "Observação",
     "destination": "Destino",
-    "amount": "Valor",
-    "total": "Total"
+    "amount": "Valor"
   }
 }

@@ -171,20 +171,6 @@ export function ChatPanel() {
           </div>
         )}
 
-        <div className="flex items-center justify-between border-b p-3">
-          <h2 className="text-sm font-medium">{t('panel.heading')}</h2>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            aria-label={t('panel.clearHistory')}
-            disabled={messages.length === 0}
-            onClick={() => clearMessages()}
-          >
-            <Trash2 className="size-4" />
-          </Button>
-        </div>
-
         <div ref={scrollAreaRef} className="min-h-0 flex-1">
           <ScrollArea className="h-full">
             <div className="flex flex-col gap-2 p-3">
@@ -273,6 +259,17 @@ export function ChatPanel() {
             className="shrink-0"
           >
             <Paperclip className="size-4" />
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            aria-label={t('panel.clearHistory')}
+            disabled={messages.length === 0}
+            onClick={() => clearMessages()}
+            className="shrink-0"
+          >
+            <Trash2 className="size-4" />
           </Button>
           <Input
             placeholder={t('panel.inputPlaceholder')}

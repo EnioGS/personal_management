@@ -16,7 +16,6 @@
     "price": "Price",
     "note": "Note",
     "destination": "Destination",
-    "amount": "Amount",
-    "total": "Total"
+    "amount": "Amount"
   }
 }

@@ -1,7 +1,6 @@
 {
   "panel": {
     "toggle": "Abrir/fechar o chat do assistente",
-    "heading": "Assistente",
     "clearHistory": "Limpar conversa",
     "emptyState": "Nenhuma mensagem ainda.",
     "inputPlaceholder": "Mensagem para o assistente…",
