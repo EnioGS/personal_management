@@ -23,7 +23,7 @@
   "assistant": {
     "heading": "Assistant",
     "connectionLabel": "Connection",
-    "connectionDescription": "Uses OpenRouter (openrouter.ai) — one key, many models. The key is stored encrypted, like everything else in the vault.",
+    "connectionDescription": "Uses OpenRouter (openrouter.ai) — one key, many models. The key is stored in this browser, like everything else here.",
     "apiKeyPlaceholder": "OpenRouter API key",
     "apiKeyFromEnv": "Filled in from your local .env (VITE_OPENROUTER_API_KEY) — click Save to store it in the vault, or edit it here to use a different key.",
     "modelPlaceholder": "Select a model",

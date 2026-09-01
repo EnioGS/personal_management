@@ -23,7 +23,7 @@
   "assistant": {
     "heading": "Assistente",
     "connectionLabel": "Conexão",
-    "connectionDescription": "Usa o OpenRouter (openrouter.ai) — uma chave, vários modelos. A chave é armazenada criptografada, como tudo mais no cofre.",
+    "connectionDescription": "Usa o OpenRouter (openrouter.ai) — uma chave, vários modelos. A chave fica salva neste navegador, como todo o resto.",
     "apiKeyPlaceholder": "Chave de API do OpenRouter",
     "apiKeyFromEnv": "Preenchido a partir do seu .env local (VITE_OPENROUTER_API_KEY) — clique em Salvar para guardá-la no cofre, ou edite aqui para usar outra chave.",
     "modelPlaceholder": "Selecione um modelo",

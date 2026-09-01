@@ -1,5 +1,4 @@
 import Papa from 'papaparse'
-import { useVaultStore } from '@/store/vault-store'
 import { findWritableTable, writableTables } from './writable-tables'
 import type { ToolDefinition } from './types'
 
@@ -33,10 +32,6 @@ export const readTableTool: ToolDefinition = {
     additionalProperties: false,
   },
   execute: async (args) => {
-    if (!useVaultStore.getState().passphrase) {
-      return 'Error: vault is locked — unlock it (Vault → Get Started) before reading data.'
-    }
-
     const tableKey = typeof args.table === 'string' ? args.table : undefined
     if (!tableKey) return 'Error: "table" argument missing or not a string.'
 

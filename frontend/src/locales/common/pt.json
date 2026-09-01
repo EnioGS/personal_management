@@ -1,10 +1,6 @@
 {
   "loading": "Carregando…",
   "comingSoon": "Em breve.",
-  "unlock": {
-    "lockedMessage": "Desbloqueie seu cofre (Cofre → Começar) para ver isto.",
-    "lockButton": "Bloquear"
-  },
   "table": {
     "add": "Adicionar",
     "delete": "Excluir",

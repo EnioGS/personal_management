@@ -7,20 +7,11 @@ import { CsvImportDialog } from '@/components/data-table/csv-import-dialog'
 import { DeleteFlaggedRowsButton } from '@/components/data-table/delete-flagged-rows-button'
 import { EditableDataTable } from '@/components/data-table/editable-data-table'
 import { ChartTablePanel } from '@/components/layout/chart-table-panel'
-import { LockButton, UnlockGate } from '@/components/layout/unlock-gate'
 import { bucketByMonth, formatDateLabel, formatMonthLabel, groupByKey, runningBalance } from '@/lib/aggregations'
 import { incomeSchema, useIncomeStore } from './income-store'
 import { spendingSchema, useSpendingStore } from './spending-store'
 
 export function OverviewPanel() {
-  return (
-    <UnlockGate>
-      <OverviewContent />
-    </UnlockGate>
-  )
-}
-
-function OverviewContent() {
   const { t } = useTranslation('finances')
   const { items: spending } = useSpendingStore()
   const { items: income } = useIncomeStore()
@@ -31,10 +22,7 @@ function OverviewContent() {
 
   return (
     <div className="flex h-full flex-col gap-4 p-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-sm font-medium">{t('items.overview')}</h2>
-        <LockButton />
-      </div>
+      <h2 className="text-sm font-medium">{t('items.overview')}</h2>
       <div className="min-h-0 flex-1">
         <AppLineChart
           data={balanceData}
@@ -48,14 +36,6 @@ function OverviewContent() {
 }
 
 export function SpendingPanel() {
-  return (
-    <UnlockGate>
-      <SpendingContent />
-    </UnlockGate>
-  )
-}
-
-function SpendingContent() {
   const { t } = useTranslation('finances')
   const { items, addItem, addItems, deleteItem, deleteItems } = useSpendingStore()
   const visibleItems = items.filter((r) => !r.deleted)
@@ -70,9 +50,8 @@ function SpendingContent() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center justify-between p-4 pb-0">
+      <div className="p-4 pb-0">
         <h2 className="text-sm font-medium">{t('items.spending')}</h2>
-        <LockButton />
       </div>
       <div className="min-h-0 flex-1">
         <ChartTablePanel
@@ -113,14 +92,6 @@ function SpendingContent() {
 }
 
 export function IncomePanel() {
-  return (
-    <UnlockGate>
-      <IncomeContent />
-    </UnlockGate>
-  )
-}
-
-function IncomeContent() {
   const { t } = useTranslation('finances')
   const { items, addItem, addItems, deleteItem, deleteItems } = useIncomeStore()
   const visibleItems = items.filter((r) => !r.deleted)
@@ -135,9 +106,8 @@ function IncomeContent() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center justify-between p-4 pb-0">
+      <div className="p-4 pb-0">
         <h2 className="text-sm font-medium">{t('items.income')}</h2>
-        <LockButton />
       </div>
       <div className="min-h-0 flex-1">
         <ChartTablePanel

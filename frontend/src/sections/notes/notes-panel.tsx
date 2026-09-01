@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { LockButton, UnlockGate } from '@/components/layout/unlock-gate'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -10,14 +9,6 @@ import { useLocaleStore } from '@/store/locale-store'
 import { useNotesStore } from './notes-store'
 
 export function NotesPanel() {
-  return (
-    <UnlockGate>
-      <NotesContent />
-    </UnlockGate>
-  )
-}
-
-function NotesContent() {
   const { t } = useTranslation(['notes', 'common'])
   const locale = useLocaleStore((s) => s.locale)
   const { items: notes, isLoading, addItem, deleteItem } = useNotesStore()
@@ -25,10 +16,7 @@ function NotesContent() {
 
   return (
     <div className="flex h-full flex-col gap-4 p-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-sm font-medium">{t('heading')}</h2>
-        <LockButton />
-      </div>
+      <h2 className="text-sm font-medium">{t('heading')}</h2>
 
       <form
         className="flex gap-2"

@@ -2,7 +2,9 @@
 
 ## Status
 
-Accepted
+Superseded by adr/0019-plaintext-local-storage-no-passphrase.md — the storage
+stayed local-first (Dexie + Zustand); the encryption layer and the passphrase
+were removed.
 
 ## Context
 

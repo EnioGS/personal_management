@@ -1,5 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { useVaultStore } from '@/store/vault-store'
+import { beforeEach, describe, expect, it } from 'vitest'
 import { useIncomeStore, type IncomeRow } from './income-store'
 
 function makeRow(overrides: Partial<IncomeRow> = {}): IncomeRow {
@@ -7,37 +6,16 @@ function makeRow(overrides: Partial<IncomeRow> = {}): IncomeRow {
 }
 
 describe('income-store', () => {
-  beforeEach(() => {
-    useVaultStore.getState().lock()
-    useIncomeStore.setState({ items: [] })
+  beforeEach(async () => {
+    await useIncomeStore.getState().refresh()
+    await useIncomeStore.getState().deleteItems(useIncomeStore.getState().items.map((r) => r.id))
   })
 
-  it('auto-refreshes when the shared vault unlocks, without an explicit refresh() call', async () => {
-    const passphrase = `pw-${crypto.randomUUID()}`
-    const row = makeRow({ note: 'auto-refresh-marker' })
-
-    useVaultStore.getState().unlock(passphrase)
-    await useIncomeStore.getState().addItem(row)
-
-    useVaultStore.getState().lock()
-    expect(useIncomeStore.getState().items).toHaveLength(0)
-
-    useVaultStore.getState().unlock(passphrase)
-    await vi.waitFor(() => {
-      expect(useIncomeStore.getState().items.some((r) => r.note === 'auto-refresh-marker')).toBe(true)
-    })
-  })
-
-  it('addItem/addItems/deleteItem/refresh round-trip through the shared vault passphrase', async () => {
-    const passphrase = `pw-${crypto.randomUUID()}`
-    useVaultStore.getState().unlock(passphrase)
-
-    const row = makeRow({ note: 'single' })
-    await useIncomeStore.getState().addItem(row)
+  it('addItem/addItems/deleteItem round-trip through the browser-local table', async () => {
+    await useIncomeStore.getState().addItem(makeRow({ note: 'single' }))
     expect(useIncomeStore.getState().items.some((r) => r.note === 'single')).toBe(true)
 
-    const bulk = [makeRow({ note: 'bulk-a' }), makeRow({ note: 'bulk-b' })]
-    await useIncomeStore.getState().addItems(bulk)
+    await useIncomeStore.getState().addItems([makeRow({ note: 'bulk-a' }), makeRow({ note: 'bulk-b' })])
     expect(useIncomeStore.getState().items.filter((r) => r.note?.startsWith('bulk-'))).toHaveLength(2)
 
     const toDelete = useIncomeStore.getState().items.find((r) => r.note === 'single')
@@ -45,12 +23,13 @@ describe('income-store', () => {
     expect(useIncomeStore.getState().items.some((r) => r.note === 'single')).toBe(false)
   })
 
-  it('clears items when the vault locks', async () => {
-    useVaultStore.getState().unlock(`pw-${crypto.randomUUID()}`)
-    await useIncomeStore.getState().addItem(makeRow())
-    expect(useIncomeStore.getState().items.length).toBeGreaterThan(0)
+  it('refresh() reloads what is already stored, with no unlock step', async () => {
+    await useIncomeStore.getState().addItem(makeRow({ note: 'stored-marker' }))
 
-    useVaultStore.getState().lock()
-    expect(useIncomeStore.getState().items).toHaveLength(0)
+    // Stand in for a page reload: in-memory items dropped, storage untouched.
+    useIncomeStore.setState({ items: [] })
+    await useIncomeStore.getState().refresh()
+
+    expect(useIncomeStore.getState().items.some((r) => r.note === 'stored-marker')).toBe(true)
   })
 })

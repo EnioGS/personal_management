@@ -5,7 +5,6 @@ import { readAttachedFile } from '@/lib/chat-attachments'
 import { cn } from '@/lib/utils'
 import { useChatPanelStore } from '@/store/chat-panel-store'
 import { useChatStore } from '@/store/chat-store'
-import { useVaultStore } from '@/store/vault-store'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -40,7 +39,6 @@ export function ChatPanel() {
   const addAttachment = useChatStore((s) => s.addAttachment)
   const removeAttachment = useChatStore((s) => s.removeAttachment)
   const pushError = useChatStore((s) => s.pushError)
-  const isUnlocked = useVaultStore((s) => s.passphrase !== null)
 
   const [draft, setDraft] = useState('')
   const [dragOffset, setDragOffset] = useState<number | null>(null)
@@ -79,7 +77,6 @@ export function ChatPanel() {
   }
 
   function handleDragOver(e: DragEvent<HTMLDivElement>) {
-    if (!isUnlocked) return
     e.preventDefault()
     setIsDraggingFileOver(true)
   }
@@ -90,7 +87,6 @@ export function ChatPanel() {
   }
 
   function handleDrop(e: DragEvent<HTMLDivElement>) {
-    if (!isUnlocked) return
     e.preventDefault()
     setIsDraggingFileOver(false)
     if (e.dataTransfer.files.length > 0) void handleFilesSelected(e.dataTransfer.files)
@@ -242,69 +238,63 @@ export function ChatPanel() {
             </ScrollArea>
           </div>
 
-          {isUnlocked ? (
-            <>
-              {attachments.length > 0 && (
-                <div className="flex flex-wrap gap-1.5 border-t px-3 pt-3">
-                  {attachments.map((attachment) => (
-                    <span
-                      key={attachment.id}
-                      className="bg-muted flex items-center gap-1 rounded-full py-1 pr-1 pl-2.5 text-xs"
-                    >
-                      {attachment.name}
-                      <button
-                        type="button"
-                        aria-label={t('panel.removeAttachment')}
-                        onClick={() => removeAttachment(attachment.id)}
-                        className="hover:bg-background/60 rounded-full p-0.5"
-                      >
-                        <X className="size-3" />
-                      </button>
-                    </span>
-                  ))}
-                </div>
-              )}
-
-              <form
-                className={cn('flex gap-2 p-3', attachments.length === 0 && 'border-t')}
-                onSubmit={(e) => {
-                  e.preventDefault()
-                  if (!draft.trim() || isSending) return
-                  void sendMessage(draft.trim())
-                  setDraft('')
-                }}
-              >
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".txt,.md"
-                  multiple
-                  className="hidden"
-                  onChange={handleFileInputChange}
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  aria-label={t('panel.attachButton')}
-                  onClick={() => fileInputRef.current?.click()}
+          {attachments.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 border-t px-3 pt-3">
+              {attachments.map((attachment) => (
+                <span
+                  key={attachment.id}
+                  className="bg-muted flex items-center gap-1 rounded-full py-1 pr-1 pl-2.5 text-xs"
                 >
-                  <Paperclip className="size-4" />
-                </Button>
-                <Input
-                  placeholder={t('panel.inputPlaceholder')}
-                  value={draft}
-                  onChange={(e) => setDraft(e.target.value)}
-                  disabled={isSending}
-                />
-                <Button type="submit" disabled={!draft.trim() || isSending}>
-                  {t('panel.send')}
-                </Button>
-              </form>
-            </>
-          ) : (
-            <p className="text-muted-foreground border-t p-3 text-sm">{t('panel.locked')}</p>
+                  {attachment.name}
+                  <button
+                    type="button"
+                    aria-label={t('panel.removeAttachment')}
+                    onClick={() => removeAttachment(attachment.id)}
+                    className="hover:bg-background/60 rounded-full p-0.5"
+                  >
+                    <X className="size-3" />
+                  </button>
+                </span>
+              ))}
+            </div>
           )}
+
+          <form
+            className={cn('flex gap-2 p-3', attachments.length === 0 && 'border-t')}
+            onSubmit={(e) => {
+              e.preventDefault()
+              if (!draft.trim() || isSending) return
+              void sendMessage(draft.trim())
+              setDraft('')
+            }}
+          >
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".txt,.md"
+              multiple
+              className="hidden"
+              onChange={handleFileInputChange}
+            />
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              aria-label={t('panel.attachButton')}
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <Paperclip className="size-4" />
+            </Button>
+            <Input
+              placeholder={t('panel.inputPlaceholder')}
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              disabled={isSending}
+            />
+            <Button type="submit" disabled={!draft.trim() || isSending}>
+              {t('panel.send')}
+            </Button>
+          </form>
         </div>
       </div>
     </div>

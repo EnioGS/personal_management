@@ -7,12 +7,12 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { coerceValue } from '@/lib/csv'
-import type { DecryptedRow } from '@/lib/secure-store/create-encrypted-table'
+import type { StoredRow } from '@/lib/local-store/create-local-table'
 import type { TableSchema } from '@/lib/table-schema'
 
 interface EditableDataTableProps<T extends Record<string, unknown>> {
   schema: TableSchema<T>
-  rows: DecryptedRow<T>[]
+  rows: StoredRow<T>[]
   onAddRow: (row: T) => void
   onDeleteRow: (id: number) => void
   /** Rendered in the same root container as the form/table (e.g. CSV export/import buttons). */
@@ -28,11 +28,11 @@ export function EditableDataTable<T extends Record<string, unknown>>({
 }: EditableDataTableProps<T>) {
   const { t } = useTranslation()
 
-  const columns = useMemo<TanstackColumnDef<DecryptedRow<T>>[]>(
+  const columns = useMemo<TanstackColumnDef<StoredRow<T>>[]>(
     () => [
       ...schema.map((col) => ({
         id: String(col.key),
-        accessorFn: (row: DecryptedRow<T>) => row[col.key],
+        accessorFn: (row: StoredRow<T>) => row[col.key],
         header: () => t(col.labelKey as never),
         cell: ({ getValue }: { getValue: () => unknown }) =>
           col.format ? col.format(getValue() as T[keyof T]) : String(getValue() ?? ''),
@@ -40,7 +40,7 @@ export function EditableDataTable<T extends Record<string, unknown>>({
       {
         id: 'actions',
         header: () => null,
-        cell: ({ row }: { row: { original: DecryptedRow<T> } }) => (
+        cell: ({ row }: { row: { original: StoredRow<T> } }) => (
           <Button
             type="button"
             variant="ghost"

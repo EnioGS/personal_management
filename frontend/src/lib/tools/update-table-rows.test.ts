@@ -1,13 +1,9 @@
 import { beforeEach, describe, expect, it } from 'vitest'
+import { clearLocalStores } from '@/lib/local-store/test-utils'
 import { useSpendingStore } from '@/sections/finances/spending-store'
-import { useVaultStore } from '@/store/vault-store'
 import { updateTableRowsTool } from './update-table-rows'
 
 const context = { attachments: [] }
-
-function unlock() {
-  useVaultStore.getState().unlock(`pw-${crypto.randomUUID()}`)
-}
 
 async function seedRow() {
   const id = await useSpendingStore
@@ -17,30 +13,21 @@ async function seedRow() {
 }
 
 describe('updateTableRowsTool', () => {
-  beforeEach(() => {
-    useVaultStore.getState().lock()
-    useSpendingStore.setState({ items: [] })
-  })
-
-  it('errors when the vault is locked', async () => {
-    const result = await updateTableRowsTool.execute({ table: 'spending', updates: [{ id: 1, fields: {} }] }, context)
-    expect(result).toContain('vault is locked')
+  beforeEach(async () => {
+    await clearLocalStores(useSpendingStore)
   })
 
   it('errors on an unknown table', async () => {
-    unlock()
     const result = await updateTableRowsTool.execute({ table: 'nope', updates: [{ id: 1, fields: {} }] }, context)
     expect(result).toContain('unknown table "nope"')
   })
 
   it('errors when updates is missing, not an array, or empty', async () => {
-    unlock()
     expect(await updateTableRowsTool.execute({ table: 'spending' }, context)).toContain('"updates" argument')
     expect(await updateTableRowsTool.execute({ table: 'spending', updates: [] }, context)).toContain('"updates" argument')
   })
 
   it('reports an unknown id', async () => {
-    unlock()
     const result = await updateTableRowsTool.execute(
       { table: 'spending', updates: [{ id: 999, fields: { amount: 5 } }] },
       context,
@@ -49,7 +36,6 @@ describe('updateTableRowsTool', () => {
   })
 
   it('rejects an unknown field name (including id/createdAt/deleted)', async () => {
-    unlock()
     const id = await seedRow()
     for (const badField of ['bogus', 'id', 'createdAt', 'deleted']) {
       const result = await updateTableRowsTool.execute(
@@ -61,7 +47,6 @@ describe('updateTableRowsTool', () => {
   })
 
   it('rejects an invalid field value', async () => {
-    unlock()
     const id = await seedRow()
     const result = await updateTableRowsTool.execute(
       { table: 'spending', updates: [{ id, fields: { category: 'NotACategory' } }] },
@@ -72,14 +57,12 @@ describe('updateTableRowsTool', () => {
   })
 
   it('rejects empty fields', async () => {
-    unlock()
     const id = await seedRow()
     const result = await updateTableRowsTool.execute({ table: 'spending', updates: [{ id, fields: {} }] }, context)
     expect(result).toContain('no fields given')
   })
 
   it('processes a duplicate id in the same call only once', async () => {
-    unlock()
     const id = await seedRow()
     const result = await updateTableRowsTool.execute(
       {
@@ -96,7 +79,6 @@ describe('updateTableRowsTool', () => {
   })
 
   it('flags the old row and creates a new corrected one, merging unspecified fields', async () => {
-    unlock()
     const id = await seedRow()
 
     const result = await updateTableRowsTool.execute(

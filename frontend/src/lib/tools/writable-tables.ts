@@ -1,4 +1,4 @@
-import type { DecryptedRow } from '@/lib/secure-store/create-encrypted-table'
+import type { StoredRow } from '@/lib/local-store/create-local-table'
 import type { TableSchema } from '@/lib/table-schema'
 import { contributionsSchema, useContributionsStore } from '@/sections/investments/contributions-store'
 import { transactionSchema } from '@/sections/investments/transaction-schema'
@@ -9,7 +9,7 @@ import { spendingSchema, useSpendingStore } from '@/sections/finances/spending-s
 
 interface ListStoreLike<T> {
   getState: () => {
-    items: DecryptedRow<T>[]
+    items: StoredRow<T>[]
     addItem: (value: T) => Promise<number>
     addItems: (values: T[]) => Promise<void>
     updateItem: (id: number, value: T) => Promise<void>
@@ -26,8 +26,8 @@ export interface WritableTable<T = any> {
 
 /**
  * Single source of truth for which tables write_to_table may append rows to. Deliberately
- * separate from vault-file.ts's TABLES map (raw encrypted export/import of ALL tables incl.
- * notes/assistant config) — this one is schema-driven, plaintext-row shaped, and scoped to
+ * separate from data-file.ts's TABLES map (raw export/import of ALL tables incl.
+ * notes/assistant config) — this one is schema-driven and scoped to
  * the Finances/Investments tables the assistant is allowed to write to. A future table just
  * needs an entry here to be picked up by the tool automatically.
  */

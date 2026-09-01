@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { useVaultStore } from '@/store/vault-store'
 import { findWritableTable, writableTables } from './writable-tables'
 
 describe('writableTables', () => {
@@ -33,7 +32,6 @@ describe('findWritableTable', () => {
 
 describe('each table exposes items/addItem/addItems/updateItem', () => {
   beforeEach(() => {
-    useVaultStore.getState().lock()
   })
 
   it('every registered table has items/addItem/addItems/updateItem on its store', () => {
@@ -47,7 +45,6 @@ describe('each table exposes items/addItem/addItems/updateItem', () => {
   })
 
   it("spending's addItem resolves the new row's numeric id", async () => {
-    useVaultStore.getState().unlock(`pw-${crypto.randomUUID()}`)
     const spending = findWritableTable('spending')!
     const id = await spending.useStore.getState().addItem({ date: Date.now(), category: 'Outros', amount: 1 })
     expect(typeof id).toBe('number')

@@ -3,42 +3,54 @@
     "label": "Vault"
   },
   "items": {
-    "getStarted": "Get Started",
+    "data": "Data",
     "about": "About"
   },
-  "getStarted": {
-    "heading": "Get Started",
-    "passphrasePlaceholder": "Passphrase",
-    "newButton": "New",
-    "importButton": "Import",
-    "continueButton": "Continue",
-    "exportButton": "Export",
-    "fileDescription": "Personal Management Vault",
-    "newDialog": {
-      "title": "Create a new vault",
-      "wipeWarning": "This will permanently delete all existing data in this browser. Make sure you've exported a backup first.",
-      "confirmPassphrasePlaceholder": "Confirm passphrase",
-      "confirmAction": "Create vault",
-      "cancelAction": "Cancel"
+  "data": {
+    "heading": "Your data",
+    "description": "Everything you enter is saved in this browser and loads automatically — no account, no password, nothing sent to a server. Export a file to back it up or move it to another machine.",
+    "fileDescription": "Personal Management data",
+    "cancelAction": "Cancel",
+    "storage": {
+      "title": "Stored in this browser",
+      "counting": "Checking…",
+      "empty": "Nothing saved yet — data you add in any section shows up here.",
+      "rowCount": "{{count}} record(s) across all sections."
     },
-    "importWipeDialog": {
+    "export": {
+      "title": "Export",
+      "description": "Save every section's data to a single file you can keep as a backup or carry to another machine.",
+      "action": "Export data"
+    },
+    "import": {
+      "title": "Import",
+      "description": "Load a previously exported file. It replaces the data currently in this browser.",
+      "action": "Choose file"
+    },
+    "reset": {
+      "title": "Clear this browser's data",
+      "description": "Deletes everything stored here. Export first if you want to keep it.",
+      "action": "Clear data"
+    },
+    "importDialog": {
       "title": "Replace existing data?",
-      "description": "Importing will permanently delete all existing data in this browser and replace it with the imported file.",
-      "confirmAction": "Continue",
-      "cancelAction": "Cancel"
+      "description": "Importing permanently deletes all data currently in this browser and replaces it with the file's contents.",
+      "confirmAction": "Choose file"
+    },
+    "resetDialog": {
+      "title": "Delete all data in this browser?",
+      "description": "This permanently removes every record from every section. It cannot be undone.",
+      "confirmAction": "Delete everything"
     }
   },
   "errors": {
     "title": "Something's not right",
-    "passphraseLength": "Passphrase must be between 8 and 16 characters.",
-    "passphraseMismatch": "Passphrases do not match.",
-    "wrongPassphrase": "That passphrase doesn't match this vault's data.",
-    "malformedFile": "This file isn't a valid vault export.",
+    "malformedFile": "This file isn't a valid Personal Management export.",
     "ok": "OK"
   },
   "about": {
     "heading": "About",
-    "description": "A personal management tool to track, update, and stay on top of day-to-day life — obligations, notes, plans, spending, and investments. Local-first and encrypted: your data stays on your machine, never a server.",
+    "description": "A personal management tool to track, update, and stay on top of day-to-day life — obligations, notes, plans, spending, and investments. Local-first: your data stays in your browser, never a server.",
     "githubLabel": "View on GitHub"
   }
 }

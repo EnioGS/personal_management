@@ -1,8 +1,8 @@
-import { createEncryptedListStore } from '@/lib/secure-store/create-encrypted-list-store'
-import { notesTable } from './secure-db'
+import { createLocalListStore } from '@/lib/local-store/create-local-list-store'
+import { notesTable } from './notes-db'
 
 export interface NoteRecord {
   text: string
 }
 
-export const useNotesStore = createEncryptedListStore<NoteRecord>(notesTable)
+export const useNotesStore = createLocalListStore<NoteRecord>(notesTable)

@@ -2,7 +2,9 @@
 
 ## Status
 
-Accepted — builds on the local-first encrypted storage decision.
+Superseded by adr/0019-plaintext-local-storage-no-passphrase.md — the generic
+factories survive as `lib/local-store/`; the shared passphrase (and the vault
+store holding it) is gone.
 
 ## Context
 

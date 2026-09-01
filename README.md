@@ -3,8 +3,9 @@
 A personal management tool: a frontend and the glue (Docker Compose, env
 config, CI) to track, update, and stay on top of day-to-day life —
 obligations, notes, future plans, spending/credit cards/investments, and
-other similar things. No backend by design — data stays local-first (see
-[Backend](#backend)).
+other similar things. No backend by design — data stays in your browser
+(see [Backend](#backend)), with one-file export/import to move it between
+machines.
 
 Two things it optimizes for:
 - **Extensible by area** — each aspect of personal life (notes, finances,
@@ -24,31 +25,29 @@ Two things it optimizes for:
 │   │   │   ├── charts/        # thin Recharts wrappers (line/bar/pie) + the shared color palette
 │   │   │   ├── data-table/    # editable table + CSV import/export, schema-driven
 │   │   │   ├── chat/          # global chat panel (mounted at app root, not a section)
-│   │   │   └── layout/        # activity-bar / secondary-bar / app-shell / chart-table-panel / unlock-gate
+│   │   │   └── layout/        # activity-bar / secondary-bar / app-shell / chart-table-panel
 │   │   ├── sections/          # feature registry — the extensibility mechanism
 │   │   │   ├── types.ts
 │   │   │   ├── index.ts       # aggregates all sections into one array
-│   │   │   ├── vault/         # brand-mark section: Get Started (unlock/new/import/export) + About
-│   │   │   ├── notes/         # notes.section.ts + panel/store/secure-db + locales/
+│   │   │   ├── vault/         # brand-mark section: Data (export/import/clear) + About
+│   │   │   ├── notes/         # notes.section.ts + panel/store/notes-db + locales/
 │   │   │   ├── finances/      # spending/income — charts + editable table + CSV, per option
 │   │   │   ├── investments/   # variable/fixed income (transaction ledger) + contributions
 │   │   │   └── settings/      # settings.section.ts + appearance/general/assistant panels + locales/
 │   │   ├── store/
 │   │   │   ├── ui-store.ts     # active section/item, secondary-bar collapsed state
-│   │   │   ├── vault-store.ts  # shared unlock passphrase — one unlock for every encrypted section
 │   │   │   ├── theme-store.ts  # light/dark/system theme
 │   │   │   ├── locale-store.ts # pt/en language
 │   │   │   ├── chat-store.ts   # chat messages/attachments/status, drives the tool-calling loop
 │   │   │   └── chat-panel-store.ts # chat panel open/closed + unread state
 │   │   ├── locales/common/    # shared strings not owned by one section
 │   │   ├── lib/
-│   │   │   ├── crypto/envelope.ts        # PBKDF2 → AES-GCM primitives, shared by every section
-│   │   │   ├── secure-store/             # generic encrypted-table + Zustand-store factories
+│   │   │   ├── local-store/              # generic Dexie-table + Zustand-store factories
 │   │   │   ├── table-schema.ts           # column schema driving tables, CSV, and add-row forms
 │   │   │   ├── csv.ts                    # CSV export/import + validation
 │   │   │   ├── aggregations.ts           # chart data-shaping (buckets, running totals)
 │   │   │   ├── current-value.ts          # investment position value from transaction history
-│   │   │   ├── vault-file.ts             # whole-vault export/import (.pmvault), passphrase verification
+│   │   │   ├── data-file.ts              # whole-app export/import (.pmdata), row counts
 │   │   │   ├── file-io.ts                # save-file picker (Chromium) with a download fallback
 │   │   │   ├── openrouter.ts             # OpenRouter chat-completions client (incl. tool-calling wire format)
 │   │   │   ├── chat-attachments.ts       # validates/reads .txt/.md/.csv files attached to a chat message
@@ -82,9 +81,10 @@ Two things it optimizes for:
 
 - **Frontend**: Vite + React + TypeScript + Tailwind CSS v4 + shadcn/ui —
   fast to build with, sober default look.
-- **Local-first encrypted storage**: Dexie (IndexedDB) + Web Crypto + Zustand
-  — for client-side data that should stay off any backend. One shared
-  passphrase unlocks every encrypted section (see [Decisions](#decisions)).
+- **Local-first storage**: Dexie (IndexedDB) + Zustand — client-side data
+  that never reaches a backend. No passphrase and no encryption layer: the
+  app opens straight into whatever is stored in the browser (see
+  [Decisions](#decisions)).
 - **Charts**: Recharts via shadcn/ui's `chart` wrapper; `@tanstack/react-table`
   for editable data tables; `papaparse` for CSV import/export.
 - **Assistant**: a global chat panel calling OpenRouter (openrouter.ai) directly
@@ -104,16 +104,17 @@ Two things it optimizes for:
   (`src/sections/`), replacing shadcn/ui's `Sidebar`.
 - Reskinning is two files — `vault/vault.section.ts` (icon) + two CSS tokens.
 - The brand-mark icon is a real, clickable section (`vault`), not decoration
-  — it's the default landing section, holding vault unlock/setup (Get
-  Started) and project info (About).
-- Whole-vault backup is one encrypted file (`.pmvault`), not per-table CSV —
-  since every row is already encrypted, exporting the raw rows needs no
-  extra encryption layer to satisfy "only readable with the passphrase."
+  — it's the default landing section, holding data management (Data:
+  export / import / clear) and project info (About).
+- No passphrase, no encryption at rest: rows are plain JSON in IndexedDB and
+  every store loads itself on import, so the app opens on the user's data
+  instead of on an unlock form.
+- Whole-app backup is one JSON file (`.pmdata`), not per-table CSV — it
+  carries every table, including the ones with no CSV UI of their own.
 - No backend by design — data stays local-first or in private storage the
   user controls, not a third-party-hosted service.
-- Encrypted storage is one generic factory (`lib/secure-store/`) plus a
-  shared vault passphrase (`store/vault-store.ts`), not per-section crypto —
-  every new section that needs encrypted local data reuses both.
+- Local storage is one generic factory (`lib/local-store/`), not per-section
+  persistence code — every new section that needs stored data reuses it.
 - The chat assistant is a global overlay (`components/chat/`), not a
   section — it stays available regardless of which section/item is active.
 - Tools the assistant can call are a flat registry (`lib/tools/registry.ts`):
@@ -147,7 +148,7 @@ Tests: `npm run test` (Vitest, also part of CI).
 
 ## Backend
 
-None by design. Data stays local-first — encrypted client-side storage (see
+None by design. Data stays local-first — client-side browser storage (see
 Stack above) — or, if remote persistence is ever needed, targets private
 storage the user controls (self-hosted, private cloud bucket) rather than a
 conventional application backend. See

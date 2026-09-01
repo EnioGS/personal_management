@@ -1,4 +1,4 @@
-import { createEncryptedListStore } from '@/lib/secure-store/create-encrypted-list-store'
+import { createLocalListStore } from '@/lib/local-store/create-local-list-store'
 import type { TableSchema } from '@/lib/table-schema'
 import { contributionsTable } from './contributions-db'
 
@@ -27,4 +27,4 @@ export const contributionsSchema: TableSchema<Contribution> = [
   { key: 'amount', labelKey: 'investments:columns.amount', type: 'number', format: (v) => currency.format(v as number) },
 ]
 
-export const useContributionsStore = createEncryptedListStore<Contribution>(contributionsTable)
+export const useContributionsStore = createLocalListStore<Contribution>(contributionsTable)

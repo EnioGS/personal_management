@@ -1,4 +1,4 @@
-import { createEncryptedListStore } from '@/lib/secure-store/create-encrypted-list-store'
+import { createLocalListStore } from '@/lib/local-store/create-local-list-store'
 import type { TableSchema } from '@/lib/table-schema'
 import { incomeTable } from './income-db'
 
@@ -24,4 +24,4 @@ export const incomeSchema: TableSchema<IncomeRow> = [
   { key: 'note', labelKey: 'finances:columns.note', type: 'text' },
 ]
 
-export const useIncomeStore = createEncryptedListStore<IncomeRow>(incomeTable)
+export const useIncomeStore = createLocalListStore<IncomeRow>(incomeTable)

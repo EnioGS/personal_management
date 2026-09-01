@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { LockButton, UnlockGate } from '@/components/layout/unlock-gate'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -11,22 +10,11 @@ import { DEFAULT_SYSTEM_PROMPT, SYSTEM_PROMPT_KEY, useAssistantPromptsStore } fr
 import { cn } from '@/lib/utils'
 
 export function AssistantPanel() {
-  return (
-    <UnlockGate>
-      <AssistantContent />
-    </UnlockGate>
-  )
-}
-
-function AssistantContent() {
   const { t } = useTranslation('settings')
 
   return (
     <div className="flex h-full flex-col gap-6 overflow-auto p-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-sm font-medium">{t('assistant.heading')}</h2>
-        <LockButton />
-      </div>
+      <h2 className="text-sm font-medium">{t('assistant.heading')}</h2>
       <ConnectionSection />
       <SystemPromptSection />
     </div>

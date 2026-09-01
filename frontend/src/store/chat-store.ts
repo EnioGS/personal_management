@@ -5,7 +5,6 @@ import { formatAttachmentsForPrompt, type ChatAttachment } from '@/lib/chat-atta
 import type { OpenRouterMessage } from '@/lib/openrouter'
 import { toolsForRequest } from '@/lib/tools/registry'
 import { runConversation, type ConversationStatus } from '@/lib/tools/run-conversation'
-import { useVaultStore } from '@/store/vault-store'
 import { useChatPanelStore } from './chat-panel-store'
 
 export interface ChatMessage {
@@ -47,10 +46,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
     set({ messages: [...priorMessages, userMessage], isSending: true, status: { type: 'waiting' } })
 
     try {
-      if (!useVaultStore.getState().passphrase) {
-        throw new Error('Unlock your vault (Vault → Get Started) before chatting.')
-      }
-
       const config = useAssistantConfigStore.getState().items.find((item) => item.key === CONFIG_KEY)
       const apiKey = config?.apiKey || DEV_API_KEY
       if (!apiKey) {

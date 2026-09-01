@@ -1,7 +1,7 @@
-import { BookOpenCheck, Info, Rocket } from 'lucide-react'
+import { BookOpenCheck, Database, Info } from 'lucide-react'
 import type { AppSection } from '../types'
 import { AboutPanel } from './about-panel'
-import { GetStartedPanel } from './get-started-panel'
+import { DataPanel } from './data-panel'
 
 /**
  * Reskinning this: swap the icon below, and the `--brand`/`--brand-foreground`
@@ -14,7 +14,7 @@ export const vaultSection: AppSection = {
   icon: BookOpenCheck,
   brand: true,
   items: [
-    { id: 'getStarted', labelKey: 'vault:items.getStarted', icon: Rocket, component: GetStartedPanel },
+    { id: 'data', labelKey: 'vault:items.data', icon: Database, component: DataPanel },
     { id: 'about', labelKey: 'vault:items.about', icon: Info, component: AboutPanel },
   ],
 }

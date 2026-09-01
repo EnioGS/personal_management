@@ -2,7 +2,9 @@
 
 ## Status
 
-Accepted — builds on the shared vault unlock decision.
+Superseded by adr/0019-plaintext-local-storage-no-passphrase.md — export/import
+and the brand-mark section survive; Get Started became Data, the file is plain
+JSON (`.pmdata`), and the passphrase/unlock flow around it is gone.
 
 ## Context
 

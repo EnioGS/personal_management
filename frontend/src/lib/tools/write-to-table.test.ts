@@ -1,51 +1,33 @@
 import { beforeEach, describe, expect, it } from 'vitest'
+import { clearLocalStores } from '@/lib/local-store/test-utils'
 import { useContributionsStore } from '@/sections/investments/contributions-store'
 import { useFixedIncomeStore } from '@/sections/investments/fixed-income-store'
 import { useVariableIncomeStore } from '@/sections/investments/variable-income-store'
 import { useIncomeStore } from '@/sections/finances/income-store'
 import { useSpendingStore } from '@/sections/finances/spending-store'
-import { useVaultStore } from '@/store/vault-store'
 import { writableTables } from './writable-tables'
 import { writeToTableTool } from './write-to-table'
 
 const context = { attachments: [] }
 
-function unlock() {
-  useVaultStore.getState().unlock(`pw-${crypto.randomUUID()}`)
-}
-
 describe('writeToTableTool', () => {
-  beforeEach(() => {
-    useVaultStore.getState().lock()
-    useSpendingStore.setState({ items: [] })
-    useIncomeStore.setState({ items: [] })
-    useVariableIncomeStore.setState({ items: [] })
-    useFixedIncomeStore.setState({ items: [] })
-    useContributionsStore.setState({ items: [] })
-  })
-
-  it('errors when the vault is locked', async () => {
-    const result = await writeToTableTool.execute({ table: 'spending', rows: [{}] }, context)
-    expect(result).toContain('vault is locked')
-    expect(useSpendingStore.getState().items).toHaveLength(0)
+  beforeEach(async () => {
+    await clearLocalStores(useSpendingStore, useIncomeStore, useVariableIncomeStore, useFixedIncomeStore, useContributionsStore)
   })
 
   it('errors on an unknown table', async () => {
-    unlock()
     const result = await writeToTableTool.execute({ table: 'nope', rows: [{}] }, context)
     expect(result).toContain('unknown table "nope"')
     expect(result).toContain('spending')
   })
 
   it('errors when rows is missing, not an array, or empty', async () => {
-    unlock()
     expect(await writeToTableTool.execute({ table: 'spending' }, context)).toContain('"rows" argument')
     expect(await writeToTableTool.execute({ table: 'spending', rows: 'nope' }, context)).toContain('"rows" argument')
     expect(await writeToTableTool.execute({ table: 'spending', rows: [] }, context)).toContain('"rows" argument')
   })
 
   it('writes valid rows and reports partial rejection', async () => {
-    unlock()
     const result = await writeToTableTool.execute(
       {
         table: 'spending',
@@ -62,7 +44,6 @@ describe('writeToTableTool', () => {
   })
 
   it('rejects a select column with a value outside its options, listing the allowed values', async () => {
-    unlock()
     const result = await writeToTableTool.execute(
       { table: 'spending', rows: [{ date: '2026-01-01', category: 'NotACategory', amount: 10 }] },
       context,
@@ -73,7 +54,6 @@ describe('writeToTableTool', () => {
   })
 
   it('writes rows to each of the 5 registered tables', async () => {
-    unlock()
 
     await writeToTableTool.execute(
       { table: 'spending', rows: [{ date: '2026-01-01', category: 'Outros', amount: 10 }] },

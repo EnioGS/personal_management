@@ -3,42 +3,54 @@
     "label": "Cofre"
   },
   "items": {
-    "getStarted": "Começar",
+    "data": "Dados",
     "about": "Sobre"
   },
-  "getStarted": {
-    "heading": "Começar",
-    "passphrasePlaceholder": "Frase-senha",
-    "newButton": "Novo",
-    "importButton": "Importar",
-    "continueButton": "Continuar",
-    "exportButton": "Exportar",
-    "fileDescription": "Cofre do Personal Management",
-    "newDialog": {
-      "title": "Criar um novo cofre",
-      "wipeWarning": "Isso apagará permanentemente todos os dados existentes neste navegador. Certifique-se de já ter exportado um backup.",
-      "confirmPassphrasePlaceholder": "Confirme a frase-senha",
-      "confirmAction": "Criar cofre",
-      "cancelAction": "Cancelar"
+  "data": {
+    "heading": "Seus dados",
+    "description": "Tudo o que você registra fica salvo neste navegador e carrega automaticamente — sem conta, sem senha, nada enviado para um servidor. Exporte um arquivo para guardar um backup ou levar seus dados para outra máquina.",
+    "fileDescription": "Dados do Personal Management",
+    "cancelAction": "Cancelar",
+    "storage": {
+      "title": "Salvo neste navegador",
+      "counting": "Verificando…",
+      "empty": "Nada salvo ainda — o que você adicionar em qualquer seção aparece aqui.",
+      "rowCount": "{{count}} registro(s) em todas as seções."
     },
-    "importWipeDialog": {
-      "title": "Substituir dados existentes?",
-      "description": "Importar vai apagar permanentemente todos os dados existentes neste navegador e substituí-los pelo arquivo importado.",
-      "confirmAction": "Continuar",
-      "cancelAction": "Cancelar"
+    "export": {
+      "title": "Exportar",
+      "description": "Salve os dados de todas as seções em um único arquivo, como backup ou para levar a outra máquina.",
+      "action": "Exportar dados"
+    },
+    "import": {
+      "title": "Importar",
+      "description": "Carregue um arquivo exportado anteriormente. Ele substitui os dados atuais deste navegador.",
+      "action": "Escolher arquivo"
+    },
+    "reset": {
+      "title": "Limpar os dados deste navegador",
+      "description": "Apaga tudo o que está salvo aqui. Exporte antes se quiser guardar.",
+      "action": "Limpar dados"
+    },
+    "importDialog": {
+      "title": "Substituir os dados existentes?",
+      "description": "Importar apaga permanentemente todos os dados deste navegador e os substitui pelo conteúdo do arquivo.",
+      "confirmAction": "Escolher arquivo"
+    },
+    "resetDialog": {
+      "title": "Apagar todos os dados deste navegador?",
+      "description": "Isso remove permanentemente todos os registros de todas as seções. Não pode ser desfeito.",
+      "confirmAction": "Apagar tudo"
     }
   },
   "errors": {
     "title": "Algo não está certo",
-    "passphraseLength": "A frase-senha deve ter entre 8 e 16 caracteres.",
-    "passphraseMismatch": "As frases-senha não coincidem.",
-    "wrongPassphrase": "Essa frase-senha não corresponde aos dados deste cofre.",
-    "malformedFile": "Este arquivo não é uma exportação de cofre válida.",
+    "malformedFile": "Este arquivo não é uma exportação válida do Personal Management.",
     "ok": "OK"
   },
   "about": {
     "heading": "Sobre",
-    "description": "Uma ferramenta de gestão pessoal para acompanhar e organizar o dia a dia — compromissos, notas, planos, gastos e investimentos. Local-first e criptografado: seus dados ficam na sua máquina, nunca em um servidor.",
+    "description": "Uma ferramenta de gestão pessoal para acompanhar e organizar o dia a dia — compromissos, notas, planos, gastos e investimentos. Local-first: seus dados ficam no seu navegador, nunca em um servidor.",
     "githubLabel": "Ver no GitHub"
   }
 }

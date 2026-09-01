@@ -8,7 +8,6 @@ import { CsvImportDialog } from '@/components/data-table/csv-import-dialog'
 import { DeleteFlaggedRowsButton } from '@/components/data-table/delete-flagged-rows-button'
 import { EditableDataTable } from '@/components/data-table/editable-data-table'
 import { ChartTablePanel } from '@/components/layout/chart-table-panel'
-import { LockButton, UnlockGate } from '@/components/layout/unlock-gate'
 import { bucketByMonth, formatDateLabel, formatMonthLabel, runningPositionOverTime } from '@/lib/aggregations'
 import { getCurrentValue, type Transaction } from '@/lib/current-value'
 import { contributionsSchema, useContributionsStore } from './contributions-store'
@@ -19,14 +18,6 @@ import { useVariableIncomeStore } from './variable-income-store'
 const currency = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
 
 export function OverviewPanel() {
-  return (
-    <UnlockGate>
-      <OverviewContent />
-    </UnlockGate>
-  )
-}
-
-function OverviewContent() {
   const { t } = useTranslation('investments')
   const { items: variableItems } = useVariableIncomeStore()
   const { items: fixedItems } = useFixedIncomeStore()
@@ -43,10 +34,7 @@ function OverviewContent() {
 
   return (
     <div className="flex h-full flex-col gap-4 p-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-sm font-medium">{t('items.overview')}</h2>
-        <LockButton />
-      </div>
+      <h2 className="text-sm font-medium">{t('items.overview')}</h2>
       <div className="grid min-h-0 flex-1 grid-cols-2 gap-4">
         <AppLineChart
           data={lineData}
@@ -98,9 +86,8 @@ function TransactionLedgerPanel({
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center justify-between p-4 pb-0">
+      <div className="p-4 pb-0">
         <h2 className="text-sm font-medium">{title}</h2>
-        <LockButton />
       </div>
       <div className="min-h-0 flex-1">
         <ChartTablePanel
@@ -141,14 +128,6 @@ function TransactionLedgerPanel({
 }
 
 export function VariableIncomePanel() {
-  return (
-    <UnlockGate>
-      <VariableIncomeContent />
-    </UnlockGate>
-  )
-}
-
-function VariableIncomeContent() {
   const { t } = useTranslation('investments')
   const { items, addItem, addItems, deleteItem, deleteItems } = useVariableIncomeStore()
   return (
@@ -166,14 +145,6 @@ function VariableIncomeContent() {
 }
 
 export function FixedIncomePanel() {
-  return (
-    <UnlockGate>
-      <FixedIncomeContent />
-    </UnlockGate>
-  )
-}
-
-function FixedIncomeContent() {
   const { t } = useTranslation('investments')
   const { items, addItem, addItems, deleteItem, deleteItems } = useFixedIncomeStore()
   return (
@@ -191,14 +162,6 @@ function FixedIncomeContent() {
 }
 
 export function ContributionsPanel() {
-  return (
-    <UnlockGate>
-      <ContributionsContent />
-    </UnlockGate>
-  )
-}
-
-function ContributionsContent() {
   const { t } = useTranslation('investments')
   const { items, addItem, addItems, deleteItem, deleteItems } = useContributionsStore()
   const visibleItems = items.filter((r) => !r.deleted)
@@ -208,9 +171,8 @@ function ContributionsContent() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center justify-between p-4 pb-0">
+      <div className="p-4 pb-0">
         <h2 className="text-sm font-medium">{t('items.contributions')}</h2>
-        <LockButton />
       </div>
       <div className="min-h-0 flex-1">
         <ChartTablePanel

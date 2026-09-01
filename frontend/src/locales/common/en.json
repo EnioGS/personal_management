@@ -1,10 +1,6 @@
 {
   "loading": "Loading…",
   "comingSoon": "Coming soon.",
-  "unlock": {
-    "lockedMessage": "Unlock your vault (Vault → Get Started) to view this.",
-    "lockButton": "Lock"
-  },
   "table": {
     "add": "Add",
     "delete": "Delete",
