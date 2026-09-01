@@ -5,7 +5,6 @@
   "items": {
     "allNotes": "All Notes"
   },
-  "heading": "Notes",
   "notePlaceholder": "Write a note…",
   "addButton": "Add",
   "emptyState": "No notes yet."

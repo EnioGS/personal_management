@@ -10,11 +10,8 @@ import { DEFAULT_SYSTEM_PROMPT, SYSTEM_PROMPT_KEY, useAssistantPromptsStore } fr
 import { cn } from '@/lib/utils'
 
 export function AssistantPanel() {
-  const { t } = useTranslation('settings')
-
   return (
     <div className="flex h-full flex-col gap-6 overflow-auto p-4">
-      <h2 className="text-sm font-medium">{t('assistant.heading')}</h2>
       <ConnectionSection />
       <SystemPromptSection />
     </div>

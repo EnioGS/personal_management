@@ -14,7 +14,6 @@ export function GeneralPanel() {
 
   return (
     <div className="flex h-full flex-col gap-4 p-4">
-      <h2 className="text-sm font-medium">{t('general.heading')}</h2>
       <div>
         <p className="mb-2 text-sm text-muted-foreground">{t('general.languageLabel')}</p>
         <div className="inline-flex rounded-md border p-1">

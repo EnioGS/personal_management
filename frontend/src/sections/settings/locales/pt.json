@@ -8,20 +8,17 @@
     "assistant": "Assistente"
   },
   "appearance": {
-    "heading": "Aparência",
     "themeLabel": "Tema",
     "light": "Claro",
     "dark": "Escuro",
     "system": "Sistema"
   },
   "general": {
-    "heading": "Geral",
     "languageLabel": "Idioma",
     "portuguese": "Português",
     "english": "Inglês"
   },
   "assistant": {
-    "heading": "Assistente",
     "connectionLabel": "Conexão",
     "connectionDescription": "Usa o OpenRouter (openrouter.ai) — uma chave, vários modelos. A chave fica salva neste navegador, como todo o resto.",
     "apiKeyPlaceholder": "Chave de API do OpenRouter",

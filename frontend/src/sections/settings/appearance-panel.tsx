@@ -15,7 +15,6 @@ export function AppearancePanel() {
 
   return (
     <div className="flex h-full flex-col gap-4 p-4">
-      <h2 className="text-sm font-medium">{t('appearance.heading')}</h2>
       <div>
         <p className="mb-2 text-sm text-muted-foreground">{t('appearance.themeLabel')}</p>
         <div className="inline-flex rounded-md border p-1">

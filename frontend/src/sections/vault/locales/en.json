@@ -7,7 +7,6 @@
     "about": "About"
   },
   "data": {
-    "heading": "Your data",
     "description": "Everything you enter is saved in this browser and loads automatically — no account, no password, nothing sent to a server. Export a file to back it up or move it to another machine.",
     "fileDescription": "Personal Management data",
     "cancelAction": "Cancel",

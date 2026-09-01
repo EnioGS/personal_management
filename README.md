@@ -35,7 +35,7 @@ Two things it optimizes for:
 │   │   │   ├── investments/   # variable/fixed income (transaction ledger) + contributions
 │   │   │   └── settings/      # settings.section.ts + appearance/general/assistant panels + locales/
 │   │   ├── store/
-│   │   │   ├── ui-store.ts     # active section/item, secondary-bar collapsed state
+│   │   │   ├── ui-store.ts     # active section/item, secondary-bar mode (expanded/icons/hidden)
 │   │   │   ├── theme-store.ts  # light/dark/system theme
 │   │   │   ├── locale-store.ts # pt/en language
 │   │   │   ├── chat-store.ts   # chat messages/attachments/status, drives the tool-calling loop
@@ -102,6 +102,10 @@ Two things it optimizes for:
 - Dockerfiles colocated per component, not a shared `deploy/`.
 - Two-level, VSCode-style navigation as a data-driven registry
   (`src/sections/`), replacing shadcn/ui's `Sidebar`.
+- Clicking the active section's icon cycles the secondary bar through
+  expanded → icon-only → hidden. Its widths are fixed per state rather than
+  drag-resizable, and neither the bar nor the panels repeat the name of what
+  is already selected.
 - Reskinning is two files — `vault/vault.section.ts` (icon) + two CSS tokens.
 - The brand-mark icon is a real, clickable section (`vault`), not decoration
   — it's the default landing section, holding data management (Data:

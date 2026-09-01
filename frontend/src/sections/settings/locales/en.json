@@ -8,20 +8,17 @@
     "assistant": "Assistant"
   },
   "appearance": {
-    "heading": "Appearance",
     "themeLabel": "Theme",
     "light": "Light",
     "dark": "Dark",
     "system": "System"
   },
   "general": {
-    "heading": "General",
     "languageLabel": "Language",
     "portuguese": "Portuguese",
     "english": "English"
   },
   "assistant": {
-    "heading": "Assistant",
     "connectionLabel": "Connection",
     "connectionDescription": "Uses OpenRouter (openrouter.ai) — one key, many models. The key is stored in this browser, like everything else here.",
     "apiKeyPlaceholder": "OpenRouter API key",

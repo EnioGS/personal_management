@@ -34,7 +34,6 @@ export function OverviewPanel() {
 
   return (
     <div className="flex h-full flex-col gap-4 p-4">
-      <h2 className="text-sm font-medium">{t('items.overview')}</h2>
       <div className="grid min-h-0 flex-1 grid-cols-2 gap-4">
         <AppLineChart
           data={lineData}
@@ -86,9 +85,6 @@ function TransactionLedgerPanel({
 
   return (
     <div className="flex h-full flex-col">
-      <div className="p-4 pb-0">
-        <h2 className="text-sm font-medium">{title}</h2>
-      </div>
       <div className="min-h-0 flex-1">
         <ChartTablePanel
           id={id}
@@ -171,9 +167,6 @@ export function ContributionsPanel() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="p-4 pb-0">
-        <h2 className="text-sm font-medium">{t('items.contributions')}</h2>
-      </div>
       <div className="min-h-0 flex-1">
         <ChartTablePanel
           id="contributions"

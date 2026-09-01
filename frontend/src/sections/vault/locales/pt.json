@@ -7,7 +7,6 @@
     "about": "Sobre"
   },
   "data": {
-    "heading": "Seus dados",
     "description": "Tudo o que você registra fica salvo neste navegador e carrega automaticamente — sem conta, sem senha, nada enviado para um servidor. Exporte um arquivo para guardar um backup ou levar seus dados para outra máquina.",
     "fileDescription": "Dados do Personal Management",
     "cancelAction": "Cancelar",

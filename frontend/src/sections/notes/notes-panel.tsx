@@ -16,7 +16,6 @@ export function NotesPanel() {
 
   return (
     <div className="flex h-full flex-col gap-4 p-4">
-      <h2 className="text-sm font-medium">{t('heading')}</h2>
 
       <form
         className="flex gap-2"

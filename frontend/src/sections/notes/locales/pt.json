@@ -5,7 +5,6 @@
   "items": {
     "allNotes": "Todas as Notas"
   },
-  "heading": "Notas",
   "notePlaceholder": "Escreva uma nota…",
   "addButton": "Adicionar",
   "emptyState": "Nenhuma nota ainda."

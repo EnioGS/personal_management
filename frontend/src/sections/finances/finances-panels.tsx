@@ -22,7 +22,6 @@ export function OverviewPanel() {
 
   return (
     <div className="flex h-full flex-col gap-4 p-4">
-      <h2 className="text-sm font-medium">{t('items.overview')}</h2>
       <div className="min-h-0 flex-1">
         <AppLineChart
           data={balanceData}
@@ -50,9 +49,6 @@ export function SpendingPanel() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="p-4 pb-0">
-        <h2 className="text-sm font-medium">{t('items.spending')}</h2>
-      </div>
       <div className="min-h-0 flex-1">
         <ChartTablePanel
           id="spending"
@@ -106,9 +102,6 @@ export function IncomePanel() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="p-4 pb-0">
-        <h2 className="text-sm font-medium">{t('items.income')}</h2>
-      </div>
       <div className="min-h-0 flex-1">
         <ChartTablePanel
           id="income"

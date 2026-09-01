@@ -95,10 +95,7 @@ export function DataPanel() {
   return (
     <div className="h-full overflow-auto">
       <div className="mx-auto flex w-full max-w-2xl flex-col gap-6 p-6">
-        <header className="flex flex-col gap-1">
-          <h2 className="text-lg font-medium">{t('data.heading')}</h2>
-          <p className="text-muted-foreground text-sm">{t('data.description')}</p>
-        </header>
+        <p className="text-muted-foreground text-sm">{t('data.description')}</p>
 
         <div className="bg-muted/40 flex items-center gap-3 rounded-lg border p-4">
           <HardDrive className="text-muted-foreground size-5 shrink-0" />
