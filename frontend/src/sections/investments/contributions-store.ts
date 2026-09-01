@@ -10,6 +10,7 @@ export type Contribution = {
   deleted?: boolean
 }
 
+/** Starting suggestions only — the column is an open vocabulary, see table-schema.ts. */
 export const CONTRIBUTION_DESTINATIONS = ['Renda Variável', 'Renda Fixa', 'Outros'] as const
 
 const currency = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
@@ -21,7 +22,7 @@ export const contributionsSchema: TableSchema<Contribution> = [
   {
     key: 'destination',
     labelKey: 'investments:columns.destination',
-    type: 'select',
+    type: 'combobox',
     options: CONTRIBUTION_DESTINATIONS,
   },
   { key: 'amount', labelKey: 'investments:columns.amount', type: 'number', format: (v) => currency.format(v as number) },

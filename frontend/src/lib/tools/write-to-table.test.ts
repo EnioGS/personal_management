@@ -45,12 +45,24 @@ describe('writeToTableTool', () => {
 
   it('rejects a select column with a value outside its options, listing the allowed values', async () => {
     const result = await writeToTableTool.execute(
-      { table: 'spending', rows: [{ date: '2026-01-01', category: 'NotACategory', amount: 10 }] },
+      {
+        table: 'variableIncome',
+        rows: [{ date: '2026-01-01', asset: 'PETR4', type: 'NotAType', quantity: 1, price: 1 }],
+      },
       context,
     )
     expect(result).toContain('Wrote 0 of 1')
     expect(result).toContain('must be one of')
-    expect(result).toContain('Outros')
+    expect(result).toContain('buy')
+  })
+
+  it('accepts a combobox value outside its suggested options — the vocabulary is open', async () => {
+    const result = await writeToTableTool.execute(
+      { table: 'spending', rows: [{ date: '2026-01-01', category: 'Categoria Nova', amount: 10 }] },
+      context,
+    )
+    expect(result).toContain('Wrote 1 of 1')
+    expect(useSpendingStore.getState().items[0].category).toBe('Categoria Nova')
   })
 
   it('writes rows to each of the 5 registered tables', async () => {

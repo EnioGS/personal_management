@@ -5,6 +5,7 @@ import type { ToolDefinition } from './types'
 function describeColumn(col: (typeof writableTables)[number]['schema'][number]): string {
   let desc = `${String(col.key)} (${col.type}`
   if (col.type === 'select' && col.options) desc += `: ${col.options.join('|')}`
+  if (col.type === 'combobox' && col.options) desc += `, existing values: ${col.options.join('|')}`
   if (col.required) desc += ', required'
   desc += ')'
   return desc
@@ -21,9 +22,12 @@ function buildDescription(): string {
     'Writes immediately — the user can review, edit, or delete rows afterward in the app UI. ' +
     'Dates must be ISO 8601 strings (e.g. "2026-07-31") or epoch milliseconds; numbers must be plain ' +
     'numeric values — strip currency symbols, thousands separators, and locale decimal commas first. ' +
-    'For a column with a fixed set of allowed values, if the source data uses different wording, map it ' +
-    'yourself to the closest matching allowed value (e.g. "Supermercado" or "Mercado" → "Alimentação") ' +
-    'rather than passing the original text through unchanged — only the exact allowed values will be accepted. ' +
+    'A "select" column accepts only its listed values: map differently-worded source data to the closest ' +
+    'one yourself rather than passing the original text through — anything else is rejected. ' +
+    'A "combobox" column is an open vocabulary: its listed values are the ones already in use, not a ' +
+    'restriction. Strongly prefer reusing an existing value when one clearly fits (e.g. "Supermercado" or ' +
+    '"Mercado" → "Alimentação") so the vocabulary does not fragment into near-duplicates, but introduce a ' +
+    'new value when nothing fits rather than forcing a bad match. ' +
     'Whenever you make a judgment call like this (mapping a category, reformatting a date, cleaning up a ' +
     'number, choosing which of several similar source columns to use), briefly say so in your reply so the ' +
     'user can correct it if your interpretation was wrong — do not apply silent guesses. ' +

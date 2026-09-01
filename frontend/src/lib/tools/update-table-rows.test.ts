@@ -49,11 +49,21 @@ describe('updateTableRowsTool', () => {
   it('rejects an invalid field value', async () => {
     const id = await seedRow()
     const result = await updateTableRowsTool.execute(
-      { table: 'spending', updates: [{ id, fields: { category: 'NotACategory' } }] },
+      { table: 'spending', updates: [{ id, fields: { amount: 'not-a-number' } }] },
       context,
     )
-    expect(result).toContain('must be one of')
+    expect(result).toContain('is not a number')
     expect(useSpendingStore.getState().items).toHaveLength(1)
+  })
+
+  it('accepts a category outside the suggested options — the vocabulary is open', async () => {
+    const id = await seedRow()
+    const result = await updateTableRowsTool.execute(
+      { table: 'spending', updates: [{ id, fields: { category: 'Categoria Nova' } }] },
+      context,
+    )
+    expect(result).not.toContain('Error')
+    expect(useSpendingStore.getState().items.some((r) => r.category === 'Categoria Nova')).toBe(true)
   })
 
   it('rejects empty fields', async () => {

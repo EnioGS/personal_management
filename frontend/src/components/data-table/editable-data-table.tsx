@@ -4,6 +4,7 @@ import { Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
+import { ComboboxInput } from './combobox-input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { coerceValue } from '@/lib/csv'
@@ -22,7 +23,7 @@ interface EditableDataTableProps<T extends Record<string, unknown>> {
   actions?: ReactNode
 }
 
-/** date/number/select are always mandatory; 'text' columns are optional unless marked required. */
+/** date/number/select/combobox are always mandatory; 'text' is optional unless marked required. */
 function isColumnRequired<T>(col: ColumnDef<T>): boolean {
   return col.type !== 'text' || !!col.required
 }
@@ -80,6 +81,21 @@ export function EditableDataTable<T extends Record<string, unknown>>({
     }
     return errors
   }, [draft, schema])
+
+  // Suggestions for open-vocabulary columns: the schema's seed values plus everything
+  // already used in this table, so a category typed (or imported) once is offered from
+  // then on without anyone having to register it anywhere.
+  const suggestionsByColumn = useMemo(() => {
+    const byColumn: Record<string, string[]> = {}
+    for (const col of schema) {
+      if (col.type !== 'combobox') continue
+      const used = rows
+        .map((row) => row[col.key] as unknown)
+        .filter((v): v is string => typeof v === 'string' && v.trim() !== '')
+      byColumn[String(col.key)] = [...new Set([...(col.options ?? []), ...used])].sort((a, b) => a.localeCompare(b))
+    }
+    return byColumn
+  }, [schema, rows])
 
   function updateDraftField(key: string, value: string) {
     setDraft((d) => ({ ...d, [key]: value }))
@@ -160,6 +176,7 @@ export function EditableDataTable<T extends Record<string, unknown>>({
                     value={draft[String(col.key)] ?? ''}
                     invalid={draftErrors[String(col.key)] ?? false}
                     label={t(col.labelKey as never)}
+                    suggestions={suggestionsByColumn[String(col.key)] ?? []}
                     onChange={(value) => updateDraftField(String(col.key), value)}
                   />
                 </TableCell>
@@ -178,12 +195,14 @@ function DraftCell<T>({
   value,
   invalid,
   label,
+  suggestions,
   onChange,
 }: {
   col: ColumnDef<T>
   value: string
   invalid: boolean
   label: string
+  suggestions: readonly string[]
   onChange: (value: string) => void
 }) {
   const className = cn(
@@ -191,6 +210,10 @@ function DraftCell<T>({
     'hover:border-input focus:border-ring focus:ring-1 focus:ring-ring/50',
     invalid && 'border-destructive/60 text-destructive',
   )
+
+  if (col.type === 'combobox') {
+    return <ComboboxInput value={value} onChange={onChange} suggestions={suggestions} label={label} className={className} />
+  }
 
   if (col.type === 'select') {
     // The app's own (Radix-based) Select, not a native <select>: a native dropdown's popup

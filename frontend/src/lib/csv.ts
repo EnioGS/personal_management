@@ -46,6 +46,12 @@ export function coerceValue<T>(
       }
       return { ok: true, value: trimmed }
     }
+    // Open vocabulary: any non-empty value is accepted, since the whole point is that
+    // an import (or the user) may introduce a value nobody has used before.
+    case 'combobox': {
+      if (!trimmed) return { ok: false, message: `"${String(col.key)}" is required` }
+      return { ok: true, value: trimmed }
+    }
     case 'text':
       if (col.required && !trimmed) return { ok: false, message: `"${String(col.key)}" is required` }
       return { ok: true, value: trimmed }

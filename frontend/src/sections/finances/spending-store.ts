@@ -13,6 +13,7 @@ export type SpendingRow = {
   deleted?: boolean
 }
 
+/** Starting suggestions only — the column is an open vocabulary, see table-schema.ts. */
 export const SPENDING_CATEGORIES = ['Alimentação', 'Contas', 'Transporte', 'Lazer', 'Saúde', 'Outros'] as const
 
 const currency = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
@@ -21,7 +22,7 @@ const date = new Intl.DateTimeFormat('pt-BR', { timeZone: 'UTC' })
 
 export const spendingSchema: TableSchema<SpendingRow> = [
   { key: 'date', labelKey: 'finances:columns.date', type: 'date', format: (v) => date.format(v as number) },
-  { key: 'category', labelKey: 'finances:columns.category', type: 'select', options: SPENDING_CATEGORIES },
+  { key: 'category', labelKey: 'finances:columns.category', type: 'combobox', options: SPENDING_CATEGORIES },
   { key: 'amount', labelKey: 'finances:columns.amount', type: 'number', format: (v) => currency.format(v as number) },
   { key: 'note', labelKey: 'finances:columns.note', type: 'text' },
 ]
