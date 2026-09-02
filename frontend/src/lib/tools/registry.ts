@@ -1,6 +1,14 @@
 import type { OpenRouterTool } from '@/lib/openrouter'
 import { addCategoryTool } from './add-category'
 import { deleteCategoryRuleTool } from './delete-category-rule'
+import {
+  assignIngestionColumnsTool,
+  listIngestionDatasetsTool,
+  readIngestionTableTool,
+  stageIngestionSourceTool,
+  updateIngestionLabelsTool,
+  validateIngestionRowsTool,
+} from './ingestion-tools'
 import { readCsvTool } from './read-csv'
 import { readCategoryRawValuesTool } from './read-category-raw-values'
 import { readTableTool } from './read-table'
@@ -21,6 +29,12 @@ export const toolRegistry: ToolDefinition[] = [
   readCsvTool,
   readTableTool,
   readCategoryRawValuesTool,
+  listIngestionDatasetsTool,
+  readIngestionTableTool,
+  assignIngestionColumnsTool,
+  stageIngestionSourceTool,
+  updateIngestionLabelsTool,
+  validateIngestionRowsTool,
   addCategoryTool,
   updateCategoryRuleTool,
   deleteCategoryRuleTool,

@@ -10,12 +10,18 @@ describe('findTool', () => {
     expect(findTool('does_not_exist')).toBeUndefined()
   })
 
-  it('registers read, category-management, and append-only table-writing tools', () => {
+  it('registers read, ingestion, category-management, and append-only table-writing tools', () => {
     expect(toolRegistry.map((t) => t.name)).toEqual([
       'read_text_file',
       'read_csv',
       'read_table',
       'read_category_raw_values',
+      'list_ingestion_datasets',
+      'read_ingestion_table',
+      'assign_ingestion_columns',
+      'stage_ingestion_source',
+      'update_ingestion_labels',
+      'validate_ingestion_rows',
       'add_category',
       'update_category_rule',
       'delete_category_rule',
