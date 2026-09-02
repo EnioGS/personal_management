@@ -1,54 +1,54 @@
 import type { StoredRow } from '@/lib/local-store/create-local-table'
+import { entriesForTable, useEntriesStore, useTableDefsStore } from '@/lib/model/model-stores'
+import { TABLE_KIND_SCHEMAS } from '@/lib/model/table-kinds'
+import type { Entry } from '@/lib/model/types'
 import type { TableSchema } from '@/lib/table-schema'
-import { contributionsSchema, useContributionsStore } from '@/sections/investments/contributions-store'
-import { transactionSchema } from '@/sections/investments/transaction-schema'
-import { useFixedIncomeStore } from '@/sections/investments/fixed-income-store'
-import { useVariableIncomeStore } from '@/sections/investments/variable-income-store'
-import { incomeSchema, useIncomeStore } from '@/sections/finances/income-store'
-import { spendingSchema, useSpendingStore } from '@/sections/finances/spending-store'
 
-interface ListStoreLike<T> {
-  getState: () => {
-    items: StoredRow<T>[]
-    addItem: (value: T) => Promise<number>
-    addItems: (values: T[]) => Promise<void>
-    updateItem: (id: number, value: T) => Promise<void>
-  }
-}
-
-export interface WritableTable<T = any> {
+export interface WritableTable {
+  /** The table definition's row id, as a string — how tools identify a table (a user-given
+   * name isn't guaranteed unique, so it appears only in `label`, for the tool description). */
   key: string
-  /** Human-readable name for the generated tool description — not i18n, see adr/0016. */
   label: string
-  schema: TableSchema<T>
-  useStore: ListStoreLike<T>
+  schema: TableSchema<Entry>
+  tableId: number
 }
 
 /**
- * Single source of truth for which tables write_to_table may append rows to. Deliberately
- * separate from data-file.ts's TABLES map (raw export/import of ALL tables incl.
- * notes/assistant config) — this one is schema-driven and scoped to
- * the Finances/Investments tables the assistant is allowed to write to. A future table just
- * needs an entry here to be picked up by the tool automatically.
+ * Every user table the assistant can read/write, read fresh from tableDefs on every
+ * call rather than built once. Tables are user data now (see lib/model/) — a table
+ * created in the app mid-conversation must be visible to the very next tool call, so
+ * this cannot be the fixed array of five stores it used to be.
  */
-export const writableTables: WritableTable[] = [
-  { key: 'spending', label: 'Spending', schema: spendingSchema, useStore: useSpendingStore },
-  { key: 'income', label: 'Income', schema: incomeSchema, useStore: useIncomeStore },
-  {
-    key: 'variableIncome',
-    label: 'Variable Income transactions',
-    schema: transactionSchema,
-    useStore: useVariableIncomeStore,
-  },
-  {
-    key: 'fixedIncome',
-    label: 'Fixed Income transactions',
-    schema: transactionSchema,
-    useStore: useFixedIncomeStore,
-  },
-  { key: 'contributions', label: 'Contributions', schema: contributionsSchema, useStore: useContributionsStore },
-]
+export function writableTables(): WritableTable[] {
+  return useTableDefsStore.getState().items.map((def) => ({
+    key: String(def.id),
+    label: def.name,
+    schema: TABLE_KIND_SCHEMAS[def.kind],
+    tableId: def.id,
+  }))
+}
 
 export function findWritableTable(key: string): WritableTable | undefined {
-  return writableTables.find((t) => t.key === key)
+  return writableTables().find((t) => t.key === key)
+}
+
+/**
+ * CRUD against the one shared entries store (lib/model/model-stores.ts), scoped to a
+ * single table's rows — the closest equivalent of the per-table stores every tool file
+ * used to call directly.
+ */
+export function itemsFor(tableId: number): StoredRow<Entry>[] {
+  return entriesForTable(useEntriesStore.getState().items, tableId)
+}
+
+export async function addItemFor(tableId: number, value: Record<string, unknown>): Promise<number> {
+  return useEntriesStore.getState().addItem({ ...value, tableId } as unknown as Entry)
+}
+
+export async function addItemsFor(tableId: number, values: Record<string, unknown>[]): Promise<void> {
+  await useEntriesStore.getState().addItems(values.map((v) => ({ ...v, tableId }) as unknown as Entry))
+}
+
+export async function updateItemFor(id: number, tableId: number, value: Record<string, unknown>): Promise<void> {
+  await useEntriesStore.getState().updateItem(id, { ...value, tableId } as unknown as Entry)
 }

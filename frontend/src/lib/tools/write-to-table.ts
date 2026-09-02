@@ -1,8 +1,8 @@
 import { coerceValue } from '@/lib/csv'
-import { findWritableTable, writableTables } from './writable-tables'
+import { addItemsFor, findWritableTable, writableTables } from './writable-tables'
 import type { ToolDefinition } from './types'
 
-function describeColumn(col: (typeof writableTables)[number]['schema'][number]): string {
+function describeColumn(col: ReturnType<typeof writableTables>[number]['schema'][number]): string {
   let desc = `${String(col.key)} (${col.type}`
   if (col.type === 'select' && col.options) desc += `: ${col.options.join('|')}`
   if (col.type === 'combobox' && col.options) desc += `, existing values: ${col.options.join('|')}`
@@ -11,14 +11,13 @@ function describeColumn(col: (typeof writableTables)[number]['schema'][number]):
   return desc
 }
 
-/** Regenerated from writableTables on every call — a new table needs no changes here. */
+/** Regenerated from writableTables() on every call — a new table needs no changes here. */
 function buildDescription(): string {
-  const tableDocs = writableTables
-    .map((t) => `- "${t.key}" (${t.label}): ${t.schema.map(describeColumn).join(', ')}`)
-    .join('\n')
+  const tables = writableTables()
+  const tableDocs = tables.map((t) => `- "${t.key}" (${t.label}): ${t.schema.map(describeColumn).join(', ')}`).join('\n')
 
   return (
-    "Appends one or more rows to a table in the user's finance/investment records. " +
+    "Appends one or more rows to a table in the user's records. " +
     'Writes immediately — the user can review, edit, or delete rows afterward in the app UI. ' +
     'Dates must be ISO 8601 strings (e.g. "2026-07-31") or epoch milliseconds; numbers must be plain ' +
     'numeric values — strip currency symbols, thousands separators, and locale decimal commas first. ' +
@@ -33,29 +32,33 @@ function buildDescription(): string {
     'user can correct it if your interpretation was wrong — do not apply silent guesses. ' +
     'Rows that still fail validation after your best mapping attempt are skipped and reported back; valid ' +
     'rows in the same call are still written.\n' +
-    `Available tables and their columns:\n${tableDocs}`
+    `Available tables and their columns:\n${tableDocs || '(none yet — tell the user to create a table in the app first)'}`
   )
 }
 
 export const writeToTableTool: ToolDefinition = {
   name: 'write_to_table',
-  description: buildDescription(),
-  parameters: {
-    type: 'object',
-    properties: {
-      table: {
-        type: 'string',
-        enum: writableTables.map((t) => t.key),
-        description: 'Which table to write rows into.',
+  get description() {
+    return buildDescription()
+  },
+  get parameters() {
+    return {
+      type: 'object',
+      properties: {
+        table: {
+          type: 'string',
+          enum: writableTables().map((t) => t.key),
+          description: 'Which table to write rows into.',
+        },
+        rows: {
+          type: 'array',
+          items: { type: 'object' },
+          description: "One object per row, with fields matching the target table's columns (see tool description).",
+        },
       },
-      rows: {
-        type: 'array',
-        items: { type: 'object' },
-        description: "One object per row, with fields matching the target table's columns (see tool description).",
-      },
-    },
-    required: ['table', 'rows'],
-    additionalProperties: false,
+      required: ['table', 'rows'],
+      additionalProperties: false,
+    }
   },
   execute: async (args) => {
     const tableKey = typeof args.table === 'string' ? args.table : undefined
@@ -63,7 +66,9 @@ export const writeToTableTool: ToolDefinition = {
 
     const table = findWritableTable(tableKey)
     if (!table) {
-      return `Error: unknown table "${tableKey}". Valid tables: ${writableTables.map((t) => t.key).join(', ')}.`
+      return `Error: unknown table "${tableKey}". Valid tables: ${writableTables()
+        .map((t) => t.key)
+        .join(', ')}.`
     }
 
     if (!Array.isArray(args.rows) || args.rows.length === 0) {
@@ -99,7 +104,7 @@ export const writeToTableTool: ToolDefinition = {
 
     if (validRows.length > 0) {
       try {
-        await table.useStore.getState().addItems(validRows)
+        await addItemsFor(table.tableId, validRows)
       } catch {
         return `Error: failed to write rows to "${tableKey}" (storage error). No rows were written. Row errors, if any: ${rowErrors.join('; ') || 'none'}`
       }

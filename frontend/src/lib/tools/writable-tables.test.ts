@@ -1,52 +1,85 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { findWritableTable, writableTables } from './writable-tables'
+import { TABLE_KIND_SCHEMAS } from '@/lib/model/table-kinds'
+import { useTableDefsStore } from '@/lib/model/model-stores'
+import { addItemFor, findWritableTable, itemsFor, writableTables } from './writable-tables'
+import { clearTables, seedTable } from './test-utils'
 
 describe('writableTables', () => {
-  it('registers exactly the 5 finance/investment tables', () => {
-    expect(writableTables.map((t) => t.key)).toEqual([
-      'spending',
-      'income',
-      'variableIncome',
-      'fixedIncome',
-      'contributions',
-    ])
+  beforeEach(clearTables)
+
+  it('is empty when the user has created no tables', () => {
+    expect(writableTables()).toEqual([])
   })
 
-  it("each table's schema keys match its expected columns", () => {
-    const spending = findWritableTable('spending')!
-    expect(spending.schema.map((c) => c.key)).toEqual(['date', 'category', 'amount', 'note'])
+  it('reflects every table definition, by id', async () => {
+    const gastosId = await seedTable('generic', 'Gastos')
+    const cardId = await seedTable('cardLedger', 'Meu Cartão')
 
-    const contributions = findWritableTable('contributions')!
-    expect(contributions.schema.map((c) => c.key)).toEqual(['date', 'destination', 'amount'])
+    // The underlying store lists newest first (same convention as every other local
+    // list store), so this checks membership/labels rather than a fixed order.
+    const tables = writableTables()
+    expect(tables.map((t) => t.key).sort()).toEqual([gastosId, cardId].sort())
+    expect(tables.find((t) => t.key === gastosId)?.label).toBe('Gastos')
+    expect(tables.find((t) => t.key === cardId)?.label).toBe('Meu Cartão')
+  })
 
-    const variableIncome = findWritableTable('variableIncome')!
-    expect(variableIncome.schema.map((c) => c.key)).toEqual(['date', 'asset', 'type', 'quantity', 'price', 'note'])
+  it("a table's schema matches its kind", async () => {
+    const key = await seedTable('cardLedger')
+    const table = findWritableTable(key)!
+    expect(table.schema).toBe(TABLE_KIND_SCHEMAS.cardLedger)
+  })
+
+  it('picks up a table created after the last call — no caching', async () => {
+    expect(writableTables()).toEqual([])
+    await seedTable('generic')
+    expect(writableTables()).toHaveLength(1)
   })
 })
 
 describe('findWritableTable', () => {
+  beforeEach(clearTables)
+
   it('returns undefined for an unknown key', () => {
     expect(findWritableTable('does_not_exist')).toBeUndefined()
   })
+
+  it('finds a table by its id', async () => {
+    const key = await seedTable('generic', 'Gastos')
+    expect(findWritableTable(key)?.label).toBe('Gastos')
+  })
 })
 
-describe('each table exposes items/addItem/addItems/updateItem', () => {
-  beforeEach(() => {
+describe('itemsFor / addItemFor', () => {
+  beforeEach(clearTables)
+
+  it('scopes rows to one table, tagging new entries with its tableId', async () => {
+    const tableAId = Number(await seedTable('generic', 'A'))
+    const tableBId = Number(await seedTable('generic', 'B'))
+
+    await addItemFor(tableAId, { date: Date.now(), category: 'Outros', amount: 1 })
+    await addItemFor(tableBId, { date: Date.now(), category: 'Outros', amount: 2 })
+
+    expect(itemsFor(tableAId)).toHaveLength(1)
+    expect(itemsFor(tableBId)).toHaveLength(1)
+    expect(itemsFor(tableAId)[0].amount).toBe(1)
   })
 
-  it('every registered table has items/addItem/addItems/updateItem on its store', () => {
-    for (const t of writableTables) {
-      const state = t.useStore.getState()
-      expect(Array.isArray(state.items)).toBe(true)
-      expect(typeof state.addItem).toBe('function')
-      expect(typeof state.addItems).toBe('function')
-      expect(typeof state.updateItem).toBe('function')
-    }
-  })
-
-  it("spending's addItem resolves the new row's numeric id", async () => {
-    const spending = findWritableTable('spending')!
-    const id = await spending.useStore.getState().addItem({ date: Date.now(), category: 'Outros', amount: 1 })
+  it("addItemFor resolves the new row's numeric id", async () => {
+    const tableId = Number(await seedTable('generic'))
+    const id = await addItemFor(tableId, { date: Date.now(), category: 'Outros', amount: 1 })
     expect(typeof id).toBe('number')
+  })
+})
+
+// Guards the store wiring itself, independent of the tool-facing helpers above.
+describe('useTableDefsStore', () => {
+  beforeEach(clearTables)
+
+  it('exposes items/addItem/addItems/updateItem', () => {
+    const state = useTableDefsStore.getState()
+    expect(Array.isArray(state.items)).toBe(true)
+    expect(typeof state.addItem).toBe('function')
+    expect(typeof state.addItems).toBe('function')
+    expect(typeof state.updateItem).toBe('function')
   })
 })

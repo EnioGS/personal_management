@@ -21,9 +21,10 @@ Two things it optimizes for:
 ├── frontend/                  # Vite + React + TypeScript + Tailwind + shadcn/ui
 │   ├── src/
 │   │   ├── components/
-│   │   │   ├── ui/            # shadcn/ui primitives (button, resizable, table, chart, ...)
-│   │   │   ├── charts/        # thin Recharts wrappers (line/bar/pie) + the shared color palette
-│   │   │   ├── data-table/    # table with an inline draft row for adding data + CSV import/export
+│   │   │   ├── ui/            # shadcn/ui primitives (button, resizable, table, chart, dropdown-menu, ...)
+│   │   │   ├── charts/        # thin Recharts wrappers (line/bar/pie/diverging-bar) + the shared color palette
+│   │   │   ├── data-table/    # table workspace (selector + "+ Nova tabela") with an inline draft row + CSV
+│   │   │   ├── dashboard/     # filter bar, stat tiles, dashboard-scoped filtering (Finances Overview)
 │   │   │   ├── chat/          # global chat panel (mounted at app root, not a section)
 │   │   │   └── layout/        # activity-bar / secondary-bar / app-shell / chart-table-panel
 │   │   ├── sections/          # feature registry — the extensibility mechanism
@@ -31,9 +32,9 @@ Two things it optimizes for:
 │   │   │   ├── index.ts       # aggregates all sections into one array
 │   │   │   ├── vault/         # brand-mark section: Data (export/import/clear) + About
 │   │   │   ├── notes/         # notes.section.ts + panel/store/notes-db + locales/
-│   │   │   ├── finances/      # spending/income — charts + a table with inline row entry + CSV, per option
+│   │   │   ├── finances/      # Overview (dashboard) / Movimentações / Gastos / Cartões — see lib/model/
 │   │   │   ├── investments/   # variable/fixed income (transaction ledger) + contributions
-│   │   │   └── settings/      # settings.section.ts + appearance/general/assistant panels + locales/
+│   │   │   └── settings/      # settings.section.ts + appearance/general/assistant/accounts-cards/categories
 │   │   ├── store/
 │   │   │   ├── ui-store.ts     # active section/item, secondary-bar mode (expanded/icons/hidden)
 │   │   │   ├── theme-store.ts  # light/dark/system theme
@@ -43,11 +44,13 @@ Two things it optimizes for:
 │   │   ├── locales/common/    # shared strings not owned by one section
 │   │   ├── lib/
 │   │   │   ├── local-store/              # generic Dexie-table + Zustand-store factories
+│   │   │   ├── model/                    # accounts/cards/tableDefs/categories/categoryRules/entries — see adr/0022
+│   │   │   ├── dashboard/                # date-range presets/resolution (lib side of components/dashboard/)
 │   │   │   ├── table-schema.ts           # column schema driving tables, CSV, and the draft-row inputs
 │   │   │   ├── csv.ts                    # CSV export/import + validation
-│   │   │   ├── aggregations.ts           # chart data-shaping (buckets, running totals)
+│   │   │   ├── aggregations.ts           # chart data-shaping (buckets, running totals, top-N + "Outros" fold)
 │   │   │   ├── current-value.ts          # investment position value from transaction history
-│   │   │   ├── data-file.ts              # whole-app export/import (.pmdata), row counts
+│   │   │   ├── data-file.ts              # whole-app export/import (.pmdata v3 + v2 upgrader), row counts
 │   │   │   ├── file-io.ts                # save-file picker (Chromium) with a download fallback
 │   │   │   ├── openrouter.ts             # OpenRouter chat-completions client (incl. tool-calling wire format)
 │   │   │   ├── chat-attachments.ts       # validates/reads .txt/.md/.csv files attached to a chat message
@@ -90,8 +93,8 @@ Two things it optimizes for:
 - **Assistant**: a global chat panel calling OpenRouter (openrouter.ai) directly
   from the browser with a user-supplied API key — no backend in the loop. Tool
   calling lets the model read attached files, and read/write/correct/flag rows
-  in Finances/Investments tables; see `lib/tools/` and [Decisions](#decisions)
-  below.
+  in whichever tables the user has created; see `lib/tools/` and
+  [Decisions](#decisions) below.
 - **i18n**: react-i18next, default Portuguese, namespace-per-section.
 - **Testing**: Vitest, colocated with the code it covers.
 - **Containerization**: Docker, one multi-stage Dockerfile (dev / production
@@ -123,11 +126,28 @@ Two things it optimizes for:
   section — it stays available regardless of which section/item is active.
 - Tools the assistant can call are a flat registry (`lib/tools/registry.ts`):
   adding one is a single new `ToolDefinition` file plus one array entry,
-  nothing else changes. `write_to_table` discovers writable tables and their
-  columns from a small registry (`lib/tools/writable-tables.ts`) instead of
-  hardcoding them, so a new Finances/Investments table is picked up
-  automatically.
-- Nothing the assistant does to existing Finances/Investments rows is ever a
+  nothing else changes. `write_to_table` and friends read the current table
+  list from `lib/tools/writable-tables.ts` fresh on every call rather than a
+  fixed array, so a table created in the UI mid-conversation is visible to
+  the very next tool call.
+- Tables, accounts, cards and the category vocabulary are user data, not
+  compile-time constants (`lib/model/`, see adr/0022) — a `TableKind` fixes
+  a table's columns, but the number of tables, accounts and cards is
+  unbounded. All of it travels in the export file (`.pmdata` v3), so
+  importing into a blank browser restores the whole setup.
+- Category rules resolve raw values onto a canonical category at *read*
+  time rather than rewriting stored data (adr/0023) — adding a rule months
+  later reclassifies all existing history at once, and stays reversible.
+- Chart colors open on the brand's own hue, then the dataviz skill's
+  remaining validated hues (adr/0024) — never a generated or cycled color
+  past that fixed set, per the skill's accessibility rule. A color follows
+  its entity (a category, an account) via a stable hash, not the entity's
+  position in whatever is currently on screen, so filtering never repaints
+  a survivor.
+- Finances' Overview is a real dashboard (adr/0025): one filter row (date
+  range, account, card, category) scoping a KPI row and a diverging in/out
+  chart, with a combined/per-account toggle — not a single hardcoded chart.
+- Nothing the assistant does to an existing row in a writable table is ever a
   hard delete or in-place overwrite — a `deleted` soft-flag column marks rows
   for removal (faded, not hidden, in the table UI) or the original of a
   correction. Only the user can permanently purge flagged rows, via a

@@ -1,48 +1,54 @@
 import { coerceValue } from '@/lib/csv'
-import { findWritableTable, writableTables } from './writable-tables'
+import { addItemFor, findWritableTable, itemsFor, updateItemFor, writableTables } from './writable-tables'
 import type { ToolDefinition } from './types'
 
 function buildDescription(): string {
-  const tableList = writableTables.map((t) => `"${t.key}" (${t.label})`).join(', ')
+  const tableList = writableTables()
+    .map((t) => `"${t.key}" (${t.label})`)
+    .join(', ')
   return (
-    'Corrects existing rows (wrong/mislabeled/misdated data) in a finance/investment table. This never edits ' +
+    'Corrects existing rows (wrong/mislabeled/misdated data) in a table. This never edits ' +
     'a row in place: the original row is flagged deleted (hidden/faded in the app, not physically removed — ' +
     'restore_table_rows is the only way to undo this) and a new row is created with the corrected values, so ' +
     'the change history stays visible. Use read_table first to find the row id(s) to correct. Only include the ' +
     'fields that are actually changing in each update — unspecified fields keep their current value. ' +
-    `Available tables and their columns follow the same shape write_to_table documents. Available tables: ${tableList}.`
+    `Available tables and their columns follow the same shape write_to_table documents. Available tables: ${tableList || '(none yet)'}.`
   )
 }
 
 export const updateTableRowsTool: ToolDefinition = {
   name: 'update_table_rows',
-  description: buildDescription(),
-  parameters: {
-    type: 'object',
-    properties: {
-      table: {
-        type: 'string',
-        enum: writableTables.map((t) => t.key),
-        description: 'Which table the rows belong to.',
-      },
-      updates: {
-        type: 'array',
-        items: {
-          type: 'object',
-          properties: {
-            id: { type: 'number', description: 'id of the existing row to correct (from read_table).' },
-            fields: {
-              type: 'object',
-              description: 'Only the columns to change — others keep their current value.',
-            },
-          },
-          required: ['id', 'fields'],
+  get description() {
+    return buildDescription()
+  },
+  get parameters() {
+    return {
+      type: 'object',
+      properties: {
+        table: {
+          type: 'string',
+          enum: writableTables().map((t) => t.key),
+          description: 'Which table the rows belong to.',
         },
-        description: 'One entry per row to correct.',
+        updates: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              id: { type: 'number', description: 'id of the existing row to correct (from read_table).' },
+              fields: {
+                type: 'object',
+                description: 'Only the columns to change — others keep their current value.',
+              },
+            },
+            required: ['id', 'fields'],
+          },
+          description: 'One entry per row to correct.',
+        },
       },
-    },
-    required: ['table', 'updates'],
-    additionalProperties: false,
+      required: ['table', 'updates'],
+      additionalProperties: false,
+    }
   },
   execute: async (args) => {
     const tableKey = typeof args.table === 'string' ? args.table : undefined
@@ -50,14 +56,16 @@ export const updateTableRowsTool: ToolDefinition = {
 
     const table = findWritableTable(tableKey)
     if (!table) {
-      return `Error: unknown table "${tableKey}". Valid tables: ${writableTables.map((t) => t.key).join(', ')}.`
+      return `Error: unknown table "${tableKey}". Valid tables: ${writableTables()
+        .map((t) => t.key)
+        .join(', ')}.`
     }
 
     if (!Array.isArray(args.updates) || args.updates.length === 0) {
       return 'Error: "updates" argument missing, not an array, or empty.'
     }
 
-    const items = table.useStore.getState().items
+    const items = itemsFor(table.tableId)
     const seen = new Set<number>()
     const results: string[] = []
 
@@ -93,7 +101,7 @@ export const updateTableRowsTool: ToolDefinition = {
         continue
       }
 
-      const { id: _id, createdAt: _createdAt, deleted: _deleted, ...rest } = existing as Record<string, unknown>
+      const { id: _id, createdAt: _createdAt, deleted: _deleted, tableId: _tableId, ...rest } = existing as Record<string, unknown>
       const coerced: Record<string, unknown> = {}
       let fieldError: string | null = null
 
@@ -120,14 +128,14 @@ export const updateTableRowsTool: ToolDefinition = {
       const newValue = { ...rest, ...coerced }
       let newId: number
       try {
-        newId = await table.useStore.getState().addItem(newValue)
+        newId = await addItemFor(table.tableId, newValue)
       } catch {
         results.push(`id ${id}: failed to write corrected row, original left unchanged`)
         continue
       }
 
       try {
-        await table.useStore.getState().updateItem(id, { ...rest, deleted: true })
+        await updateItemFor(id, table.tableId, { ...rest, deleted: true })
       } catch {
         results.push(`id ${id}: corrected row ${newId} created, but failed to flag the original — flag it manually`)
         continue

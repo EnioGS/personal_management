@@ -1,36 +1,42 @@
-import { findWritableTable, writableTables } from './writable-tables'
+import { findWritableTable, itemsFor, updateItemFor, writableTables } from './writable-tables'
 import type { ToolDefinition } from './types'
 
 function buildDescription(): string {
-  const tableList = writableTables.map((t) => `"${t.key}" (${t.label})`).join(', ')
+  const tableList = writableTables()
+    .map((t) => `"${t.key}" (${t.label})`)
+    .join(', ')
   return (
-    'Flags one or more rows in a finance/investment table as deleted. This is NOT a physical delete — flagged ' +
+    'Flags one or more rows in a table as deleted. This is NOT a physical delete — flagged ' +
     'rows are only hidden/faded in the app, still exist, and are still visible to read_table (tagged ' +
     'deleted=true). Only the user, via the "delete flagged rows" button in the app, can permanently remove ' +
     'them. restore_table_rows is the only way to un-flag a row — use it if you flag something by mistake. ' +
-    `Available tables: ${tableList}.`
+    `Available tables: ${tableList || '(none yet)'}.`
   )
 }
 
 export const deleteTableRowsTool: ToolDefinition = {
   name: 'delete_table_rows',
-  description: buildDescription(),
-  parameters: {
-    type: 'object',
-    properties: {
-      table: {
-        type: 'string',
-        enum: writableTables.map((t) => t.key),
-        description: 'Which table the rows belong to.',
+  get description() {
+    return buildDescription()
+  },
+  get parameters() {
+    return {
+      type: 'object',
+      properties: {
+        table: {
+          type: 'string',
+          enum: writableTables().map((t) => t.key),
+          description: 'Which table the rows belong to.',
+        },
+        ids: {
+          type: 'array',
+          items: { type: 'number' },
+          description: 'Row ids to flag as deleted (from read_table).',
+        },
       },
-      ids: {
-        type: 'array',
-        items: { type: 'number' },
-        description: 'Row ids to flag as deleted (from read_table).',
-      },
-    },
-    required: ['table', 'ids'],
-    additionalProperties: false,
+      required: ['table', 'ids'],
+      additionalProperties: false,
+    }
   },
   execute: async (args) => {
     const tableKey = typeof args.table === 'string' ? args.table : undefined
@@ -38,14 +44,16 @@ export const deleteTableRowsTool: ToolDefinition = {
 
     const table = findWritableTable(tableKey)
     if (!table) {
-      return `Error: unknown table "${tableKey}". Valid tables: ${writableTables.map((t) => t.key).join(', ')}.`
+      return `Error: unknown table "${tableKey}". Valid tables: ${writableTables()
+        .map((t) => t.key)
+        .join(', ')}.`
     }
 
     if (!Array.isArray(args.ids) || args.ids.length === 0) {
       return 'Error: "ids" argument missing, not an array, or empty.'
     }
 
-    const items = table.useStore.getState().items
+    const items = itemsFor(table.tableId)
     const results: string[] = []
 
     for (const rawId of args.ids as unknown[]) {
@@ -63,9 +71,9 @@ export const deleteTableRowsTool: ToolDefinition = {
         continue
       }
 
-      const { id: _id, createdAt: _createdAt, deleted: _deleted, ...rest } = existing as Record<string, unknown>
+      const { id: _id, createdAt: _createdAt, deleted: _deleted, tableId: _tableId, ...rest } = existing as Record<string, unknown>
       try {
-        await table.useStore.getState().updateItem(rawId, { ...rest, deleted: true })
+        await updateItemFor(rawId, table.tableId, { ...rest, deleted: true })
         results.push(`id ${rawId}: flagged deleted`)
       } catch {
         results.push(`id ${rawId}: storage error, not changed`)

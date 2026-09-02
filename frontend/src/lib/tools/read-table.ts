@@ -1,35 +1,41 @@
 import Papa from 'papaparse'
-import { findWritableTable, writableTables } from './writable-tables'
+import { findWritableTable, itemsFor, writableTables } from './writable-tables'
 import type { ToolDefinition } from './types'
 
 const MAX_ROWS = 200
 
 function buildDescription(): string {
-  const tableList = writableTables.map((t) => `"${t.key}" (${t.label})`).join(', ')
+  const tableList = writableTables()
+    .map((t) => `"${t.key}" (${t.label})`)
+    .join(', ')
   return (
-    "Reads existing rows from a table in the user's finance/investment records, optionally scoped to a " +
+    "Reads existing rows from a table in the user's records, optionally scoped to a " +
     'date range. Use this before write_to_table/update_table_rows when reconciling an attached file against ' +
     'existing data — e.g. to avoid adding rows that are already present, or to find rows that need correcting. ' +
     'Rows may carry a "deleted" flag: such rows are hidden/faded in the app but not physically removed — this ' +
     'tool still returns them (tagged deleted=true) so you can reason about them; treat them as superseded/' +
     'historical, not current data, unless the user is specifically asking about deleted entries. ' +
     'For a period like one statement month, set dateFrom/dateTo to that period rather than omitting them — ' +
-    `large unscoped reads are rejected with just a count instead of the actual rows. Available tables: ${tableList}.`
+    `large unscoped reads are rejected with just a count instead of the actual rows. Available tables: ${tableList || '(none yet — the user has not created any)'}.`
   )
 }
 
 export const readTableTool: ToolDefinition = {
   name: 'read_table',
-  description: buildDescription(),
-  parameters: {
-    type: 'object',
-    properties: {
-      table: { type: 'string', enum: writableTables.map((t) => t.key), description: 'Which table to read.' },
-      dateFrom: { type: 'string', description: 'Inclusive start date, "YYYY-MM-DD". Omit for no lower bound.' },
-      dateTo: { type: 'string', description: 'Inclusive end date, "YYYY-MM-DD". Omit for no upper bound.' },
-    },
-    required: ['table'],
-    additionalProperties: false,
+  get description() {
+    return buildDescription()
+  },
+  get parameters() {
+    return {
+      type: 'object',
+      properties: {
+        table: { type: 'string', enum: writableTables().map((t) => t.key), description: 'Which table to read.' },
+        dateFrom: { type: 'string', description: 'Inclusive start date, "YYYY-MM-DD". Omit for no lower bound.' },
+        dateTo: { type: 'string', description: 'Inclusive end date, "YYYY-MM-DD". Omit for no upper bound.' },
+      },
+      required: ['table'],
+      additionalProperties: false,
+    }
   },
   execute: async (args) => {
     const tableKey = typeof args.table === 'string' ? args.table : undefined
@@ -37,7 +43,9 @@ export const readTableTool: ToolDefinition = {
 
     const table = findWritableTable(tableKey)
     if (!table) {
-      return `Error: unknown table "${tableKey}". Valid tables: ${writableTables.map((t) => t.key).join(', ')}.`
+      return `Error: unknown table "${tableKey}". Valid tables: ${writableTables()
+        .map((t) => t.key)
+        .join(', ')}.`
     }
 
     let fromMs = -Infinity
@@ -53,7 +61,7 @@ export const readTableTool: ToolDefinition = {
       toMs = parsed
     }
 
-    const allItems = table.useStore.getState().items
+    const allItems = itemsFor(table.tableId)
     const filtered = allItems
       .filter((row) => {
         const date = (row as Record<string, unknown>).date
