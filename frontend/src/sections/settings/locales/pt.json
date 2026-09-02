@@ -22,14 +22,23 @@
     "english": "Inglês"
   },
   "assistant": {
-    "connectionLabel": "Conexão",
-    "connectionDescription": "Usa o OpenRouter (openrouter.ai) — uma chave, vários modelos. A chave fica salva neste navegador, como todo o resto.",
-    "apiKeyPlaceholder": "Chave de API do OpenRouter",
-    "apiKeyFromEnv": "Preenchido a partir do seu .env local (VITE_OPENROUTER_API_KEY) — clique em Salvar para guardá-la no cofre, ou edite aqui para usar outra chave.",
+    "connectionLabel": "Conexões",
+    "connectionDescription": "Cole uma chave de API e o provedor é detectado automaticamente. A chave fica salva neste navegador, como todo o resto.",
+    "apiKeyPlaceholder": "Cole uma chave de API",
+    "apiKeyFromEnv": "Usando a chave do OpenRouter do seu .env local (VITE_OPENROUTER_API_KEY) — conecte uma abaixo para usar outra chave.",
     "modelPlaceholder": "Selecione um modelo",
+    "active": "Ativa",
+    "use": "Usar",
+    "disconnect": "Desconectar",
+    "connect": "Conectar",
+    "unsupportedKey": "Formato de chave não reconhecido — provedor não suportado.",
+    "detectedProvider": "Detectado: {{provider}}",
+    "replaceTitle": "Substituir a conexão existente com {{provider}}?",
+    "replaceDescription": "Esse provedor já está conectado. A nova chave vai substituir a que está salva atualmente para ele.",
+    "replaceConfirm": "Substituir",
     "systemPromptLabel": "Prompt do sistema",
     "systemPromptDescription": "Enviado ao modelo no início de cada conversa. Não é traduzido — sempre salvo e usado no idioma em que você escrevê-lo.",
-    "save": "Salvar"
+    "resetPrompt": "Restaurar padrão"
   },
   "accountsCards": {
     "accountsHeading": "Contas bancárias",

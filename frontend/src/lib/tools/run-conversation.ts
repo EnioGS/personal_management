@@ -38,7 +38,7 @@ export async function runConversation({
     const message = await requestFn(apiKey, model, conversation, tools)
 
     if (!message.tool_calls || message.tool_calls.length === 0) {
-      if (typeof message.content !== 'string') throw new Error('Unexpected response from OpenRouter.')
+      if (typeof message.content !== 'string') throw new Error('Unexpected response from the assistant API.')
       return message.content
     }
 

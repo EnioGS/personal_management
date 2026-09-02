@@ -1,14 +1,15 @@
 import { createLocalListStore } from '@/lib/local-store/create-local-list-store'
+import type { ApiProvider } from './ai-providers'
 import { assistantConfigTable } from './assistant-config-db'
 
+/** One saved connection per provider — see adr/0027. */
 export interface AssistantConfig {
-  key: string
+  provider: ApiProvider
   apiKey: string
   model: string
+  /** The connection the chat currently sends requests to. Exactly one row is active at a time. */
+  isActive: boolean
 }
-
-export const CONFIG_KEY = 'default'
-export const DEFAULT_MODEL = 'openai/gpt-5.5'
 
 /**
  * Dev-only convenience, read from .env's VITE_OPENROUTER_API_KEY: lets a saved

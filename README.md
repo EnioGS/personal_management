@@ -53,8 +53,10 @@ Two things it optimizes for:
 │   │   │   ├── data-file.ts              # whole-app export/import (.pmdata v3 + v2 upgrader), row counts
 │   │   │   ├── file-io.ts                # save-file picker (Chromium) with a download fallback
 │   │   │   ├── openrouter.ts             # OpenRouter chat-completions client (incl. tool-calling wire format)
+│   │   │   ├── openai-client.ts          # OpenAI direct chat-completions client, same wire format
+│   │   │   ├── ai-providers.ts           # provider registry + key-prefix detection (adr/0027)
 │   │   │   ├── chat-attachments.ts       # validates/reads .txt/.md/.csv files attached to a chat message
-│   │   │   ├── assistant-config.ts       # API key/model (assistant-models.json is the pickable model list)
+│   │   │   ├── assistant-config.ts       # one connection (provider/key/model) per row — see adr/0027
 │   │   │   ├── assistant-prompts.ts      # editable system prompt (not translated, see adr/0016)
 │   │   │   ├── tools/                    # tool-calling: registry.ts + one file per tool + run-conversation.ts loop
 │   │   │   ├── utils.ts       # cn() helper (shadcn convention)
@@ -90,10 +92,12 @@ Two things it optimizes for:
   [Decisions](#decisions)).
 - **Charts**: Recharts via shadcn/ui's `chart` wrapper; `@tanstack/react-table`
   for editable data tables; `papaparse` for CSV import/export.
-- **Assistant**: a global chat panel calling OpenRouter (openrouter.ai) directly
-  from the browser with a user-supplied API key — no backend in the loop. Tool
-  calling lets the model read attached files, and read/write/correct/flag rows
-  in whichever tables the user has created; see `lib/tools/` and
+- **Assistant**: a global chat panel calling either OpenRouter (openrouter.ai)
+  or OpenAI directly from the browser, whichever connection is active — no
+  backend in the loop. The provider is detected from the pasted API key's own
+  format (adr/0027), user-supplied and stored per connection. Tool calling
+  lets the model read attached files, and read/write/correct/flag rows in
+  whichever tables the user has created; see `lib/tools/` and
   [Decisions](#decisions) below.
 - **i18n**: react-i18next, default Portuguese, namespace-per-section.
 - **Testing**: Vitest, colocated with the code it covers.
@@ -153,6 +157,12 @@ Two things it optimizes for:
   computed elsewhere, positions/allocation share one weighted-average-price
   calculation (`lib/current-value.ts`), recurring detection is pattern
   matching over existing entries, not a declared schedule.
+- The assistant's Connections list supports more than one provider — one
+  saved connection per provider, detected from the key's own prefix rather
+  than a picker, with exactly one active at a time (adr/0027). Nothing in
+  Settings → Assistant has a Save button: a connected key and an edited
+  system prompt already persist themselves, with a reset button restoring
+  the default prompt for anyone who'd rather not hand-edit it.
 - Nothing the assistant does to an existing row in a writable table is ever a
   hard delete or in-place overwrite — a `deleted` soft-flag column marks rows
   for removal (faded, not hidden, in the table UI) or the original of a

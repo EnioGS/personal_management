@@ -22,14 +22,23 @@
     "english": "English"
   },
   "assistant": {
-    "connectionLabel": "Connection",
-    "connectionDescription": "Uses OpenRouter (openrouter.ai) — one key, many models. The key is stored in this browser, like everything else here.",
-    "apiKeyPlaceholder": "OpenRouter API key",
-    "apiKeyFromEnv": "Filled in from your local .env (VITE_OPENROUTER_API_KEY) — click Save to store it in the vault, or edit it here to use a different key.",
+    "connectionLabel": "Connections",
+    "connectionDescription": "Paste an API key and the provider is detected automatically. The key is stored in this browser, like everything else here.",
+    "apiKeyPlaceholder": "Paste an API key",
+    "apiKeyFromEnv": "Using the OpenRouter key from your local .env (VITE_OPENROUTER_API_KEY) — connect one below to use a different key instead.",
     "modelPlaceholder": "Select a model",
+    "active": "Active",
+    "use": "Use",
+    "disconnect": "Disconnect",
+    "connect": "Connect",
+    "unsupportedKey": "Unrecognized API key format — not a supported provider.",
+    "detectedProvider": "Detected: {{provider}}",
+    "replaceTitle": "Replace the existing {{provider}} connection?",
+    "replaceDescription": "This provider is already connected. The new key will replace the one currently saved for it.",
+    "replaceConfirm": "Replace",
     "systemPromptLabel": "System prompt",
     "systemPromptDescription": "Sent to the model at the start of every conversation. Not translated — always saved and used in whatever language you write it in.",
-    "save": "Save"
+    "resetPrompt": "Reset to default"
   },
   "accountsCards": {
     "accountsHeading": "Bank accounts",

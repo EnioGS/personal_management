@@ -1,3 +1,4 @@
+import type { ApiProvider } from './ai-providers'
 import rawModels from './assistant-models.json'
 
 export interface AssistantModelOption {
@@ -5,10 +6,6 @@ export interface AssistantModelOption {
   provider: string
 }
 
-/**
- * The list shown in Settings → Assistant's model picker. Edit assistant-models.json
- * directly to add/remove models — nothing else needs to change.
- */
 export const assistantModels: AssistantModelOption[] = rawModels
 
 export interface AssistantModelGroup {
@@ -16,12 +13,11 @@ export interface AssistantModelGroup {
   models: AssistantModelOption[]
 }
 
-/** Groups by provider, preserving each provider's first-appearance order in the JSON file. */
-export function groupAssistantModelsByProvider(): AssistantModelGroup[] {
+export function groupAssistantModelsByProvider(models: AssistantModelOption[] = assistantModels): AssistantModelGroup[] {
   const groups: AssistantModelGroup[] = []
   const groupByProvider = new Map<string, AssistantModelGroup>()
 
-  for (const model of assistantModels) {
+  for (const model of models) {
     let group = groupByProvider.get(model.provider)
     if (!group) {
       group = { provider: model.provider, models: [] }
@@ -32,4 +28,21 @@ export function groupAssistantModelsByProvider(): AssistantModelGroup[] {
   }
 
   return groups
+}
+
+/**
+ * OpenRouter routes to every vendor under its own namespaced ids (e.g.
+ * "openai/gpt-5.5") — a connection to it can pick from the full catalog as-is.
+ * A direct OpenAI connection can only run OpenAI's own models, and OpenAI's API
+ * expects the bare id with no "openai/" prefix.
+ */
+export function assistantModelsForProvider(provider: ApiProvider): AssistantModelOption[] {
+  if (provider === 'openrouter') return assistantModels
+  return assistantModels
+    .filter((model) => model.provider === 'OpenAI')
+    .map((model) => ({ ...model, id: model.id.replace(/^openai\//, '') }))
+}
+
+export function defaultModelForProvider(provider: ApiProvider): string {
+  return assistantModelsForProvider(provider)[0]?.id ?? ''
 }
