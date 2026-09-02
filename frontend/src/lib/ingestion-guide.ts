@@ -83,7 +83,7 @@ is Fixed Income or Variable Income. Call read_table to see what exists.
 
 ## How to work
 
-1. list_ingestion_datasets to see the worklist and the sources.
+1. list_ingestion_datasets for the worklist, the sources and the destination tables.
 2. read_ingestion_table for the rows themselves. Work one page at a time — never
    page through the whole worklist before answering. A backlog of hundreds of rows
    is normal; read a page, label what you can, report, and offer to continue.

@@ -82,6 +82,14 @@ describe('what the dataset listing tells the model', () => {
     expect(listed.sources[0].rows).toMatchObject({ total: 3, unlabelled: 3, ready: 0 })
   })
 
+  it('offers every destination table with the id the labelling tool expects', async () => {
+    const tableId = await tableDefsTable.add({ createdAt: 1, data: { name: 'Extrato Nubank', kind: 'bankLedger' } })
+
+    const listed = JSON.parse(await listIngestionDatasetsTool.execute({}, context))
+
+    expect(listed.destinationTables).toEqual([{ destinationTableId: tableId, name: 'Extrato Nubank', kind: 'bankLedger' }])
+  })
+
   it('never puts the uploaded file itself into the conversation', async () => {
     const rawCsv = 'date,amount\n2026-01-01,10\n'.repeat(500)
     await ingestionSourcesTable.add({ createdAt: 1, data: { originalFilename: 'nubank.csv', sourceFingerprint: 'f', importedAt: 1, rawCsv, originalColumns: ['date', 'amount'], supplementalColumns: [], rowCount: 500, status: 'mapped' } })

@@ -5,9 +5,9 @@ import { createSupplementalColumn, saveIngestionMappings } from '@/lib/model/ing
 import { updateIngestionRowLabels, updateIngestionRowWorklist } from '@/lib/model/ingestion-promotion'
 import { FINANCE_DESTINATIONS, FLOW_ROLES, labelValues, matchLabelValue, RECURRENCES, SETTLEMENT_CHANNELS, SPENDING_TREATMENTS } from '@/lib/model/label-vocabulary'
 import { assistantPromptsTable } from '@/lib/assistant-prompts-db'
-import { categoriesTable, ingestionAuditEventsTable, ingestionColumnMappingsTable, ingestionRowsTable, ingestionSourcesTable } from '@/lib/model/model-db'
+import { categoriesTable, ingestionAuditEventsTable, ingestionColumnMappingsTable, ingestionRowsTable, ingestionSourcesTable, tableDefsTable } from '@/lib/model/model-db'
 import type { AssistantPrompt } from '@/lib/assistant-prompts'
-import type { Category, IngestionAuditEvent, IngestionColumnMapping, IngestionRow, IngestionRowLabels, IngestionSource, IngestionTargetField } from '@/lib/model/types'
+import type { Category, IngestionAuditEvent, IngestionColumnMapping, IngestionRow, IngestionRowLabels, IngestionSource, IngestionTargetField, TableDef } from '@/lib/model/types'
 import type { ToolDefinition } from './types'
 
 const MAX_ROWS = 100
@@ -40,16 +40,20 @@ const TARGET_FIELDS: IngestionTargetField[] = ['date', 'amount', 'description', 
 
 export const listIngestionDatasetsTool: ToolDefinition = {
   name: 'list_ingestion_datasets',
-  description: 'Lists the imported-unlabelled worklist and uploaded CSV sources with original filenames, source IDs, mapping state, row count, and ready-row count. Read-only.',
+  description: 'Lists the imported-unlabelled worklist and uploaded CSV sources with original filenames, source IDs, mapping state and per-status row counts, plus every destination table a row can be sent to with the id update_ingestion_labels expects. Start here. Read-only.',
   parameters: { type: 'object', properties: {}, additionalProperties: false },
   execute: async () => {
-    const [sources, storedRows] = await Promise.all([ingestionSourcesTable.toArray(), ingestionRowsTable.toArray()])
+    const [sources, storedRows, tables] = await Promise.all([ingestionSourcesTable.toArray(), ingestionRowsTable.toArray(), tableDefsTable.toArray()])
     const rows = storedRows.map((row) => row.data as IngestionRow)
     const active = rows.filter((row) => row.status !== 'promoted' && row.status !== 'reconciledExisting')
     return JSON.stringify({
       unlabelled: { count: active.length, ready: active.filter((row) => row.status === 'ready').length },
       readTheseWith: 'read_ingestion_table without a sourceId, one page at a time',
       sources: sources.map((source) => summariseSource(source, rows)),
+      // A destination table is required on every row, and an empty table is still a
+      // valid destination — so list them here rather than leaving the model to infer
+      // them from a tool that reads rows.
+      destinationTables: tables.map((table) => ({ destinationTableId: table.id, ...(table.data as TableDef) })),
     })
   },
 }
