@@ -165,6 +165,12 @@ export interface IngestionSource {
   status: IngestionSourceStatus
   /** True only for the synthetic source that links pre-existing app entries. */
   legacy?: boolean
+  /**
+   * Marks which one-off repair of the legacy queue has already run for this
+   * source, so a repair corrects historical data exactly once instead of
+   * discarding labels the user has assigned since.
+   */
+  repairVersion?: number
 }
 
 /** Maps one original or supplemental source column onto exactly one canonical field. */
