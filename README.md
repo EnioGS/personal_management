@@ -149,7 +149,12 @@ Two things it optimizes for:
   rows and label sidecars travel in the v5 export too, so
   importing into a blank browser restores the whole setup.
 - Data enters Finance through Settings → Data ingestion centre (adr/0030,
-  adr/0031): CSV source columns are mapped without rewriting the original file,
+  adr/0031). The drop zone takes CSV files and exported `.db` databases alike — a
+  database is split into one dataset per user table it contains, so rows from
+  another vault or an old backup arrive unlabelled and go through the same door
+  as a bank statement, rather than being restored into a finance table (that is
+  still Vault → import, which replaces everything). CSV source columns are
+  mapped without rewriting the original file,
   sparse sources may gain explicitly blank supplemental columns, and only
   user-confirmed ready rows are written into a destination table. A row nobody
   has labelled is not in a finance table at all — it waits in the worklist, so

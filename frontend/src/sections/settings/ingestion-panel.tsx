@@ -12,6 +12,7 @@ import {
   stageIngestionSource,
   validateIngestionMappings,
 } from '@/lib/model/ingestion-source'
+import { createIngestionSourcesFromDatabaseFile } from '@/lib/model/ingestion-database-file'
 import { promoteReadyIngestionRows, updateIngestionRowWorklist } from '@/lib/model/ingestion-promotion'
 import {
   useCategoriesStore,
@@ -120,16 +121,33 @@ export function IngestionPanel() {
     setMessage(`Promoted ${result.promoted} row(s), reconciled ${result.reconciled} existing row(s).${result.errors.length ? ` ${result.errors.join(' ')}` : ''}`)
   }
 
+  /**
+   * CSVs arrive as one source each. An exported database is split into one source per
+   * user table it contains, so its rows enter through mapping and labelling like any
+   * other file — this never restores a vault and never writes an entry.
+   */
   async function handleFiles(files: FileList | null) {
     if (!files) return
+    const notes: string[] = []
     try {
       for (const file of Array.from(files)) {
-        if (!file.name.toLowerCase().endsWith('.csv')) throw new Error(`"${file.name}" is not a CSV file.`)
-        const sourceId = await createIngestionSource(file.name, await file.text())
-        setSelected(String(sourceId))
+        const name = file.name.toLowerCase()
+        if (name.endsWith('.csv')) {
+          const sourceId = await createIngestionSource(file.name, await file.text())
+          setSelected(String(sourceId))
+          notes.push(`${file.name}: added. Assign all required fields before staging it.`)
+          continue
+        }
+        if (name.endsWith('.db') || name.endsWith('.pmdata')) {
+          const result = await createIngestionSourcesFromDatabaseFile(file.name, new Uint8Array(await file.arrayBuffer()))
+          notes.push(`${file.name}: ${result.created.length} table(s) added${result.created.length ? ` — ${result.created.map((table) => `${table.name} (${table.rowCount} rows)`).join(', ')}` : ''}.`)
+          for (const skipped of result.skipped) notes.push(`Skipped ${skipped.name}: ${skipped.reason}`)
+          continue
+        }
+        throw new Error(`"${file.name}" is not a CSV or exported database file.`)
       }
       await refresh()
-      setMessage('Source file added. Assign all required fields before staging it.')
+      setMessage(notes.join(' '))
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Could not import the source file.')
     }
@@ -231,8 +249,8 @@ export function IngestionPanel() {
       )}
 
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-dashed p-3" onDragOver={(event) => event.preventDefault()} onDrop={handleDrop}>
-        <div className="text-xs"><p className="font-medium">Import data</p><p className="text-muted-foreground">Drop one or more CSV files here, or choose files.</p></div>
-        <div className="flex gap-2"><input ref={fileInput} type="file" accept=".csv,text/csv" multiple className="hidden" onChange={(event: ChangeEvent<HTMLInputElement>) => void handleFiles(event.target.files)} /><Button type="button" variant="outline" size="sm" onClick={() => fileInput.current?.click()}><FilePlus2 className="size-3.5" />Import data</Button>{selectedSource ? <Button type="button" size="sm" disabled={!!validation?.errors.length} onClick={() => void saveAndStage()}><Upload className="size-3.5" />Add to imported unlabelled data</Button> : <Button type="button" size="sm" disabled={!rows.some((row) => row.status === 'ready')} onClick={() => void confirmPromotion()}><Check className="size-3.5" />Confirm and move ready rows</Button>}</div>
+        <div className="text-xs"><p className="font-medium">Import data</p><p className="text-muted-foreground">Drop CSV files here, or an exported .db — a database is split into one dataset per table it contains.</p></div>
+        <div className="flex gap-2"><input ref={fileInput} type="file" accept=".csv,text/csv,.db,.pmdata,application/vnd.sqlite3" multiple className="hidden" onChange={(event: ChangeEvent<HTMLInputElement>) => void handleFiles(event.target.files)} /><Button type="button" variant="outline" size="sm" onClick={() => fileInput.current?.click()}><FilePlus2 className="size-3.5" />Import data</Button>{selectedSource ? <Button type="button" size="sm" disabled={!!validation?.errors.length} onClick={() => void saveAndStage()}><Upload className="size-3.5" />Add to imported unlabelled data</Button> : <Button type="button" size="sm" disabled={!rows.some((row) => row.status === 'ready')} onClick={() => void confirmPromotion()}><Check className="size-3.5" />Confirm and move ready rows</Button>}</div>
       </div>
     </div>
   )
