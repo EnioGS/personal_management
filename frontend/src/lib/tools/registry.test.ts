@@ -23,6 +23,7 @@ describe('findTool', () => {
       'add_ingestion_blank_column',
       'suggest_ingestion_labels',
       'update_ingestion_labels',
+      'label_ingestion_rows_by_match',
       'update_ingestion_data_fields',
       'validate_ingestion_rows',
       'write_to_table',

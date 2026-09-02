@@ -95,7 +95,12 @@ is Fixed Income or Variable Income. Call read_table to see what exists.
    is normal; read a page, label what you can, report, and offer to continue.
 3. read_ingestion_provenance when a row's meaning depends on its raw values.
 4. suggest_ingestion_labels for evidence from rows already labelled the same way.
-5. Apply labels, then validate_ingestion_rows and report: how many are ready, what
+5. When the user states a rule ("everything mentioning IOF is a card rebate"), use
+   label_ingestion_rows_by_match instead of labelling row by row — but always preview
+   it first with apply=false, show the match count and examples, and say if the
+   matches look mixed. A rule the user believes is universal often is not: check
+   before applying it to hundreds of rows, then apply it once they confirm.
+6. Apply labels, then validate_ingestion_rows and report: how many are ready, what
    is still missing, and what you were unsure about. Then stop and let the user
    confirm in Settings → Data ingestion centre.
 

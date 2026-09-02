@@ -2,6 +2,7 @@ import type { OpenRouterTool } from '@/lib/openrouter'
 import {
   assignIngestionColumnsTool,
   addIngestionBlankColumnTool,
+  labelIngestionRowsByMatchTool,
   listIngestionDatasetsTool,
   readIngestionGuideTool,
   readIngestionProvenanceTool,
@@ -38,6 +39,7 @@ export const toolRegistry: ToolDefinition[] = [
   addIngestionBlankColumnTool,
   suggestIngestionLabelsTool,
   updateIngestionLabelsTool,
+  labelIngestionRowsByMatchTool,
   updateIngestionDataFieldsTool,
   validateIngestionRowsTool,
   writeToTableTool,

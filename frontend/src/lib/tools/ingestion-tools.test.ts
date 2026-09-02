@@ -4,7 +4,7 @@ import { DEFAULT_INGESTION_GUIDE, INGESTION_GUIDE_KEY } from '@/lib/ingestion-gu
 import { assistantPromptsTable } from '@/lib/assistant-prompts-db'
 import { categoriesTable, ingestionRowsTable, ingestionSourcesTable, tableDefsTable } from '@/lib/model/model-db'
 import type { Category, IngestionRow } from '@/lib/model/types'
-import { addIngestionBlankColumnTool, assignIngestionColumnsTool, listIngestionDatasetsTool, readIngestionGuideTool, readIngestionProvenanceTool, readIngestionTableTool, updateIngestionLabelsTool } from './ingestion-tools'
+import { addIngestionBlankColumnTool, assignIngestionColumnsTool, labelIngestionRowsByMatchTool, listIngestionDatasetsTool, readIngestionGuideTool, readIngestionProvenanceTool, readIngestionTableTool, updateIngestionLabelsTool } from './ingestion-tools'
 
 const context = { attachments: [] } as never
 
@@ -134,5 +134,61 @@ describe('the legacy source has no file', () => {
 
     expect(await assignIngestionColumnsTool.execute({ sourceId, mappings: [{ sourceColumn: 'date', targetField: 'date' }] }, context)).toContain('no columns to map')
     expect(await addIngestionBlankColumnTool.execute({ sourceId, name: 'quantity' }, context)).toContain('no columns to map')
+  })
+})
+
+describe('labelling by a rule instead of row by row', () => {
+  beforeEach(async () => { await wipeAllData() })
+
+  async function seedCardRows(descriptions: string[]) {
+    const tableId = await tableDefsTable.add({ createdAt: 1, data: { name: 'Fatura Nubank', kind: 'cardLedger' } })
+    const sourceId = await ingestionSourcesTable.add({ createdAt: 1, data: { originalFilename: 'fatura.csv', sourceFingerprint: 'f', importedAt: 1, rawCsv: '', originalColumns: [], supplementalColumns: [], rowCount: descriptions.length, status: 'staged' } })
+    const ids: number[] = []
+    for (const [index, description] of descriptions.entries()) {
+      ids.push(await ingestionRowsTable.add({
+        createdAt: 2,
+        data: { sourceId, sourceRowIndex: index, sourceRowFingerprint: `r${index}`, rawValues: { description }, mappedValues: { date: '2026-01-02', amount: '10', description, rawCategory: description }, labels: {}, status: 'unlabelled', validationErrors: [], destinationTableId: tableId } satisfies IngestionRow,
+      }))
+    }
+    return { ids, tableId }
+  }
+
+  it('changes nothing until it is told to apply, and shows what it would hit', async () => {
+    const { ids, tableId } = await seedCardRows(['IOF de Moonshot Ai', 'IOF de volta de Moonshot Ai', 'Amazonprimebr'])
+
+    const preview = JSON.parse(await labelIngestionRowsByMatchTool.execute({ contains: 'iof', labels: { financeDestination: 'movements', flowRole: 'inflow', settlementChannel: 'creditCard', spendingTreatment: 'notApplicable', recurrence: 'oneOff', destinationTableId: tableId } }, context))
+
+    expect(preview).toMatchObject({ applied: false, matched: 2 })
+    expect(preview.examples.map((example: { rowId: number }) => example.rowId)).toEqual([ids[0], ids[1]])
+    expect(((await ingestionRowsTable.get(ids[0]))!.data as IngestionRow).labels).toEqual({})
+  })
+
+  it('labels every match in one call and reports how many became ready', async () => {
+    const { ids, tableId } = await seedCardRows(['IOF de Moonshot Ai', 'IOF de volta de Moonshot Ai', 'Amazonprimebr'])
+
+    const result = JSON.parse(await labelIngestionRowsByMatchTool.execute({ contains: 'IOF', apply: true, labels: { financeDestination: 'movements', flowRole: 'inflow', settlementChannel: 'creditCard', spendingTreatment: 'notApplicable', recurrence: 'oneOff', destinationTableId: tableId } }, context))
+
+    expect(result).toMatchObject({ applied: true, matched: 2, ready: 2, errors: [] })
+    expect(((await ingestionRowsTable.get(ids[1]))!.data as IngestionRow).labels).toMatchObject({ financeDestination: 'movements', flowRole: 'inflow' })
+    expect(((await ingestionRowsTable.get(ids[2]))!.data as IngestionRow).labels).toEqual({})
+  })
+
+  it('keeps labels the rule does not mention, so rules can be layered', async () => {
+    const { ids, tableId } = await seedCardRows(['Amazonprimebr'])
+    await updateIngestionLabelsTool.execute({ updates: [{ rowId: ids[0], financeDestination: 'spending', flowRole: 'outflow', settlementChannel: 'creditCard', spendingTreatment: 'expense', recurrence: 'oneOff', category: 'Assinaturas', destinationTableId: tableId }] }, context)
+
+    await labelIngestionRowsByMatchTool.execute({ contains: 'prime', apply: true, labels: { recurrence: 'recurring' } }, context)
+
+    expect(((await ingestionRowsTable.get(ids[0]))!.data as IngestionRow).labels).toMatchObject({ financeDestination: 'spending', spendingTreatment: 'expense', recurrence: 'recurring' })
+  })
+
+  it('never touches a row that was already promoted', async () => {
+    const { ids } = await seedCardRows(['IOF de Moonshot Ai'])
+    const promoted = (await ingestionRowsTable.get(ids[0]))!.data as IngestionRow
+    await ingestionRowsTable.update(ids[0], { data: { ...promoted, status: 'promoted' } })
+
+    const preview = JSON.parse(await labelIngestionRowsByMatchTool.execute({ contains: 'iof', labels: { flowRole: 'inflow' } }, context))
+
+    expect(preview.matched).toBe(0)
   })
 })

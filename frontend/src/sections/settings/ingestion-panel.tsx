@@ -73,7 +73,13 @@ export function IngestionPanel() {
     ? validateIngestionMappings(selectedSource.originalColumns, selectedSource.supplementalColumns, mappings)
     : null
   const sourcePreview = useMemo(() => (selectedSource ? parseIngestionCsv(selectedSource.rawCsv).rows : []), [selectedSource])
-  const rows = useMemo(() => rowStore.items.filter((row) => row.status !== 'promoted' && row.status !== 'reconciledExisting'), [rowStore.items])
+  // Ready rows first. They are the only rows the confirmation button acts on, and a
+  // backlog of hundreds otherwise buries them; the sort is stable, so everything else
+  // keeps the order it was queued in.
+  const rows = useMemo(() => {
+    const active = rowStore.items.filter((row) => row.status !== 'promoted' && row.status !== 'reconciledExisting')
+    return [...active].sort((left, right) => Number(right.status === 'ready') - Number(left.status === 'ready'))
+  }, [rowStore.items])
 
   async function refresh() {
     await Promise.all([sourceStore.refresh(), mappingStore.refresh(), rowStore.refresh()])
@@ -207,7 +213,7 @@ export function IngestionPanel() {
         <Select value={selected} onValueChange={(value) => { setSelected(value); setDraftMappings(null); setMessage(null) }}>
           <SelectTrigger className="w-72"><SelectValue /></SelectTrigger>
           <SelectContent>
-            <SelectItem value={UNLABELLED_DATASET}>Imported, unlabelled data ({rows.length})</SelectItem>
+            <SelectItem value={UNLABELLED_DATASET}>Imported, unlabelled data ({rows.length}; {rows.filter((row) => row.status === 'ready').length} ready)</SelectItem>
             {sourceStore.items.map((source) => <SelectItem key={source.id} value={String(source.id)}>{source.originalFilename} · {source.legacy ? `${rowStore.items.filter((row) => row.sourceId === source.id).length} queued rows` : `${source.rowCount} rows`}</SelectItem>)}
           </SelectContent>
         </Select>

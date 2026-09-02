@@ -182,6 +182,88 @@ export const updateIngestionLabelsTool: ToolDefinition = {
   },
 }
 
+const LABEL_PROPERTIES = {
+  financeDestination: { type: 'string', enum: labelValues(FINANCE_DESTINATIONS) },
+  flowRole: { type: 'string', enum: labelValues(FLOW_ROLES) },
+  settlementChannel: { type: 'string', enum: labelValues(SETTLEMENT_CHANNELS) },
+  spendingTreatment: { type: 'string', enum: labelValues(SPENDING_TREATMENTS) },
+  recurrence: { type: 'string', enum: labelValues(RECURRENCES) },
+  category: { type: 'string', description: 'Category name. A name that does not exist yet is created.' },
+  destinationTableId: { type: 'number', description: 'Row id of the destination table, from list_ingestion_datasets.' },
+} as const
+
+/** The text a rule is matched against: everything the source said about the row. */
+function searchableText(row: IngestionRow, field: string): string {
+  if (field === 'description') return String(row.mappedValues.description ?? row.rawValues.description ?? '')
+  if (field === 'rawCategory') return String(row.mappedValues.rawCategory ?? row.rawValues.category ?? '')
+  return [...Object.values(row.rawValues), row.mappedValues.description, row.mappedValues.rawCategory, row.mappedValues.note].map((value) => String(value ?? '')).join(' \u0000 ')
+}
+
+export const labelIngestionRowsByMatchTool: ToolDefinition = {
+  name: 'label_ingestion_rows_by_match',
+  description: `Applies one set of labels to every unfinalized row whose text matches a string — the efficient way to act on a rule such as "every row mentioning IOF" without reading each row. ALWAYS call it once with apply=false first: that changes nothing and returns the match count with examples, so the user can confirm the rule really describes those rows before hundreds are labelled. Report the count and the examples, and say plainly when the matches look mixed (a description containing IOF may be a charge on one row and a reversal on another). Only then call it again with apply=true. Values are the same closed vocabulary as update_ingestion_labels; fields you omit keep whatever each row already has. Finalized rows are never touched, and this cannot promote anything.`,
+  parameters: {
+    type: 'object',
+    properties: {
+      contains: { type: 'string', description: 'Text to look for, case-insensitive unless caseSensitive is true.' },
+      field: { type: 'string', enum: ['any', 'description', 'rawCategory'], description: 'Where to look. "any" (default) searches every raw source value.' },
+      caseSensitive: { type: 'boolean' },
+      sourceId: { type: 'number', description: 'Restrict to one dataset.' },
+      apply: { type: 'boolean', description: 'false (default) previews the match without changing anything; true applies the labels.' },
+      labels: { type: 'object', properties: LABEL_PROPERTIES, additionalProperties: false },
+    },
+    required: ['contains', 'labels'],
+    additionalProperties: false,
+  },
+  execute: async (args) => {
+    const contains = typeof args.contains === 'string' ? args.contains.trim() : ''
+    if (!contains) return 'Error: contains is required and cannot be empty.'
+    const update = (args.labels ?? {}) as Record<string, unknown>
+    const field = typeof args.field === 'string' ? args.field : 'any'
+    const caseSensitive = args.caseSensitive === true
+    const needle = caseSensitive ? contains : contains.toLowerCase()
+
+    const stored = await ingestionRowsTable.toArray()
+    const matches = stored.filter((row) => {
+      const data = row.data as IngestionRow
+      if (data.status === 'promoted' || data.status === 'reconciledExisting') return false
+      if (typeof args.sourceId === 'number' && data.sourceId !== args.sourceId) return false
+      const text = searchableText(data, field)
+      return (caseSensitive ? text : text.toLowerCase()).includes(needle)
+    })
+
+    const examples = matches.slice(0, 5).map((row) => ({ rowId: row.id, text: searchableText(row.data as IngestionRow, 'description').slice(0, 160), amount: (row.data as IngestionRow).mappedValues.amount, status: (row.data as IngestionRow).status }))
+    if (args.apply !== true) {
+      return JSON.stringify({ applied: false, matched: matches.length, examples, next: 'Show the user the count and these examples, confirm the rule really covers them, then call again with apply=true.' })
+    }
+
+    const categoryId = typeof update.category === 'string' ? await ensureCategoryByName(update.category) : undefined
+    const result = { applied: true, matched: matches.length, ready: 0, invalid: 0, unchanged: 0, errors: [] as string[] }
+    for (const row of matches) {
+      const current = row.data as IngestionRow
+      const labels: IngestionRowLabels = {
+        ...current.labels,
+        ...(typeof update.financeDestination === 'string' ? { financeDestination: matchLabelValue(FINANCE_DESTINATIONS, update.financeDestination) } : {}),
+        ...(typeof update.flowRole === 'string' ? { flowRole: matchLabelValue(FLOW_ROLES, update.flowRole) } : {}),
+        ...(typeof update.settlementChannel === 'string' ? { settlementChannel: matchLabelValue(SETTLEMENT_CHANNELS, update.settlementChannel) } : {}),
+        ...(typeof update.spendingTreatment === 'string' ? { spendingTreatment: matchLabelValue(SPENDING_TREATMENTS, update.spendingTreatment) } : {}),
+        ...(typeof update.recurrence === 'string' ? { recurrence: matchLabelValue(RECURRENCES, update.recurrence) } : {}),
+        ...(categoryId ? { categoryId } : {}),
+      }
+      const destinationTableId = typeof update.destinationTableId === 'number' ? update.destinationTableId : current.destinationTableId
+      try {
+        const next = await updateIngestionRowLabels(row.id, labels, destinationTableId, 'assistant')
+        if (next.status === 'ready') result.ready += 1
+        else if (next.status === 'invalid') result.invalid += 1
+        else result.unchanged += 1
+      } catch (error) {
+        result.errors.push(`Row ${row.id}: ${error instanceof Error ? error.message : 'could not be labelled.'}`)
+      }
+    }
+    return JSON.stringify(result)
+  },
+}
+
 export const updateIngestionDataFieldsTool: ToolDefinition = {
   name: 'update_ingestion_data_fields',
   description: 'Edits canonical data fields on explicit unfinalized ingestion rows. Use it to correct a mapped value or add a missing field such as quantity during labelling. Read the rows first. This never promotes data; the user alone confirms promotion.',
