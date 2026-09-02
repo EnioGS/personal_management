@@ -60,5 +60,25 @@
   },
   "chart": {
     "other": "Outros"
+  },
+  "dashboard": {
+    "presets": {
+      "last30": "30 dias",
+      "last90": "90 dias",
+      "thisYear": "Este ano",
+      "custom": "Personalizado"
+    },
+    "rangeTo": "até",
+    "accounts": "Contas",
+    "cards": "Cartões",
+    "categories": "Categorias",
+    "netBalance": "Saldo líquido",
+    "totalIn": "Total de entradas",
+    "totalOut": "Total de saídas",
+    "cardSpend": "Gasto em cartões",
+    "inLabel": "Entrada",
+    "outLabel": "Saída",
+    "aggregate": "Combinado",
+    "splitByAccount": "Por conta"
   }
 }

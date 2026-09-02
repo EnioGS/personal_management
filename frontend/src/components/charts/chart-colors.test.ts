@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { CATEGORICAL_PALETTE, colorForKey, MAX_CATEGORICAL_SERIES } from './chart-colors'
+import { CATEGORICAL_PALETTE, chartSafeKey, colorForKey, MAX_CATEGORICAL_SERIES } from './chart-colors'
 
 describe('colorForKey', () => {
   it('is stable: the same key always resolves to the same color', () => {
@@ -26,6 +26,24 @@ describe('colorForKey', () => {
     // Not a strict guarantee (hashing can collide) — just confirms it isn't returning
     // the same slot for every key by accident.
     expect(colors.size).toBeGreaterThan(1)
+  })
+})
+
+describe('chartSafeKey', () => {
+  it('leaves a bare identifier untouched', () => {
+    expect(chartSafeKey('Alimentacao')).toBe('Alimentacao')
+  })
+
+  it('replaces spaces and other non-identifier characters', () => {
+    // This is the exact bug it exists to prevent: `var(--color-Banco Inter)` is
+    // invalid CSS and silently renders with no color at all — no error, just a
+    // blank mark, which is why every chart wrapper must route through this.
+    expect(chartSafeKey('Banco Inter')).toBe('Banco_Inter')
+    expect(chartSafeKey('Renda Variável (R$)')).toBe('Renda_Vari_vel__R__')
+  })
+
+  it('never returns an empty string', () => {
+    expect(chartSafeKey('')).toBe('series')
   })
 })
 

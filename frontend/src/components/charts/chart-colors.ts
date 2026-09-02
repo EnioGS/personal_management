@@ -62,6 +62,36 @@ export function colorForKey(key: string): ThemedColor {
   return CATEGORICAL_PALETTE[hashString(key) % CATEGORICAL_PALETTE.length]
 }
 
+/**
+ * A CSS-custom-property-safe id for an arbitrary series key (a category, an account
+ * name...). `components/ui/chart.tsx` themes a series by emitting `--color-<key>` and
+ * referencing it back as `var(--color-<key>)` — valid only when `<key>` is a bare CSS
+ * identifier. A key straight from user data ("Banco Inter", "Contas de Casa") breaks
+ * that silently: the browser drops the malformed declaration/reference and the mark
+ * renders with no color at all, with no console error to point at why. Every chart
+ * wrapper in this folder must route a data-derived key through this before using it as
+ * a ChartConfig key or inside `var(--color-...)`; the real dataKey/nameKey binding
+ * recharts uses to read values back out of the data (a plain JS property name, which
+ * can be any string) is untouched — only the CSS side needs sanitizing.
+ */
+export function chartSafeKey(key: string): string {
+  const slug = key.replace(/[^a-zA-Z0-9_-]/g, '_')
+  return slug || 'series'
+}
+
+/**
+ * The diverging pair (dataviz skill, references/palette.md): blue/red poles, for a
+ * value that has a genuine polarity around zero — money in vs. out, not "series 4".
+ * Kept separate from the categorical palette on purpose: reusing categorical slot 2
+ * (also blue) here is intentional — same hue, different *job* — but red is not
+ * CATEGORICAL_PALETTE's red; the diverging pair is validated as its own two-color set,
+ * not as members of the 8-hue categorical order.
+ */
+export const DIVERGING_PAIR = {
+  positive: { light: '#2a78d6', dark: '#3987e5' }, // in / above baseline
+  negative: { light: '#c0392b', dark: '#e0574a' }, // out / below baseline
+} as const
+
 /** Fixed per-domain identity colors, reused everywhere that series appears (Overview + its own leaf chart). */
 export const DOMAIN_COLOR = {
   /** The rollup/overview metric (running balance, combined portfolio value) — wears the brand color. */
