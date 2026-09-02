@@ -15,13 +15,15 @@ import { Button } from '@/components/ui/button'
 import {
   DATA_FILE_EXTENSION,
   DATA_FILE_NAME,
+  LEGACY_DATA_FILE_EXTENSION,
   countAllRows,
   exportData,
   importData,
   parseDataExportFile,
   wipeAllData,
 } from '@/lib/data-file'
-import { saveTextFile } from '@/lib/file-io'
+import { saveBinaryFile } from '@/lib/file-io'
+import { buildSqliteFile, looksLikeSqlite, parseSqliteFile } from '@/lib/sqlite-export'
 
 type DialogState =
   | { kind: 'none' }
@@ -52,9 +54,11 @@ export function DataPanel() {
 
   async function handleExport() {
     const data = await exportData()
-    await saveTextFile({
+    const bytes = await buildSqliteFile(data)
+    await saveBinaryFile({
       filename: DATA_FILE_NAME,
-      contents: JSON.stringify(data, null, 2),
+      contents: bytes,
+      mimeType: 'application/vnd.sqlite3',
       extension: DATA_FILE_EXTENSION,
       description: t('data.fileDescription'),
     })
@@ -66,6 +70,10 @@ export function DataPanel() {
     else importInputRef.current?.click()
   }
 
+  // A real .db (SQLite) file is the current format; a .pmdata (JSON) file is what
+  // this app exported before adr/0028 and still reads on import. Detected from the
+  // bytes themselves — SQLite's own magic header — rather than the file extension,
+  // since a user may have renamed it.
   async function handleImportFile(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     e.target.value = ''
@@ -73,7 +81,9 @@ export function DataPanel() {
 
     const parsed = await (async () => {
       try {
-        return parseDataExportFile(JSON.parse(await file.text()))
+        const bytes = new Uint8Array(await file.arrayBuffer())
+        if (looksLikeSqlite(bytes)) return await parseSqliteFile(bytes)
+        return parseDataExportFile(JSON.parse(new TextDecoder().decode(bytes)))
       } catch {
         return null
       }
@@ -154,7 +164,7 @@ export function DataPanel() {
         <input
           ref={importInputRef}
           type="file"
-          accept={`${DATA_FILE_EXTENSION},application/json`}
+          accept={`${DATA_FILE_EXTENSION},${LEGACY_DATA_FILE_EXTENSION},application/json,application/vnd.sqlite3`}
           className="hidden"
           onChange={(e) => void handleImportFile(e)}
         />

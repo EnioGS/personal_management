@@ -23,8 +23,10 @@ import { notesTable } from '@/sections/notes/notes-db'
  * the user's whole setup rather than a pile of untitled data.
  */
 export const DATA_EXPORT_VERSION = 3 as const
-export const DATA_FILE_NAME = 'personal-management-data.pmdata'
-export const DATA_FILE_EXTENSION = '.pmdata'
+export const DATA_FILE_NAME = 'personal-management-data.db'
+export const DATA_FILE_EXTENSION = '.db'
+/** Still accepted on import (see `data-panel.tsx`) — a backup made before adr/0028. */
+export const LEGACY_DATA_FILE_EXTENSION = '.pmdata'
 
 /** Everything that round-trips. Key order here is the order tables are cleared/restored. */
 const TABLES = {

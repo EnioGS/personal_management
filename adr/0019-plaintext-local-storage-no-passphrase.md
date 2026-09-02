@@ -43,6 +43,10 @@ Drop encryption entirely and store rows as plain JSON in IndexedDB.
   plain JSON (`lib/data-file.ts`, `.pmdata`, `version: 2`). Old encrypted
   `.pmvault` files (`version: 1`) are rejected on import — they cannot be
   read without the passphrase that no longer exists anywhere in the app.
+  (The export *file format* later moved again, from JSON to a real SQLite
+  `.db` — see adr/0028 — but the "no encryption, plaintext" decision here
+  is unchanged; a `.db` export is just as directly inspectable as the JSON
+  it replaced, only with SQLite tooling instead of a text editor.)
 - The brand-mark section's first item is no longer "Get Started" (a login
   form) but **Data**: a management screen showing what is stored in this
   browser, an Export card, an Import card, and a separate clear-everything

@@ -18,7 +18,7 @@
     },
     "export": {
       "title": "Exportar",
-      "description": "Salve os dados de todas as seções em um único arquivo, como backup ou para levar a outra máquina.",
+      "description": "Salve os dados de todas as seções em um único arquivo SQLite (.db) — abra-o em um leitor de SQLite para inspecionar ou editar diretamente, ou apenas guarde como backup.",
       "action": "Exportar dados"
     },
     "import": {

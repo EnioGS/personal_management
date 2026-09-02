@@ -50,7 +50,9 @@ Two things it optimizes for:
 │   │   │   ├── csv.ts                    # CSV export/import + validation
 │   │   │   ├── aggregations.ts           # chart data-shaping (buckets, running totals, top-N + "Outros" fold)
 │   │   │   ├── current-value.ts          # investment position value from transaction history
-│   │   │   ├── data-file.ts              # whole-app export/import (.pmdata v3 + v2 upgrader), row counts
+│   │   │   ├── data-file.ts              # whole-app export/import (in-memory v3 shape + v2 upgrader), row counts
+│   │   │   ├── sqlite-schema.ts          # DataExportFile <-> typed SQLite columns, per table (adr/0028)
+│   │   │   ├── sqlite-export.ts          # sql.js glue: build/parse the actual .db file bytes
 │   │   │   ├── file-io.ts                # save-file picker (Chromium) with a download fallback
 │   │   │   ├── openrouter.ts             # OpenRouter chat-completions client (incl. tool-calling wire format)
 │   │   │   ├── openai-client.ts          # OpenAI direct chat-completions client, same wire format
@@ -91,7 +93,8 @@ Two things it optimizes for:
   app opens straight into whatever is stored in the browser (see
   [Decisions](#decisions)).
 - **Charts**: Recharts via shadcn/ui's `chart` wrapper; `@tanstack/react-table`
-  for editable data tables; `papaparse` for CSV import/export.
+  for editable data tables; `papaparse` for CSV import/export; `sql.js`
+  (SQLite compiled to WASM) for the whole-app SQLite export/import.
 - **Assistant**: a global chat panel calling either OpenRouter (openrouter.ai)
   or OpenAI directly from the browser, whichever connection is active — no
   backend in the loop. The provider is detected from the pasted API key's own
@@ -120,8 +123,12 @@ Two things it optimizes for:
 - No passphrase, no encryption at rest: rows are plain JSON in IndexedDB and
   every store loads itself on import, so the app opens on the user's data
   instead of on an unlock form.
-- Whole-app backup is one JSON file (`.pmdata`), not per-table CSV — it
-  carries every table, including the ones with no CSV UI of their own.
+- Whole-app backup is one file, not per-table CSV — it carries every table,
+  including the ones with no CSV UI of their own. It's a real SQLite `.db`
+  (adr/0028, built client-side with `sql.js`), one typed table per app
+  table, openable in any SQLite browser or the `sqlite3` CLI — not a JSON
+  blob wearing a `.db` extension. An old `.pmdata` (JSON) backup still
+  imports; format is detected from the file's own bytes, not its name.
 - No backend by design — data stays local-first or in private storage the
   user controls, not a third-party-hosted service.
 - Local storage is one generic factory (`lib/local-store/`), not per-section
