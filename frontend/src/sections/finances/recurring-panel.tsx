@@ -33,7 +33,13 @@ export function RecurringPanel() {
     useDashboardFilters()
   const entries = useDashboardEntries(filters)
   const outgoing = useMemo(() => entries.filter((entry) => entry.direction === 'out' && entry.amount > 0), [entries])
-  const candidates = useMemo(() => detectRecurringEntries(outgoing), [outgoing])
+  const candidates = useMemo(() => {
+    const detected = detectRecurringEntries(outgoing.filter((entry) => !entry.labelled))
+    // An explicit recurrence label is authoritative even before three months of
+    // history exist; unlabelled rows retain the old conservative detector.
+    const labelled = detectRecurringEntries(outgoing.filter((entry) => entry.labelled && entry.recurrence === 'recurring'), 1)
+    return [...new Map([...labelled, ...detected].map((candidate) => [`${candidate.category}\u0000${Math.round(candidate.averageAmount)}`, candidate])).values()]
+  }, [outgoing])
   const monthlyTotal = candidates.reduce((total, candidate) => total + candidate.averageAmount, 0)
   const largest = candidates.reduce((largestAmount, candidate) => Math.max(largestAmount, candidate.averageAmount), 0)
   const latestMonth = outgoing.length > 0 ? monthKey(Math.max(...outgoing.map((entry) => entry.date))) : new Date().toISOString().slice(0, 7)
