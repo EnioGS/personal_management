@@ -14,7 +14,7 @@ import type { DateRangePreset } from '@/lib/dashboard/date-range'
 import type { TableKind } from '@/lib/model/types'
 import type { DashboardFilters } from './dashboard-filters'
 
-const PRESETS: DateRangePreset[] = ['last30', 'last90', 'thisYear', 'custom']
+const PRESETS: DateRangePreset[] = ['thisYear', 'last12Months', 'last24Months', 'custom']
 
 interface FilterBarProps {
   filters: DashboardFilters

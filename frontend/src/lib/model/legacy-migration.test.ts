@@ -51,12 +51,17 @@ describe('buildModelFromLegacy', () => {
     expect(new Set(entries.map((e) => e.id)).size).toBe(3)
   })
 
-  it('maps investment and contribution tables onto their own kinds', () => {
+  it('maps investment tables to their stored class and contributions to their own kind', () => {
     const { tableDefs } = buildModelFromLegacy({
       variableIncome: [{ id: 1, createdAt: 1, data: {} }],
+      fixedIncome: [{ id: 1, createdAt: 1, data: {} }],
       contributions: [{ id: 1, createdAt: 1, data: {} }],
     })
 
-    expect(tableDefs.map((t) => (t.data as { kind: string }).kind)).toEqual(['investmentLedger', 'contributions'])
+    expect(tableDefs.map((t) => (t.data as { kind: string }).kind)).toEqual(['investmentLedger', 'investmentLedger', 'contributions'])
+    expect(tableDefs.slice(0, 2).map((t) => (t.data as { investmentClass: string }).investmentClass)).toEqual([
+      'variableIncome',
+      'fixedIncome',
+    ])
   })
 })

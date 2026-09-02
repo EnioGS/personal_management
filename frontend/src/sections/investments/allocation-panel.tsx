@@ -13,7 +13,7 @@ function formatPercent(value: number) {
 }
 
 /** Target vs. actual portfolio share per asset, with the rebalancing delta highlighted. */
-export function AllocationPanel() {
+export function AllocationPanel({ embedded = false }: { embedded?: boolean }) {
   const { t } = useTranslation(['investments', 'common'])
   const rows = useEntriesOfKinds(['investmentLedger'])
   const positions = computePositions(rows as unknown as Transaction[])
@@ -42,11 +42,11 @@ export function AllocationPanel() {
   const assets = [...new Set([...positions.map((p) => p.asset), ...targets.map((t) => t.asset)])]
 
   return (
-    <div className="flex h-full flex-col gap-3 p-4">
-      <div>
+    <div className={`flex h-full flex-col gap-3 ${embedded ? '' : 'p-4'}`}>
+      {!embedded && <div>
         <h2 className="text-sm font-medium">{t('items.allocation')}</h2>
         <p className="text-muted-foreground text-xs">{t('allocation.description')}</p>
-      </div>
+      </div>}
 
       {assets.length === 0 ? (
         <p className="text-muted-foreground rounded-md border border-dashed p-3 text-xs">{t('allocation.noAssets')}</p>

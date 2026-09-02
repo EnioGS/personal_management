@@ -4,7 +4,7 @@ export interface DateRange {
   to: number
 }
 
-export type DateRangePreset = 'last30' | 'last90' | 'thisYear' | 'custom'
+export type DateRangePreset = 'thisYear' | 'last12Months' | 'last24Months' | 'custom'
 
 const DAY_MS = 86_400_000
 
@@ -21,12 +21,14 @@ function startOfDayUtc(date: Date): number {
 export function resolvePreset(preset: Exclude<DateRangePreset, 'custom'>, now: Date = new Date()): DateRange {
   const to = startOfDayUtc(now) + DAY_MS - 1 // end of today, inclusive
   switch (preset) {
-    case 'last30':
-      return { from: to - 30 * DAY_MS, to }
-    case 'last90':
-      return { from: to - 90 * DAY_MS, to }
     case 'thisYear':
       return { from: Date.UTC(now.getUTCFullYear(), 0, 1), to }
+    // Calendar-month windows keep every monthly bar complete except the current
+    // month, instead of producing arbitrary 30-day fragments at the range start.
+    case 'last12Months':
+      return { from: Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 11, 1), to }
+    case 'last24Months':
+      return { from: Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 23, 1), to }
   }
 }
 
@@ -36,9 +38,8 @@ export function isWithinRange(dateMs: number, range: DateRange): boolean {
 
 /**
  * The immediately preceding range of the same length — "vs. last period" for a KPI
- * delta. A 90-day range ending today compares against the 90 days before that, not a
- * calendar-aligned "last quarter"; the two ranges are adjacent and equal-length so a
- * percentage change between them is comparing like with like.
+ * delta. The preceding range has the same concrete length as the selected one; the
+ * two ranges are adjacent, so a percentage change compares like with like.
  */
 export function previousEquivalentRange(range: DateRange): DateRange {
   const length = range.to - range.from + 1

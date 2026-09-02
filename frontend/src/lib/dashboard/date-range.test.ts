@@ -5,17 +5,15 @@ import { isWithinRange, previousEquivalentRange, resolvePreset } from './date-ra
 const NOW = new Date('2026-03-15T12:34:56Z')
 
 describe('resolvePreset', () => {
-  it('last30 spans the 30 days up to and including today', () => {
-    const range = resolvePreset('last30', NOW)
+  it('last12Months starts at the first day of the twelfth calendar month in the window', () => {
+    const range = resolvePreset('last12Months', NOW)
     expect(new Date(range.to).toISOString()).toBe('2026-03-15T23:59:59.999Z')
-    // Exactly 30*DAY_MS before `to`, so it lands on the same end-of-day offset 30
-    // calendar days earlier, not midnight.
-    expect(new Date(range.from).toISOString()).toBe('2026-02-13T23:59:59.999Z')
+    expect(new Date(range.from).toISOString()).toBe('2025-04-01T00:00:00.000Z')
   })
 
-  it('last90 spans exactly 90 days', () => {
-    const range = resolvePreset('last90', NOW)
-    expect(range.to - range.from).toBe(90 * 86_400_000)
+  it('last24Months starts at the first day of the twenty-fourth calendar month in the window', () => {
+    const range = resolvePreset('last24Months', NOW)
+    expect(new Date(range.from).toISOString()).toBe('2024-04-01T00:00:00.000Z')
   })
 
   it('thisYear starts on January 1st of the current year', () => {
@@ -24,14 +22,14 @@ describe('resolvePreset', () => {
   })
 
   it('is stable regardless of the time of day "now" falls on', () => {
-    const morning = resolvePreset('last30', new Date('2026-03-15T00:00:01Z'))
-    const night = resolvePreset('last30', new Date('2026-03-15T23:59:59Z'))
+    const morning = resolvePreset('last12Months', new Date('2026-03-15T00:00:01Z'))
+    const night = resolvePreset('last12Months', new Date('2026-03-15T23:59:59Z'))
     expect(morning).toEqual(night)
   })
 })
 
 describe('isWithinRange', () => {
-  const range = resolvePreset('last30', NOW)
+  const range = resolvePreset('last12Months', NOW)
 
   it('includes both endpoints', () => {
     expect(isWithinRange(range.from, range)).toBe(true)
@@ -46,7 +44,7 @@ describe('isWithinRange', () => {
 
 describe('previousEquivalentRange', () => {
   it('is adjacent to and the same length as the original range', () => {
-    const range = resolvePreset('last30', NOW)
+    const range = resolvePreset('last12Months', NOW)
     const previous = previousEquivalentRange(range)
     expect(previous.to).toBe(range.from - 1)
     expect(previous.to - previous.from).toBe(range.to - range.from)

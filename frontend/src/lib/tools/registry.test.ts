@@ -10,7 +10,7 @@ describe('findTool', () => {
     expect(findTool('does_not_exist')).toBeUndefined()
   })
 
-  it('registers read-only tools and category-management tools', () => {
+  it('registers read, category-management, and append-only table-writing tools', () => {
     expect(toolRegistry.map((t) => t.name)).toEqual([
       'read_text_file',
       'read_csv',
@@ -19,11 +19,12 @@ describe('findTool', () => {
       'add_category',
       'update_category_rule',
       'delete_category_rule',
+      'write_to_table',
     ])
   })
 
-  it('does not expose row-mutating tools', () => {
-    expect(findTool('write_to_table')).toBeUndefined()
+  it('exposes append-only writing but not row correction or removal', () => {
+    expect(findTool('write_to_table')).toBeDefined()
     expect(findTool('update_table_rows')).toBeUndefined()
     expect(findTool('delete_table_rows')).toBeUndefined()
     expect(findTool('restore_table_rows')).toBeUndefined()

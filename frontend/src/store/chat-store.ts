@@ -3,7 +3,7 @@ import { requestChatMessage } from '@/lib/openrouter'
 import { requestOpenAiChatMessage } from '@/lib/openai-client'
 import { DEV_API_KEY, useAssistantConfigStore, type AssistantConfig } from '@/lib/assistant-config'
 import { defaultModelForProvider } from '@/lib/assistant-models'
-import { DEFAULT_SYSTEM_PROMPT, SYSTEM_PROMPT_KEY, useAssistantPromptsStore } from '@/lib/assistant-prompts'
+import { DEFAULT_SYSTEM_PROMPT, SYSTEM_PROMPT_KEY, enableAppendOnlyTableWrites, useAssistantPromptsStore } from '@/lib/assistant-prompts'
 import { formatAttachmentsForPrompt, type ChatAttachment } from '@/lib/chat-attachments'
 import type { OpenRouterMessage } from '@/lib/openrouter'
 import { toolsForRequest } from '@/lib/tools/registry'
@@ -62,7 +62,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
       }
 
       const promptRow = useAssistantPromptsStore.getState().items.find((item) => item.key === SYSTEM_PROMPT_KEY)
-      const systemPrompt = promptRow?.content ?? DEFAULT_SYSTEM_PROMPT
+      const savedPrompt = promptRow?.content ?? DEFAULT_SYSTEM_PROMPT
+      const systemPrompt = enableAppendOnlyTableWrites(savedPrompt)
+      // Existing browser profiles persist their system prompt. Upgrade only the prior
+      // read-only sentence in place, leaving the user's other custom instructions intact.
+      if (promptRow && systemPrompt !== promptRow.content) {
+        void useAssistantPromptsStore.getState().updateItem(promptRow.id, { key: SYSTEM_PROMPT_KEY, content: systemPrompt })
+      }
       const attachments = get().attachments
 
       const apiMessages: OpenRouterMessage[] = [

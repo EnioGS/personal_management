@@ -15,11 +15,13 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { KIND_REQUIRES_ACCOUNT, KIND_REQUIRES_CARD } from '@/lib/model/table-kinds'
 import { useAccountsStore, useCardsStore } from '@/lib/model/model-stores'
-import type { TableDef, TableKind } from '@/lib/model/types'
+import type { InvestmentClass, TableDef, TableKind } from '@/lib/model/types'
 
 interface AddTableDialogProps {
   /** Kinds this workspace can hold — the first is the default selection. */
   kinds: TableKind[]
+  /** Stored automatically for investment workspaces; never shown as a row column. */
+  investmentClass?: InvestmentClass
   onCreate: (table: TableDef) => void
 }
 
@@ -27,11 +29,12 @@ interface AddTableDialogProps {
  * Creates a table. Which *kind* it is fixes its columns (see table-kinds.ts), and the
  * account/card binding is what later lets a dashboard aggregate or split by them.
  */
-export function AddTableDialog({ kinds, onCreate }: AddTableDialogProps) {
-  const { t } = useTranslation()
+export function AddTableDialog({ kinds, investmentClass, onCreate }: AddTableDialogProps) {
+  const { t } = useTranslation(['common', 'investments'])
   const [open, setOpen] = useState(false)
   const [name, setName] = useState('')
   const [kind, setKind] = useState<TableKind>(kinds[0])
+  const [investmentClassChoice, setInvestmentClassChoice] = useState<InvestmentClass>('variableIncome')
   const [accountId, setAccountId] = useState<string>('')
   const [cardId, setCardId] = useState<string>('')
 
@@ -44,12 +47,14 @@ export function AddTableDialog({ kinds, onCreate }: AddTableDialogProps) {
   function reset() {
     setName('')
     setKind(kinds[0])
+    setInvestmentClassChoice('variableIncome')
     setAccountId('')
     setCardId('')
   }
 
   function handleCreate() {
-    const table: TableDef = { name: name.trim(), kind }
+    const resolvedInvestmentClass = investmentClass ?? (kind === 'investmentLedger' ? investmentClassChoice : undefined)
+    const table: TableDef = { name: name.trim(), kind, ...(resolvedInvestmentClass ? { investmentClass: resolvedInvestmentClass } : {}) }
     if (needsAccount && accountId) table.accountId = Number(accountId)
     if (needsCard && cardId) table.cardId = Number(cardId)
     onCreate(table)
@@ -82,6 +87,19 @@ export function AddTableDialog({ kinds, onCreate }: AddTableDialogProps) {
             <span className="text-xs font-medium">{t('table.tableName')}</span>
             <Input value={name} onChange={(e) => setName(e.target.value)} autoFocus />
           </label>
+
+          {kind === 'investmentLedger' && !investmentClass && (
+            <label className="flex flex-col gap-1.5">
+              <span className="text-xs font-medium">{t('investments:columns.investmentClass')}</span>
+              <Select value={investmentClassChoice} onValueChange={(value) => setInvestmentClassChoice(value as InvestmentClass)}>
+                <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="variableIncome">{t('investments:items.variableIncome')}</SelectItem>
+                  <SelectItem value="fixedIncome">{t('investments:items.fixedIncome')}</SelectItem>
+                </SelectContent>
+              </Select>
+            </label>
+          )}
 
           <label className="flex flex-col gap-1.5">
             <span className="text-xs font-medium">{t('table.tableKind')}</span>

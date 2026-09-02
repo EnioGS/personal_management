@@ -1,8 +1,7 @@
 import initSqlJs, { type Database } from 'sql.js'
 import sqlWasmUrl from 'sql.js/dist/sql-wasm.wasm?url'
-import type { DataExportFile, DataTableKey } from './data-file'
-import { DATA_EXPORT_VERSION } from './data-file'
-import { createTableSql, insertSql, selectAllSql, rowToSqlValues, sqlValuesToRow, SQLITE_SCHEMAS } from './sqlite-schema'
+import { parseDataExportFile, type DataExportFile, type DataTableKey } from './data-file'
+import { columnNames, createTableSql, insertSql, rowToSqlValues, sqlValuesToRow, SQLITE_SCHEMAS } from './sqlite-schema'
 import type { LocalRow } from '@/lib/local-store/create-local-table'
 
 /** SQLite's own magic header — every valid .db file starts with these 16 bytes. */
@@ -63,6 +62,20 @@ function queryAll(db: Database, sql: string): (string | number | null)[][] {
   return rows
 }
 
+/**
+ * Older .db exports legitimately lack columns added after their creation. Select
+ * NULL for those fields so they remain importable; the application's normal model
+ * migration can then fill any required metadata such as investmentClass.
+ */
+function selectCompatibleRows(db: Database, schema: (typeof SQLITE_SCHEMAS)[DataTableKey]): (string | number | null)[][] {
+  const available = new Set(queryAll(db, `PRAGMA table_info("${schema.sqlName}")`).map((row) => String(row[1])))
+  // An export predating an additive app table does not contain that SQLite table at
+  // all. Treat it as an empty app table so the data-file upgrader can restore it.
+  if (available.size === 0) return []
+  const columns = columnNames(schema).map((column) => (available.has(column) ? `"${column}"` : `NULL AS "${column}"`))
+  return queryAll(db, `SELECT ${columns.join(', ')} FROM "${schema.sqlName}"`)
+}
+
 /** The reverse of `buildSqliteFile` — real SQLite bytes -> the same `DataExportFile` shape `importData` expects. */
 export async function parseSqliteFile(bytes: Uint8Array): Promise<DataExportFile> {
   const SQL = await getSqlJs()
@@ -76,10 +89,13 @@ export async function parseSqliteFile(bytes: Uint8Array): Promise<DataExportFile
     const tables = {} as Record<DataTableKey, LocalRow[]>
     for (const key of Object.keys(SQLITE_SCHEMAS) as DataTableKey[]) {
       const schema = SQLITE_SCHEMAS[key]
-      tables[key] = queryAll(db, selectAllSql(schema)).map((values) => sqlValuesToRow(schema, values))
+      tables[key] = selectCompatibleRows(db, schema).map((values) => sqlValuesToRow(schema, values))
     }
 
-    return { version: version as typeof DATA_EXPORT_VERSION, exportedAt, tables }
+    // SQLite exports use the same logical versioning as JSON exports. Running this
+    // through the shared parser keeps old .db and .pmdata files on identical
+    // upgrade paths, including empty new ingestion tables.
+    return parseDataExportFile({ version, exportedAt, tables })
   } finally {
     db.close()
   }

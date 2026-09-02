@@ -12,9 +12,9 @@ export type Direction = (typeof DIRECTIONS)[number]
 
 const DIRECTION_LABEL: Record<string, string> = { in: 'Entrada', out: 'Saída' }
 
-/** Buy vs. sell on an investment ledger. Also a closed set. */
-export const TRANSACTION_TYPES = ['buy', 'sell'] as const
-const TRANSACTION_TYPE_LABEL: Record<string, string> = { buy: 'Compra', sell: 'Venda' }
+/** Investment transaction mode. Income is paid out separately and does not alter a position's quantity. */
+export const TRANSACTION_TYPES = ['buy', 'sell', 'income'] as const
+const TRANSACTION_TYPE_LABEL: Record<string, string> = { buy: 'Compra', sell: 'Venda', income: 'Rendimento' }
 
 const dateColumn = { key: 'date', labelKey: 'common:columns.date', type: 'date' as const, format: (v: unknown) => date.format(v as number) }
 const amountColumn = { key: 'amount', labelKey: 'common:columns.amount', type: 'number' as const, format: (v: unknown) => currency.format(v as number) }
@@ -49,6 +49,7 @@ export const TABLE_KIND_SCHEMAS: Record<TableKind, TableSchema<any>> = {
   cardLedger: [dateColumn, categoryColumn, descriptionColumn, amountColumn],
   investmentLedger: [
     dateColumn,
+    categoryColumn,
     { key: 'asset', labelKey: 'common:columns.asset', type: 'text', required: true },
     {
       key: 'type',

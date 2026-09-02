@@ -7,10 +7,29 @@ import {
   cardsTable,
   categoriesTable,
   categoryRulesTable,
+  entryLabelsTable,
   entriesTable,
+  ingestionAuditEventsTable,
+  ingestionColumnMappingsTable,
+  ingestionRowsTable,
+  ingestionSourcesTable,
   tableDefsTable,
 } from './model-db'
-import type { Account, AllocationTarget, Budget, Card, Category, CategoryRule, Entry, TableDef } from './types'
+import type {
+  Account,
+  AllocationTarget,
+  Budget,
+  Card,
+  Category,
+  CategoryRule,
+  Entry,
+  EntryLabels,
+  IngestionAuditEvent,
+  IngestionColumnMapping,
+  IngestionRow,
+  IngestionSource,
+  TableDef,
+} from './types'
 
 export const useAccountsStore = createLocalListStore<Account>(accountsTable)
 export const useCardsStore = createLocalListStore<Card>(cardsTable)
@@ -19,6 +38,11 @@ export const useCategoriesStore = createLocalListStore<Category>(categoriesTable
 export const useCategoryRulesStore = createLocalListStore<CategoryRule>(categoryRulesTable)
 export const useBudgetsStore = createLocalListStore<Budget>(budgetsTable)
 export const useAllocationTargetsStore = createLocalListStore<AllocationTarget>(allocationTargetsTable)
+export const useIngestionSourcesStore = createLocalListStore<IngestionSource>(ingestionSourcesTable)
+export const useIngestionColumnMappingsStore = createLocalListStore<IngestionColumnMapping>(ingestionColumnMappingsTable)
+export const useIngestionRowsStore = createLocalListStore<IngestionRow>(ingestionRowsTable)
+export const useEntryLabelsStore = createLocalListStore<EntryLabels>(entryLabelsTable)
+export const useIngestionAuditEventsStore = createLocalListStore<IngestionAuditEvent>(ingestionAuditEventsTable)
 
 /**
  * Every user table's rows, in one store. Consumers filter by `tableId` — see

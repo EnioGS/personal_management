@@ -1,6 +1,14 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { createLocalTable } from '@/lib/local-store/create-local-table'
-import { categoriesTable, categoryRulesTable, entriesTable, tableDefsTable } from '@/lib/model/model-db'
+import {
+  categoriesTable,
+  categoryRulesTable,
+  entriesTable,
+  ingestionColumnMappingsTable,
+  ingestionRowsTable,
+  ingestionSourcesTable,
+  tableDefsTable,
+} from '@/lib/model/model-db'
 import { notesTable } from '@/sections/notes/notes-db'
 import {
   DATA_EXPORT_VERSION,
@@ -30,6 +38,11 @@ function emptyTables(): DataExportFile['tables'] {
     entries: [],
     budgets: [],
     allocationTargets: [],
+    ingestionSources: [],
+    ingestionColumnMappings: [],
+    ingestionRows: [],
+    entryLabels: [],
+    ingestionAuditEvents: [],
     notes: [],
     assistantPrompts: [],
     assistantConfig: [],
@@ -116,6 +129,50 @@ describe('data-file', () => {
     ])
   })
 
+  it('round-trips source provenance, mappings and staged labels', async () => {
+    const sourceId = await ingestionSourcesTable.add({
+      createdAt: 1,
+      data: {
+        originalFilename: 'nubank.csv',
+        sourceFingerprint: 'file-hash',
+        importedAt: 1,
+        rawCsv: 'Data,Valor\n2026-01-01,10',
+        originalColumns: ['Data', 'Valor'],
+        supplementalColumns: ['asset'],
+        rowCount: 1,
+        status: 'mapped',
+      },
+    })
+    await ingestionColumnMappingsTable.add({
+      createdAt: 2,
+      data: { sourceId, sourceColumn: 'Data', targetField: 'date' },
+    })
+    await ingestionRowsTable.add({
+      createdAt: 3,
+      data: {
+        sourceId,
+        sourceRowIndex: 0,
+        sourceRowFingerprint: 'row-hash',
+        rawValues: { Data: '2026-01-01', Valor: '10' },
+        mappedValues: { date: 1767225600000, amount: 10 },
+        labels: { financeDestinations: ['movements'], flowRole: 'inflow' },
+        status: 'unlabelled',
+        validationErrors: ['Choose a destination table.'],
+      },
+    })
+
+    const exported = await exportData()
+    await wipeAllData()
+    await importData(exported)
+
+    expect(await ingestionSourcesTable.toArray()).toHaveLength(1)
+    expect(await ingestionColumnMappingsTable.toArray()).toHaveLength(1)
+    expect((await ingestionRowsTable.toArray())[0].data).toMatchObject({
+      rawValues: { Data: '2026-01-01', Valor: '10' },
+      labels: { financeDestinations: ['movements'], flowRole: 'inflow' },
+    })
+  })
+
   describe('parseDataExportFile', () => {
     const valid: DataExportFile = {
       version: DATA_EXPORT_VERSION,
@@ -156,6 +213,20 @@ describe('data-file', () => {
 
       expect(parsed.tables.categories).toEqual([])
       expect(parsed.tables.notes).toEqual([])
+      expect(parsed.tables.ingestionRows).toEqual([])
+    })
+
+    it('adds an investment class when importing a pre-class investment table', () => {
+      const parsed = parseDataExportFile({
+        version: DATA_EXPORT_VERSION,
+        exportedAt: Date.now(),
+        tables: {
+          ...emptyTables(),
+          tableDefs: [{ id: 1, createdAt: 1, data: { name: 'Renda Fixa', kind: 'investmentLedger' } }],
+        },
+      })
+
+      expect(parsed.tables.tableDefs[0].data).toMatchObject({ investmentClass: 'fixedIncome' })
     })
   })
 
@@ -211,5 +282,17 @@ describe('data-file', () => {
       expect(await tableDefsTable.count()).toBe(2)
       expect(await entriesTable.count()).toBe(2)
     })
+  })
+
+  it('upgrades a v3 export with no ingestion tables', () => {
+    const parsed = parseDataExportFile({
+      version: 3,
+      exportedAt: 1,
+      tables: { tableDefs: [], entries: [] },
+    })
+
+    expect(parsed.version).toBe(DATA_EXPORT_VERSION)
+    expect(parsed.tables.ingestionSources).toEqual([])
+    expect(parsed.tables.entryLabels).toEqual([])
   })
 })

@@ -3,7 +3,6 @@
     "label": "Finances"
   },
   "items": {
-    "overview": "Overview",
     "movements": "Movements",
     "spending": "Spending",
     "cards": "Cards",
@@ -18,8 +17,11 @@
     "note": "Note"
   },
   "overview": {
-    "monthlyFlow": "Monthly flow",
+    "capitalEvolution": "Capital evolution",
+    "currentCapital": "Current capital",
+    "startingPeriod": "vs. starting period",
     "whereItWent": "Where it went",
+    "spendingCategories": "Spendings categories",
     "accounts": "Accounts",
     "entries": "Entries",
     "previousPeriod": "vs. previous period",
@@ -66,22 +68,6 @@
     "noEntries": "No card entries in this period yet.",
     "noInvoiceEntries": "No entries in the current invoice yet.",
     "noInstallments": "No open installments found in the selected history."
-  },
-  "movements": {
-    "noStatements": "Add a bank statement table to analyse account movements.",
-    "totalIn": "Total in",
-    "totalOut": "Total out",
-    "periodResult": "Period result",
-    "entryCount": "Entries",
-    "inAndOutByMonth": "In and out by month",
-    "topCategories": "Top categories",
-    "largestEntries": "Largest entries",
-    "recurringInStatement": "Recurring in this statement",
-    "monthCount": "{{count}} month(s)",
-    "noEntries": "No entries in this statement for the selected period yet.",
-    "noIncoming": "No incoming entries in this period.",
-    "noOutgoing": "No outgoing entries in this period.",
-    "noRecurring": "No recurring charges in this statement yet."
   },
   "budget": {
     "description": "A monthly target per category, compared against what was actually spent.",

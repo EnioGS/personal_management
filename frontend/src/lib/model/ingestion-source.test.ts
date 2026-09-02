@@ -1,0 +1,76 @@
+import { beforeEach, describe, expect, it } from 'vitest'
+import {
+  createIngestionSource,
+  createSupplementalColumn,
+  parseIngestionCsv,
+  saveIngestionMappings,
+  stageIngestionSource,
+  validateIngestionMappings,
+} from './ingestion-source'
+import { ingestionRowsTable, ingestionSourcesTable } from './model-db'
+import { wipeAllData } from '@/lib/data-file'
+import type { IngestionTargetField } from './types'
+
+const RAW_CSV = 'Date,Description,Amount\n2026-01-01,Coffee,10\n2026-01-02,Market,20'
+const SUPPLEMENTAL_FIELDS: IngestionTargetField[] = ['direction', 'rawCategory', 'asset', 'investmentType', 'quantity', 'price', 'note', 'destination']
+
+describe('ingestion source staging', () => {
+  beforeEach(async () => {
+    await wipeAllData()
+  })
+
+  it('keeps original columns untouched while parsing raw values', () => {
+    expect(parseIngestionCsv(RAW_CSV)).toEqual({
+      columns: ['Date', 'Description', 'Amount'],
+      rows: [
+        { Date: '2026-01-01', Description: 'Coffee', Amount: '10' },
+        { Date: '2026-01-02', Description: 'Market', Amount: '20' },
+      ],
+    })
+  })
+
+  it('requires mappings for every possible later table destination', () => {
+    const validation = validateIngestionMappings(['Date'], [], [{ sourceId: 1, sourceColumn: 'Date', targetField: 'date' }])
+    expect(validation.missingFields).toEqual(expect.arrayContaining(['amount', 'asset', 'investmentType']))
+  })
+
+  it('uses supplemental blank columns to make a sparse source structurally complete without changing the raw csv', async () => {
+    const sourceId = await createIngestionSource('source.csv', RAW_CSV)
+    for (const column of SUPPLEMENTAL_FIELDS) {
+      await createSupplementalColumn(sourceId, column)
+    }
+    await saveIngestionMappings(sourceId, [
+      { sourceId, sourceColumn: 'Date', targetField: 'date' },
+      { sourceId, sourceColumn: 'Description', targetField: 'description' },
+      { sourceId, sourceColumn: 'Amount', targetField: 'amount' },
+      ...SUPPLEMENTAL_FIELDS.map((column) => ({
+        sourceId,
+        sourceColumn: column,
+        targetField: column,
+        isSupplemental: true,
+      })),
+    ])
+
+    await expect(stageIngestionSource(sourceId)).resolves.toEqual({ staged: 2, duplicates: 0 })
+    const source = (await ingestionSourcesTable.get(sourceId))!.data as { originalColumns: string[]; supplementalColumns: string[]; rawCsv: string }
+    expect(source.originalColumns).toEqual(['Date', 'Description', 'Amount'])
+    expect(source.supplementalColumns).toContain('asset')
+    expect(source.rawCsv).toBe(RAW_CSV)
+    expect((await ingestionRowsTable.toArray())[0].data).toMatchObject({ rawValues: { asset: '' }, mappedValues: { asset: '' } })
+  })
+
+  it('does not create duplicate staged rows when staging is retried', async () => {
+    const sourceId = await createIngestionSource('source.csv', RAW_CSV)
+    const source = (await ingestionSourcesTable.get(sourceId))!.data as { originalColumns: string[] }
+    const missing = validateIngestionMappings(source.originalColumns, [], []).missingFields
+    for (const field of missing) await createSupplementalColumn(sourceId, field)
+    await saveIngestionMappings(
+      sourceId,
+      missing.map((field) => ({ sourceId, sourceColumn: field, targetField: field, isSupplemental: true })),
+    )
+
+    await stageIngestionSource(sourceId)
+    await expect(stageIngestionSource(sourceId)).resolves.toEqual({ staged: 0, duplicates: 2 })
+    expect(await ingestionRowsTable.count()).toBe(2)
+  })
+})

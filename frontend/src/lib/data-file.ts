@@ -2,6 +2,7 @@ import { assistantConfigTable } from '@/lib/assistant-config-db'
 import { assistantPromptsTable } from '@/lib/assistant-prompts-db'
 import { refreshAllLocalStores } from '@/lib/local-store/create-local-list-store'
 import type { LocalRow } from '@/lib/local-store/create-local-table'
+import { inferInvestmentClass } from '@/lib/model/investment-class'
 import { buildModelFromLegacy, LEGACY_TABLE_KEYS, type LegacyTables } from '@/lib/model/legacy-migration'
 import {
   accountsTable,
@@ -10,7 +11,12 @@ import {
   cardsTable,
   categoriesTable,
   categoryRulesTable,
+  entryLabelsTable,
   entriesTable,
+  ingestionAuditEventsTable,
+  ingestionColumnMappingsTable,
+  ingestionRowsTable,
+  ingestionSourcesTable,
   tableDefsTable,
 } from '@/lib/model/model-db'
 import { notesTable } from '@/sections/notes/notes-db'
@@ -20,9 +26,10 @@ import { notesTable } from '@/sections/notes/notes-db'
  * v2 was the five hardcoded tables; it still imports, upgraded on the way in.
  * v3 carries the configurable model: accounts, cards, table definitions and the
  * category vocabulary travel with the rows, so importing into a blank browser restores
- * the user's whole setup rather than a pile of untitled data.
+ * the user's whole setup rather than a pile of untitled data. v4 also includes
+ * ingestion sources, staged rows, label sidecars and their audit events.
  */
-export const DATA_EXPORT_VERSION = 3 as const
+export const DATA_EXPORT_VERSION = 4 as const
 export const DATA_FILE_NAME = 'personal-management-data.db'
 export const DATA_FILE_EXTENSION = '.db'
 /** Still accepted on import (see `data-panel.tsx`) — a backup made before adr/0028. */
@@ -38,6 +45,11 @@ const TABLES = {
   entries: entriesTable,
   budgets: budgetsTable,
   allocationTargets: allocationTargetsTable,
+  ingestionSources: ingestionSourcesTable,
+  ingestionColumnMappings: ingestionColumnMappingsTable,
+  ingestionRows: ingestionRowsTable,
+  entryLabels: entryLabelsTable,
+  ingestionAuditEvents: ingestionAuditEventsTable,
   notes: notesTable,
   assistantPrompts: assistantPromptsTable,
   assistantConfig: assistantConfigTable,
@@ -88,8 +100,27 @@ function asRows(value: unknown): LocalRow[] {
   return Array.isArray(value) ? (value as LocalRow[]) : []
 }
 
+/** v3 exports predate stored investment classes; enrich them before restoring rows. */
+function withInvestmentClasses(rows: LocalRow[]): LocalRow[] {
+  return rows.map((row) => {
+    const table = row.data as Record<string, unknown> | undefined
+    if (!table || table.kind !== 'investmentLedger' || table.investmentClass) return row
+    return { ...row, data: { ...table, investmentClass: inferInvestmentClass(table.name) } }
+  })
+}
+
+function emptyIngestionTables() {
+  return {
+    ingestionSources: [] as LocalRow[],
+    ingestionColumnMappings: [] as LocalRow[],
+    ingestionRows: [] as LocalRow[],
+    entryLabels: [] as LocalRow[],
+    ingestionAuditEvents: [] as LocalRow[],
+  }
+}
+
 /**
- * Rewrites a v2 file (five fixed tables) into the v3 shape, turning each populated
+ * Rewrites a v2 file (five fixed tables) into the current shape, turning each populated
  * legacy table into a table definition plus tagged entries — the same mapping the
  * in-browser migration uses, so a file and a live database upgrade identically.
  */
@@ -112,6 +143,30 @@ function upgradeV2(record: Record<string, unknown>): DataExportFile {
       entries,
       budgets: [],
       allocationTargets: [],
+      ...emptyIngestionTables(),
+      notes: asRows(tables.notes),
+      assistantPrompts: asRows(tables.assistantPrompts),
+      assistantConfig: asRows(tables.assistantConfig),
+    },
+  }
+}
+
+/** v3 had the configurable model but no source-ingestion or row-label stores. */
+function upgradeV3(record: Record<string, unknown>): DataExportFile {
+  const tables = record.tables as Record<string, unknown>
+  return {
+    version: DATA_EXPORT_VERSION,
+    exportedAt: typeof record.exportedAt === 'number' ? record.exportedAt : Date.now(),
+    tables: {
+      accounts: asRows(tables.accounts),
+      cards: asRows(tables.cards),
+      tableDefs: withInvestmentClasses(asRows(tables.tableDefs)),
+      categories: asRows(tables.categories),
+      categoryRules: asRows(tables.categoryRules),
+      entries: asRows(tables.entries),
+      budgets: asRows(tables.budgets),
+      allocationTargets: asRows(tables.allocationTargets),
+      ...emptyIngestionTables(),
       notes: asRows(tables.notes),
       assistantPrompts: asRows(tables.assistantPrompts),
       assistantConfig: asRows(tables.assistantConfig),
@@ -121,8 +176,9 @@ function upgradeV2(record: Record<string, unknown>): DataExportFile {
 
 /**
  * Throws a descriptive Error if `value` isn't a well-formed export this app can read.
- * A v2 file is accepted and upgraded; only the shape actually needed is required, so a
- * file written before a table existed still imports (missing tables come back empty).
+ * v2 and v3 files are accepted and upgraded; only the shape actually needed is
+ * required, so a file written before an additive table existed still imports with
+ * that table empty.
  */
 export function parseDataExportFile(value: unknown): DataExportFile {
   if (typeof value !== 'object' || value === null) throw new Error('Not a data export file.')
@@ -133,6 +189,7 @@ export function parseDataExportFile(value: unknown): DataExportFile {
   }
 
   if (record.version === 2) return upgradeV2(record)
+  if (record.version === 3) return upgradeV3(record)
 
   if (record.version !== DATA_EXPORT_VERSION) {
     throw new Error(`Unsupported data export version: ${String(record.version)}.`)
@@ -145,6 +202,7 @@ export function parseDataExportFile(value: unknown): DataExportFile {
     if (!Array.isArray(tables[key])) throw new Error(`Malformed data export file: missing "${key}" table.`)
   }
 
-  const normalised = Object.fromEntries(TABLE_KEYS.map((key) => [key, asRows(tables[key])]))
-  return { version: DATA_EXPORT_VERSION, exportedAt: record.exportedAt, tables: normalised as DataExportFile['tables'] }
+  const normalised = Object.fromEntries(TABLE_KEYS.map((key) => [key, asRows(tables[key])])) as DataExportFile['tables']
+  normalised.tableDefs = withInvestmentClasses(normalised.tableDefs)
+  return { version: DATA_EXPORT_VERSION, exportedAt: record.exportedAt, tables: normalised }
 }

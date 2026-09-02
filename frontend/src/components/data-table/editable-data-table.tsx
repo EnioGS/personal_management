@@ -18,6 +18,8 @@ interface EditableDataTableProps<T extends Record<string, unknown>> {
   schema: TableSchema<T>
   rows: StoredRow<T>[]
   onAddRow: (row: T) => void
+  /** Persist one edited field on an existing row. */
+  onUpdateRow: (id: number, changes: Partial<T>) => void
   onDeleteRow: (id: number) => void
   /** Rendered above the table (e.g. CSV export/import buttons). */
   actions?: ReactNode
@@ -32,41 +34,12 @@ export function EditableDataTable<T extends Record<string, unknown>>({
   schema,
   rows,
   onAddRow,
+  onUpdateRow,
   onDeleteRow,
   actions,
 }: EditableDataTableProps<T>) {
   const { t } = useTranslation()
   const [draft, setDraft] = useState<Record<string, string>>({})
-
-  const columns = useMemo<TanstackColumnDef<StoredRow<T>>[]>(
-    () => [
-      ...schema.map((col) => ({
-        id: String(col.key),
-        accessorFn: (row: StoredRow<T>) => row[col.key],
-        header: () => t(col.labelKey as never),
-        cell: ({ getValue }: { getValue: () => unknown }) =>
-          col.format ? col.format(getValue() as T[keyof T]) : String(getValue() ?? ''),
-      })),
-      {
-        id: 'actions',
-        header: () => null,
-        cell: ({ row }: { row: { original: StoredRow<T> } }) => (
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-xs"
-            aria-label={t('table.delete')}
-            onClick={() => onDeleteRow(row.original.id)}
-          >
-            <Trash2 className="size-3.5" />
-          </Button>
-        ),
-      },
-    ],
-    [schema, t, onDeleteRow],
-  )
-
-  const table = useReactTable({ data: rows, columns, getCoreRowModel: getCoreRowModel() })
 
   // Per-field validity of what's currently typed in the draft row — used only to flag
   // an invalid value (e.g. a malformed date) visually; an empty, not-yet-filled field is
@@ -96,6 +69,43 @@ export function EditableDataTable<T extends Record<string, unknown>>({
     }
     return byColumn
   }, [schema, rows])
+
+  const columns = useMemo<TanstackColumnDef<StoredRow<T>>[]>(
+    () => [
+      ...schema.map((col) => ({
+        id: String(col.key),
+        accessorFn: (row: StoredRow<T>) => row[col.key],
+        header: () => t(col.labelKey as never),
+        cell: ({ getValue, row }: { getValue: () => unknown; row: { original: StoredRow<T> } }) => (
+          <ExistingRowCell
+            col={col}
+            value={getValue()}
+            label={t(col.labelKey as never)}
+            suggestions={suggestionsByColumn[String(col.key)] ?? []}
+            onCommit={(value) => onUpdateRow(row.original.id, { [col.key]: value } as Partial<T>)}
+          />
+        ),
+      })),
+      {
+        id: 'actions',
+        header: () => null,
+        cell: ({ row }: { row: { original: StoredRow<T> } }) => (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            aria-label={t('table.delete')}
+            onClick={() => onDeleteRow(row.original.id)}
+          >
+            <Trash2 className="size-3.5" />
+          </Button>
+        ),
+      },
+    ],
+    [schema, t, onDeleteRow, onUpdateRow, suggestionsByColumn],
+  )
+
+  const table = useReactTable({ data: rows, columns, getCoreRowModel: getCoreRowModel() })
 
   function updateDraftField(key: string, value: string) {
     setDraft((d) => ({ ...d, [key]: value }))
@@ -250,4 +260,72 @@ function DraftCell<T>({
       onChange={(e) => onChange(e.target.value)}
     />
   )
+}
+
+/** A real row cell uses the same input types and validation as the creation row. */
+function ExistingRowCell<T>({
+  col,
+  value,
+  label,
+  suggestions,
+  onCommit,
+}: {
+  col: ColumnDef<T>
+  value: unknown
+  label: string
+  suggestions: readonly string[]
+  onCommit: (value: T[keyof T]) => void
+}) {
+  const sourceValue = cellInputValue(col, value)
+  const [draft, setDraft] = useState(sourceValue)
+  const [committed, setCommitted] = useState(sourceValue)
+
+  // Store refreshes after an edit (or an import) replace the row object. Do not clobber
+  // text the user is still typing, but otherwise keep the editor in sync with its row.
+  useEffect(() => {
+    if (draft === committed) setDraft(sourceValue)
+    setCommitted(sourceValue)
+    // `draft`/`committed` deliberately describe the current local edit, not a reason to
+    // re-run this synchronization on every keystroke.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sourceValue])
+
+  const parsed = parseCellValue(col, draft)
+  const invalid = !parsed.ok
+
+  // Existing rows save after the same short pause as the always-present creation row.
+  // This prevents a number such as "100" from being saved as "1" and then "10" while
+  // still making every cell directly editable without a separate save button.
+  useEffect(() => {
+    if (draft === committed || !parsed.ok) return
+    const timer = setTimeout(() => {
+      onCommit(parsed.value as T[keyof T])
+      setCommitted(draft)
+    }, COMMIT_DEBOUNCE_MS)
+    return () => clearTimeout(timer)
+  }, [draft, committed, parsed, onCommit])
+
+  return (
+    <DraftCell
+      col={col}
+      value={draft}
+      invalid={invalid}
+      label={label}
+      suggestions={suggestions}
+      onChange={setDraft}
+    />
+  )
+}
+
+function cellInputValue<T>(col: ColumnDef<T>, value: unknown): string {
+  if (value === undefined || value === null) return ''
+  if (col.type === 'date' && typeof value === 'number') return new Date(value).toISOString().slice(0, 10)
+  return String(value)
+}
+
+/** Empty optional text is valid; every other column must retain a valid value. */
+function parseCellValue<T>(col: ColumnDef<T>, raw: string): { ok: true; value: unknown } | { ok: false } {
+  if (!raw.trim() && col.type === 'text' && !col.required) return { ok: true, value: '' }
+  const result = coerceValue(col, raw)
+  return result.ok ? result : { ok: false }
 }

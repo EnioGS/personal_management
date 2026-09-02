@@ -25,6 +25,16 @@ describe('getCurrentValue', () => {
   it('returns 0 for an asset with no transactions', () => {
     expect(getCurrentValue('NONE', [])).toBe(0)
   })
+
+  it('does not let separately paid income change a holding quantity or price', () => {
+    const transactions: Transaction[] = [
+      { date: 1, asset: 'CDB', type: 'buy', quantity: 2, price: 100 },
+      { date: 2, asset: 'CDB', type: 'income', quantity: 1, price: 15 },
+    ]
+
+    expect(getCurrentValue('CDB', transactions)).toBe(200)
+    expect(computePositions(transactions)).toEqual([{ asset: 'CDB', quantity: 2, averagePrice: 100, currentValue: 200 }])
+  })
 })
 
 describe('computePositions', () => {

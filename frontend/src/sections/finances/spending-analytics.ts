@@ -22,6 +22,44 @@ export interface DescriptionFrequency {
   total: number
 }
 
+export interface CategoryMonthlyAverage {
+  key: string
+  label: string
+  /** Average monthly spend across every month in the selected range. */
+  value: number
+  /** Latest-quarter monthly average compared with the full selected-period average. */
+  comparison: number
+}
+
+/**
+ * Credit-card categories, normalized to a monthly average so a 24-month view is
+ * comparable with a 12-month one. The trend compares the most recent quarter of
+ * selected months with that full-period monthly average.
+ */
+export function averageCardSpendByCategory(rows: FilteredEntry[], selectedMonths: string[]): CategoryMonthlyAverage[] {
+  const months = [...new Set(selectedMonths)].sort()
+  if (months.length === 0) return []
+
+  const recentMonthCount = Math.max(1, Math.floor(months.length / 4))
+  const recentMonths = new Set(months.slice(-recentMonthCount))
+  const totals = new Map<string, { total: number; recentTotal: number }>()
+
+  for (const row of rows) {
+    if (row.cardId === undefined || row.direction !== 'out' || row.amount <= 0) continue
+    const month = monthKey(row.date)
+    const aggregate = totals.get(row.category) ?? { total: 0, recentTotal: 0 }
+    aggregate.total += row.amount
+    if (recentMonths.has(month)) aggregate.recentTotal += row.amount
+    totals.set(row.category, aggregate)
+  }
+
+  return [...totals.entries()].map(([category, aggregate]) => {
+    const value = aggregate.total / months.length
+    const recentAverage = aggregate.recentTotal / recentMonthCount
+    return { key: category, label: category, value, comparison: (recentAverage - value) / value }
+  })
+}
+
 /** Refunds and credits are not spending, even when their source table is a card ledger. */
 export function outgoingSpending(rows: FilteredEntry[]): FilteredEntry[] {
   return rows.filter((row) => row.direction === 'out' && row.amount > 0)

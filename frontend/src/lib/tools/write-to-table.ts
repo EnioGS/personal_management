@@ -1,5 +1,5 @@
 import { coerceValue } from '@/lib/csv'
-import { addItemsFor, findWritableTable, writableTables } from './writable-tables'
+import { addItemsFor, describeWritableTable, findWritableTable, writableTables } from './writable-tables'
 import type { ToolDefinition } from './types'
 
 function describeColumn(col: ReturnType<typeof writableTables>[number]['schema'][number]): string {
@@ -14,7 +14,7 @@ function describeColumn(col: ReturnType<typeof writableTables>[number]['schema']
 /** Regenerated from writableTables() on every call — a new table needs no changes here. */
 function buildDescription(): string {
   const tables = writableTables()
-  const tableDocs = tables.map((t) => `- "${t.key}" (${t.label}): ${t.schema.map(describeColumn).join(', ')}`).join('\n')
+  const tableDocs = tables.map((t) => `- ${describeWritableTable(t)}: ${t.schema.map(describeColumn).join(', ')}`).join('\n')
 
   return (
     "Appends one or more rows to a table in the user's records. " +

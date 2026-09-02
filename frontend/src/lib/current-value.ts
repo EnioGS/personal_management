@@ -2,8 +2,9 @@
 // Record<string, unknown> generic constraint used by EditableDataTable/chart components.
 export type Transaction = {
   date: number
+  category?: string
   asset: string
-  type: 'buy' | 'sell'
+  type: 'buy' | 'sell' | 'income'
   quantity: number
   price: number
   note?: string
@@ -18,8 +19,10 @@ export type Transaction = {
  */
 export function getCurrentValue(asset: string, transactions: Transaction[]): number {
   const assetTx = transactions.filter((t) => t.asset === asset).sort((a, b) => a.date - b.date)
-  const quantity = assetTx.reduce((q, t) => q + (t.type === 'buy' ? t.quantity : -t.quantity), 0)
-  const lastPrice = assetTx.at(-1)?.price ?? 0
+  const quantity = assetTx.reduce((q, t) => q + quantityDelta(t), 0)
+  // Income is paid separately: it neither changes the holding nor supplies a new
+  // unit price for it.
+  const lastPrice = assetTx.filter((t) => t.type !== 'income').at(-1)?.price ?? 0
   return quantity * lastPrice
 }
 
@@ -43,7 +46,7 @@ export function computePositions(transactions: Transaction[]): Position[] {
   return assets
     .map((asset): Position => {
       const assetTx = visible.filter((t) => t.asset === asset).sort((a, b) => a.date - b.date)
-      const quantity = assetTx.reduce((q, t) => q + (t.type === 'buy' ? t.quantity : -t.quantity), 0)
+      const quantity = assetTx.reduce((q, t) => q + quantityDelta(t), 0)
 
       const buys = assetTx.filter((t) => t.type === 'buy')
       const buyQuantity = buys.reduce((q, t) => q + t.quantity, 0)
@@ -53,4 +56,10 @@ export function computePositions(transactions: Transaction[]): Position[] {
       return { asset, quantity, averagePrice, currentValue: getCurrentValue(asset, visible) }
     })
     .filter((position) => Math.abs(position.quantity) > 1e-9)
+}
+
+function quantityDelta(transaction: Transaction): number {
+  if (transaction.type === 'buy') return transaction.quantity
+  if (transaction.type === 'sell') return -transaction.quantity
+  return 0
 }

@@ -1,5 +1,5 @@
 import type { LocalRow } from '@/lib/local-store/create-local-table'
-import type { TableKind } from './types'
+import type { InvestmentClass, TableKind } from './types'
 
 /** The five hardcoded tables the app shipped with before tables became user data. */
 export const LEGACY_TABLE_KEYS = ['spending', 'income', 'variableIncome', 'fixedIncome', 'contributions'] as const
@@ -8,6 +8,7 @@ export type LegacyTableKey = (typeof LEGACY_TABLE_KEYS)[number]
 interface LegacyMapping {
   name: string
   kind: TableKind
+  investmentClass?: InvestmentClass
   /** Legacy field -> current field, for columns the new schema names differently. */
   rename?: Record<string, string>
 }
@@ -22,8 +23,8 @@ interface LegacyMapping {
 export const LEGACY_TABLE_MAP: Record<LegacyTableKey, LegacyMapping> = {
   spending: { name: 'Gastos', kind: 'generic' },
   income: { name: 'Receitas', kind: 'generic', rename: { source: 'category' } },
-  variableIncome: { name: 'Renda Variável', kind: 'investmentLedger' },
-  fixedIncome: { name: 'Renda Fixa', kind: 'investmentLedger' },
+  variableIncome: { name: 'Renda Variável', kind: 'investmentLedger', investmentClass: 'variableIncome' },
+  fixedIncome: { name: 'Renda Fixa', kind: 'investmentLedger', investmentClass: 'fixedIncome' },
   contributions: { name: 'Aportes', kind: 'contributions' },
 }
 
@@ -57,7 +58,7 @@ export function buildModelFromLegacy(legacy: LegacyTables): ModelRows {
     tableDefs.push({
       id: tableId,
       createdAt: rows[0]?.createdAt ?? Date.now(),
-      data: { name: mapping.name, kind: mapping.kind },
+      data: { name: mapping.name, kind: mapping.kind, ...(mapping.investmentClass ? { investmentClass: mapping.investmentClass } : {}) },
     })
 
     for (const row of rows) {

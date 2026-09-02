@@ -9,7 +9,7 @@ import { TableMenu } from '@/components/data-table/table-menu'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { entriesForTable, useCategoriesStore, useEntriesStore, useTableDefsStore } from '@/lib/model/model-stores'
 import { categoryColumnFor, TABLE_KIND_SCHEMAS } from '@/lib/model/table-kinds'
-import type { Entry, TableKind } from '@/lib/model/types'
+import type { Entry, InvestmentClass, TableKind } from '@/lib/model/types'
 import { useUiStore } from '@/store/ui-store'
 
 interface TableWorkspaceProps {
@@ -17,6 +17,8 @@ interface TableWorkspaceProps {
   workspaceId: string
   /** Which kinds of table belong in this panel. */
   kinds: TableKind[]
+  /** Separates Variable Income and Fixed Income investment ledgers. */
+  investmentClass?: InvestmentClass
 }
 
 /**
@@ -24,7 +26,7 @@ interface TableWorkspaceProps {
  * another. Everything here is driven by tableDefs/entries rather than a hardcoded
  * store, so a new table needs no code (see lib/model/).
  */
-export function TableWorkspace({ workspaceId, kinds }: TableWorkspaceProps) {
+export function TableWorkspace({ workspaceId, kinds, investmentClass }: TableWorkspaceProps) {
   const { t } = useTranslation()
   const tableDefs = useTableDefsStore((s) => s.items)
   const addTable = useTableDefsStore((s) => s.addItem)
@@ -33,13 +35,17 @@ export function TableWorkspace({ workspaceId, kinds }: TableWorkspaceProps) {
   const entries = useEntriesStore((s) => s.items)
   const addEntry = useEntriesStore((s) => s.addItem)
   const addEntries = useEntriesStore((s) => s.addItems)
+  const updateEntry = useEntriesStore((s) => s.updateItem)
   const deleteEntry = useEntriesStore((s) => s.deleteItem)
   const deleteEntries = useEntriesStore((s) => s.deleteItems)
   const activeTableByWorkspace = useUiStore((s) => s.activeTableByWorkspace)
   const selectTable = useUiStore((s) => s.selectTable)
   const categories = useCategoriesStore((s) => s.items)
 
-  const available = useMemo(() => tableDefs.filter((def) => kinds.includes(def.kind)), [tableDefs, kinds])
+  const available = useMemo(
+    () => tableDefs.filter((def) => kinds.includes(def.kind) && (!investmentClass || def.investmentClass === investmentClass)),
+    [tableDefs, kinds, investmentClass],
+  )
 
   // Falls back to the first available table so the panel is never blank just because
   // nothing has been picked yet, or because the remembered table was deleted.
@@ -100,7 +106,7 @@ export function TableWorkspace({ workspaceId, kinds }: TableWorkspaceProps) {
           onDelete={() => void handleDeleteTable()}
         />
       )}
-      <AddTableDialog kinds={kinds} onCreate={(table) => void addTable(table)} />
+      <AddTableDialog kinds={kinds} investmentClass={investmentClass} onCreate={(table) => void addTable(table)} />
     </div>
   )
 
@@ -122,6 +128,12 @@ export function TableWorkspace({ workspaceId, kinds }: TableWorkspaceProps) {
       rows={rows}
       onAddRow={(row) => {
         void addEntry({ ...(row as Entry), tableId: active.id })
+      }}
+      onUpdateRow={(id, changes) => {
+        const existing = rows.find((row) => row.id === id)
+        if (!existing) return
+        const { id: _id, createdAt: _createdAt, ...entry } = existing
+        void updateEntry(id, { ...entry, ...changes, tableId: active.id } as Entry)
       }}
       onDeleteRow={(id) => void deleteEntry(id)}
       actions={

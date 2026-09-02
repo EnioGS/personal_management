@@ -3,7 +3,7 @@ import { resolveFilterRange, type DashboardFilters } from './dashboard-filters'
 
 function filters(overrides: Partial<DashboardFilters> = {}): DashboardFilters {
   return {
-    preset: 'last30',
+    preset: 'thisYear',
     customFrom: '',
     customTo: '',
     accountIds: [],
@@ -16,7 +16,7 @@ function filters(overrides: Partial<DashboardFilters> = {}): DashboardFilters {
 
 describe('resolveFilterRange', () => {
   it('resolves a preset without touching the custom fields', () => {
-    const range = resolveFilterRange(filters({ preset: 'last30' }))
+    const range = resolveFilterRange(filters({ preset: 'last12Months' }))
     expect(range.to).toBeGreaterThan(range.from)
   })
 

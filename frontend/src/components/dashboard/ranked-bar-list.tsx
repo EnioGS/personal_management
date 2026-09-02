@@ -5,12 +5,16 @@ export interface RankedBarItem {
   key: string
   label: string
   value: number
+  /** Change against a contextual comparison window, expressed as a fraction. */
+  comparison?: number
 }
 
 interface RankedBarListProps {
   items: RankedBarItem[]
   valueFormatter: (value: number) => string
   emptyLabel: string
+  /** A roomier two-line row for long labels and contextual category comparisons. */
+  variant?: 'inline' | 'underlined'
 }
 
 /**
@@ -20,7 +24,7 @@ interface RankedBarListProps {
  * problems. Color still follows the entity (colorForKey), just as a bar fill instead
  * of a slice.
  */
-export function RankedBarList({ items, valueFormatter, emptyLabel }: RankedBarListProps) {
+export function RankedBarList({ items, valueFormatter, emptyLabel, variant = 'inline' }: RankedBarListProps) {
   if (items.length === 0) {
     return <p className="text-muted-foreground flex h-full items-center justify-center text-xs">{emptyLabel}</p>
   }
@@ -30,10 +34,36 @@ export function RankedBarList({ items, valueFormatter, emptyLabel }: RankedBarLi
   const max = Math.max(...sorted.map((item) => Math.max(item.value, 0)), 1)
 
   return (
-    <div className="flex h-full flex-col gap-2.5 overflow-y-auto">
+    <div className={variant === 'underlined' ? 'flex h-full flex-col gap-3 overflow-y-auto pr-2' : 'flex h-full flex-col gap-2.5 overflow-y-auto'}>
       {sorted.map((item) => {
         const color = colorForKey(item.key)
         const share = total > 0 ? (item.value / total) * 100 : 0
+        const comparison = item.comparison
+        const comparisonClass = comparison === undefined || comparison === 0
+          ? 'text-muted-foreground'
+          : comparison < 0 ? 'text-brand' : 'text-destructive'
+        const comparisonLabel = comparison === undefined
+          ? '—'
+          : `${comparison >= 0 ? '▲' : '▼'} ${Number.isFinite(comparison) ? `${(Math.abs(comparison) * 100).toFixed(1)}%` : '∞%'}`
+
+        if (variant === 'underlined') {
+          return (
+            <div key={item.key} className="grid grid-cols-[minmax(0,1fr)_5rem_3.5rem] items-start gap-x-2 text-xs">
+              <div className="min-w-0">
+                <span className="block break-words leading-4" title={item.label}>{item.label || '—'}</span>
+                <div className="bg-muted mt-1 h-[3px] overflow-hidden rounded-full">
+                  <div
+                    className="entity-fill h-full rounded-full"
+                    style={{ width: `${(Math.max(item.value, 0) / max) * 100}%`, '--entity-light': color.light, '--entity-dark': color.dark } as CSSProperties}
+                  />
+                </div>
+              </div>
+              <span className="pt-0.5 text-right tabular-nums">{valueFormatter(item.value)}</span>
+              <span className={`mr-[5px] pt-0.5 text-right tabular-nums whitespace-nowrap ${comparisonClass}`}>{comparisonLabel}</span>
+            </div>
+          )
+        }
+
         return (
           <div key={item.key} className="flex items-center gap-2 text-xs">
             <span className="w-24 shrink-0 truncate" title={item.label}>

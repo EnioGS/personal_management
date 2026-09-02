@@ -42,7 +42,7 @@ describe('writeToTableTool', () => {
   it('rejects a select column with a value outside its options, listing the allowed values', async () => {
     const table = await seedTable('investmentLedger')
     const result = await writeToTableTool.execute(
-      { table, rows: [{ date: '2026-01-01', asset: 'PETR4', type: 'NotAType', quantity: 1, price: 1 }] },
+      { table, rows: [{ date: '2026-01-01', category: 'Ações', asset: 'PETR4', type: 'NotAType', quantity: 1, price: 1 }] },
       context,
     )
     expect(result).toContain('Wrote 0 of 1')
@@ -74,7 +74,7 @@ describe('writeToTableTool', () => {
 
     const investment = await seedTable('investmentLedger')
     await writeToTableTool.execute(
-      { table: investment, rows: [{ date: '2026-01-01', asset: 'PETR4', type: 'buy', quantity: 10, price: 30 }] },
+      { table: investment, rows: [{ date: '2026-01-01', category: 'Ações', asset: 'PETR4', type: 'buy', quantity: 10, price: 30 }] },
       context,
     )
     expect(itemsFor(Number(investment))).toHaveLength(1)
@@ -96,13 +96,14 @@ describe('writeToTableTool', () => {
 
   it('description lists every registered table and a select column’s options', async () => {
     await seedTable('generic', 'Gastos')
-    await seedTable('investmentLedger', 'Renda Variável')
+    await seedTable('investmentLedger', 'Tesouro', 'fixedIncome')
 
     for (const t of writableTables()) {
       expect(writeToTableTool.description).toContain(t.key)
       expect(writeToTableTool.description).toContain(t.label)
     }
     expect(writeToTableTool.description).toContain('buy')
+    expect(writeToTableTool.description).toContain('Fixed Income')
   })
 
   it('parameters.table.enum matches the registry keys', async () => {

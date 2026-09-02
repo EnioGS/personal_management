@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { FilteredEntry } from '@/components/dashboard/use-dashboard-entries'
-import { categorySpendChanges, frequentDescriptions, outgoingSpending, spendingByMonth } from './spending-analytics'
+import { averageCardSpendByCategory, categorySpendChanges, frequentDescriptions, outgoingSpending, spendingByMonth } from './spending-analytics'
 
 function entry(overrides: Partial<FilteredEntry>): FilteredEntry {
   return {
@@ -57,6 +57,21 @@ describe('spending analytics', () => {
       { label: 'Market', count: 2, total: 50 },
       { label: 'Taxi', count: 1, total: 150 },
       { label: 'Transport', count: 1, total: 100 },
+    ])
+  })
+
+  it('averages card categories over all selected months and compares the latest quarter', () => {
+    const rows = [
+      entry({ cardId: 1, category: 'Food', amount: 100, date: Date.UTC(2026, 0, 1) }),
+      entry({ cardId: 1, category: 'Food', amount: 300, date: Date.UTC(2026, 3, 1) }),
+      entry({ cardId: 1, category: 'Travel', amount: 400, date: Date.UTC(2026, 3, 2) }),
+      entry({ cardId: 1, category: 'Refund', amount: -50, date: Date.UTC(2026, 3, 3) }),
+      entry({ category: 'Cash only', amount: 900, date: Date.UTC(2026, 3, 4) }),
+    ]
+
+    expect(averageCardSpendByCategory(rows, ['2026-01', '2026-02', '2026-03', '2026-04'])).toEqual([
+      { key: 'Food', label: 'Food', value: 100, comparison: 2 },
+      { key: 'Travel', label: 'Travel', value: 100, comparison: 3 },
     ])
   })
 })

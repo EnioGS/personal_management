@@ -3,7 +3,6 @@
     "label": "Finanças"
   },
   "items": {
-    "overview": "Visão Geral",
     "movements": "Movimentações",
     "spending": "Gastos",
     "cards": "Cartões",
@@ -18,8 +17,11 @@
     "note": "Observação"
   },
   "overview": {
-    "monthlyFlow": "Fluxo mensal",
+    "capitalEvolution": "Evolução do capital",
+    "currentCapital": "Capital atual",
+    "startingPeriod": "vs. início do período",
     "whereItWent": "Para onde foi",
+    "spendingCategories": "Categorias de gastos",
     "accounts": "Contas",
     "entries": "Lançamentos",
     "previousPeriod": "vs. período anterior",
@@ -66,22 +68,6 @@
     "noEntries": "Nenhum lançamento de cartão neste período ainda.",
     "noInvoiceEntries": "Nenhum lançamento na fatura atual ainda.",
     "noInstallments": "Nenhum parcelamento em aberto encontrado no histórico selecionado."
-  },
-  "movements": {
-    "noStatements": "Adicione um extrato bancário para analisar as movimentações da conta.",
-    "totalIn": "Total de entradas",
-    "totalOut": "Total de saídas",
-    "periodResult": "Resultado do período",
-    "entryCount": "Lançamentos",
-    "inAndOutByMonth": "Entradas e saídas por mês",
-    "topCategories": "Maiores categorias",
-    "largestEntries": "Maiores lançamentos",
-    "recurringInStatement": "Recorrências neste extrato",
-    "monthCount": "{{count}} mês(es)",
-    "noEntries": "Nenhum lançamento neste extrato no período selecionado ainda.",
-    "noIncoming": "Nenhuma entrada neste período.",
-    "noOutgoing": "Nenhuma saída neste período.",
-    "noRecurring": "Nenhuma cobrança recorrente neste extrato ainda."
   },
   "budget": {
     "description": "Uma meta mensal por categoria, comparada com o que foi realmente gasto.",

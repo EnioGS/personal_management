@@ -8,6 +8,7 @@ import { useDashboardFilters } from '@/components/dashboard/dashboard-filters'
 import { useDashboardEntries } from '@/components/dashboard/use-dashboard-entries'
 import { formatDateLabel, formatMonthLabel, monthKey } from '@/lib/aggregations'
 import { detectRecurringEntries } from '@/lib/model/recurring'
+import { FinanceTableDrawer } from './finance-table-drawer'
 
 const currency = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
 const DAY_MS = 86_400_000
@@ -65,8 +66,9 @@ export function RecurringPanel() {
         toggleCategory={toggleCategory}
         clearCategories={clearCategories}
       />
-      <div className="min-h-0 flex-1 overflow-auto p-4">
-        <div className="flex flex-col gap-3">
+      <div className="min-h-0 flex-1">
+        <FinanceTableDrawer id="recurring" kinds={['bankLedger', 'cardLedger', 'generic']}>
+          <div className="flex flex-col gap-3">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <StatTile label={t('finances:recurring.monthlyTotal')} value={currency.format(monthlyTotal)} indicatorColor="var(--brand)" />
             <StatTile label={t('finances:recurring.recurringCount')} value={candidates.length.toLocaleString('pt-BR')} indicatorColor="var(--brand)" />
@@ -123,7 +125,8 @@ export function RecurringPanel() {
               </div>
             </DashboardCard>
           </div>
-        </div>
+          </div>
+        </FinanceTableDrawer>
       </div>
     </div>
   )

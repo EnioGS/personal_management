@@ -33,9 +33,9 @@ Two things it optimizes for:
 │   │   │   ├── index.ts       # aggregates all sections into one array
 │   │   │   ├── vault/         # brand-mark section: Data (export/import/clear) + About
 │   │   │   ├── notes/         # notes.section.ts + panel/store/notes-db + locales/
-│   │   │   ├── finances/      # Overview / Movimentações / Gastos / Cartões / Orçamento / Recorrentes
-│   │   │   ├── investments/   # Overview / Posições / ledgers / Aportes / Proventos / Alocação
-│   │   │   └── settings/      # appearance/general/assistant/accounts-cards/categories/tables panels
+│   │   │   ├── finances/      # Movimentações / Gastos / Investimentos / Recorrentes
+│   │   │   ├── investments/   # shared investment analytics, ledgers, allocation components
+│   │   │   └── settings/      # appearance/general/assistant/accounts-cards/categories/ingestion/tables panels
 │   │   ├── store/
 │   │   │   ├── ui-store.ts     # active section/item, secondary-bar mode (expanded/icons/hidden)
 │   │   │   ├── theme-store.ts  # light/dark/system theme
@@ -45,13 +45,13 @@ Two things it optimizes for:
 │   │   ├── locales/common/    # shared strings not owned by one section
 │   │   ├── lib/
 │   │   │   ├── local-store/              # generic Dexie-table + Zustand-store factories
-│   │   │   ├── model/                    # accounts/cards/tableDefs/categories/categoryRules/entries — see adr/0022
+│   │   │   ├── model/                    # configurable records + ingestion sources/labels — see adr/0022 and adr/0030
 │   │   │   ├── dashboard/                # date-range presets/resolution (lib side of components/dashboard/)
 │   │   │   ├── table-schema.ts           # column schema driving tables, CSV, and the draft-row inputs
 │   │   │   ├── csv.ts                    # CSV export/import + validation
 │   │   │   ├── aggregations.ts           # chart data-shaping (buckets, running totals, top-N + "Outros" fold)
 │   │   │   ├── current-value.ts          # investment position value from transaction history
-│   │   │   ├── data-file.ts              # whole-app export/import (in-memory v3 shape + v2 upgrader), row counts
+│   │   │   ├── data-file.ts              # whole-app export/import (in-memory v4 shape + v2/v3 upgraders), row counts
 │   │   │   ├── sqlite-schema.ts          # DataExportFile <-> typed SQLite columns, per table (adr/0028)
 │   │   │   ├── sqlite-export.ts          # sql.js glue: build/parse the actual .db file bytes
 │   │   │   ├── file-io.ts                # save-file picker (Chromium) with a download fallback
@@ -145,8 +145,14 @@ Two things it optimizes for:
 - Tables, accounts, cards and the category vocabulary are user data, not
   compile-time constants (`lib/model/`, see adr/0022) — a `TableKind` fixes
   a table's columns, but the number of tables, accounts and cards is
-  unbounded. All of it travels in the export file (`.pmdata` v3), so
+  unbounded. The data ingestion centre's source provenance, mappings, staged
+  rows and label sidecars travel in the v4 export too, so
   importing into a blank browser restores the whole setup.
+- Data enters Finance through Settings → Data ingestion centre (adr/0030): CSV
+  source columns are mapped without rewriting the original file, sparse sources
+  may gain explicitly blank supplemental columns, and only user-confirmed ready
+  rows can be promoted into a destination table. Labels distinguish flow role,
+  settlement channel, spending expense/rebate treatment and Finance destinations.
 - Category rules resolve raw values onto a canonical category at *read*
   time rather than rewriting stored data (adr/0023) — adding a rule months
   later reclassifies all existing history at once, and stays reversible.
@@ -156,7 +162,7 @@ Two things it optimizes for:
   its entity (a category, an account) via a stable hash, not the entity's
   position in whatever is currently on screen, so filtering never repaints
   a survivor.
-- Finances' Overview is a real dashboard (adr/0025): one dropdown-based
+- Finances' Movements dashboard is a real dashboard (adr/0025): one dropdown-based
   context row (date range, account, card, category) scopes a KPI row and a
   combined diverging in/out chart — not a single hardcoded chart.
 - Orçamento, Recorrentes, Posições, Proventos, Alocação, and a Settings ->

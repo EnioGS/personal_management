@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { TABLE_KIND_SCHEMAS } from '@/lib/model/table-kinds'
 import { useTableDefsStore } from '@/lib/model/model-stores'
-import { addItemFor, findWritableTable, itemsFor, writableTables } from './writable-tables'
+import { addItemFor, describeWritableTable, findWritableTable, itemsFor, writableTables } from './writable-tables'
 import { clearTables, seedTable } from './test-utils'
 
 describe('writableTables', () => {
@@ -33,6 +33,11 @@ describe('writableTables', () => {
     expect(writableTables()).toEqual([])
     await seedTable('generic')
     expect(writableTables()).toHaveLength(1)
+  })
+
+  it('includes the stored investment class in tool-facing table descriptions', async () => {
+    const key = await seedTable('investmentLedger', 'Tesouro', 'fixedIncome')
+    expect(describeWritableTable(findWritableTable(key)!)).toContain('Fixed Income')
   })
 })
 

@@ -7,13 +7,13 @@ import { readTableTool } from './read-table'
 import { readTextFileTool } from './read-text-file'
 import type { ToolDefinition } from './types'
 import { updateCategoryRuleTool } from './update-category-rule'
-// Row-mutating assistant tools are intentionally disabled. The implementations are
-// kept in their files for now so this can be reversed without reconstructing them,
-// but they are not exposed to the model or executable through findTool().
+import { writeToTableTool } from './write-to-table'
+// Row correction/deletion tools stay disabled: the assistant may append new rows,
+// but cannot alter existing history. Their implementations remain available here for
+// a future, separately-authorized capability.
 // import { deleteTableRowsTool } from './delete-table-rows'
 // import { restoreTableRowsTool } from './restore-table-rows'
 // import { updateTableRowsTool } from './update-table-rows'
-// import { writeToTableTool } from './write-to-table'
 
 /** Adding a tool = write one ToolDefinition file + add it here. Nothing else changes. */
 export const toolRegistry: ToolDefinition[] = [
@@ -24,6 +24,7 @@ export const toolRegistry: ToolDefinition[] = [
   addCategoryTool,
   updateCategoryRuleTool,
   deleteCategoryRuleTool,
+  writeToTableTool,
 ]
 
 export function findTool(name: string): ToolDefinition | undefined {

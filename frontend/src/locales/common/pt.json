@@ -64,9 +64,9 @@
   },
   "dashboard": {
     "presets": {
-      "last30": "30 dias",
-      "last90": "90 dias",
       "thisYear": "Este ano",
+      "last12Months": "12 meses",
+      "last24Months": "24 meses",
       "custom": "Personalizado"
     },
     "rangeTo": "até",

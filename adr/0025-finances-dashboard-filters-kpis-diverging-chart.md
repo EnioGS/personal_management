@@ -2,14 +2,14 @@
 
 ## Status
 
-Accepted — the Finances section's Overview panel, built on adr/0022's model
+Accepted — the Finances section's Movements panel, built on adr/0022's model
 and adr/0024's color system. Extended by adr/0029 (KPI deltas/sparklines,
 titled cards, ranked bars over a pie) without changing anything decided
 here.
 
 ## Context
 
-Overview was a single line chart (running balance) reading one hardcoded
+The combined Finance dashboard was a single line chart (running balance) reading one hardcoded
 rollup. Once tables are per-account and per-card (adr/0022), "the aggregate
 or a subset of different banks for each account" is a real, asked-for
 requirement, and money in vs. out is a genuine polarity around a zero
@@ -22,8 +22,8 @@ Applied the dataviz skill's composition rules directly, rather than
 inventing a bespoke layout:
 
 - **One filter row, above everything it scopes** (`components/dashboard/
-  filter-bar.tsx`) — never per-chart. Date range leads (presets: 30/90 days,
-  this year, custom), then account/card/category dropdowns; screens that are
+  filter-bar.tsx`) — never per-chart. Date range leads (this year, 12 months,
+  24 months, custom), then account/card/category dropdowns; screens that are
   scoped to one statement or card ledger can add that ledger dropdown. Every
   stat tile and the chart below read the same filtered set
   (`use-dashboard-entries.ts`), so the numbers on screen always agree with

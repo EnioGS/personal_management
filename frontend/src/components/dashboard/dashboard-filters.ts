@@ -14,17 +14,19 @@ export interface DashboardFilters {
   categories: string[]
 }
 
+const DEFAULT_PRESET: Exclude<DateRangePreset, 'custom'> = 'last24Months'
+
 // Seeds the custom-range inputs with the default preset's own bounds, so switching to
 // "custom" starts from where the user already was instead of an unrelated window.
 function defaultCustomBounds(): { from: string; to: string } {
-  const range = resolvePreset('last90')
+  const range = resolvePreset(DEFAULT_PRESET)
   return { from: new Date(range.from).toISOString().slice(0, 10), to: new Date(range.to).toISOString().slice(0, 10) }
 }
 
 export function useDashboardFilters() {
   const [filters, setFilters] = useState<DashboardFilters>(() => {
     const { from, to } = defaultCustomBounds()
-    return { preset: 'last90', customFrom: from, customTo: to, accountIds: [], tableIds: [], cardIds: [], categories: [] }
+    return { preset: DEFAULT_PRESET, customFrom: from, customTo: to, accountIds: [], tableIds: [], cardIds: [], categories: [] }
   })
 
   function toggle(list: number[], id: number): number[] {

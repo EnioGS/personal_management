@@ -24,6 +24,7 @@ interface StatTileProps {
 }
 
 function formatPercent(value: number): string {
+  if (!Number.isFinite(value)) return '∞%'
   return `${(Math.abs(value) * 100).toFixed(1)}%`
 }
 

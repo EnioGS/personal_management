@@ -13,11 +13,13 @@
   },
   "columns": {
     "date": "Date",
+    "category": "Category",
     "asset": "Asset",
     "type": "Type",
     "quantity": "Quantity",
     "price": "Price",
     "note": "Note",
+    "investmentClass": "Investment class",
     "destination": "Destination",
     "amount": "Amount"
   },

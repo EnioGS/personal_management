@@ -40,6 +40,9 @@ export interface Card {
  */
 export type TableKind = 'bankLedger' | 'cardLedger' | 'investmentLedger' | 'contributions' | 'dividends' | 'generic'
 
+/** Stored on investment table definitions so the two investment workspaces stay separate. */
+export type InvestmentClass = 'variableIncome' | 'fixedIncome'
+
 export interface TableDef {
   name: string
   kind: TableKind
@@ -47,6 +50,8 @@ export interface TableDef {
   accountId?: number
   /** Set for cardLedger — which card this table records. */
   cardId?: number
+  /** Set for investmentLedger; intentionally metadata, not a visible row column. */
+  investmentClass?: InvestmentClass
 }
 
 /** A canonical category. Raw values in the data resolve to one of these via CategoryRule. */
@@ -82,6 +87,8 @@ export interface Entry {
   tableId: number
   /** Soft-delete flag — see adr/0018. */
   deleted?: boolean
+  /** Stable source-row fingerprint used by imports to make re-importing a statement idempotent. */
+  importKey?: string
   /** Column values, keyed by the schema of the table's kind. */
   [field: string]: unknown
 }
@@ -96,4 +103,124 @@ export interface Budget {
 export interface AllocationTarget {
   asset: string
   targetPercent: number
+}
+
+/** Finance surfaces a labelled row contributes to. A row may belong to more than one. */
+export type FinanceDestination = 'movements' | 'spending' | 'investments' | 'recurring'
+
+/** Economic direction, independent from the sign convention used by a source file. */
+export type FlowRole = 'inflow' | 'outflow' | 'transfer' | 'adjustment'
+
+/** Where the event is settled; used to keep card, cash and investment effects distinct. */
+export type SettlementChannel = 'checkingAccount' | 'creditCard' | 'cash' | 'investment' | 'other'
+
+/** A spending record either adds to spend, offsets it, or is unrelated to spending. */
+export type SpendingTreatment = 'expense' | 'rebate' | 'notApplicable'
+
+export type RecurrenceLabel = 'oneOff' | 'recurring' | 'unknown'
+
+export type IngestionSourceStatus = 'draftSource' | 'mapped' | 'staged' | 'archived'
+export type IngestionRowStatus =
+  | 'unlabelled'
+  | 'ready'
+  | 'promoted'
+  | 'reconciledExisting'
+  | 'invalid'
+  | 'promotionError'
+
+/** Canonical values available above a raw source file's original column headers. */
+export type IngestionTargetField =
+  | 'date'
+  | 'amount'
+  | 'description'
+  | 'rawCategory'
+  | 'direction'
+  | 'accountReference'
+  | 'cardReference'
+  | 'asset'
+  | 'quantity'
+  | 'price'
+  | 'investmentType'
+  | 'note'
+  | 'destination'
+  | 'financeDestinations'
+  | 'flowRole'
+  | 'settlementChannel'
+  | 'spendingTreatment'
+  | 'categoryId'
+  | 'recurrence'
+  | 'destinationTableId'
+
+/** An uploaded CSV retained locally and identified by its unmodified-byte fingerprint. */
+export interface IngestionSource {
+  originalFilename: string
+  sourceFingerprint: string
+  importedAt: number
+  /** Original CSV text. It is source provenance and is never rewritten by mappings. */
+  rawCsv: string
+  originalColumns: string[]
+  /** Virtual empty columns supplement sparse source files without changing rawCsv. */
+  supplementalColumns: string[]
+  rowCount: number
+  status: IngestionSourceStatus
+  /** True only for the synthetic source that links pre-existing app entries. */
+  legacy?: boolean
+}
+
+/** Maps one original or supplemental source column onto exactly one canonical field. */
+export interface IngestionColumnMapping {
+  sourceId: number
+  sourceColumn: string
+  targetField: IngestionTargetField
+  /** Reserved for a future parsing UI; mappings are lossless until then. */
+  parser?: string
+  isSupplemental?: boolean
+}
+
+/** Labels are sidecar data so all table schemas can share the same classification model. */
+export interface EntryLabels {
+  entryId: number
+  financeDestinations: FinanceDestination[]
+  flowRole: FlowRole
+  settlementChannel: SettlementChannel
+  spendingTreatment: SpendingTreatment
+  categoryId?: number
+  recurrence: RecurrenceLabel
+  sourceIngestionRowId?: number
+}
+
+export interface IngestionRowLabels {
+  financeDestinations?: FinanceDestination[]
+  flowRole?: FlowRole
+  settlementChannel?: SettlementChannel
+  spendingTreatment?: SpendingTreatment
+  categoryId?: number
+  recurrence?: RecurrenceLabel
+}
+
+/** A lossless raw row plus its mapped values, labels and promotion lineage. */
+export interface IngestionRow {
+  sourceId: number
+  sourceRowIndex: number
+  sourceRowFingerprint: string
+  rawValues: Record<string, string>
+  mappedValues: Partial<Record<IngestionTargetField, unknown>>
+  labels: IngestionRowLabels
+  status: IngestionRowStatus
+  validationErrors: string[]
+  destinationTableId?: number
+  /** Present for a migration row linked to an already stored entry. */
+  existingEntryId?: number
+  /** Present after a newly staged row is promoted to an app entry. */
+  promotedEntryId?: number
+}
+
+/** Append-only trace of user/assistant classification actions. */
+export interface IngestionAuditEvent {
+  event: 'sourceUploaded' | 'mappingChanged' | 'rowsStaged' | 'labelsChanged' | 'rowsPromoted' | 'rowsReconciled' | 'promotionFailed'
+  actor: 'user' | 'assistant' | 'migration'
+  sourceId?: number
+  ingestionRowIds?: number[]
+  entryIds?: number[]
+  details?: Record<string, unknown>
 }

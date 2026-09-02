@@ -67,6 +67,35 @@ describe('rowToSqlValues / sqlValuesToRow round-trip', () => {
     expect(sqlValuesToRow(SQLITE_SCHEMAS.categoryRules, rowToSqlValues(SQLITE_SCHEMAS.categoryRules, rule))).toEqual(rule)
   })
 
+  it('round-trips investment class as table metadata', () => {
+    const table = {
+      id: 10,
+      createdAt: 3,
+      data: { name: 'Nubank - Fixed income', kind: 'investmentLedger', accountId: 1, investmentClass: 'fixedIncome' },
+    }
+
+    expect(sqlValuesToRow(SQLITE_SCHEMAS.tableDefs, rowToSqlValues(SQLITE_SCHEMAS.tableDefs, table))).toEqual(table)
+  })
+
+  it('round-trips structured ingestion provenance as JSON columns', () => {
+    const row = {
+      id: 11,
+      createdAt: 4,
+      data: {
+        sourceId: 3,
+        sourceRowIndex: 0,
+        sourceRowFingerprint: 'row-hash',
+        rawValues: { Data: '2026-01-01', Valor: '10,00' },
+        mappedValues: { amount: 10 },
+        labels: { financeDestinations: ['movements', 'spending'], flowRole: 'outflow' },
+        status: 'unlabelled',
+        validationErrors: ['Choose a destination table.'],
+      },
+    }
+
+    expect(sqlValuesToRow(SQLITE_SCHEMAS.ingestionRows, rowToSqlValues(SQLITE_SCHEMAS.ingestionRows, row))).toEqual(row)
+  })
+
   it('round-trips every entries column used across the current table kinds', () => {
     const row = {
       id: 9,
@@ -74,6 +103,7 @@ describe('rowToSqlValues / sqlValuesToRow round-trip', () => {
       data: {
         tableId: 3,
         deleted: false,
+        importKey: 'source-row-hash',
         date: 1700000000000,
         direction: 'out',
         category: 'Alimentação',
@@ -94,6 +124,7 @@ describe('rowToSqlValues / sqlValuesToRow round-trip', () => {
       data: {
         tableId: 3,
         deleted: false,
+        importKey: 'source-row-hash',
         date: 1700000000000,
         direction: 'out',
         category: 'Alimentação',

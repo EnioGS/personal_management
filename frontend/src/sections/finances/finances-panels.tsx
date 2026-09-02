@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, type CSSProperties } from 'react'
 import { useTranslation } from 'react-i18next'
 import { AppBarChart } from '@/components/charts/bar-chart'
+import { CapitalEvolutionChart } from '@/components/charts/capital-evolution-chart'
 import { DIVERGING_PAIR, DOMAIN_COLOR } from '@/components/charts/chart-colors'
 import { DivergingBarChart } from '@/components/charts/diverging-bar-chart'
 import { CategoryPill } from '@/components/dashboard/category-pill'
@@ -9,112 +10,100 @@ import { RankedBarList } from '@/components/dashboard/ranked-bar-list'
 import { StatTile, type StatDelta } from '@/components/dashboard/stat-tile'
 import { FilterBar } from '@/components/dashboard/filter-bar'
 import { resolveFilterRange, useDashboardFilters, type DashboardFilters } from '@/components/dashboard/dashboard-filters'
-import { useDashboardEntries, type FilteredEntry } from '@/components/dashboard/use-dashboard-entries'
+import { useDashboardEntries } from '@/components/dashboard/use-dashboard-entries'
 import { formatDateLabel, formatMonthLabel, groupByKey } from '@/lib/aggregations'
-import { previousEquivalentRange } from '@/lib/dashboard/date-range'
+import { capitalEvolution, type CapitalEvolutionPoint, type InvestmentValueEntry } from '@/lib/dashboard/capital-evolution'
 import { useAccountsStore, useCardsStore, useEntriesStore, useTableDefsStore } from '@/lib/model/model-stores'
-import { detectRecurringEntries } from '@/lib/model/recurring'
-import { categorySpendChanges, frequentDescriptions, outgoingSpending, spendingByMonth } from './spending-analytics'
+import { averageCardSpendByCategory, categorySpendChanges, frequentDescriptions, outgoingSpending, spendingByMonth } from './spending-analytics'
 import { currentInvoiceCycle, daysUntil, entriesInInvoice, openInstallments } from './card-analytics'
+import { FinanceTableDrawer } from './finance-table-drawer'
 
 const currency = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
 
-// Dates are stored as UTC-midnight epoch ms (see lib/aggregations.ts) — bucket in UTC to match.
-function formatMonthKey(epochMs: number): string {
-  const d = new Date(epochMs)
-  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`
-}
-
-interface MonthlyTotals {
-  month: string
-  in: number
-  out: number
-  cardSpend: number
-  // DivergingBarChart's data prop wants a plain indexable row, same as any other chart data.
-  [key: string]: string | number
-}
-
-function monthlyTotals(rows: FilteredEntry[]): MonthlyTotals[] {
-  const perMonth = new Map<string, MonthlyTotals>()
-  for (const row of rows) {
-    const month = formatMonthKey(row.date)
-    const bucket = perMonth.get(month) ?? { month, in: 0, out: 0, cardSpend: 0 }
-    if (row.direction === 'in') bucket.in += row.amount
-    else bucket.out += row.amount
-    if (row.cardId) bucket.cardSpend += row.amount
-    perMonth.set(month, bucket)
-  }
-  return [...perMonth.values()].sort((a, b) => a.month.localeCompare(b.month))
-}
-
-interface PeriodTotals {
-  totalIn: number
-  totalOut: number
-  cardSpend: number
-  net: number
-}
-
-function sumTotals(rows: FilteredEntry[]): PeriodTotals {
-  let totalIn = 0
-  let totalOut = 0
-  let cardSpend = 0
-  for (const row of rows) {
-    if (row.direction === 'in') totalIn += row.amount
-    else totalOut += row.amount
-    if (row.cardId) cardSpend += row.amount
-  }
-  return { totalIn, totalOut, cardSpend, net: totalIn - totalOut }
-}
-
-/** No comparison when there's nothing to divide by — a delta needs a non-zero referent. */
+/** A non-zero change from zero is infinite rather than absent, so every KPI retains its starting-period comparison. */
 function delta(current: number, previous: number, goodDirection: 'up' | 'down', label: string): StatDelta | undefined {
-  if (previous === 0) return undefined
+  if (previous === 0) {
+    if (current === 0) return { value: 0, goodDirection, label }
+    return { value: current > 0 ? Infinity : -Infinity, goodDirection, label }
+  }
   return { value: (current - previous) / Math.abs(previous), goodDirection, label }
 }
 
+type CapitalMetric = 'capital' | 'fixedIncome' | 'variableIncome' | 'cardSpend'
+
+/** The selected period defines the comparison; the compact tile only draws its latest six months. */
+function capitalMetric(points: CapitalEvolutionPoint[], metric: CapitalMetric, goodDirection: 'up' | 'down', label: string) {
+  const values = points.map((point) => point[metric])
+  const current = values.at(-1) ?? 0
+  const starting = values[0] ?? 0
+  return {
+    current,
+    sparkline: values.slice(-6),
+    delta: delta(current, starting, goodDirection, label),
+  }
+}
+
 export function OverviewPanel() {
-  const { t } = useTranslation(['finances', 'common'])
+  const { t } = useTranslation(['finances', 'common', 'investments'])
   const { filters, setPreset, setCustomFrom, setCustomTo, selectAccount, selectTable, selectCard, toggleCategory, clearCategories } =
     useDashboardFilters()
   const rows = useDashboardEntries(filters)
-
-  // The immediately preceding, equal-length period, under the same account/card/
-  // category filters — what every KPI's delta is measured against.
-  const previousFilters: DashboardFilters = useMemo(() => {
-    const previous = previousEquivalentRange(resolveFilterRange(filters))
-    return {
-      ...filters,
-      preset: 'custom',
-      customFrom: new Date(previous.from).toISOString().slice(0, 10),
-      customTo: new Date(previous.to).toISOString().slice(0, 10),
-    }
-  }, [filters])
-  const previousRows = useDashboardEntries(previousFilters)
-
-  const totals = useMemo(() => sumTotals(rows), [rows])
-  const previousTotals = useMemo(() => sumTotals(previousRows), [previousRows])
-  const comparisonLabel = t('finances:overview.previousPeriod')
-
-  const monthly = useMemo(() => monthlyTotals(rows), [rows])
-  const sparklineWindow = monthly.slice(-6)
-  const netSparkline = sparklineWindow.map((m) => m.in - m.out)
-  const inSparkline = sparklineWindow.map((m) => m.in)
-  const outSparkline = sparklineWindow.map((m) => m.out)
-  const cardSparkline = sparklineWindow.map((m) => m.cardSpend)
-
-  const outgoingByCategory = useMemo(() => {
-    // amount > 0, not just direction === 'out': a cardLedger row has no direction of
-    // its own and always counts as "out", but a negative amount there is a refund/
-    // credit, not spend — it belongs in the total, not in "where money went".
-    // No folding into "Outros" here — unlike a pie, a ranked list has no slice-count
-    // ceiling, it just scrolls (RankedBarList), so every category stays visible.
-    const outgoing = rows.filter((row) => row.direction === 'out' && row.amount > 0)
-    return groupByKey(outgoing, 'category', 'amount').map((g) => ({ key: g.label, label: g.label, value: g.value }))
-  }, [rows])
-
+  const selectedRange = useMemo(() => resolveFilterRange(filters), [filters])
   const accounts = useAccountsStore((s) => s.items).filter((a) => !a.archived)
   const tableDefs = useTableDefsStore((s) => s.items)
   const allEntries = useEntriesStore((s) => s.items)
+
+  // Capital must begin at the first matching entry, not at the start of the
+  // selected window. The displayed points remain scoped to that window, while the
+  // running total retains the complete prior history that establishes their value.
+  const capitalHistoryFilters: DashboardFilters = useMemo(
+    () => ({ ...filters, preset: 'custom', customFrom: '', customTo: '' }),
+    [filters],
+  )
+  const capitalHistoryRows = useDashboardEntries(capitalHistoryFilters)
+  const investmentHistory = useMemo<InvestmentValueEntry[]>(() => {
+    const classByTableId = new Map(
+      tableDefs
+        .filter((table) => table.kind === 'investmentLedger' && table.investmentClass)
+        .map((table) => [table.id, table.investmentClass]),
+    )
+    return allEntries.flatMap((entry) => {
+      const investmentClass = classByTableId.get(entry.tableId)
+      if (
+        !investmentClass ||
+        typeof entry.date !== 'number' ||
+        typeof entry.asset !== 'string' ||
+        (entry.type !== 'buy' && entry.type !== 'sell' && entry.type !== 'income') ||
+        typeof entry.quantity !== 'number' ||
+        typeof entry.price !== 'number'
+      ) return []
+      return [{
+        date: entry.date,
+        asset: entry.asset,
+        type: entry.type,
+        quantity: entry.quantity,
+        price: entry.price,
+        investmentClass,
+        deleted: Boolean(entry.deleted),
+      }]
+    })
+  }, [tableDefs, allEntries])
+  const capitalData = useMemo(
+    () => capitalEvolution(capitalHistoryRows, selectedRange, investmentHistory),
+    [capitalHistoryRows, selectedRange, investmentHistory],
+  )
+
+  const comparisonLabel = t('finances:overview.startingPeriod')
+  const currentCapital = useMemo(() => capitalMetric(capitalData, 'capital', 'up', comparisonLabel), [capitalData, comparisonLabel])
+  const fixedIncome = useMemo(() => capitalMetric(capitalData, 'fixedIncome', 'up', comparisonLabel), [capitalData, comparisonLabel])
+  const variableIncome = useMemo(() => capitalMetric(capitalData, 'variableIncome', 'up', comparisonLabel), [capitalData, comparisonLabel])
+  const cardSpend = useMemo(() => capitalMetric(capitalData, 'cardSpend', 'down', comparisonLabel), [capitalData, comparisonLabel])
+
+  const cardCategoryAverages = useMemo(
+    () => averageCardSpendByCategory(rows, capitalData.map((point) => point.month)),
+    [capitalData, rows],
+  )
+
   const accountBalances = useMemo(() => {
     return accounts.map((account) => {
       const tableIds = new Set(
@@ -147,62 +136,68 @@ export function OverviewPanel() {
         toggleCategory={toggleCategory}
         clearCategories={clearCategories}
       />
-      <div className="min-h-0 flex-1 overflow-auto p-4">
+      <div className="min-h-0 flex-1">
+        <FinanceTableDrawer id="movements" kinds={['bankLedger', 'cardLedger', 'generic']}>
         <div className="flex flex-col gap-3">
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <StatTile
-              label={t('common:dashboard.netBalance')}
-              value={currency.format(totals.net)}
+              label={t('finances:overview.currentCapital')}
+              value={currency.format(currentCapital.current)}
               indicatorColor={DOMAIN_COLOR.balance.light}
-              delta={delta(totals.net, previousTotals.net, 'up', comparisonLabel)}
-              sparkline={netSparkline}
+              delta={currentCapital.delta}
+              sparkline={currentCapital.sparkline}
             />
             <StatTile
-              label={t('common:dashboard.totalIn')}
-              value={currency.format(totals.totalIn)}
-              indicatorColor={DIVERGING_PAIR.positive.light}
-              delta={delta(totals.totalIn, previousTotals.totalIn, 'up', comparisonLabel)}
-              sparkline={inSparkline}
+              label={t('investments:items.fixedIncome')}
+              value={currency.format(fixedIncome.current)}
+              indicatorColor={DOMAIN_COLOR.fixedIncome.light}
+              delta={fixedIncome.delta}
+              sparkline={fixedIncome.sparkline}
             />
             <StatTile
-              label={t('common:dashboard.totalOut')}
-              value={currency.format(totals.totalOut)}
-              indicatorColor={DIVERGING_PAIR.negative.light}
-              delta={delta(totals.totalOut, previousTotals.totalOut, 'down', comparisonLabel)}
-              sparkline={outSparkline}
+              label={t('investments:items.variableIncome')}
+              value={currency.format(variableIncome.current)}
+              indicatorColor={DOMAIN_COLOR.variableIncome.light}
+              delta={variableIncome.delta}
+              sparkline={variableIncome.sparkline}
             />
             <StatTile
               label={t('common:dashboard.cardSpend')}
-              value={currency.format(totals.cardSpend)}
-              indicatorColor={DOMAIN_COLOR.cards.light}
-              delta={delta(totals.cardSpend, previousTotals.cardSpend, 'down', comparisonLabel)}
-              sparkline={cardSparkline}
+              value={currency.format(cardSpend.current)}
+              indicatorColor={DIVERGING_PAIR.negative.light}
+              delta={cardSpend.delta}
+              sparkline={cardSpend.sparkline}
             />
           </div>
 
           <div className="grid grid-cols-3 gap-3">
             <DashboardCard
-              title={t('finances:overview.monthlyFlow')}
+              title={t('finances:overview.capitalEvolution')}
               className="col-span-2 h-[320px]"
               bodyClassName="p-2"
             >
-              <DivergingBarChart
-                data={monthly}
-                xKey="month"
-                positiveKey="in"
-                negativeKey="out"
-                positiveLabel={t('common:dashboard.inLabel')}
-                negativeLabel={t('common:dashboard.outLabel')}
-                xFormatter={formatMonthLabel}
-                valueFormatter={(v) => currency.format(v)}
-              />
+              {capitalData.length === 0 ? (
+                <p className="text-muted-foreground flex h-full items-center justify-center text-xs">{t('finances:overview.noEntries')}</p>
+              ) : (
+                <CapitalEvolutionChart
+                  data={capitalData}
+                  xKey="month"
+                  xFormatter={formatMonthLabel}
+                  valueFormatter={(value) => currency.format(value)}
+                  capitalLabel={t('finances:overview.capitalEvolution')}
+                  cardSpendLabel={t('common:dashboard.cardSpend')}
+                  variableIncomeLabel={t('investments:items.variableIncome')}
+                  fixedIncomeLabel={t('investments:items.fixedIncome')}
+                />
+              )}
             </DashboardCard>
 
-            <DashboardCard title={t('finances:overview.whereItWent')} className="h-[320px]">
+            <DashboardCard title={t('finances:overview.spendingCategories')} className="h-[320px]">
               <RankedBarList
-                items={outgoingByCategory}
+                items={cardCategoryAverages}
                 valueFormatter={(v) => currency.format(v)}
-                emptyLabel={t('finances:overview.noOutgoing')}
+                emptyLabel={t('finances:spending.noSpending')}
+                variant="underlined"
               />
             </DashboardCard>
           </div>
@@ -257,150 +252,8 @@ export function OverviewPanel() {
             </DashboardCard>
           </div>
         </div>
+        </FinanceTableDrawer>
       </div>
-    </div>
-  )
-}
-
-/** Per-account bank statement: money in and out for whichever account's table is selected. */
-export function MovementsPanel() {
-  const { t } = useTranslation(['finances', 'common'])
-  const { filters, setPreset, setCustomFrom, setCustomTo, selectAccount, selectTable, selectCard, toggleCategory, clearCategories } =
-    useDashboardFilters()
-  const tableDefs = useTableDefsStore((s) => s.items)
-  const statements = tableDefs.filter((table) => table.kind === 'bankLedger')
-  const hasInitializedStatement = useRef(false)
-
-  useEffect(() => {
-    if (hasInitializedStatement.current || statements.length === 0) return
-    const statement = statements.find((table) => table.id === filters.tableIds[0]) ?? statements[0]
-    selectTable(statement.id)
-    selectAccount(statement.accountId ?? null)
-    hasInitializedStatement.current = true
-  }, [filters.tableIds, selectAccount, selectTable, statements])
-
-  const rows = useDashboardEntries(filters)
-  const statementIds = useMemo(() => new Set(statements.map((table) => table.id)), [statements])
-  const entries = useMemo(() => rows.filter((row) => statementIds.has(row.tableId)), [rows, statementIds])
-  const totals = useMemo(() => sumTotals(entries), [entries])
-  const monthly = useMemo(() => monthlyTotals(entries), [entries])
-  const categories = useMemo(
-    () => groupByKey(entries.filter((row) => row.direction === 'out' && row.amount > 0), 'category', 'amount')
-      .map((group) => ({ key: group.label, label: group.label, value: group.value })),
-    [entries],
-  )
-  const topIncoming = useMemo(() => entries.filter((row) => row.direction === 'in').sort((a, b) => b.amount - a.amount).slice(0, 5), [entries])
-  const topOutgoing = useMemo(() => entries.filter((row) => row.direction === 'out' && row.amount > 0).sort((a, b) => b.amount - a.amount).slice(0, 5), [entries])
-  const recurring = useMemo(() => detectRecurringEntries(entries.filter((row) => row.direction === 'out' && row.amount > 0)), [entries])
-
-  function handleSelectTable(id: number | null) {
-    selectTable(id)
-    const statement = statements.find((table) => table.id === id)
-    if (statement?.accountId) selectAccount(statement.accountId)
-  }
-
-  function handleSelectAccount(id: number | null) {
-    selectAccount(id)
-    selectTable(null)
-  }
-
-  return (
-    <div className="flex h-full flex-col">
-      <FilterBar
-        filters={filters}
-        setPreset={setPreset}
-        setCustomFrom={setCustomFrom}
-        setCustomTo={setCustomTo}
-        selectAccount={handleSelectAccount}
-        selectTable={handleSelectTable}
-        selectCard={selectCard}
-        toggleCategory={toggleCategory}
-        clearCategories={clearCategories}
-        show={{ accounts: true, tables: true, cards: false, categories: true }}
-        tableKinds={['bankLedger']}
-      />
-      <div className="min-h-0 flex-1 overflow-auto p-4">
-        {statements.length === 0 ? (
-          <p className="text-muted-foreground rounded-md border border-dashed p-3 text-xs">{t('finances:movements.noStatements')}</p>
-        ) : (
-          <div className="flex flex-col gap-3">
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <StatTile label={t('finances:movements.totalIn')} value={currency.format(totals.totalIn)} indicatorColor={DIVERGING_PAIR.positive.light} sparkline={monthly.map((month) => month.in)} />
-              <StatTile label={t('finances:movements.totalOut')} value={currency.format(totals.totalOut)} indicatorColor={DIVERGING_PAIR.negative.light} sparkline={monthly.map((month) => month.out)} />
-              <StatTile label={t('finances:movements.periodResult')} value={currency.format(totals.net)} indicatorColor={DOMAIN_COLOR.movements.light} sparkline={monthly.map((month) => month.in - month.out)} />
-              <StatTile label={t('finances:movements.entryCount')} value={entries.length.toLocaleString('pt-BR')} indicatorColor={DOMAIN_COLOR.movements.light} />
-            </div>
-
-            <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
-              <DashboardCard title={t('finances:movements.inAndOutByMonth')} className="h-[320px] lg:col-span-2" bodyClassName="p-2">
-                {monthly.length === 0 ? (
-                  <p className="text-muted-foreground flex h-full items-center justify-center text-xs">{t('finances:movements.noEntries')}</p>
-                ) : (
-                  <DivergingBarChart
-                    data={monthly}
-                    xKey="month"
-                    positiveKey="in"
-                    negativeKey="out"
-                    positiveLabel={t('common:dashboard.inLabel')}
-                    negativeLabel={t('common:dashboard.outLabel')}
-                    xFormatter={formatMonthLabel}
-                    valueFormatter={(value) => currency.format(value)}
-                  />
-                )}
-              </DashboardCard>
-              <DashboardCard title={t('finances:movements.topCategories')} className="h-[320px]">
-                <RankedBarList items={categories} valueFormatter={(value) => currency.format(value)} emptyLabel={t('finances:movements.noOutgoing')} />
-              </DashboardCard>
-            </div>
-
-            <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-              <DashboardCard title={t('finances:movements.largestEntries')} className="h-[260px]" bodyClassName="p-0">
-                <div className="grid h-full grid-cols-2 divide-x">
-                  <MovementEntryList title={t('common:dashboard.inLabel')} entries={topIncoming} emptyLabel={t('finances:movements.noIncoming')} />
-                  <MovementEntryList title={t('common:dashboard.outLabel')} entries={topOutgoing} emptyLabel={t('finances:movements.noOutgoing')} />
-                </div>
-              </DashboardCard>
-              <DashboardCard title={t('finances:movements.recurringInStatement')} className="h-[260px]" bodyClassName="overflow-auto p-0">
-                {recurring.length === 0 ? (
-                  <p className="text-muted-foreground flex h-full items-center justify-center text-xs">{t('finances:movements.noRecurring')}</p>
-                ) : (
-                  <div className="divide-y">
-                    {recurring.map((item) => (
-                      <div key={`${item.category}-${item.averageAmount}`} className="flex items-center justify-between gap-3 p-3 text-xs">
-                        <div className="min-w-0">
-                          <CategoryPill label={item.category} />
-                          <p className="text-muted-foreground mt-1">{t('finances:movements.monthCount', { count: item.months.length })}</p>
-                        </div>
-                        <span className="shrink-0 tabular-nums">{currency.format(item.averageAmount)}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </DashboardCard>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
-
-function MovementEntryList({ title, entries, emptyLabel }: { title: string; entries: FilteredEntry[]; emptyLabel: string }) {
-  return (
-    <div className="flex min-h-0 flex-col">
-      <p className="text-muted-foreground shrink-0 border-b px-3 py-2 text-[10px] font-medium tracking-wide uppercase">{title}</p>
-      {entries.length === 0 ? (
-        <p className="text-muted-foreground flex min-h-0 flex-1 items-center justify-center p-3 text-center text-xs">{emptyLabel}</p>
-      ) : (
-        <div className="min-h-0 flex-1 overflow-y-auto divide-y">
-          {entries.map((entry) => (
-            <div key={`${entry.tableId}-${entry.date}-${entry.description}`} className="flex items-center justify-between gap-2 p-3 text-xs">
-              <span className="min-w-0 truncate" title={entry.description}>{entry.description || entry.category}</span>
-              <span className="shrink-0 tabular-nums">{currency.format(entry.amount)}</span>
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   )
 }
@@ -439,7 +292,8 @@ export function SpendingPanel() {
         toggleCategory={toggleCategory}
         clearCategories={clearCategories}
       />
-      <div className="min-h-0 flex-1 overflow-auto p-4">
+      <div className="min-h-0 flex-1">
+        <FinanceTableDrawer id="spending" kinds={['bankLedger', 'cardLedger', 'generic']}>
         <div className="flex flex-col gap-3">
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <StatTile
@@ -537,7 +391,16 @@ export function SpendingPanel() {
               )}
             </DashboardCard>
           </div>
+
+          {/* Card detail now lives with spending rather than as a separate Finance item. */}
+          <CardsPanel
+            filters={filters}
+            controls={{ setPreset, setCustomFrom, setCustomTo, selectAccount, selectTable, selectCard, toggleCategory, clearCategories }}
+            showFilter={false}
+            initializeCard={false}
+          />
         </div>
+        </FinanceTableDrawer>
       </div>
     </div>
   )
@@ -567,24 +430,40 @@ function DescriptionRankList({
   )
 }
 
-/** Credit-card focus: one table per card. */
-export function CardsPanel() {
+type DashboardFilterControls = Pick<
+  ReturnType<typeof useDashboardFilters>,
+  'setPreset' | 'setCustomFrom' | 'setCustomTo' | 'selectAccount' | 'selectTable' | 'selectCard' | 'toggleCategory' | 'clearCategories'
+>
+
+/** Credit-card detail now shares Spending's context whenever embedded there. */
+export function CardsPanel({
+  filters: suppliedFilters,
+  controls,
+  showFilter = true,
+  initializeCard = true,
+}: {
+  filters?: DashboardFilters
+  controls?: DashboardFilterControls
+  showFilter?: boolean
+  initializeCard?: boolean
+} = {}) {
   const { t } = useTranslation(['finances', 'common'])
-  const { filters, setPreset, setCustomFrom, setCustomTo, selectAccount, selectTable, selectCard, toggleCategory, clearCategories } =
-    useDashboardFilters()
+  const localControls = useDashboardFilters()
+  const filters = suppliedFilters ?? localControls.filters
+  const { setPreset, setCustomFrom, setCustomTo, selectAccount, selectTable, selectCard, toggleCategory, clearCategories } = controls ?? localControls
   const cards = useCardsStore((s) => s.items).filter((card) => !card.archived)
   const tableDefs = useTableDefsStore((s) => s.items)
   const hasInitializedCard = useRef(false)
   const selectedTable = tableDefs.find((table) => table.id === filters.tableIds[0] && table.kind === 'cardLedger')
 
   useEffect(() => {
-    if (hasInitializedCard.current || cards.length === 0) return
+    if (!initializeCard || hasInitializedCard.current || cards.length === 0) return
     const cardId = filters.cardIds[0] ?? selectedTable?.cardId ?? cards[0].id
     selectCard(cardId)
     hasInitializedCard.current = true
-  }, [cards, filters.cardIds, selectCard, selectedTable])
+  }, [cards, filters.cardIds, initializeCard, selectCard, selectedTable])
 
-  const activeCard = cards.find((card) => card.id === filters.cardIds[0])
+  const activeCard = cards.find((card) => card.id === filters.cardIds[0]) ?? cards[0]
   const rows = useDashboardEntries(filters)
   const cardEntries = useMemo(
     () => rows.filter((row) => row.cardId === activeCard?.id && row.amount > 0),
@@ -628,8 +507,8 @@ export function CardsPanel() {
   }
 
   return (
-    <div className="flex h-full flex-col">
-      <FilterBar
+    <div className="flex flex-col border-t pt-3">
+      {showFilter && <FilterBar
         filters={filters}
         setPreset={setPreset}
         setCustomFrom={setCustomFrom}
@@ -641,7 +520,7 @@ export function CardsPanel() {
         clearCategories={clearCategories}
         show={{ accounts: true, tables: true, cards: true, categories: false }}
         tableKinds={['cardLedger']}
-      />
+      />}
       <div className="min-h-0 flex-1 overflow-auto p-4">
         {!activeCard ? (
           <p className="text-muted-foreground rounded-md border border-dashed p-3 text-xs">{t('finances:cards.noCards')}</p>

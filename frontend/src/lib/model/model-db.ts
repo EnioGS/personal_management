@@ -1,5 +1,7 @@
 import Dexie, { type EntityTable } from 'dexie'
 import type { LocalRow } from '@/lib/local-store/create-local-table'
+import { inferInvestmentClass } from './investment-class'
+import type { Entry, TableDef } from './types'
 
 /**
  * One database for the whole configurable model: the config entities plus every
@@ -19,6 +21,11 @@ const db = new Dexie('app-model-db') as Dexie & {
   entries: EntityTable<LocalRow, 'id'>
   budgets: EntityTable<LocalRow, 'id'>
   allocationTargets: EntityTable<LocalRow, 'id'>
+  ingestionSources: EntityTable<LocalRow, 'id'>
+  ingestionColumnMappings: EntityTable<LocalRow, 'id'>
+  ingestionRows: EntityTable<LocalRow, 'id'>
+  entryLabels: EntityTable<LocalRow, 'id'>
+  ingestionAuditEvents: EntityTable<LocalRow, 'id'>
 }
 
 db.version(1).stores({
@@ -38,6 +45,68 @@ db.version(2).stores({
   allocationTargets: '++id, createdAt',
 })
 
+// `investmentClass` is table metadata, not an indexed field, but existing model
+// tables need one stored value so Variable Income and Fixed Income can be separate
+// workspaces. The old built-in "Renda Fixa" table is inferred reliably by name;
+// custom legacy investment tables retain their previous Variable Income placement.
+db.version(3).stores({
+  accounts: '++id, createdAt',
+  cards: '++id, createdAt',
+  tableDefs: '++id, createdAt',
+  categories: '++id, createdAt',
+  categoryRules: '++id, createdAt',
+  entries: '++id, createdAt',
+  budgets: '++id, createdAt',
+  allocationTargets: '++id, createdAt',
+}).upgrade(async (tx) => {
+  await tx.table('tableDefs').toCollection().modify((row: LocalRow) => {
+    const table = row.data as Partial<TableDef> | undefined
+    if (!table || table.kind !== 'investmentLedger' || table.investmentClass) return
+    row.data = { ...table, investmentClass: inferInvestmentClass(table.name) }
+  })
+})
+
+// Before `income` existed, separately paid investment interest had to be entered
+// as a sell. Convert the unambiguous historical spelling so it no longer reduces
+// an investment position or the Capital evolution line. A user-entered note that
+// merely mentions juros remains untouched; this is deliberately exact.
+db.version(4).stores({
+  accounts: '++id, createdAt',
+  cards: '++id, createdAt',
+  tableDefs: '++id, createdAt',
+  categories: '++id, createdAt',
+  categoryRules: '++id, createdAt',
+  entries: '++id, createdAt',
+  budgets: '++id, createdAt',
+  allocationTargets: '++id, createdAt',
+}).upgrade(async (tx) => {
+  await tx.table('entries').toCollection().modify((row: LocalRow) => {
+    const entry = row.data as Partial<Entry> | undefined
+    const note = typeof entry?.note === 'string' ? entry.note : ''
+    if (entry?.type !== 'sell' || note.trim().toLocaleLowerCase('pt-BR') !== 'juros') return
+    row.data = { ...entry, type: 'income' }
+  })
+})
+
+// The ingestion centre keeps source provenance and classifications beside the
+// configurable model. Entries remain schema-specific; their cross-table labels are
+// stored as sidecars so a bank/card/investment table never needs artificial columns.
+db.version(5).stores({
+  accounts: '++id, createdAt',
+  cards: '++id, createdAt',
+  tableDefs: '++id, createdAt',
+  categories: '++id, createdAt',
+  categoryRules: '++id, createdAt',
+  entries: '++id, createdAt',
+  budgets: '++id, createdAt',
+  allocationTargets: '++id, createdAt',
+  ingestionSources: '++id, createdAt',
+  ingestionColumnMappings: '++id, createdAt',
+  ingestionRows: '++id, createdAt',
+  entryLabels: '++id, createdAt',
+  ingestionAuditEvents: '++id, createdAt',
+})
+
 export const accountsTable = db.accounts
 export const cardsTable = db.cards
 export const tableDefsTable = db.tableDefs
@@ -46,3 +115,8 @@ export const categoryRulesTable = db.categoryRules
 export const entriesTable = db.entries
 export const budgetsTable = db.budgets
 export const allocationTargetsTable = db.allocationTargets
+export const ingestionSourcesTable = db.ingestionSources
+export const ingestionColumnMappingsTable = db.ingestionColumnMappings
+export const ingestionRowsTable = db.ingestionRows
+export const entryLabelsTable = db.entryLabels
+export const ingestionAuditEventsTable = db.ingestionAuditEvents

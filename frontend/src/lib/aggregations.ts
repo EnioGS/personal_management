@@ -74,9 +74,9 @@ export function runningPositionOverTime(transactions: Transaction[]): { date: nu
   const lastPrices = new Map<string, number>()
 
   return sorted.map((t) => {
-    const delta = t.type === 'buy' ? t.quantity : -t.quantity
+    const delta = t.type === 'buy' ? t.quantity : t.type === 'sell' ? -t.quantity : 0
     quantities.set(t.asset, (quantities.get(t.asset) ?? 0) + delta)
-    lastPrices.set(t.asset, t.price)
+    if (t.type !== 'income') lastPrices.set(t.asset, t.price)
 
     let value = 0
     for (const [asset, quantity] of quantities) value += quantity * (lastPrices.get(asset) ?? 0)

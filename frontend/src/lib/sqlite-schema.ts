@@ -1,7 +1,7 @@
 import type { LocalRow } from '@/lib/local-store/create-local-table'
 import type { DataTableKey } from './data-file'
 
-export type SqliteColumnType = 'text' | 'integer' | 'real' | 'boolean'
+export type SqliteColumnType = 'text' | 'integer' | 'real' | 'boolean' | 'json'
 
 export interface SqliteColumn {
   /** snake_case column name — SQLite tooling (DB Browser, sqlite3, DBeaver...) shows this. */
@@ -57,6 +57,7 @@ export const SQLITE_SCHEMAS: Record<DataTableKey, SqliteTableSchema> = {
       { column: 'kind', key: 'kind', type: 'text' },
       { column: 'account_id', key: 'accountId', type: 'integer' },
       { column: 'card_id', key: 'cardId', type: 'integer' },
+      { column: 'investment_class', key: 'investmentClass', type: 'text' },
     ],
   },
   categories: {
@@ -83,6 +84,7 @@ export const SQLITE_SCHEMAS: Record<DataTableKey, SqliteTableSchema> = {
     columns: [
       { column: 'table_id', key: 'tableId', type: 'integer' },
       { column: 'deleted', key: 'deleted', type: 'boolean' },
+      { column: 'import_key', key: 'importKey', type: 'text' },
       { column: 'date', key: 'date', type: 'integer' },
       { column: 'direction', key: 'direction', type: 'text' },
       { column: 'category', key: 'category', type: 'text' },
@@ -108,6 +110,70 @@ export const SQLITE_SCHEMAS: Record<DataTableKey, SqliteTableSchema> = {
     columns: [
       { column: 'asset', key: 'asset', type: 'text' },
       { column: 'target_percent', key: 'targetPercent', type: 'real' },
+    ],
+  },
+  ingestionSources: {
+    sqlName: 'ingestion_sources',
+    columns: [
+      { column: 'original_filename', key: 'originalFilename', type: 'text' },
+      { column: 'source_fingerprint', key: 'sourceFingerprint', type: 'text' },
+      { column: 'imported_at', key: 'importedAt', type: 'integer' },
+      { column: 'raw_csv', key: 'rawCsv', type: 'text' },
+      { column: 'original_columns', key: 'originalColumns', type: 'json' },
+      { column: 'supplemental_columns', key: 'supplementalColumns', type: 'json' },
+      { column: 'row_count', key: 'rowCount', type: 'integer' },
+      { column: 'status', key: 'status', type: 'text' },
+      { column: 'legacy', key: 'legacy', type: 'boolean' },
+    ],
+  },
+  ingestionColumnMappings: {
+    sqlName: 'ingestion_column_mappings',
+    columns: [
+      { column: 'source_id', key: 'sourceId', type: 'integer' },
+      { column: 'source_column', key: 'sourceColumn', type: 'text' },
+      { column: 'target_field', key: 'targetField', type: 'text' },
+      { column: 'parser', key: 'parser', type: 'text' },
+      { column: 'is_supplemental', key: 'isSupplemental', type: 'boolean' },
+    ],
+  },
+  ingestionRows: {
+    sqlName: 'ingestion_rows',
+    columns: [
+      { column: 'source_id', key: 'sourceId', type: 'integer' },
+      { column: 'source_row_index', key: 'sourceRowIndex', type: 'integer' },
+      { column: 'source_row_fingerprint', key: 'sourceRowFingerprint', type: 'text' },
+      { column: 'raw_values', key: 'rawValues', type: 'json' },
+      { column: 'mapped_values', key: 'mappedValues', type: 'json' },
+      { column: 'labels', key: 'labels', type: 'json' },
+      { column: 'status', key: 'status', type: 'text' },
+      { column: 'validation_errors', key: 'validationErrors', type: 'json' },
+      { column: 'destination_table_id', key: 'destinationTableId', type: 'integer' },
+      { column: 'existing_entry_id', key: 'existingEntryId', type: 'integer' },
+      { column: 'promoted_entry_id', key: 'promotedEntryId', type: 'integer' },
+    ],
+  },
+  entryLabels: {
+    sqlName: 'entry_labels',
+    columns: [
+      { column: 'entry_id', key: 'entryId', type: 'integer' },
+      { column: 'finance_destinations', key: 'financeDestinations', type: 'json' },
+      { column: 'flow_role', key: 'flowRole', type: 'text' },
+      { column: 'settlement_channel', key: 'settlementChannel', type: 'text' },
+      { column: 'spending_treatment', key: 'spendingTreatment', type: 'text' },
+      { column: 'category_id', key: 'categoryId', type: 'integer' },
+      { column: 'recurrence', key: 'recurrence', type: 'text' },
+      { column: 'source_ingestion_row_id', key: 'sourceIngestionRowId', type: 'integer' },
+    ],
+  },
+  ingestionAuditEvents: {
+    sqlName: 'ingestion_audit_events',
+    columns: [
+      { column: 'event', key: 'event', type: 'text' },
+      { column: 'actor', key: 'actor', type: 'text' },
+      { column: 'source_id', key: 'sourceId', type: 'integer' },
+      { column: 'ingestion_row_ids', key: 'ingestionRowIds', type: 'json' },
+      { column: 'entry_ids', key: 'entryIds', type: 'json' },
+      { column: 'details', key: 'details', type: 'json' },
     ],
   },
   notes: {
@@ -136,6 +202,7 @@ function encodeValue(value: unknown, type: SqliteColumnType): string | number | 
   if (value === undefined || value === null) return null
   if (type === 'boolean') return value ? 1 : 0
   if (type === 'integer' || type === 'real') return typeof value === 'number' ? value : Number(value)
+  if (type === 'json') return JSON.stringify(value)
   return String(value)
 }
 
@@ -143,6 +210,13 @@ function decodeValue(value: string | number | null, type: SqliteColumnType): unk
   if (value === null || value === undefined) return undefined
   if (type === 'boolean') return value === 1 || value === '1'
   if (type === 'integer' || type === 'real') return typeof value === 'number' ? value : Number(value)
+  if (type === 'json') {
+    try {
+      return JSON.parse(String(value))
+    } catch {
+      return undefined
+    }
+  }
   return String(value)
 }
 

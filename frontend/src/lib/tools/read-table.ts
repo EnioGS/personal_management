@@ -1,12 +1,12 @@
 import Papa from 'papaparse'
-import { findWritableTable, itemsFor, writableTables } from './writable-tables'
+import { describeWritableTable, findWritableTable, itemsFor, writableTables } from './writable-tables'
 import type { ToolDefinition } from './types'
 
 const MAX_ROWS = 200
 
 function buildDescription(): string {
   const tableList = writableTables()
-    .map((t) => `"${t.key}" (${t.label})`)
+    .map(describeWritableTable)
     .join(', ')
   return (
     "Reads existing rows from a table in the user's records, optionally scoped to a " +

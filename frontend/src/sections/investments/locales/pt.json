@@ -13,11 +13,13 @@
   },
   "columns": {
     "date": "Data",
+    "category": "Categoria",
     "asset": "Ativo",
     "type": "Tipo",
     "quantity": "Quantidade",
     "price": "Preço",
     "note": "Observação",
+    "investmentClass": "Classe de investimento",
     "destination": "Destino",
     "amount": "Valor"
   },

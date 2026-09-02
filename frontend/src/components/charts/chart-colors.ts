@@ -96,9 +96,8 @@ export const DIVERGING_PAIR = {
 export const DOMAIN_COLOR = {
   /** The rollup/overview metric (running balance, combined portfolio value) — wears the brand color. */
   balance: CATEGORICAL_PALETTE[0],
-  movements: CATEGORICAL_PALETTE[1],
   spending: CATEGORICAL_PALETTE[2],
-  variableIncome: CATEGORICAL_PALETTE[3],
+  variableIncome: CATEGORICAL_PALETTE[1],
   fixedIncome: CATEGORICAL_PALETTE[4],
   contributions: CATEGORICAL_PALETTE[5],
   cards: CATEGORICAL_PALETTE[6],

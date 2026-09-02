@@ -1,7 +1,7 @@
 import type { StoredRow } from '@/lib/local-store/create-local-table'
 import { entriesForTable, useEntriesStore, useTableDefsStore } from '@/lib/model/model-stores'
 import { TABLE_KIND_SCHEMAS } from '@/lib/model/table-kinds'
-import type { Entry } from '@/lib/model/types'
+import type { Entry, InvestmentClass } from '@/lib/model/types'
 import type { TableSchema } from '@/lib/table-schema'
 
 export interface WritableTable {
@@ -11,6 +11,7 @@ export interface WritableTable {
   label: string
   schema: TableSchema<Entry>
   tableId: number
+  investmentClass?: InvestmentClass
 }
 
 /**
@@ -25,7 +26,15 @@ export function writableTables(): WritableTable[] {
     label: def.name,
     schema: TABLE_KIND_SCHEMAS[def.kind],
     tableId: def.id,
+    investmentClass: def.investmentClass,
   }))
+}
+
+/** Human-readable metadata for tool descriptions; never used as the stable table key. */
+export function describeWritableTable(table: WritableTable): string {
+  if (!table.investmentClass) return `"${table.key}" (${table.label})`
+  const investmentClass = table.investmentClass === 'fixedIncome' ? 'Fixed Income' : 'Variable Income'
+  return `"${table.key}" (${table.label}; investment class: ${investmentClass})`
 }
 
 export function findWritableTable(key: string): WritableTable | undefined {
