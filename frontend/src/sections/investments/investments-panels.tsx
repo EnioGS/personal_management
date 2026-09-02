@@ -1,21 +1,21 @@
 import { useTranslation } from 'react-i18next'
 import { AppBarChart } from '@/components/charts/bar-chart'
-import { CATEGORICAL_PALETTE, DOMAIN_COLOR } from '@/components/charts/chart-colors'
+import { colorForKey, DOMAIN_COLOR, MAX_CATEGORICAL_SERIES } from '@/components/charts/chart-colors'
 import { AppLineChart } from '@/components/charts/line-chart'
 import { AppPieChart } from '@/components/charts/pie-chart'
 import { ChartTablePanel } from '@/components/layout/chart-table-panel'
 import { TableWorkspace } from '@/components/data-table/table-workspace'
-import { bucketByMonth, formatDateLabel, formatMonthLabel, runningPositionOverTime } from '@/lib/aggregations'
+import { bucketByMonth, foldTopCategories, formatDateLabel, formatMonthLabel, runningPositionOverTime } from '@/lib/aggregations'
 import { getCurrentValue, type Transaction } from '@/lib/current-value'
 import { useActiveTableEntries, useEntriesOfKinds } from '@/lib/model/use-model-data'
 
 export function OverviewPanel() {
-  const { t } = useTranslation('investments')
+  const { t } = useTranslation(['investments', 'common'])
   const rows = useEntriesOfKinds(['investmentLedger'])
   const visible = rows.filter((row) => !row.deleted) as unknown as Transaction[]
 
   const lineData = runningPositionOverTime(visible)
-  const pieData = allocationPieData(visible)
+  const pieData = allocationPieData(visible, t('common:chart.other'))
 
   return (
     <div className="flex h-full flex-col gap-4 p-4">
@@ -32,17 +32,18 @@ export function OverviewPanel() {
   )
 }
 
-function allocationPieData(items: Transaction[]) {
+function allocationPieData(items: Transaction[], otherLabel: string) {
   const visibleItems = items.filter((t) => !t.deleted)
   const assets = [...new Set(visibleItems.map((t) => t.asset))]
-  return assets
-    .map((asset, i) => ({
-      key: asset,
-      label: asset,
-      value: getCurrentValue(asset, visibleItems),
-      color: CATEGORICAL_PALETTE[i % CATEGORICAL_PALETTE.length],
-    }))
+  const data = assets
+    .map((asset) => ({ label: asset, value: getCurrentValue(asset, visibleItems) }))
     .filter((slice) => slice.value > 0)
+  return foldTopCategories(data, MAX_CATEGORICAL_SERIES, otherLabel).map((d) => ({
+    key: d.label,
+    label: d.label,
+    value: d.value,
+    color: colorForKey(d.label),
+  }))
 }
 
 function TransactionLedgerPanel({
@@ -54,11 +55,12 @@ function TransactionLedgerPanel({
   title: string
   color: (typeof DOMAIN_COLOR)['variableIncome']
 }) {
+  const { t } = useTranslation('common')
   const rows = useActiveTableEntries(workspaceId, ['investmentLedger'])
   const visible = rows.filter((row) => !row.deleted) as unknown as Transaction[]
 
   const lineData = runningPositionOverTime(visible)
-  const pieData = allocationPieData(visible)
+  const pieData = allocationPieData(visible, t('chart.other'))
 
   return (
     <div className="flex h-full flex-col">

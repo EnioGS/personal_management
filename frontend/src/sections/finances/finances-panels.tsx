@@ -2,10 +2,17 @@ import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { AppLineChart } from '@/components/charts/line-chart'
 import { AppPieChart } from '@/components/charts/pie-chart'
-import { CATEGORICAL_PALETTE, DOMAIN_COLOR } from '@/components/charts/chart-colors'
+import { colorForKey, DOMAIN_COLOR, MAX_CATEGORICAL_SERIES } from '@/components/charts/chart-colors'
 import { ChartTablePanel } from '@/components/layout/chart-table-panel'
 import { TableWorkspace } from '@/components/data-table/table-workspace'
-import { bucketByMonth, formatDateLabel, formatMonthLabel, groupByKey, runningBalance } from '@/lib/aggregations'
+import {
+  bucketByMonth,
+  foldTopCategories,
+  formatDateLabel,
+  formatMonthLabel,
+  groupByKey,
+  runningBalance,
+} from '@/lib/aggregations'
 import type { TableKind } from '@/lib/model/types'
 import { useActiveTableEntries, useEntriesOfKinds } from '@/lib/model/use-model-data'
 
@@ -61,15 +68,17 @@ function LedgerPanel({
   color: typeof DOMAIN_COLOR.spending
   categoryField?: string
 }) {
+  const { t } = useTranslation('common')
   const rows = useActiveTableEntries(workspaceId, [kind])
   const visible = rows.filter((row) => !row.deleted)
 
   const lineData = bucketByMonth(visible, 'date', 'amount').map((d) => ({ month: d.month, amount: d.total }))
-  const pieData = groupByKey(visible, categoryField, 'amount').map((d, i) => ({
+  const grouped = groupByKey(visible, categoryField, 'amount')
+  const pieData = foldTopCategories(grouped, MAX_CATEGORICAL_SERIES, t('chart.other')).map((d) => ({
     key: d.label,
     label: d.label,
     value: d.value,
-    color: CATEGORICAL_PALETTE[i % CATEGORICAL_PALETTE.length],
+    color: colorForKey(d.label),
   }))
 
   return (

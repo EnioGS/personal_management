@@ -47,6 +47,26 @@ export function groupByKey<T>(
   return [...totals.entries()].map(([label, value]) => ({ label, value }))
 }
 
+/**
+ * A pie/legend can carry as many *distinct* categories as the data has — a bank
+ * statement's category vocabulary isn't capped at 8 — but the validated categorical
+ * palette (see chart-colors.ts) only has 8 slots, and past ~7 a legend stops being
+ * readable regardless of color (see the dataviz skill's series-count ladder). Rather
+ * than mint more hues (an accessibility anti-pattern — see chart-colors.ts), the
+ * smallest categories fold into one "other" bucket beyond `maxCategories`.
+ */
+export function foldTopCategories(
+  data: { label: string; value: number }[],
+  maxCategories: number,
+  otherLabel: string,
+): { label: string; value: number }[] {
+  if (data.length <= maxCategories) return data
+  const sorted = [...data].sort((a, b) => b.value - a.value)
+  const top = sorted.slice(0, maxCategories)
+  const otherTotal = sorted.slice(maxCategories).reduce((sum, d) => sum + d.value, 0)
+  return [...top, { label: otherLabel, value: otherTotal }]
+}
+
 /** Step function: value only changes at transaction events, flat between them — intentional, not a bug (see current-value.ts). */
 export function runningPositionOverTime(transactions: Transaction[]): { date: number; value: number }[] {
   const sorted = [...transactions].sort((a, b) => a.date - b.date)

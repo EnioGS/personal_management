@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { bucketByMonth, formatMonthLabel, groupByKey, runningBalance, runningPositionOverTime } from './aggregations'
+import {
+  bucketByMonth,
+  foldTopCategories,
+  formatMonthLabel,
+  groupByKey,
+  runningBalance,
+  runningPositionOverTime,
+} from './aggregations'
 import type { Transaction } from './current-value'
 
 describe('bucketByMonth', () => {
@@ -29,6 +36,41 @@ describe('groupByKey', () => {
       { label: 'Groceries', value: 15 },
       { label: 'Bills', value: 30 },
     ])
+  })
+})
+
+describe('foldTopCategories', () => {
+  it('leaves the data untouched when it fits within the cap', () => {
+    const data = [
+      { label: 'A', value: 10 },
+      { label: 'B', value: 5 },
+    ]
+    expect(foldTopCategories(data, 7, 'Other')).toEqual(data)
+  })
+
+  it('folds everything past the cap into one "other" bucket, by value not appearance order', () => {
+    const data = [
+      { label: 'A', value: 1 },
+      { label: 'B', value: 50 },
+      { label: 'C', value: 2 },
+      { label: 'D', value: 3 },
+    ]
+
+    const result = foldTopCategories(data, 2, 'Other')
+
+    expect(result).toEqual([
+      { label: 'B', value: 50 },
+      { label: 'D', value: 3 },
+      { label: 'Other', value: 1 + 2 }, // A + C, the two smallest
+    ])
+  })
+
+  it('is exactly at the cap: no "other" bucket appears', () => {
+    const data = [
+      { label: 'A', value: 1 },
+      { label: 'B', value: 2 },
+    ]
+    expect(foldTopCategories(data, 2, 'Other')).toHaveLength(2)
   })
 })
 

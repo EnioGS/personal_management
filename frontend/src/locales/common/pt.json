@@ -57,5 +57,8 @@
   "direction": {
     "in": "Entrada",
     "out": "Saída"
+  },
+  "chart": {
+    "other": "Outros"
   }
 }

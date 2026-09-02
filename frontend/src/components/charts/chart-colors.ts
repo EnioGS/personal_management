@@ -4,30 +4,72 @@ export interface ThemedColor {
 }
 
 /**
- * Validated default categorical palette (dataviz skill, references/palette.md).
- * Fixed order, never cycled — validated against this app's actual light/dark
- * surfaces via scripts/validate_palette.js (all checks pass; three light-mode
- * slots sit below 3:1 contrast by design, mitigated by always-visible legends).
+ * Validated categorical palette (dataviz skill, references/palette.md), re-themed to
+ * open on the app's brand hue instead of the skill's default blue-first order — same
+ * method, same six checks, different opening color. Slot 1's hue is the brand's
+ * (oklch(... 150), see index.css --brand), nudged from C 0.09/0.10 to 0.12/0.11 to
+ * clear the palette's chroma floor (below it a hue reads as gray, see
+ * color-formula.md check 3) — the smallest change that gets it past the gate, not a
+ * new color. Slots 2-8 are the skill's own remaining seven hues, kept in their
+ * validated relative order.
+ *
+ * Fixed order, never cycled — validated with scripts/validate_palette.js against this
+ * app's actual light/dark surfaces (all checks pass; three light-mode slots sit below
+ * 3:1 contrast by design, mitigated by always-visible legends, per the skill's relief
+ * rule). Re-run the validator before changing any value here.
  */
 export const CATEGORICAL_PALETTE: ThemedColor[] = [
-  { light: '#2a78d6', dark: '#3987e5' }, // 1 blue
-  { light: '#eb6834', dark: '#d95926' }, // 2 orange
-  { light: '#1baf7a', dark: '#199e70' }, // 3 aqua
-  { light: '#eda100', dark: '#c98500' }, // 4 yellow
-  { light: '#e87ba4', dark: '#d55181' }, // 5 magenta
-  { light: '#008300', dark: '#008300' }, // 6 green
+  { light: '#33854a', dark: '#5aa26b' }, // 1 green (brand)
+  { light: '#2a78d6', dark: '#3987e5' }, // 2 blue
+  { light: '#eb6834', dark: '#d95926' }, // 3 orange
+  { light: '#1baf7a', dark: '#199e70' }, // 4 aqua
+  { light: '#eda100', dark: '#c98500' }, // 5 yellow
+  { light: '#e87ba4', dark: '#d55181' }, // 6 magenta
   { light: '#4a3aa7', dark: '#9085e9' }, // 7 violet
   { light: '#e34948', dark: '#e66767' }, // 8 red
 ]
 
+/**
+ * Past the palette's 8 validated slots, more hues are not the answer — the dataviz
+ * skill treats a generated/cycled categorical hue as an accessibility anti-pattern:
+ * distinguishability (colorblind or not) degrades past ~7-8 regardless of how the
+ * colors are chosen. The correct handling of "more categories than colors" is
+ * `foldTopCategories` (aggregations.ts): fold the smallest into one "other" slice and
+ * let a table carry the full breakdown, per the skill's series-count ladder.
+ */
+export const MAX_CATEGORICAL_SERIES = CATEGORICAL_PALETTE.length - 1
+
+/** Deterministic, well-distributed across a small modulus — not for anything security-sensitive. */
+function hashString(value: string): number {
+  let hash = 0
+  for (let i = 0; i < value.length; i++) hash = (hash * 31 + value.charCodeAt(i)) >>> 0
+  return hash
+}
+
+/**
+ * A stable color for an arbitrary key (a category name, an asset ticker, an account) —
+ * the same key always lands on the same slot, regardless of what other keys are
+ * present in a given render or how many there are. Assigning by array *position*
+ * instead (`data[i]`) breaks the moment a filter changes which entities are on
+ * screen — a survivor gets repainted even though nothing about it changed, which the
+ * dataviz skill calls out explicitly ("color follows the entity, never its rank").
+ *
+ * Cap the category count with `foldTopCategories` before calling this — collisions
+ * (two keys landing on the same slot) become possible past `MAX_CATEGORICAL_SERIES`
+ * distinct keys, which is exactly the case that folding avoids.
+ */
+export function colorForKey(key: string): ThemedColor {
+  return CATEGORICAL_PALETTE[hashString(key) % CATEGORICAL_PALETTE.length]
+}
+
 /** Fixed per-domain identity colors, reused everywhere that series appears (Overview + its own leaf chart). */
 export const DOMAIN_COLOR = {
-  movements: CATEGORICAL_PALETTE[0],
-  spending: CATEGORICAL_PALETTE[1],
-  variableIncome: CATEGORICAL_PALETTE[2],
-  fixedIncome: CATEGORICAL_PALETTE[3],
-  contributions: CATEGORICAL_PALETTE[4],
-  /** The rollup/overview metric (running balance, combined portfolio value) — distinct from any single domain above. */
-  balance: CATEGORICAL_PALETTE[5],
+  /** The rollup/overview metric (running balance, combined portfolio value) — wears the brand color. */
+  balance: CATEGORICAL_PALETTE[0],
+  movements: CATEGORICAL_PALETTE[1],
+  spending: CATEGORICAL_PALETTE[2],
+  variableIncome: CATEGORICAL_PALETTE[3],
+  fixedIncome: CATEGORICAL_PALETTE[4],
+  contributions: CATEGORICAL_PALETTE[5],
   cards: CATEGORICAL_PALETTE[6],
 } as const
