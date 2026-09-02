@@ -3,9 +3,11 @@ import { addCategoryTool } from './add-category'
 import { deleteCategoryRuleTool } from './delete-category-rule'
 import {
   assignIngestionColumnsTool,
+  addIngestionBlankColumnTool,
   listIngestionDatasetsTool,
   readIngestionTableTool,
   stageIngestionSourceTool,
+  suggestIngestionLabelsTool,
   updateIngestionLabelsTool,
   validateIngestionRowsTool,
 } from './ingestion-tools'
@@ -32,7 +34,9 @@ export const toolRegistry: ToolDefinition[] = [
   listIngestionDatasetsTool,
   readIngestionTableTool,
   assignIngestionColumnsTool,
+  addIngestionBlankColumnTool,
   stageIngestionSourceTool,
+  suggestIngestionLabelsTool,
   updateIngestionLabelsTool,
   validateIngestionRowsTool,
   addCategoryTool,

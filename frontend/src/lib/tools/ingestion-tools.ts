@@ -1,7 +1,8 @@
 import { ingestionLabelErrors } from '@/lib/model/ingestion'
-import { saveIngestionMappings, stageIngestionSource } from '@/lib/model/ingestion-source'
+import { createSupplementalColumn, saveIngestionMappings, stageIngestionSource } from '@/lib/model/ingestion-source'
 import { updateIngestionRowLabels } from '@/lib/model/ingestion-promotion'
-import { ingestionColumnMappingsTable, ingestionRowsTable, ingestionSourcesTable } from '@/lib/model/model-db'
+import { categoriesTable, categoryRulesTable, ingestionColumnMappingsTable, ingestionRowsTable, ingestionSourcesTable, tableDefsTable } from '@/lib/model/model-db'
+import { findMatchingCategoryRule } from '@/lib/model/category-resolver'
 import type { IngestionColumnMapping, IngestionRow, IngestionRowLabels, IngestionTargetField } from '@/lib/model/types'
 import type { ToolDefinition } from './types'
 
@@ -49,6 +50,16 @@ export const assignIngestionColumnsTool: ToolDefinition = {
   },
 }
 
+export const addIngestionBlankColumnTool: ToolDefinition = {
+  name: 'add_ingestion_blank_column',
+  description: 'Adds an explicitly blank supplemental column to a sparse uploaded source so it can satisfy a possible future destination. This does not alter the original CSV; inspect the source first and explain why the blank field is needed.',
+  parameters: { type: 'object', properties: { sourceId: { type: 'number' }, name: { type: 'string' } }, required: ['sourceId', 'name'], additionalProperties: false },
+  execute: async (args) => {
+    if (typeof args.sourceId !== 'number' || typeof args.name !== 'string') return 'Error: sourceId and name are required.'
+    try { return JSON.stringify(await createSupplementalColumn(args.sourceId, args.name)) } catch (error) { return `Error: ${error instanceof Error ? error.message : 'could not add blank column.'}` }
+  },
+}
+
 export const stageIngestionSourceTool: ToolDefinition = {
   name: 'stage_ingestion_source',
   description: 'Validates a fully mapped source and stages it in Imported, unlabelled data. Use only after you have described the intended mapping to the user. Reports duplicates and never promotes data into a Finance table.',
@@ -87,6 +98,28 @@ export const validateIngestionRowsTool: ToolDefinition = {
       if (!stored) { result.push({ id, error: 'not found' }); continue }
       const row = stored.data as IngestionRow
       result.push({ id, status: row.status, errors: row.validationErrors.length ? row.validationErrors : ingestionLabelErrors(row.labels, row.destinationTableId) })
+    }
+    return JSON.stringify(result)
+  },
+}
+
+export const suggestIngestionLabelsTool: ToolDefinition = {
+  name: 'suggest_ingestion_labels',
+  description: 'Returns read-only, evidence-based category suggestions for explicit ingestion row IDs using current category rules and the row raw values. Never applies labels. Treat IOF and Pix as uncertain unless the available evidence clearly establishes the meaning.',
+  parameters: { type: 'object', properties: { rowIds: { type: 'array', items: { type: 'number' } } }, required: ['rowIds'], additionalProperties: false },
+  execute: async (args) => {
+    if (!Array.isArray(args.rowIds)) return 'Error: rowIds are required.'
+    const [categories, rules, tables] = await Promise.all([categoriesTable.toArray(), categoryRulesTable.toArray(), tableDefsTable.toArray()])
+    const tableById = new Map(tables.map((table) => [table.id, table.data as { kind?: never }]))
+    const result = []
+    for (const id of args.rowIds) {
+      if (typeof id !== 'number') continue
+      const stored = await ingestionRowsTable.get(id)
+      if (!stored) { result.push({ id, error: 'not found' }); continue }
+      const row = stored.data as IngestionRow
+      const raw = String(row.mappedValues.rawCategory ?? row.rawValues.category ?? row.rawValues.description ?? '')
+      const rule = findMatchingCategoryRule(categories.map((row) => ({ id: row.id, createdAt: row.createdAt, ...(row.data as object) })) as never, rules.map((row) => ({ id: row.id, createdAt: row.createdAt, ...(row.data as object) })) as never, raw, tableById.get(row.destinationTableId ?? 0)?.kind)
+      result.push({ id, rawCategory: raw, suggestedCategoryId: rule?.categoryId ?? null, matchingString: rule?.pattern ?? null, note: 'Suggestion only; review before applying.' })
     }
     return JSON.stringify(result)
   },

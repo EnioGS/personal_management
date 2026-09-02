@@ -150,6 +150,22 @@ function stableRowValue(rawValues: Record<string, string>): string {
   return JSON.stringify(Object.entries(rawValues).sort(([a], [b]) => a.localeCompare(b)))
 }
 
+/** Copies explicitly mapped label columns into a staged row; invalid values remain empty for manual review. */
+function labelsFromMappedValues(values: IngestionRow['mappedValues']): IngestionRow['labels'] {
+  const destinations = typeof values.financeDestinations === 'string'
+    ? values.financeDestinations.split(/[,;|]/).map((value) => value.trim()).filter((value): value is NonNullable<IngestionRow['labels']['financeDestinations']>[number] => ['movements', 'spending', 'investments', 'recurring'].includes(value))
+    : []
+  const categoryId = typeof values.categoryId === 'string' && /^\d+$/.test(values.categoryId) ? Number(values.categoryId) : undefined
+  return {
+    ...(destinations.length ? { financeDestinations: destinations } : {}),
+    ...(typeof values.flowRole === 'string' && ['inflow', 'outflow', 'transfer', 'adjustment'].includes(values.flowRole) ? { flowRole: values.flowRole as IngestionRow['labels']['flowRole'] } : {}),
+    ...(typeof values.settlementChannel === 'string' && ['checkingAccount', 'creditCard', 'cash', 'investment', 'other'].includes(values.settlementChannel) ? { settlementChannel: values.settlementChannel as IngestionRow['labels']['settlementChannel'] } : {}),
+    ...(typeof values.spendingTreatment === 'string' && ['expense', 'rebate', 'notApplicable'].includes(values.spendingTreatment) ? { spendingTreatment: values.spendingTreatment as IngestionRow['labels']['spendingTreatment'] } : {}),
+    ...(categoryId ? { categoryId } : {}),
+    ...(typeof values.recurrence === 'string' && ['oneOff', 'recurring', 'unknown'].includes(values.recurrence) ? { recurrence: values.recurrence as IngestionRow['labels']['recurrence'] } : {}),
+  }
+}
+
 /**
  * Sends a fully mapped source into the unlabelled worklist. Staging is idempotent:
  * existing source-row fingerprints are retained and reported instead of duplicated.
@@ -188,7 +204,7 @@ export async function stageIngestionSource(sourceId: number): Promise<{ staged: 
       sourceRowFingerprint,
       rawValues,
       mappedValues,
-      labels: {},
+      labels: labelsFromMappedValues(mappedValues),
       status: 'unlabelled',
       validationErrors: [],
     })
@@ -204,4 +220,3 @@ export async function stageIngestionSource(sourceId: number): Promise<{ staged: 
   })
   return { staged: staged.length, duplicates }
 }
-
