@@ -35,7 +35,7 @@ Two things it optimizes for:
 │   │   │   ├── notes/         # notes.section.ts + panel/store/notes-db + locales/
 │   │   │   ├── finances/      # Movimentações / Gastos / Investimentos / Recorrentes
 │   │   │   ├── investments/   # shared investment analytics, ledgers, allocation components
-│   │   │   └── settings/      # appearance/general/assistant/accounts-cards/categories/ingestion/tables panels
+│   │   │   └── settings/      # appearance/general/assistant/accounts-cards/ingestion/tables panels
 │   │   ├── store/
 │   │   │   ├── ui-store.ts     # active section/item, secondary-bar mode (expanded/icons/hidden)
 │   │   │   ├── theme-store.ts  # light/dark/system theme
@@ -146,18 +146,24 @@ Two things it optimizes for:
   compile-time constants (`lib/model/`, see adr/0022) — a `TableKind` fixes
   a table's columns, but the number of tables, accounts and cards is
   unbounded. The data ingestion centre's source provenance, mappings, staged
-  rows and label sidecars travel in the v4 export too, so
+  rows and label sidecars travel in the v5 export too, so
   importing into a blank browser restores the whole setup.
-- Data enters Finance through Settings → Data ingestion centre (adr/0030): CSV
-  source columns are mapped without rewriting the original file, sparse sources
-  may gain explicitly blank supplemental columns, and only user-confirmed ready
-  rows can be promoted into a destination table. Pending, unlabelled and invalid
-  rows are excluded from Finance analytics until confirmation. Labels distinguish
-  flow role, settlement channel, spending expense/rebate treatment and Finance
-  destinations.
-- Category rules resolve raw values onto a canonical category at *read*
-  time rather than rewriting stored data (adr/0023) — adding a rule months
-  later reclassifies all existing history at once, and stays reversible.
+- Data enters Finance through Settings → Data ingestion centre (adr/0030,
+  adr/0031): CSV source columns are mapped without rewriting the original file,
+  sparse sources may gain explicitly blank supplemental columns, and only
+  user-confirmed ready rows are written into a destination table. A row nobody
+  has labelled is not in a finance table at all — it waits in the worklist, so
+  every chart, KPI and position reads confirmed labels only. Labels are a single
+  Finance destination plus flow role, settlement channel, spending
+  expense/rebate treatment, recurrence, category and destination table.
+- The category vocabulary *is* the category labels (adr/0031, superseding
+  adr/0023): naming a category on a row creates it. There is no rule engine and
+  no Categories settings screen — one classification path, decided per row.
+- The assistant can map columns, edit staged values, label rows and validate
+  them, but has no tool for the two steps that move data (staging a mapped
+  source, promoting labelled rows); those are the user's clicks. Its whole
+  workflow knowledge is one retrievable document (`read_ingestion_guide`),
+  editable and resettable under Settings → Assistant.
 - Chart colors open on the brand's own hue, then the dataviz skill's
   remaining validated hues (adr/0024) — never a generated or cycled color
   past that fixed set, per the skill's accessibility rule. A color follows

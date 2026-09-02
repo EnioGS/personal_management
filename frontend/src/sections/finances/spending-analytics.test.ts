@@ -9,17 +9,19 @@ function entry(overrides: Partial<FilteredEntry>): FilteredEntry {
     direction: 'out',
     category: 'Food',
     description: 'Market',
+    financeDestination: 'spending',
+    spendingTreatment: 'expense',
     ...overrides,
     tableId: overrides.tableId ?? 1,
   }
 }
 
 describe('spending analytics', () => {
-  it('excludes incoming entries and refunds from spending', () => {
+  it('keeps labelled spending rows and drops rows labelled for another destination', () => {
     expect(outgoingSpending([
       entry({ amount: 120 }),
-      entry({ direction: 'in', amount: 120 }),
-      entry({ amount: -20 }),
+      entry({ financeDestination: 'movements', spendingTreatment: 'notApplicable', amount: 120 }),
+      entry({ financeDestination: 'investments', spendingTreatment: 'notApplicable', amount: 20 }),
     ])).toEqual([entry({ amount: 120 })])
   })
 
@@ -65,12 +67,12 @@ describe('spending analytics', () => {
       entry({ cardId: 1, category: 'Food', amount: 100, date: Date.UTC(2026, 0, 1) }),
       entry({ cardId: 1, category: 'Food', amount: 300, date: Date.UTC(2026, 3, 1) }),
       entry({ cardId: 1, category: 'Travel', amount: 400, date: Date.UTC(2026, 3, 2) }),
-      entry({ cardId: 1, category: 'Refund', amount: -50, date: Date.UTC(2026, 3, 3) }),
+      entry({ cardId: 1, category: 'Food', spendingTreatment: 'rebate', amount: 50, date: Date.UTC(2026, 3, 3) }),
       entry({ category: 'Cash only', amount: 900, date: Date.UTC(2026, 3, 4) }),
     ]
 
     expect(averageCardSpendByCategory(rows, ['2026-01', '2026-02', '2026-03', '2026-04'])).toEqual([
-      { key: 'Food', label: 'Food', value: 100, comparison: 2 },
+      { key: 'Food', label: 'Food', value: 87.5, comparison: 1.8571428571428572 },
       { key: 'Travel', label: 'Travel', value: 100, comparison: 3 },
     ])
   })

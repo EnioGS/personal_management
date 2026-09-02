@@ -17,7 +17,6 @@ const db = new Dexie('app-model-db') as Dexie & {
   cards: EntityTable<LocalRow, 'id'>
   tableDefs: EntityTable<LocalRow, 'id'>
   categories: EntityTable<LocalRow, 'id'>
-  categoryRules: EntityTable<LocalRow, 'id'>
   entries: EntityTable<LocalRow, 'id'>
   budgets: EntityTable<LocalRow, 'id'>
   allocationTargets: EntityTable<LocalRow, 'id'>
@@ -107,11 +106,15 @@ db.version(5).stores({
   ingestionAuditEvents: '++id, createdAt',
 })
 
+// Category rules are gone: a row's semantic category is now a label the user (or the
+// assistant) sets in the ingestion centre, never a substring rule applied at read
+// time. Categories themselves remain as the vocabulary those labels name.
+db.version(6).stores({ categoryRules: null })
+
 export const accountsTable = db.accounts
 export const cardsTable = db.cards
 export const tableDefsTable = db.tableDefs
 export const categoriesTable = db.categories
-export const categoryRulesTable = db.categoryRules
 export const entriesTable = db.entries
 export const budgetsTable = db.budgets
 export const allocationTargetsTable = db.allocationTargets

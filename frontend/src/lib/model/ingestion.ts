@@ -46,13 +46,13 @@ export function allPotentialIngestionFields(): IngestionTargetField[] {
 /** Reports the required label and destination choices still missing from a staged row. */
 export function ingestionLabelErrors(labels: IngestionRowLabels, destinationTableId?: number): string[] {
   const errors: string[] = []
-  if (!labels.financeDestinations || labels.financeDestinations.length === 0) errors.push('Choose at least one Finance destination.')
+  if (!labels.financeDestination) errors.push('Choose a Finance destination.')
   if (!labels.flowRole) errors.push('Choose a flow role.')
   if (!labels.settlementChannel) errors.push('Choose a settlement channel.')
   if (!labels.recurrence) errors.push('Choose a recurrence label.')
   if (!destinationTableId) errors.push('Choose a destination table.')
 
-  if (labels.financeDestinations?.includes('spending')) {
+  if (labels.financeDestination === 'spending') {
     if (!labels.spendingTreatment || labels.spendingTreatment === 'notApplicable') {
       errors.push('Choose expense or rebate for a spending row.')
     }
@@ -69,7 +69,7 @@ export function entryLabelsFromIngestionRow(entryId: number, row: IngestionRow):
 
   return {
     entryId,
-    financeDestinations: row.labels.financeDestinations!,
+    financeDestination: row.labels.financeDestination!,
     flowRole: row.labels.flowRole!,
     settlementChannel: row.labels.settlementChannel!,
     spendingTreatment: row.labels.spendingTreatment!,

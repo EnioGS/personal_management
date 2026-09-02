@@ -2,7 +2,10 @@
 
 ## Status
 
-Accepted.
+Accepted, refined by adr/0031 — which makes the Finance destination
+single-valued, adds the `cancelled` flow role, makes the historical migration
+*move* entries out of their tables instead of copying them, and removes the
+category-rule fallback described below.
 
 ## Context
 
@@ -31,7 +34,7 @@ Add an ingestion model to the existing configurable-model Dexie database:
   shape of a possible future destination. They do not claim to be original CSV
   columns and missing required values still block promotion.
 - Classifications are **independent label dimensions**, not a category tree:
-  Finance destinations (one or more), flow role, settlement channel, spending
+  Finance destination (single-valued since adr/0031), flow role, settlement channel, spending
   treatment, semantic category, recurrence, and a concrete destination table.
   An `expense` and `rebate` are intentionally distinct so a card credit reduces
   spending without being misreported as an ordinary outflow.
@@ -42,20 +45,21 @@ Add an ingestion model to the existing configurable-model Dexie database:
   confirmation promotes ready rows into destination entries. A chat assistant may
   inspect, map, stage, label and validate, but has no operation for final
   promotion.
-- Existing active entries enter the same review queue through linked migration
-  rows. Confirming such a row creates/reconciles labels only; it never inserts a
-  second entry.
+- Existing active entries enter the same review queue. Since adr/0031 they are
+  moved rather than linked: the entry leaves its finance table, and confirming
+  its labels writes it back, so an unreviewed row is never counted anywhere.
 - Sources, mappings, ingestion rows, entry labels and audit events are included in
   the app export/import format. The export version is bumped to v4, while v2/v3
   exports continue to import with the new stores empty.
 
 ## Consequences
 
-The current category-rule resolver remains a non-destructive suggestion mechanism
-while historical rows are reviewed. It is not an alternative classification path:
 Finance analytics read only entries with a confirmed label sidecar. Staged,
-unlabelled, invalid and merely suggested historical rows are deliberately absent
-from dashboards until the user confirms them.
+unlabelled and invalid rows are deliberately absent from dashboards until the
+user confirms them. The category-rule resolver that adr/0023 introduced was kept
+here as a transitional suggestion mechanism; adr/0031 removed it entirely,
+because a second classification path is a second way for an undecided row to
+reach a dashboard.
 
 The export schema gains several typed tables, with JSON columns for lossless raw
 source values and multi-value labels. This is a modest increase in local storage

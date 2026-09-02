@@ -10,26 +10,32 @@ describe('findTool', () => {
     expect(findTool('does_not_exist')).toBeUndefined()
   })
 
-  it('registers read, ingestion, category-management, and append-only table-writing tools', () => {
+  it('registers read, ingestion-classification, and append-only table-writing tools', () => {
     expect(toolRegistry.map((t) => t.name)).toEqual([
       'read_text_file',
       'read_csv',
       'read_table',
-      'read_category_raw_values',
+      'read_ingestion_guide',
       'list_ingestion_datasets',
       'read_ingestion_table',
+      'read_ingestion_provenance',
       'assign_ingestion_columns',
       'add_ingestion_blank_column',
-      'stage_ingestion_source',
       'suggest_ingestion_labels',
       'update_ingestion_labels',
       'update_ingestion_data_fields',
       'validate_ingestion_rows',
-      'add_category',
-      'update_category_rule',
-      'delete_category_rule',
       'write_to_table',
     ])
+  })
+
+  it('leaves both data-moving steps to the user and keeps no category-rule tools', () => {
+    expect(findTool('stage_ingestion_source')).toBeUndefined()
+    expect(findTool('promote_ingestion_rows')).toBeUndefined()
+    expect(findTool('add_category')).toBeUndefined()
+    expect(findTool('update_category_rule')).toBeUndefined()
+    expect(findTool('delete_category_rule')).toBeUndefined()
+    expect(findTool('read_category_raw_values')).toBeUndefined()
   })
 
   it('exposes append-only writing but not row correction or removal', () => {

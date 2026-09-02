@@ -19,14 +19,29 @@ import { assistantModelsForProvider, defaultModelForProvider, groupAssistantMode
 import { DEV_API_KEY, useAssistantConfigStore, type AssistantConfig } from '@/lib/assistant-config'
 import { detectApiProvider, providerLabel, type ApiProvider } from '@/lib/ai-providers'
 import { DEFAULT_SYSTEM_PROMPT, SYSTEM_PROMPT_KEY, useAssistantPromptsStore } from '@/lib/assistant-prompts'
+import { DEFAULT_INGESTION_GUIDE, INGESTION_GUIDE_KEY } from '@/lib/ingestion-guide'
 import type { StoredRow } from '@/lib/local-store/create-local-table'
 import { cn } from '@/lib/utils'
 
 export function AssistantPanel() {
+  const { t } = useTranslation('settings')
   return (
     <div className="flex h-full flex-col gap-6 overflow-auto p-4">
       <ConnectionsSection />
-      <SystemPromptSection />
+      <PromptSection
+        promptKey={SYSTEM_PROMPT_KEY}
+        defaultContent={DEFAULT_SYSTEM_PROMPT}
+        label={t('assistant.systemPromptLabel')}
+        description={t('assistant.systemPromptDescription')}
+        resetLabel={t('assistant.resetPrompt')}
+      />
+      <PromptSection
+        promptKey={INGESTION_GUIDE_KEY}
+        defaultContent={DEFAULT_INGESTION_GUIDE}
+        label={t('assistant.ingestionGuideLabel')}
+        description={t('assistant.ingestionGuideDescription')}
+        resetLabel={t('assistant.resetPrompt')}
+      />
     </div>
   )
 }
@@ -198,23 +213,27 @@ function ConnectionsSection() {
   )
 }
 
-function SystemPromptSection() {
-  const { t } = useTranslation('settings')
+/**
+ * One editable prompt stored in the vault. Used for the system prompt and for the
+ * ingestion guide the assistant fetches with read_ingestion_guide — both are text
+ * sent to the model, so both are the user's to rewrite and to reset.
+ */
+function PromptSection({ promptKey, defaultContent, label, description, resetLabel }: { promptKey: string; defaultContent: string; label: string; description: string; resetLabel: string }) {
   const { items, isLoading, addItem, updateItem } = useAssistantPromptsStore()
   const [draft, setDraft] = useState<string | null>(null)
   const [isFocused, setIsFocused] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
-  const systemPromptRow = items.find((item) => item.key === SYSTEM_PROMPT_KEY)
+  const promptRow = items.find((item) => item.key === promptKey)
 
   // Only seeds the draft once, the first time data is available — deliberately
-  // not depending on systemPromptRow, so a later refresh (e.g. after an
-  // auto-save round-trip) doesn't clobber whatever the user is currently typing.
+  // not depending on promptRow, so a later refresh (e.g. after an auto-save
+  // round-trip) doesn't clobber whatever the user is currently typing.
   useEffect(() => {
     if (draft === null && !isLoading) {
-      setDraft(systemPromptRow?.content ?? DEFAULT_SYSTEM_PROMPT)
+      setDraft(promptRow?.content ?? defaultContent)
     }
-  }, [isLoading, draft, systemPromptRow])
+  }, [isLoading, draft, promptRow, defaultContent])
 
   // Collapsed to one line unless focused, then grows to fit the full text —
   // measured via scrollHeight rather than relying solely on field-sizing:
@@ -232,25 +251,25 @@ function SystemPromptSection() {
   }, [isFocused, draft])
 
   async function persist(content: string) {
-    if (systemPromptRow) await updateItem(systemPromptRow.id, { key: SYSTEM_PROMPT_KEY, content })
-    else await addItem({ key: SYSTEM_PROMPT_KEY, content })
+    if (promptRow) await updateItem(promptRow.id, { key: promptKey, content })
+    else await addItem({ key: promptKey, content })
   }
 
   function resetToDefault() {
-    setDraft(DEFAULT_SYSTEM_PROMPT)
-    void persist(DEFAULT_SYSTEM_PROMPT)
+    setDraft(defaultContent)
+    void persist(defaultContent)
   }
 
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-start justify-between gap-2">
         <div>
-          <p className="text-sm font-medium">{t('assistant.systemPromptLabel')}</p>
-          <p className="text-muted-foreground text-xs">{t('assistant.systemPromptDescription')}</p>
+          <p className="text-sm font-medium">{label}</p>
+          <p className="text-muted-foreground text-xs">{description}</p>
         </div>
         <Button type="button" variant="outline" size="xs" className="shrink-0 gap-1" disabled={draft === null} onClick={resetToDefault}>
           <RotateCcw className="size-3" />
-          {t('assistant.resetPrompt')}
+          {resetLabel}
         </Button>
       </div>
       <Textarea

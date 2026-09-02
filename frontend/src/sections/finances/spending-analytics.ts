@@ -45,7 +45,7 @@ export function averageCardSpendByCategory(rows: FilteredEntry[], selectedMonths
   const totals = new Map<string, { total: number; recentTotal: number }>()
 
   for (const row of rows) {
-    if (!isSpendingRow(row) || (!row.labelled && row.cardId === undefined)) continue
+    if (!isSpendingRow(row) || row.cardId === undefined) continue
     const month = monthKey(row.date)
     const aggregate = totals.get(row.category) ?? { total: 0, recentTotal: 0 }
     const amount = row.spendingTreatment === 'rebate' ? -row.amount : row.amount
@@ -66,12 +66,9 @@ export function outgoingSpending(rows: FilteredEntry[]): FilteredEntry[] {
   return rows.filter(isSpendingRow)
 }
 
-/** Labelled rows use explicit expense/rebate treatment; old history retains its card-only fallback. */
+/** Only an explicitly labelled spending row counts, whichever table it came from. */
 function isSpendingRow(row: FilteredEntry): boolean {
-  if (row.labelled) {
-    return row.financeDestinations?.includes('spending') === true && (row.spendingTreatment === 'expense' || row.spendingTreatment === 'rebate')
-  }
-  return row.direction === 'out' && row.amount > 0
+  return row.financeDestination === 'spending' && (row.spendingTreatment === 'expense' || row.spendingTreatment === 'rebate')
 }
 
 export function spendingByMonth(rows: FilteredEntry[]): MonthlySpend[] {

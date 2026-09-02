@@ -1,24 +1,23 @@
 import type { OpenRouterTool } from '@/lib/openrouter'
-import { addCategoryTool } from './add-category'
-import { deleteCategoryRuleTool } from './delete-category-rule'
 import {
   assignIngestionColumnsTool,
   addIngestionBlankColumnTool,
   listIngestionDatasetsTool,
+  readIngestionGuideTool,
+  readIngestionProvenanceTool,
   readIngestionTableTool,
-  stageIngestionSourceTool,
   suggestIngestionLabelsTool,
   updateIngestionLabelsTool,
   updateIngestionDataFieldsTool,
   validateIngestionRowsTool,
 } from './ingestion-tools'
 import { readCsvTool } from './read-csv'
-import { readCategoryRawValuesTool } from './read-category-raw-values'
 import { readTableTool } from './read-table'
 import { readTextFileTool } from './read-text-file'
 import type { ToolDefinition } from './types'
-import { updateCategoryRuleTool } from './update-category-rule'
 import { writeToTableTool } from './write-to-table'
+// Staging a mapped source and promoting labelled rows are user-only actions: both
+// are the moments data changes shape, so no tool implements them at all.
 // Row correction/deletion tools stay disabled: the assistant may append new rows,
 // but cannot alter existing history. Their implementations remain available here for
 // a future, separately-authorized capability.
@@ -31,19 +30,16 @@ export const toolRegistry: ToolDefinition[] = [
   readTextFileTool,
   readCsvTool,
   readTableTool,
-  readCategoryRawValuesTool,
+  readIngestionGuideTool,
   listIngestionDatasetsTool,
   readIngestionTableTool,
+  readIngestionProvenanceTool,
   assignIngestionColumnsTool,
   addIngestionBlankColumnTool,
-  stageIngestionSourceTool,
   suggestIngestionLabelsTool,
   updateIngestionLabelsTool,
   updateIngestionDataFieldsTool,
   validateIngestionRowsTool,
-  addCategoryTool,
-  updateCategoryRuleTool,
-  deleteCategoryRuleTool,
   writeToTableTool,
 ]
 

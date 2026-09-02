@@ -7,6 +7,7 @@ import {
   ingestionSourcesTable,
 } from './model-db'
 import { allPotentialIngestionFields } from './ingestion'
+import { FINANCE_DESTINATIONS, FLOW_ROLES, matchLabelValue, RECURRENCES, SETTLEMENT_CHANNELS, SPENDING_TREATMENTS } from './label-vocabulary'
 import type { IngestionColumnMapping, IngestionRow, IngestionSource, IngestionTargetField } from './types'
 
 export interface ParsedIngestionCsv {
@@ -152,17 +153,20 @@ function stableRowValue(rawValues: Record<string, string>): string {
 
 /** Copies explicitly mapped label columns into a staged row; invalid values remain empty for manual review. */
 function labelsFromMappedValues(values: IngestionRow['mappedValues']): IngestionRow['labels'] {
-  const destinations = typeof values.financeDestinations === 'string'
-    ? values.financeDestinations.split(/[,;|]/).map((value) => value.trim()).filter((value): value is NonNullable<IngestionRow['labels']['financeDestinations']>[number] => ['movements', 'spending', 'investments', 'recurring'].includes(value))
-    : []
+  const text = (field: keyof IngestionRow['mappedValues']) => (typeof values[field] === 'string' ? (values[field] as string) : undefined)
   const categoryId = typeof values.categoryId === 'string' && /^\d+$/.test(values.categoryId) ? Number(values.categoryId) : undefined
+  const destination = matchLabelValue(FINANCE_DESTINATIONS, text('financeDestination'))
+  const flowRole = matchLabelValue(FLOW_ROLES, text('flowRole'))
+  const settlementChannel = matchLabelValue(SETTLEMENT_CHANNELS, text('settlementChannel'))
+  const spendingTreatment = matchLabelValue(SPENDING_TREATMENTS, text('spendingTreatment'))
+  const recurrence = matchLabelValue(RECURRENCES, text('recurrence'))
   return {
-    ...(destinations.length ? { financeDestinations: destinations } : {}),
-    ...(typeof values.flowRole === 'string' && ['inflow', 'outflow', 'transfer', 'adjustment'].includes(values.flowRole) ? { flowRole: values.flowRole as IngestionRow['labels']['flowRole'] } : {}),
-    ...(typeof values.settlementChannel === 'string' && ['checkingAccount', 'creditCard', 'cash', 'investment', 'other'].includes(values.settlementChannel) ? { settlementChannel: values.settlementChannel as IngestionRow['labels']['settlementChannel'] } : {}),
-    ...(typeof values.spendingTreatment === 'string' && ['expense', 'rebate', 'notApplicable'].includes(values.spendingTreatment) ? { spendingTreatment: values.spendingTreatment as IngestionRow['labels']['spendingTreatment'] } : {}),
+    ...(destination ? { financeDestination: destination } : {}),
+    ...(flowRole ? { flowRole } : {}),
+    ...(settlementChannel ? { settlementChannel } : {}),
+    ...(spendingTreatment ? { spendingTreatment } : {}),
     ...(categoryId ? { categoryId } : {}),
-    ...(typeof values.recurrence === 'string' && ['oneOff', 'recurring', 'unknown'].includes(values.recurrence) ? { recurrence: values.recurrence as IngestionRow['labels']['recurrence'] } : {}),
+    ...(recurrence ? { recurrence } : {}),
   }
 }
 

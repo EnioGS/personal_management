@@ -29,7 +29,7 @@ describe('ingestion label completeness', () => {
   it('requires explicit card spending treatment and semantic category for spending rows', () => {
     const errors = ingestionLabelErrors(
       {
-        financeDestinations: ['spending'],
+        financeDestination: 'spending',
         flowRole: 'outflow',
         settlementChannel: 'creditCard',
         spendingTreatment: 'notApplicable',
@@ -46,7 +46,7 @@ describe('ingestion label completeness', () => {
       ...base,
       destinationTableId: 4,
       labels: {
-        financeDestinations: ['movements', 'spending'],
+        financeDestination: 'spending',
         flowRole: 'outflow',
         settlementChannel: 'checkingAccount',
         spendingTreatment: 'expense',
@@ -55,6 +55,6 @@ describe('ingestion label completeness', () => {
       },
     }
 
-    expect(entryLabelsFromIngestionRow(9, row)).toMatchObject({ entryId: 9, categoryId: 7, financeDestinations: ['movements', 'spending'] })
+    expect(entryLabelsFromIngestionRow(9, row)).toMatchObject({ entryId: 9, categoryId: 7, financeDestination: 'spending' })
   })
 })

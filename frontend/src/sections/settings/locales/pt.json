@@ -7,7 +7,6 @@
     "general": "Geral",
     "assistant": "Assistente",
     "accountsCards": "Contas e Cartões",
-    "categories": "Categorias",
     "ingestion": "Centro de ingestão de dados",
     "tables": "Tabelas"
   },
@@ -39,7 +38,9 @@
     "replaceConfirm": "Substituir",
     "systemPromptLabel": "Prompt do sistema",
     "systemPromptDescription": "Enviado ao modelo no início de cada conversa. Não é traduzido — sempre salvo e usado no idioma em que você escrevê-lo.",
-    "resetPrompt": "Restaurar padrão"
+    "resetPrompt": "Restaurar padrão",
+    "ingestionGuideLabel": "Guia de importação",
+    "ingestionGuideDescription": "O guia passo a passo que o assistente lê antes de ajudar com importação, mapeamento e rótulos. Edite para mudar como ele age, ou restaure o padrão."
   },
   "accountsCards": {
     "accountsHeading": "Contas bancárias",
@@ -77,35 +78,6 @@
     "deleteCardDialogTitle": "Excluir \"{{name}}\"?",
     "deleteCardDialogDescription": "Isso exclui permanentemente o cartão. Não pode ser desfeito.",
     "deleteCardConfirm": "Excluir cartão"
-  },
-  "categories": {
-    "rawValuesHeading": "Valores brutos das categorias",
-    "rawValuesDescription": "Valores brutos encontrados nos seus dados, classificados pela quantidade de vezes que aparecem.",
-    "rawValueCount": "{{count}} ocorrência(s)",
-    "noRawValues": "Nenhum valor de categoria encontrado nos seus dados ainda.",
-    "unmatched": "Não correspondido",
-    "categoriesHeading": "Categorias",
-    "categoriesDescription": "Adicione uma categoria com uma string de correspondência. Digite o nome de uma categoria existente para adicionar outra string a ela. A busca não diferencia maiúsculas e usa correspondência por substring.",
-    "categoryName": "Nome da categoria",
-    "matchString": "String de correspondência",
-    "addCategory": "Adicionar categoria",
-    "noCategories": "Nenhuma categoria ainda.",
-    "deleteCategory": "Excluir \"{{name}}\"",
-    "rulesHeading": "Regras de normalização",
-    "rulesDescription": "As strings de correspondência são executadas de cima para baixo. A primeira que combinar vence; mova uma regra para mudar sua prioridade. As regras continuam como fallback enquanto o histórico é revisado no Centro de ingestão de dados.",
-    "legacyCoverage": "{{labelledEntries}} de {{activeEntries}} lançamentos ativos têm rótulos completos; {{awaitingReview}} ainda usam o fallback legado.",
-    "matchTypes": {
-      "contains": "Contém",
-      "equals": "Igual a",
-      "startsWith": "Começa com",
-      "regex": "Regex"
-    },
-    "noRules": "Nenhuma regra ainda.",
-    "moveUp": "Mover para cima",
-    "moveDown": "Mover para baixo",
-    "deleteRule": "Excluir regra",
-    "deleteRuleDialogTitle": "Excluir esta regra?",
-    "deleteRuleDialogDescription": "Os valores que ela combinava voltam a ficar não classificados — nada mais muda."
   },
   "tables": {
     "heading": "Todas as tabelas",

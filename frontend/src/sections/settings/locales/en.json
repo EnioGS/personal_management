@@ -7,7 +7,6 @@
     "general": "General",
     "assistant": "Assistant",
     "accountsCards": "Accounts & Cards",
-    "categories": "Categories",
     "ingestion": "Data ingestion centre",
     "tables": "Tables"
   },
@@ -39,7 +38,9 @@
     "replaceConfirm": "Replace",
     "systemPromptLabel": "System prompt",
     "systemPromptDescription": "Sent to the model at the start of every conversation. Not translated — always saved and used in whatever language you write it in.",
-    "resetPrompt": "Reset to default"
+    "resetPrompt": "Reset to default",
+    "ingestionGuideLabel": "Ingestion guide",
+    "ingestionGuideDescription": "The step-by-step guide the assistant reads before helping with importing, mapping and labelling. Edit it to change how it works, or reset it to the default."
   },
   "accountsCards": {
     "accountsHeading": "Bank accounts",
@@ -77,35 +78,6 @@
     "deleteCardDialogTitle": "Delete \"{{name}}\"?",
     "deleteCardDialogDescription": "This permanently deletes the card. This cannot be undone.",
     "deleteCardConfirm": "Delete card"
-  },
-  "categories": {
-    "rawValuesHeading": "Category raw values",
-    "rawValuesDescription": "Raw values found in your data ranked by how many times they appear.",
-    "rawValueCount": "{{count}} occurrence(s)",
-    "noRawValues": "No category values found in your data yet.",
-    "unmatched": "Unmatched",
-    "categoriesHeading": "Categories",
-    "categoriesDescription": "Add a category with a matching string. Enter an existing category name to add another matching string to it. Matching is case-insensitive and uses substring matching.",
-    "categoryName": "Category name",
-    "matchString": "Match string",
-    "addCategory": "Add category",
-    "noCategories": "No categories yet.",
-    "deleteCategory": "Delete \"{{name}}\"",
-    "rulesHeading": "Normalization rules",
-    "rulesDescription": "Matching strings run from top to bottom. The first matching string wins; move a rule to change its priority. Rules remain a fallback while historical data is being reviewed in Data ingestion centre.",
-    "legacyCoverage": "{{labelledEntries}} of {{activeEntries}} active entries have completed labels; {{awaitingReview}} still use the legacy fallback.",
-    "matchTypes": {
-      "contains": "Contains",
-      "equals": "Equals",
-      "startsWith": "Starts with",
-      "regex": "Regex"
-    },
-    "noRules": "No rules yet.",
-    "moveUp": "Move up",
-    "moveDown": "Move down",
-    "deleteRule": "Delete rule",
-    "deleteRuleDialogTitle": "Delete this rule?",
-    "deleteRuleDialogDescription": "Values it matched go back to unclassified — nothing else changes."
   },
   "tables": {
     "heading": "All tables",

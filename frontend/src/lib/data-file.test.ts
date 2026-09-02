@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { createLocalTable } from '@/lib/local-store/create-local-table'
 import {
   categoriesTable,
-  categoryRulesTable,
   entriesTable,
   ingestionColumnMappingsTable,
   ingestionRowsTable,
@@ -34,7 +33,6 @@ function emptyTables(): DataExportFile['tables'] {
     cards: [],
     tableDefs: [],
     categories: [],
-    categoryRules: [],
     entries: [],
     budgets: [],
     allocationTargets: [],
@@ -98,22 +96,11 @@ describe('data-file', () => {
     expect((restored[0].data as { name: string }).name).toBe('Nubank')
   })
 
-  it('round-trips category names, match strings, and rule priority', async () => {
-    const categoryId = await categoriesTable.add({
-      createdAt: 1,
-      data: { name: 'Recebida pelo Pix', scope: 'bankLedger', archived: false },
-    })
-    await categoryRulesTable.bulkAdd([
-      { createdAt: 2, data: { categoryId, match: 'contains', pattern: 'pix', priority: 1, caseSensitive: false } },
-      { createdAt: 3, data: { categoryId, match: 'contains', pattern: 'recebida pelo pix', priority: 0 } },
-    ])
+  it('round-trips the category vocabulary', async () => {
+    await categoriesTable.add({ createdAt: 1, data: { name: 'Recebida pelo Pix', scope: 'bankLedger', archived: false } })
 
     const exported = await exportData()
     expect(exported.tables.categories).toHaveLength(1)
-    expect(exported.tables.categoryRules.map((row) => row.data)).toEqual([
-      { categoryId, match: 'contains', pattern: 'pix', priority: 1, caseSensitive: false },
-      { categoryId, match: 'contains', pattern: 'recebida pelo pix', priority: 0 },
-    ])
 
     await wipeAllData()
     await importData(exported)
@@ -123,10 +110,6 @@ describe('data-file', () => {
       scope: 'bankLedger',
       archived: false,
     })
-    expect((await categoryRulesTable.toArray()).map((row) => row.data)).toEqual([
-      { categoryId, match: 'contains', pattern: 'pix', priority: 1, caseSensitive: false },
-      { categoryId, match: 'contains', pattern: 'recebida pelo pix', priority: 0 },
-    ])
   })
 
   it('round-trips source provenance, mappings and staged labels', async () => {
@@ -155,7 +138,7 @@ describe('data-file', () => {
         sourceRowFingerprint: 'row-hash',
         rawValues: { Data: '2026-01-01', Valor: '10' },
         mappedValues: { date: 1767225600000, amount: 10 },
-        labels: { financeDestinations: ['movements'], flowRole: 'inflow' },
+        labels: { financeDestination: 'movements', flowRole: 'inflow' },
         status: 'unlabelled',
         validationErrors: ['Choose a destination table.'],
       },
@@ -169,7 +152,7 @@ describe('data-file', () => {
     expect(await ingestionColumnMappingsTable.toArray()).toHaveLength(1)
     expect((await ingestionRowsTable.toArray())[0].data).toMatchObject({
       rawValues: { Data: '2026-01-01', Valor: '10' },
-      labels: { financeDestinations: ['movements'], flowRole: 'inflow' },
+      labels: { financeDestination: 'movements', flowRole: 'inflow' },
     })
   })
 

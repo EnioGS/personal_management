@@ -73,7 +73,7 @@ export function OverviewPanel() {
       const labels = labelsByEntryId.get(entry.id)
       const investmentClass = classByTableId.get(entry.tableId)
       if (
-        !labels?.financeDestinations.includes('investments') ||
+        labels?.financeDestination !== 'investments' ||
         !investmentClass ||
         typeof entry.date !== 'number' ||
         typeof entry.asset !== 'string' ||
@@ -114,7 +114,7 @@ export function OverviewPanel() {
         tableDefs.filter((table) => table.kind === 'bankLedger' && table.accountId === account.id).map((table) => table.id),
       )
       const balance = capitalHistoryRows
-        .filter((entry) => tableIds.has(entry.tableId) && entry.financeDestinations?.includes('movements'))
+        .filter((entry) => tableIds.has(entry.tableId) && entry.financeDestination !== 'investments')
         .reduce((sum, entry) => sum + (entry.direction === 'in' ? entry.amount : -entry.amount), 0)
       return { key: String(account.id), label: account.name, value: balance }
     })

@@ -6,7 +6,6 @@ import {
   budgetsTable,
   cardsTable,
   categoriesTable,
-  categoryRulesTable,
   entryLabelsTable,
   entriesTable,
   ingestionAuditEventsTable,
@@ -21,7 +20,6 @@ import type {
   Budget,
   Card,
   Category,
-  CategoryRule,
   Entry,
   EntryLabels,
   IngestionAuditEvent,
@@ -35,7 +33,6 @@ export const useAccountsStore = createLocalListStore<Account>(accountsTable)
 export const useCardsStore = createLocalListStore<Card>(cardsTable)
 export const useTableDefsStore = createLocalListStore<TableDef>(tableDefsTable)
 export const useCategoriesStore = createLocalListStore<Category>(categoriesTable)
-export const useCategoryRulesStore = createLocalListStore<CategoryRule>(categoryRulesTable)
 export const useBudgetsStore = createLocalListStore<Budget>(budgetsTable)
 export const useAllocationTargetsStore = createLocalListStore<AllocationTarget>(allocationTargetsTable)
 export const useIngestionSourcesStore = createLocalListStore<IngestionSource>(ingestionSourcesTable)

@@ -53,6 +53,10 @@ async function entryFromIngestionRow(row: IngestionRow): Promise<Entry> {
     if (!result.ok) throw new Error(result.message)
     entry[entryField] = result.value
   }
+  // The source-row fingerprint travels with the promoted entry so re-importing the
+  // same statement still recognises the row it already produced.
+  const importKey = row.rawValues.importKey ?? row.sourceRowFingerprint
+  if (importKey) entry.importKey = importKey
   return entry as Entry
 }
 
@@ -70,7 +74,7 @@ async function validateAndSave(
     }
   }
   next.validationErrors = errors
-  next.status = errors.length === 0 ? 'ready' : next.labels.financeDestinations || Object.values(next.labelValues ?? {}).some(Boolean) ? 'invalid' : 'unlabelled'
+  next.status = errors.length === 0 ? 'ready' : next.labels.financeDestination || Object.values(next.labelValues ?? {}).some(Boolean) ? 'invalid' : 'unlabelled'
   await ingestionRowsTable.update(rowId, { data: next })
   await ingestionAuditEventsTable.add({
     createdAt: Date.now(),

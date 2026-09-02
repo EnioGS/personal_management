@@ -9,8 +9,7 @@ export interface CapitalEntry {
   amount: number
   direction: 'in' | 'out'
   cardId?: number
-  labelled?: boolean
-  financeDestinations?: string[]
+  financeDestination?: string
   spendingTreatment?: 'expense' | 'rebate' | 'notApplicable'
 }
 
@@ -69,11 +68,13 @@ export function capitalEvolution(
     // Card purchases are obligations, not cash movements. Their eventual payment
     // is already represented in the linked bank ledger, so including both would
     // double-count card spend. Keep card rows only for the red monthly bars.
-    const belongsToMovements = !entry.labelled || entry.financeDestinations?.includes('movements') === true
-    if (!entry.cardId && belongsToMovements) bucket.capitalDelta += entry.direction === 'in' ? entry.amount : -entry.amount
-    if (entry.cardId && (!entry.labelled || entry.financeDestinations?.includes('spending'))) {
+    // Spending is money that moved, so it counts towards cash capital exactly like
+    // a plain movement; only the card rows are held back, because a card purchase is
+    // an obligation whose payment already appears in the linked bank ledger.
+    if (!entry.cardId && entry.financeDestination !== 'investments') bucket.capitalDelta += entry.direction === 'in' ? entry.amount : -entry.amount
+    if (entry.cardId && entry.financeDestination === 'spending') {
       if (entry.spendingTreatment === 'rebate') bucket.cardSpend -= entry.amount
-      else if ((!entry.labelled && entry.amount > 0) || entry.spendingTreatment === 'expense') bucket.cardSpend += entry.amount
+      else if (entry.spendingTreatment === 'expense') bucket.cardSpend += entry.amount
     }
     byMonth.set(month, bucket)
   }

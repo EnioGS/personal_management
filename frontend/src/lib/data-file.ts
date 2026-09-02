@@ -10,7 +10,6 @@ import {
   budgetsTable,
   cardsTable,
   categoriesTable,
-  categoryRulesTable,
   entryLabelsTable,
   entriesTable,
   ingestionAuditEventsTable,
@@ -27,9 +26,11 @@ import { notesTable } from '@/sections/notes/notes-db'
  * v3 carries the configurable model: accounts, cards, table definitions and the
  * category vocabulary travel with the rows, so importing into a blank browser restores
  * the user's whole setup rather than a pile of untitled data. v4 also includes
- * ingestion sources, staged rows, label sidecars and their audit events.
+ * ingestion sources, staged rows, label sidecars and their audit events. v5 drops
+ * category rules: a row's category is a label set in the ingestion centre, so a rule
+ * store no longer exists to round-trip.
  */
-export const DATA_EXPORT_VERSION = 4 as const
+export const DATA_EXPORT_VERSION = 5 as const
 export const DATA_FILE_NAME = 'personal-management-data.db'
 export const DATA_FILE_EXTENSION = '.db'
 /** Still accepted on import (see `data-panel.tsx`) — a backup made before adr/0028. */
@@ -41,7 +42,6 @@ const TABLES = {
   cards: cardsTable,
   tableDefs: tableDefsTable,
   categories: categoriesTable,
-  categoryRules: categoryRulesTable,
   entries: entriesTable,
   budgets: budgetsTable,
   allocationTargets: allocationTargetsTable,
@@ -139,7 +139,6 @@ function upgradeV2(record: Record<string, unknown>): DataExportFile {
       cards: [],
       tableDefs,
       categories: [],
-      categoryRules: [],
       entries,
       budgets: [],
       allocationTargets: [],
@@ -162,7 +161,6 @@ function upgradeV3(record: Record<string, unknown>): DataExportFile {
       cards: asRows(tables.cards),
       tableDefs: withInvestmentClasses(asRows(tables.tableDefs)),
       categories: asRows(tables.categories),
-      categoryRules: asRows(tables.categoryRules),
       entries: asRows(tables.entries),
       budgets: asRows(tables.budgets),
       allocationTargets: asRows(tables.allocationTargets),
@@ -171,6 +169,16 @@ function upgradeV3(record: Record<string, unknown>): DataExportFile {
       assistantPrompts: asRows(tables.assistantPrompts),
       assistantConfig: asRows(tables.assistantConfig),
     },
+  }
+}
+
+/** v4 files carry a categoryRules table this version no longer has; the rest is identical. */
+function upgradeV4(record: Record<string, unknown>): DataExportFile {
+  const tables = record.tables as Record<string, unknown>
+  return {
+    version: DATA_EXPORT_VERSION,
+    exportedAt: typeof record.exportedAt === 'number' ? record.exportedAt : Date.now(),
+    tables: Object.fromEntries(TABLE_KEYS.map((key) => [key, asRows(tables[key])])) as Record<DataTableKey, LocalRow[]>,
   }
 }
 
@@ -190,6 +198,7 @@ export function parseDataExportFile(value: unknown): DataExportFile {
 
   if (record.version === 2) return upgradeV2(record)
   if (record.version === 3) return upgradeV3(record)
+  if (record.version === 4) return upgradeV4(record)
 
   if (record.version !== DATA_EXPORT_VERSION) {
     throw new Error(`Unsupported data export version: ${String(record.version)}.`)

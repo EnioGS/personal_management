@@ -68,17 +68,6 @@ export const SQLITE_SCHEMAS: Record<DataTableKey, SqliteTableSchema> = {
       { column: 'archived', key: 'archived', type: 'boolean' },
     ],
   },
-  categoryRules: {
-    sqlName: 'category_rules',
-    columns: [
-      { column: 'category_id', key: 'categoryId', type: 'integer' },
-      { column: 'match', key: 'match', type: 'text' },
-      { column: 'pattern', key: 'pattern', type: 'text' },
-      { column: 'case_sensitive', key: 'caseSensitive', type: 'boolean' },
-      { column: 'priority', key: 'priority', type: 'integer' },
-      { column: 'scope', key: 'scope', type: 'text' },
-    ],
-  },
   entries: {
     sqlName: 'entries',
     columns: [
@@ -156,7 +145,7 @@ export const SQLITE_SCHEMAS: Record<DataTableKey, SqliteTableSchema> = {
     sqlName: 'entry_labels',
     columns: [
       { column: 'entry_id', key: 'entryId', type: 'integer' },
-      { column: 'finance_destinations', key: 'financeDestinations', type: 'json' },
+      { column: 'finance_destination', key: 'financeDestination', type: 'text' },
       { column: 'flow_role', key: 'flowRole', type: 'text' },
       { column: 'settlement_channel', key: 'settlementChannel', type: 'text' },
       { column: 'spending_treatment', key: 'spendingTreatment', type: 'text' },

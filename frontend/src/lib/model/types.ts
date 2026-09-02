@@ -54,31 +54,16 @@ export interface TableDef {
   investmentClass?: InvestmentClass
 }
 
-/** A canonical category. Raw values in the data resolve to one of these via CategoryRule. */
+/**
+ * A canonical category. It is pure vocabulary: the semantic-category label on an
+ * ingestion row names one of these, and typing a name that does not exist yet
+ * creates it. There is no rule engine that derives a category from row text.
+ */
 export interface Category {
   name: string
   /** Restricts where the category is offered; undefined means every table. */
   scope?: TableKind
   archived?: boolean
-}
-
-export type CategoryMatch = 'equals' | 'contains' | 'startsWith' | 'regex'
-
-/**
- * Maps raw values onto a Category at *read* time — the stored row keeps whatever the
- * import or the user actually wrote. That is what lets a rule added months later
- * reclassify all existing history at once, and be edited or removed without data loss.
- * Rules are evaluated in `priority` order and the first match wins.
- */
-export interface CategoryRule {
-  /** Row id of the Category this rule resolves to. */
-  categoryId: number
-  match: CategoryMatch
-  pattern: string
-  caseSensitive?: boolean
-  priority: number
-  /** Restricts the rule to one kind of table; undefined applies it everywhere. */
-  scope?: TableKind
 }
 
 /** One row of user data. Every table's rows live in a single store, split by `tableId`. */
@@ -105,11 +90,19 @@ export interface AllocationTarget {
   targetPercent: number
 }
 
-/** Finance surfaces a labelled row contributes to. A row may belong to more than one. */
-export type FinanceDestination = 'movements' | 'spending' | 'investments' | 'recurring'
+/**
+ * The one Finance surface a labelled row belongs to. It is single-valued: a
+ * spending row is still money that moved, so Movements reads it too, rather than
+ * the row having to claim both. Recurrence is its own dimension, so there is no
+ * `recurring` destination competing with `spending`.
+ */
+export type FinanceDestination = 'movements' | 'spending' | 'investments'
 
-/** Economic direction, independent from the sign convention used by a source file. */
-export type FlowRole = 'inflow' | 'outflow' | 'transfer' | 'adjustment'
+/**
+ * Economic direction, independent from the sign convention used by a source file.
+ * `cancelled` marks a voided or reversed record that must not reach any total.
+ */
+export type FlowRole = 'inflow' | 'outflow' | 'transfer' | 'adjustment' | 'cancelled'
 
 /** Where the event is settled; used to keep card, cash and investment effects distinct. */
 export type SettlementChannel = 'checkingAccount' | 'creditCard' | 'cash' | 'investment' | 'other'
@@ -143,7 +136,7 @@ export type IngestionTargetField =
   | 'investmentType'
   | 'note'
   | 'destination'
-  | 'financeDestinations'
+  | 'financeDestination'
   | 'flowRole'
   | 'settlementChannel'
   | 'spendingTreatment'
@@ -186,7 +179,7 @@ export interface IngestionColumnMapping {
 /** Labels are sidecar data so all table schemas can share the same classification model. */
 export interface EntryLabels {
   entryId: number
-  financeDestinations: FinanceDestination[]
+  financeDestination: FinanceDestination
   flowRole: FlowRole
   settlementChannel: SettlementChannel
   spendingTreatment: SpendingTreatment
@@ -196,7 +189,7 @@ export interface EntryLabels {
 }
 
 export interface IngestionRowLabels {
-  financeDestinations?: FinanceDestination[]
+  financeDestination?: FinanceDestination
   flowRole?: FlowRole
   settlementChannel?: SettlementChannel
   spendingTreatment?: SpendingTreatment
@@ -210,7 +203,7 @@ export interface IngestionRowLabels {
  * invalid value instead of silently discarding what the user entered.
  */
 export interface IngestionRowLabelValues {
-  financeDestinations?: string
+  financeDestination?: string
   flowRole?: string
   settlementChannel?: string
   spendingTreatment?: string

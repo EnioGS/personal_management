@@ -6,14 +6,14 @@ describe('capitalEvolution', () => {
     const points = capitalEvolution([
       { date: Date.UTC(2026, 0, 5), amount: 100, direction: 'in' },
       { date: Date.UTC(2026, 0, 8), amount: 30, direction: 'out' },
-      { date: Date.UTC(2026, 2, 2), amount: 20, direction: 'out', cardId: 1 },
-      { date: Date.UTC(2026, 2, 5), amount: -5, direction: 'out', cardId: 1 },
+      { date: Date.UTC(2026, 2, 2), amount: 20, direction: 'out', cardId: 1, financeDestination: 'spending', spendingTreatment: 'expense' },
+      { date: Date.UTC(2026, 2, 5), amount: 5, direction: 'in', cardId: 1, financeDestination: 'spending', spendingTreatment: 'rebate' },
     ], { from: Date.UTC(2026, 0, 1), to: Date.UTC(2026, 2, 31) })
 
     expect(points).toEqual([
       { month: '2026-01', cashCapital: 70, variableIncome: 0, fixedIncome: 0, capital: 70, cardSpend: 0 },
       { month: '2026-02', cashCapital: 70, variableIncome: 0, fixedIncome: 0, capital: 70, cardSpend: 0 },
-      { month: '2026-03', cashCapital: 70, variableIncome: 0, fixedIncome: 0, capital: 70, cardSpend: 20 },
+      { month: '2026-03', cashCapital: 70, variableIncome: 0, fixedIncome: 0, capital: 70, cardSpend: 15 },
     ])
   })
 

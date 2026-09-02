@@ -29,7 +29,7 @@ describe('ingestion promotion', () => {
   it('does not make a row ready until required labels and destination data are valid', async () => {
     const { rowId, tableId } = await addCardRow()
     const row = await updateIngestionRowLabels(rowId, {
-      financeDestinations: ['spending'],
+      financeDestination: 'spending',
       flowRole: 'outflow',
       settlementChannel: 'creditCard',
       spendingTreatment: 'expense',
@@ -50,7 +50,7 @@ describe('ingestion promotion', () => {
   it('promotes a ready row once and persists its label sidecar', async () => {
     const { rowId, tableId } = await addCardRow()
     await updateIngestionRowLabels(rowId, {
-      financeDestinations: ['movements'],
+      financeDestination: 'movements',
       flowRole: 'outflow',
       settlementChannel: 'creditCard',
       spendingTreatment: 'notApplicable',

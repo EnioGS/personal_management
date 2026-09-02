@@ -2,8 +2,12 @@
 
 ## Status
 
-Accepted — builds on adr/0022's table model, and on the combobox column
-type introduced for open-vocabulary columns (`lib/table-schema.ts`).
+Superseded by adr/0031. Category rules, the resolver and the Categories
+settings panel were removed: a row's category is now one of the labels assigned
+in the Data ingestion centre, and naming a category there creates it. Read-time
+resolution solved the wrong half of the problem — it normalised a raw string,
+but it also let a row reach a dashboard without anyone deciding what the row
+actually was.
 
 ## Context
 

@@ -57,14 +57,7 @@ describe('rowToSqlValues / sqlValuesToRow round-trip', () => {
 
   it('round-trips category names and normalization rule fields', () => {
     const category = { id: 7, createdAt: 1, data: { name: 'Recebida pelo Pix', scope: 'bankLedger', archived: false } }
-    const rule = {
-      id: 8,
-      createdAt: 2,
-      data: { categoryId: 7, match: 'contains', pattern: 'recebida pelo pix', caseSensitive: false, priority: 3, scope: 'bankLedger' },
-    }
-
     expect(sqlValuesToRow(SQLITE_SCHEMAS.categories, rowToSqlValues(SQLITE_SCHEMAS.categories, category))).toEqual(category)
-    expect(sqlValuesToRow(SQLITE_SCHEMAS.categoryRules, rowToSqlValues(SQLITE_SCHEMAS.categoryRules, rule))).toEqual(rule)
   })
 
   it('round-trips investment class as table metadata', () => {
@@ -87,7 +80,7 @@ describe('rowToSqlValues / sqlValuesToRow round-trip', () => {
         sourceRowFingerprint: 'row-hash',
         rawValues: { Data: '2026-01-01', Valor: '10,00' },
         mappedValues: { amount: 10 },
-        labels: { financeDestinations: ['movements', 'spending'], flowRole: 'outflow' },
+        labels: { financeDestination: 'spending', flowRole: 'outflow' },
         status: 'unlabelled',
         validationErrors: ['Choose a destination table.'],
       },

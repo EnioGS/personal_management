@@ -1,8 +1,22 @@
 import { useMemo } from 'react'
 import type { StoredRow } from '@/lib/local-store/create-local-table'
 import { useUiStore } from '@/store/ui-store'
-import { entriesForTable, useEntriesStore, useTableDefsStore } from './model-stores'
+import { entriesForTable, useEntriesStore, useEntryLabelsStore, useTableDefsStore } from './model-stores'
 import type { Entry, InvestmentClass, TableKind } from './types'
+
+/**
+ * Rows whose ingestion labels the user has confirmed. Everything else is still in
+ * the ingestion centre's worklist, so no chart may count it — this is the single
+ * gate every analytics surface outside the Finances dashboard passes through.
+ */
+function useLabelledEntries(): StoredRow<Entry>[] {
+  const entries = useEntriesStore((s) => s.items)
+  const entryLabels = useEntryLabelsStore((s) => s.items)
+  return useMemo(() => {
+    const labelled = new Set(entryLabels.filter((labels) => labels.flowRole !== 'cancelled').map((labels) => labels.entryId))
+    return entries.filter((entry) => labelled.has(entry.id))
+  }, [entries, entryLabels])
+}
 
 /**
  * The rows of whichever table a workspace currently has selected.
@@ -13,7 +27,7 @@ import type { Entry, InvestmentClass, TableKind } from './types'
  */
 export function useActiveTableEntries(workspaceId: string, kinds: TableKind[], investmentClass?: InvestmentClass): StoredRow<Entry>[] {
   const tableDefs = useTableDefsStore((s) => s.items)
-  const entries = useEntriesStore((s) => s.items)
+  const entries = useLabelledEntries()
   const remembered = useUiStore((s) => s.activeTableByWorkspace[workspaceId])
   // Call sites pass an inline array literal, so compare by contents, not identity.
   const kindKey = kinds.join(',')
@@ -29,7 +43,7 @@ export function useActiveTableEntries(workspaceId: string, kinds: TableKind[], i
 /** Every row across every table of the given kinds — for rollups that span tables. */
 export function useEntriesOfKinds(kinds: TableKind[]): StoredRow<Entry>[] {
   const tableDefs = useTableDefsStore((s) => s.items)
-  const entries = useEntriesStore((s) => s.items)
+  const entries = useLabelledEntries()
   const kindKey = kinds.join(',')
 
   return useMemo(() => {
