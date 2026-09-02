@@ -92,7 +92,8 @@
     "noCategories": "No categories yet.",
     "deleteCategory": "Delete \"{{name}}\"",
     "rulesHeading": "Normalization rules",
-    "rulesDescription": "Matching strings run from top to bottom. The first matching string wins; move a rule to change its priority.",
+    "rulesDescription": "Matching strings run from top to bottom. The first matching string wins; move a rule to change its priority. Rules remain a fallback while historical data is being reviewed in Data ingestion centre.",
+    "legacyCoverage": "{{labelledEntries}} of {{activeEntries}} active entries have completed labels; {{awaitingReview}} still use the legacy fallback.",
     "matchTypes": {
       "contains": "Contains",
       "equals": "Equals",

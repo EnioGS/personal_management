@@ -15,6 +15,8 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useCategoriesStore, useCategoryRulesStore } from '@/lib/model/model-stores'
+import { useEntriesStore, useEntryLabelsStore } from '@/lib/model/model-stores'
+import { labelCoverage } from '@/lib/model/label-coverage'
 import { useCategoryRawValues } from '@/lib/model/use-unclassified-values'
 
 export function CategoriesPanel() {
@@ -124,6 +126,9 @@ function RulesSection() {
   const updateRule = useCategoryRulesStore((s) => s.updateItem)
   const deleteRule = useCategoryRulesStore((s) => s.deleteItem)
   const categories = useCategoriesStore((s) => s.items)
+  const entries = useEntriesStore((s) => s.items)
+  const entryLabels = useEntryLabelsStore((s) => s.items)
+  const coverage = labelCoverage(entries, entryLabels)
 
   const sorted = [...rules].sort((a, b) => a.priority - b.priority)
 
@@ -149,6 +154,7 @@ function RulesSection() {
       <div>
         <h2 className="text-sm font-medium">{t('categories.rulesHeading')}</h2>
         <p className="text-muted-foreground text-xs">{t('categories.rulesDescription')}</p>
+        <p className="text-muted-foreground mt-1 text-xs">{t('categories.legacyCoverage', { ...coverage })}</p>
       </div>
 
       {sorted.length === 0 ? (

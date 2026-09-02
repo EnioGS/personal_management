@@ -92,7 +92,8 @@
     "noCategories": "Nenhuma categoria ainda.",
     "deleteCategory": "Excluir \"{{name}}\"",
     "rulesHeading": "Regras de normalização",
-    "rulesDescription": "As strings de correspondência são executadas de cima para baixo. A primeira que combinar vence; mova uma regra para mudar sua prioridade.",
+    "rulesDescription": "As strings de correspondência são executadas de cima para baixo. A primeira que combinar vence; mova uma regra para mudar sua prioridade. As regras continuam como fallback enquanto o histórico é revisado no Centro de ingestão de dados.",
+    "legacyCoverage": "{{labelledEntries}} de {{activeEntries}} lançamentos ativos têm rótulos completos; {{awaitingReview}} ainda usam o fallback legado.",
     "matchTypes": {
       "contains": "Contém",
       "equals": "Igual a",
