@@ -75,6 +75,25 @@ export function ChatPanel() {
     resizeComposer()
   }, [draft])
 
+  // The panel is mounted while closed, where the composer is a few pixels wide and
+  // its placeholder wraps into many lines — measuring there would open the panel with
+  // a composer already at its maximum height. Re-measure whenever the element's own
+  // width actually changes (opening the panel, dragging it wider or narrower), which
+  // is also what makes the height track the text at every panel width.
+  useEffect(() => {
+    const composer = composerRef.current
+    if (!composer || typeof ResizeObserver === 'undefined') return
+    let lastWidth = composer.clientWidth
+    const observer = new ResizeObserver(() => {
+      // Ignore the height changes this very effect causes; only width matters here.
+      if (composer.clientWidth === lastWidth) return
+      lastWidth = composer.clientWidth
+      resizeComposer()
+    })
+    observer.observe(composer)
+    return () => observer.disconnect()
+  }, [])
+
   async function handleFilesSelected(files: FileList | File[]) {
     for (const file of Array.from(files)) {
       const result = await readAttachedFile(file)
