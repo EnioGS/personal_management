@@ -42,8 +42,9 @@ export const SPENDING_TREATMENTS: LabelOption<SpendingTreatment>[] = [
 
 export const RECURRENCES: LabelOption<RecurrenceLabel>[] = [
   { value: 'oneOff', meaning: 'Happens once; nothing like it is expected again.' },
-  { value: 'recurring', meaning: 'Repeats on a schedule — a subscription, rent, a monthly fee.' },
-  { value: 'unknown', meaning: 'Not decided yet. Allowed, but it tells the Recurring screen nothing.' },
+  { value: 'recurring', meaning: 'Repeats on a schedule with no end in sight — a subscription, rent, a monthly fee.' },
+  { value: 'installment', meaning: 'One purchase split into a fixed number of monthly charges ("parcela 3/10"); it ends on a known date.' },
+  { value: 'undecided', meaning: 'Nobody has judged this row yet. Allowed, but the Recurring screen then has to guess from the description.' },
 ]
 
 export function labelValues<T extends string>(options: LabelOption<T>[]): T[] {

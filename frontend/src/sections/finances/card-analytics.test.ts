@@ -50,4 +50,16 @@ describe('card analytics', () => {
   it('never returns a negative date countdown', () => {
     expect(daysUntil(Date.UTC(2026, 7, 1), new Date(Date.UTC(2026, 8, 2)))).toBe(0)
   })
+
+  it('lets an explicit recurrence label decide what is an instalment, not the description text', () => {
+    const rows = [
+      entry({ description: 'Loja 2/6', amount: 100, recurrence: 'installment' }),
+      entry({ description: 'Aluguel 1/12', amount: 200, recurrence: 'recurring' }),
+      entry({ description: 'Curso 1/4', amount: 50, recurrence: 'oneOff' }),
+      entry({ description: 'Mercado 3/9', amount: 60, recurrence: 'undecided' }),
+    ]
+
+    // Ordered by the amount still owed: Loja has 4 x 100 left, Mercado 6 x 60.
+    expect(openInstallments(rows).map((installment) => installment.description)).toEqual(['Loja 2/6', 'Mercado 3/9'])
+  })
 })

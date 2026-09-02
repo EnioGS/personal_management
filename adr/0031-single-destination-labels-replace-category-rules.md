@@ -24,6 +24,13 @@ reached dashboards — the exact outcome adr/0030 existed to prevent.
   `recurring` is not a destination; the recurrence dimension already says it.
 - **Flow role gains `cancelled`** for voided or reversed records. They keep their
   provenance and reach no total.
+- **Recurrence gains `installment`, and `unknown` becomes `undecided`.** An
+  instalment plan ends on a known date and a subscription does not, and the
+  parking value now reads as "nobody judged this yet" rather than as a fact. The
+  label decides what an instalment is; the "parcela 3/10" text is read only to
+  find how far along it is, and a row explicitly labelled `oneOff` or `recurring`
+  is never re-guessed from its description. Recurring detection likewise runs
+  only over rows still marked `undecided`.
 - **The legacy migration moves rows, it does not copy them.** An entry nobody has
   labelled is deleted from its finance table and queued with its complete values;
   confirming its labels writes it back. A one-off repair version on the legacy

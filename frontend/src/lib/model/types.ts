@@ -110,7 +110,12 @@ export type SettlementChannel = 'checkingAccount' | 'creditCard' | 'cash' | 'inv
 /** A spending record either adds to spend, offsets it, or is unrelated to spending. */
 export type SpendingTreatment = 'expense' | 'rebate' | 'notApplicable'
 
-export type RecurrenceLabel = 'oneOff' | 'recurring' | 'unknown'
+/**
+ * `installment` is distinct from `recurring`: a purchase split into a fixed number
+ * of monthly charges ends, a subscription does not. `undecided` is the deliberate
+ * parking value — a row can be fully labelled without anyone having judged this yet.
+ */
+export type RecurrenceLabel = 'oneOff' | 'recurring' | 'installment' | 'undecided'
 
 export type IngestionSourceStatus = 'draftSource' | 'mapped' | 'staged' | 'archived'
 export type IngestionRowStatus =

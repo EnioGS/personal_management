@@ -46,9 +46,14 @@ export function entriesInInvoice(rows: FilteredEntry[], cycle: InvoiceCycle): Fi
   return rows.filter((row) => row.date >= cycle.from && row.date <= cycle.to && row.amount > 0)
 }
 
-/** Recognizes the common "2/3" and "Parcela 2/3" notation in imported descriptions. */
+/**
+ * The recurrence label decides *whether* a row is an instalment; the "2/3" or
+ * "Parcela 2/3" notation is then read only to find how far along it is. A row the
+ * user explicitly called one-off or recurring is never re-guessed from its text.
+ */
 export function openInstallments(rows: FilteredEntry[]): OpenInstallment[] {
   return rows
+    .filter((row) => row.recurrence === 'installment' || row.recurrence === 'undecided' || row.recurrence === undefined)
     .map((row) => {
       const match = row.description.match(/(?:parcela\s*)?(\d{1,2})\s*\/\s*(\d{1,2})/i)
       if (!match) return null

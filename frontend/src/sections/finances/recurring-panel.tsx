@@ -38,7 +38,9 @@ export function RecurringPanel() {
     // history exist. The detector still runs over everything else, so a repeating
     // charge nobody labelled yet is still proposed here.
     const declared = detectRecurringEntries(outgoing.filter((entry) => entry.recurrence === 'recurring'), 1)
-    const detected = detectRecurringEntries(outgoing.filter((entry) => entry.recurrence !== 'recurring'))
+    // Guessing is only for rows nobody has judged: an explicit oneOff or
+    // installment label must not be overridden by a repeating description.
+    const detected = detectRecurringEntries(outgoing.filter((entry) => entry.recurrence === 'undecided'))
     return [...new Map([...declared, ...detected].map((candidate) => [`${candidate.category}\u0000${Math.round(candidate.averageAmount)}`, candidate])).values()]
   }, [outgoing])
   const monthlyTotal = candidates.reduce((total, candidate) => total + candidate.averageAmount, 0)

@@ -111,6 +111,23 @@ db.version(5).stores({
 // time. Categories themselves remain as the vocabulary those labels name.
 db.version(6).stores({ categoryRules: null })
 
+// `unknown` was a poor name for the recurrence parking value: it read as a fact
+// about the row rather than as "nobody decided yet". Rename it in place, in both
+// the confirmed label sidecars and the rows still waiting in the worklist.
+db.version(7).stores({}).upgrade(async (tx) => {
+  await tx.table('entryLabels').toCollection().modify((row: LocalRow) => {
+    const labels = row.data as { recurrence?: string } | undefined
+    if (labels?.recurrence === 'unknown') row.data = { ...labels, recurrence: 'undecided' }
+  })
+  await tx.table('ingestionRows').toCollection().modify((row: LocalRow) => {
+    const ingestionRow = row.data as { labels?: { recurrence?: string }; labelValues?: { recurrence?: string } } | undefined
+    if (!ingestionRow) return
+    const labels = ingestionRow.labels?.recurrence === 'unknown' ? { ...ingestionRow.labels, recurrence: 'undecided' } : ingestionRow.labels
+    const labelValues = ingestionRow.labelValues?.recurrence === 'unknown' ? { ...ingestionRow.labelValues, recurrence: 'undecided' } : ingestionRow.labelValues
+    row.data = { ...ingestionRow, labels, labelValues }
+  })
+})
+
 export const accountsTable = db.accounts
 export const cardsTable = db.cards
 export const tableDefsTable = db.tableDefs

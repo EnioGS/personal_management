@@ -155,7 +155,9 @@ Two things it optimizes for:
   has labelled is not in a finance table at all — it waits in the worklist, so
   every chart, KPI and position reads confirmed labels only. Labels are a single
   Finance destination plus flow role, settlement channel, spending
-  expense/rebate treatment, recurrence, category and destination table.
+  expense/rebate treatment, recurrence, category and destination table. An
+  explicit label always beats a guess: description-based recurring/instalment
+  detection only runs over rows still labelled `undecided`.
 - The category vocabulary *is* the category labels (adr/0031, superseding
   adr/0023): naming a category on a row creates it. There is no rule engine and
   no Categories settings screen — one classification path, decided per row.

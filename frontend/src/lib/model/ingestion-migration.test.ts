@@ -45,7 +45,7 @@ describe('existing-entry ingestion migration', () => {
   it('repairs the legacy queue only once, so labels assigned afterwards survive a reload', async () => {
     const { rowId } = await queueLegacyRowTheOldWay()
     await migrateExistingEntriesToIngestion()
-    const reviewed = { ...((await ingestionRowsTable.get(rowId))!.data as object), labels: { financeDestination: 'movements', flowRole: 'inflow', settlementChannel: 'checkingAccount', spendingTreatment: 'notApplicable', recurrence: 'unknown' }, status: 'ready', validationErrors: [] }
+    const reviewed = { ...((await ingestionRowsTable.get(rowId))!.data as object), labels: { financeDestination: 'movements', flowRole: 'inflow', settlementChannel: 'checkingAccount', spendingTreatment: 'notApplicable', recurrence: 'undecided' }, status: 'ready', validationErrors: [] }
     await ingestionRowsTable.update(rowId, { data: reviewed })
 
     await migrateExistingEntriesToIngestion()
@@ -64,7 +64,7 @@ async function queueLegacyRowTheOldWay() {
   await migrateExistingEntriesToIngestion()
   const stored = (await ingestionRowsTable.toArray())[0]
   const entryId = await entriesTable.add({ createdAt: 4, data: { tableId, date: 1, direction: 'in', category: 'Pix', description: 'Transfer', amount: 10 } })
-  await ingestionRowsTable.update(stored.id, { data: { ...(stored.data as object), existingEntryId: entryId, labels: { financeDestination: 'movements', flowRole: 'inflow', settlementChannel: 'checkingAccount', spendingTreatment: 'notApplicable', recurrence: 'unknown' }, status: 'ready', validationErrors: [] } })
+  await ingestionRowsTable.update(stored.id, { data: { ...(stored.data as object), existingEntryId: entryId, labels: { financeDestination: 'movements', flowRole: 'inflow', settlementChannel: 'checkingAccount', spendingTreatment: 'notApplicable', recurrence: 'undecided' }, status: 'ready', validationErrors: [] } })
   const source = (await ingestionSourcesTable.toArray())[0]
   const { repairVersion: _stale, ...beforeTheRepair } = source.data as { repairVersion?: number }
   await ingestionSourcesTable.update(source.id, { data: beforeTheRepair })
