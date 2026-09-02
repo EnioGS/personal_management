@@ -4,7 +4,7 @@ import { DEFAULT_INGESTION_GUIDE, INGESTION_GUIDE_KEY } from '@/lib/ingestion-gu
 import { assistantPromptsTable } from '@/lib/assistant-prompts-db'
 import { categoriesTable, ingestionRowsTable, ingestionSourcesTable, tableDefsTable } from '@/lib/model/model-db'
 import type { Category, IngestionRow } from '@/lib/model/types'
-import { listIngestionDatasetsTool, readIngestionGuideTool, readIngestionProvenanceTool, readIngestionTableTool, updateIngestionLabelsTool } from './ingestion-tools'
+import { addIngestionBlankColumnTool, assignIngestionColumnsTool, listIngestionDatasetsTool, readIngestionGuideTool, readIngestionProvenanceTool, readIngestionTableTool, updateIngestionLabelsTool } from './ingestion-tools'
 
 const context = { attachments: [] } as never
 
@@ -108,5 +108,31 @@ describe('what the dataset listing tells the model', () => {
 
     expect(page).toMatchObject({ total: 3, offset: 0, returned: 2, hasMore: true })
     expect(page.rows[0].rawValues.description).toBe('Row 0')
+  })
+})
+
+describe('the legacy source has no file', () => {
+  beforeEach(async () => { await wipeAllData() })
+
+  async function seedLegacySource() {
+    return ingestionSourcesTable.add({ createdAt: 1, data: { originalFilename: 'Existing data migration', sourceFingerprint: 'existing-app-data-v1', importedAt: 1, rawCsv: '', originalColumns: [], supplementalColumns: [], rowCount: 0, status: 'staged', legacy: true } })
+  }
+
+  it('says so in the listing instead of reporting an empty file to map', async () => {
+    const sourceId = await seedLegacySource()
+    await ingestionRowsTable.add({ createdAt: 2, data: { sourceId, sourceRowIndex: 0, sourceRowFingerprint: 'r0', rawValues: {}, mappedValues: {}, labels: {}, status: 'unlabelled', validationErrors: [] } satisfies IngestionRow })
+
+    const source = JSON.parse(await listIngestionDatasetsTool.execute({}, context)).sources[0]
+
+    expect(source.note).toContain('only need labels')
+    expect(source).not.toHaveProperty('rowCount')
+    expect(source.rows.total).toBe(1)
+  })
+
+  it('refuses column mapping against it, with the reason', async () => {
+    const sourceId = await seedLegacySource()
+
+    expect(await assignIngestionColumnsTool.execute({ sourceId, mappings: [{ sourceColumn: 'date', targetField: 'date' }] }, context)).toContain('no columns to map')
+    expect(await addIngestionBlankColumnTool.execute({ sourceId, name: 'quantity' }, context)).toContain('no columns to map')
   })
 })

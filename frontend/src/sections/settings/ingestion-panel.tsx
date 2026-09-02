@@ -190,7 +190,7 @@ export function IngestionPanel() {
           <SelectTrigger className="w-72"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value={UNLABELLED_DATASET}>Imported, unlabelled data ({rows.length})</SelectItem>
-            {sourceStore.items.map((source) => <SelectItem key={source.id} value={String(source.id)}>{source.originalFilename} · {source.rowCount} rows</SelectItem>)}
+            {sourceStore.items.map((source) => <SelectItem key={source.id} value={String(source.id)}>{source.originalFilename} · {source.legacy ? `${rowStore.items.filter((row) => row.sourceId === source.id).length} queued rows` : `${source.rowCount} rows`}</SelectItem>)}
           </SelectContent>
         </Select>
       </div>

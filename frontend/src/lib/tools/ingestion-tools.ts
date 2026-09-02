@@ -21,12 +21,18 @@ const MAX_ROWS = 100
  * nothing to read.
  */
 function summariseSource(stored: { id: number; data: unknown }, rows: IngestionRow[]) {
-  const { rawCsv, ...source } = stored.data as IngestionSource
+  const { rawCsv, rowCount: _statedByTheFile, ...source } = stored.data as IngestionSource
   const mine = rows.filter((row) => row.sourceId === stored.id)
   return {
     id: stored.id,
     ...source,
     rawCsvLength: rawCsv?.length ?? 0,
+    // A legacy source has no file to map, and saying so here saves the model from
+    // analysing columns that cannot exist. Its rows were moved out of the finance
+    // tables, so they are already mapped — they only need labels.
+    ...(source.legacy
+      ? { note: 'Legacy migration: rows moved out of the finance tables. There is no original file and no column mapping to do — these rows only need labels.' }
+      : {}),
     rows: {
       total: mine.length,
       unlabelled: mine.filter((row) => row.status === 'unlabelled').length,
@@ -37,6 +43,14 @@ function summariseSource(stored: { id: number; data: unknown }, rows: IngestionR
   }
 }
 const TARGET_FIELDS: IngestionTargetField[] = ['date', 'amount', 'description', 'rawCategory', 'direction', 'asset', 'investmentType', 'quantity', 'price', 'note', 'destination', 'financeDestination', 'flowRole', 'settlementChannel', 'spendingTreatment', 'categoryId', 'recurrence', 'destinationTableId']
+
+/** Mapping tools act on an uploaded file; the migration's synthetic source has none. */
+async function rejectIfLegacy(sourceId: number): Promise<string | null> {
+  const stored = await ingestionSourcesTable.get(sourceId)
+  if (!stored) return `Error: ingestion source ${sourceId} was not found.`
+  if (!(stored.data as IngestionSource).legacy) return null
+  return 'Error: this is the legacy migration source, not an uploaded file. It has no columns to map — its rows are already mapped and only need labels.'
+}
 
 export const listIngestionDatasetsTool: ToolDefinition = {
   name: 'list_ingestion_datasets',
@@ -90,6 +104,8 @@ export const assignIngestionColumnsTool: ToolDefinition = {
   parameters: { type: 'object', properties: { sourceId: { type: 'number' }, mappings: { type: 'array', items: { type: 'object', properties: { sourceColumn: { type: 'string' }, targetField: { type: 'string', enum: TARGET_FIELDS } }, required: ['sourceColumn', 'targetField'] } } }, required: ['sourceId', 'mappings'], additionalProperties: false },
   execute: async (args) => {
     if (typeof args.sourceId !== 'number' || !Array.isArray(args.mappings)) return 'Error: sourceId and mappings are required.'
+    const rejection = await rejectIfLegacy(args.sourceId)
+    if (rejection) return rejection
     try {
       const mappings = args.mappings.map((item) => ({ sourceId: args.sourceId as number, sourceColumn: String((item as Record<string, unknown>).sourceColumn ?? ''), targetField: (item as Record<string, unknown>).targetField as IngestionTargetField }))
       const result = await saveIngestionMappings(args.sourceId, mappings)
@@ -104,6 +120,8 @@ export const addIngestionBlankColumnTool: ToolDefinition = {
   parameters: { type: 'object', properties: { sourceId: { type: 'number' }, name: { type: 'string' } }, required: ['sourceId', 'name'], additionalProperties: false },
   execute: async (args) => {
     if (typeof args.sourceId !== 'number' || typeof args.name !== 'string') return 'Error: sourceId and name are required.'
+    const rejection = await rejectIfLegacy(args.sourceId)
+    if (rejection) return rejection
     try { return JSON.stringify(await createSupplementalColumn(args.sourceId, args.name)) } catch (error) { return `Error: ${error instanceof Error ? error.message : 'could not add blank column.'}` }
   },
 }
