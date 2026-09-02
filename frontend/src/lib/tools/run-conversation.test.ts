@@ -58,6 +58,13 @@ describe('runConversation', () => {
     expect(requestFn).toHaveBeenCalledTimes(3)
   })
 
+  it('allows a long labelling session before giving up: the default cap is well past a handful of rounds', async () => {
+    const requestFn = vi.fn().mockResolvedValue(toolCallMessage('call_x', 'read_text_file', { fileId: 'f1' }))
+
+    await expect(runConversation({ apiKey: 'k', model: 'm', messages: baseMessages, context, requestFn })).rejects.toThrow(/did not produce a final answer/)
+    expect(requestFn.mock.calls.length).toBeGreaterThanOrEqual(30)
+  })
+
   it('rejects once maxIterations is exhausted, calling requestFn exactly that many times', async () => {
     const requestFn = vi.fn().mockResolvedValue(toolCallMessage('call_x', 'read_text_file', { fileId: 'f1' }))
 

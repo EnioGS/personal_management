@@ -26,7 +26,7 @@ export const listIngestionDatasetsTool: ToolDefinition = {
 
 export const readIngestionTableTool: ToolDefinition = {
   name: 'read_ingestion_table',
-  description: 'Reads a paged slice of the imported-unlabelled worklist or one uploaded source, including its original filename, raw values, mappings, labels, status and validation errors. Read-only; use offset/limit for large datasets.',
+  description: 'Reads a paged slice of the imported-unlabelled worklist or one uploaded source, including its original filename, raw values, mappings, labels, status and validation errors. Read-only. The result reports the total, so read ONE page (25-100 rows), act on it, and answer the user — never loop through an entire backlog before replying.',
   parameters: { type: 'object', properties: { sourceId: { type: 'number', description: 'Uploaded source ID. Omit to read imported unlabelled rows.' }, offset: { type: 'number' }, limit: { type: 'number' } }, additionalProperties: false },
   execute: async (args) => {
     const offset = typeof args.offset === 'number' && args.offset >= 0 ? Math.floor(args.offset) : 0

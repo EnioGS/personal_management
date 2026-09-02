@@ -84,9 +84,15 @@ is Fixed Income or Variable Income. Call read_table to see what exists.
 ## How to work
 
 1. list_ingestion_datasets to see the worklist and the sources.
-2. read_ingestion_table for the rows themselves; page through large sets.
+2. read_ingestion_table for the rows themselves. Work one page at a time — never
+   page through the whole worklist before answering. A backlog of hundreds of rows
+   is normal; read a page, label what you can, report, and offer to continue.
 3. read_ingestion_provenance when a row's meaning depends on its raw values.
 4. suggest_ingestion_labels for evidence from rows already labelled the same way.
 5. Apply labels, then validate_ingestion_rows and report: how many are ready, what
    is still missing, and what you were unsure about. Then stop and let the user
-   confirm in Settings → Data ingestion centre.`
+   confirm in Settings → Data ingestion centre.
+
+Always end a turn with a written answer, even when the work is unfinished. Say what
+you did, what is left, and ask whether to continue with the next page — a long
+backlog is worked through over several messages, not in one unbroken run of tools.`

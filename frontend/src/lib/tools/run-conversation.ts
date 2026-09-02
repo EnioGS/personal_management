@@ -4,6 +4,17 @@ import type { ToolContext } from './types'
 
 type RequestFn = typeof requestChatMessage
 
+/**
+ * How many request/tool-result rounds one message may take before the loop gives up.
+ *
+ * Labelling work is legitimately long: reading a page of staged rows, checking their
+ * provenance, applying labels in batches and validating the result is easily a dozen
+ * rounds on its own, and each round may carry several parallel tool calls. The cap
+ * exists only to stop a model that has started looping, so it sits well above what
+ * real work needs rather than just above the shortest task.
+ */
+const DEFAULT_MAX_TOOL_ROUNDS = 30
+
 export type ConversationStatus = { type: 'waiting' } | { type: 'tool'; name: string }
 
 export interface RunConversationArgs {
@@ -27,7 +38,7 @@ export async function runConversation({
   messages,
   context,
   tools,
-  maxIterations = 5,
+  maxIterations = DEFAULT_MAX_TOOL_ROUNDS,
   requestFn = requestChatMessage,
   onStatus,
 }: RunConversationArgs): Promise<string> {
@@ -51,7 +62,7 @@ export async function runConversation({
     }
   }
 
-  throw new Error(`Assistant did not produce a final answer after ${maxIterations} tool-call rounds.`)
+  throw new Error(`Assistant did not produce a final answer after ${maxIterations} tool-call rounds. Ask it to continue, or narrow the request — for example a page of rows at a time.`)
 }
 
 async function executeToolCall(
