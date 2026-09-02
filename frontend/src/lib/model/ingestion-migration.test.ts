@@ -13,6 +13,6 @@ describe('existing-entry ingestion migration', () => {
     await expect(migrateExistingEntriesToIngestion()).resolves.toEqual({ queued: 1, skipped: 0 })
     await expect(migrateExistingEntriesToIngestion()).resolves.toEqual({ queued: 0, skipped: 1 })
     expect(await entriesTable.count()).toBe(1)
-    expect((await ingestionRowsTable.toArray())[0].data).toMatchObject({ existingEntryId: entryId, destinationTableId: tableId })
+    expect((await ingestionRowsTable.toArray())[0].data).toMatchObject({ existingEntryId: entryId, destinationTableId: tableId, labels: {}, status: 'unlabelled' })
   })
 })

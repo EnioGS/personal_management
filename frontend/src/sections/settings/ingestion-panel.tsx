@@ -12,7 +12,7 @@ import {
   stageIngestionSource,
   validateIngestionMappings,
 } from '@/lib/model/ingestion-source'
-import { promoteReadyIngestionRows, updateIngestionRowLabels } from '@/lib/model/ingestion-promotion'
+import { promoteReadyIngestionRows, updateIngestionRowWorklist } from '@/lib/model/ingestion-promotion'
 import {
   useCategoriesStore,
   useIngestionColumnMappingsStore,
@@ -20,7 +20,7 @@ import {
   useIngestionSourcesStore,
   useTableDefsStore,
 } from '@/lib/model/model-stores'
-import type { IngestionColumnMapping, IngestionRowLabels, IngestionTargetField } from '@/lib/model/types'
+import type { IngestionColumnMapping, IngestionRowLabels, IngestionRowLabelValues, IngestionTargetField } from '@/lib/model/types'
 import type { StoredRow } from '@/lib/local-store/create-local-table'
 import type { IngestionRow } from '@/lib/model/types'
 
@@ -30,6 +30,13 @@ const TARGET_FIELDS: IngestionTargetField[] = [
 ]
 
 const UNLABELLED_DATASET = '__unlabelled__'
+const LABEL_FIELDS = ['financeDestinations', 'flowRole', 'settlementChannel', 'spendingTreatment', 'category', 'recurrence', 'destinationTable'] as const
+const DATA_FIELDS = TARGET_FIELDS.filter((field) => !['financeDestinations', 'flowRole', 'settlementChannel', 'spendingTreatment', 'categoryId', 'recurrence', 'destinationTableId'].includes(field))
+const DESTINATIONS = ['movements', 'spending', 'investments', 'recurring'] as const
+const FLOW_ROLES = ['inflow', 'outflow', 'transfer', 'adjustment'] as const
+const CHANNELS = ['checkingAccount', 'creditCard', 'cash', 'investment', 'other'] as const
+const SPENDING_TREATMENTS = ['expense', 'rebate', 'notApplicable'] as const
+const RECURRENCES = ['oneOff', 'recurring', 'unknown'] as const
 
 /**
  * The first usable slice of the ingestion centre: CSV sources remain raw, their
@@ -47,6 +54,7 @@ export function IngestionPanel() {
   const [draftMappings, setDraftMappings] = useState<IngestionColumnMapping[] | null>(null)
   const [supplementalName, setSupplementalName] = useState('')
   const [message, setMessage] = useState<string | null>(null)
+  const [worklistFieldName, setWorklistFieldName] = useState('')
   const fileInput = useRef<HTMLInputElement>(null)
 
   const selectedSource = sourceStore.items.find((source) => String(source.id) === selected)
@@ -63,12 +71,27 @@ export function IngestionPanel() {
     await Promise.all([sourceStore.refresh(), mappingStore.refresh(), rowStore.refresh()])
   }
 
-  async function updateLabels(rowId: number, labels: IngestionRowLabels, destinationTableId?: number) {
+  async function updateWorklist(rowId: number, patch: { mappedValues?: Partial<IngestionRow['mappedValues']>; labels?: IngestionRowLabels; labelValues?: IngestionRowLabelValues; destinationTableId?: number | null }) {
     try {
-      await updateIngestionRowLabels(rowId, labels, destinationTableId)
+      await updateIngestionRowWorklist(rowId, patch)
       await refresh()
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Could not update labels.')
+    }
+  }
+
+  async function addWorklistField() {
+    const field = worklistFieldName.trim() as IngestionTargetField
+    if (!DATA_FIELDS.includes(field)) {
+      setMessage(`"${worklistFieldName.trim()}" is not a supported canonical data field.`)
+      return
+    }
+    try {
+      await Promise.all(rows.map((row) => updateIngestionRowWorklist(row.id, { mappedValues: { [field]: row.mappedValues[field] ?? '' } })))
+      setWorklistFieldName('')
+      await refresh()
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Could not add the blank data field.')
     }
   }
 
@@ -182,8 +205,12 @@ export function IngestionPanel() {
           {validation && <p className={cn('text-xs', validation.errors.length ? 'text-amber-600 dark:text-amber-300' : 'text-emerald-600 dark:text-emerald-300')}>{validation.errors.length ? validation.errors.join(' ') : 'Mapping covers every possible destination table. Individual blank values are checked later.'}</p>}
         </section>
       ) : (
-        <section className="min-h-0 flex-1 overflow-auto rounded-md border">
-          <table className="min-w-max text-left text-xs"><thead className="bg-muted/30"><tr><th className="p-2">Source</th><th className="p-2">Raw values</th><th className="p-2">Destinations</th><th className="p-2">Flow</th><th className="p-2">Channel</th><th className="p-2">Spending</th><th className="p-2">Category</th><th className="p-2">Recurrence</th><th className="p-2">Table</th><th className="p-2">Status</th></tr></thead><tbody>{rows.map((row) => <LabelledRow key={row.id} row={row} sourceName={sourceStore.items.find((source) => source.id === row.sourceId)?.originalFilename ?? 'Existing data'} categories={categories} tableDefs={tableDefs} onChange={updateLabels} />)}{rows.length === 0 && <tr><td colSpan={10} className="text-muted-foreground p-4 text-center">No staged data yet.</td></tr>}</tbody></table>
+        <section className="flex min-h-0 flex-1 flex-col gap-2 rounded-md border p-2">
+          <p className="text-muted-foreground text-xs">Source data is shown in its own columns. Canonical fields can be edited here; label fields accept text and turn red when the value is not valid.</p>
+          <div className="min-h-0 flex-1 overflow-auto rounded border">
+            <table className="min-w-max text-left text-xs"><thead className="bg-muted/30"><tr><th className="sticky left-0 z-10 bg-muted/30 p-2">Source</th>{rawColumns(rows).map((column) => <th key={`raw-${column}`} className="min-w-36 p-2">{column}</th>)}{DATA_FIELDS.map((field) => <th key={field} className="min-w-32 p-2">{field}</th>)}{LABEL_FIELDS.map((field) => <th key={field} className="min-w-32 p-2">{field}</th>)}<th className="min-w-44 p-2">Status</th></tr></thead><tbody>{rows.map((row) => <WorklistRow key={row.id} row={row} sourceName={sourceStore.items.find((source) => source.id === row.sourceId)?.originalFilename ?? 'Existing data'} categories={categories} tableDefs={tableDefs} rawColumns={rawColumns(rows)} onChange={updateWorklist} />)}{rows.length === 0 && <tr><td colSpan={1 + DATA_FIELDS.length + LABEL_FIELDS.length} className="text-muted-foreground p-4 text-center">No staged data yet.</td></tr>}</tbody></table>
+          </div>
+          <div className="flex items-center gap-2 text-xs"><Input value={worklistFieldName} onChange={(event) => setWorklistFieldName(event.target.value)} placeholder="Add blank canonical field, e.g. quantity" className="h-7 w-60 text-xs" /><Button type="button" size="xs" variant="outline" onClick={() => void addWorklistField()} disabled={!worklistFieldName.trim()}><Plus className="size-3" />Add blank data field</Button></div>
         </section>
       )}
 
@@ -195,14 +222,55 @@ export function IngestionPanel() {
   )
 }
 
-function LabelledRow({ row, sourceName, categories, tableDefs, onChange }: { row: StoredRow<IngestionRow>; sourceName: string; categories: { id: number; name: string }[]; tableDefs: { id: number; name: string }[]; onChange: (id: number, labels: IngestionRowLabels, destinationTableId?: number) => Promise<void> }) {
-  const labels = row.labels
-  function update(patch: Partial<IngestionRowLabels>, destinationTableId = row.destinationTableId) {
-    void onChange(row.id, { ...labels, ...patch }, destinationTableId)
-  }
-  return <tr className="border-t align-top"><td className="max-w-32 p-2">{sourceName}</td><td className="max-w-72 truncate p-2 font-mono" title={JSON.stringify(row.rawValues)}>{JSON.stringify(row.rawValues)}</td><td className="p-1"><div className="flex gap-1">{(['movements', 'spending', 'investments', 'recurring'] as const).map((destination) => <label key={destination} className="flex items-center gap-1 whitespace-nowrap"><input type="checkbox" checked={labels.financeDestinations?.includes(destination) ?? false} onChange={(event) => update({ financeDestinations: event.target.checked ? [...(labels.financeDestinations ?? []), destination] : (labels.financeDestinations ?? []).filter((value) => value !== destination) })} />{destination}</label>)}</div></td><td className="p-1"><NativeSelect value={labels.flowRole ?? ''} options={['inflow', 'outflow', 'transfer', 'adjustment']} onChange={(value) => update({ flowRole: value as IngestionRowLabels['flowRole'] })} /></td><td className="p-1"><NativeSelect value={labels.settlementChannel ?? ''} options={['checkingAccount', 'creditCard', 'cash', 'investment', 'other']} onChange={(value) => update({ settlementChannel: value as IngestionRowLabels['settlementChannel'] })} /></td><td className="p-1"><NativeSelect value={labels.spendingTreatment ?? ''} options={['expense', 'rebate', 'notApplicable']} onChange={(value) => update({ spendingTreatment: value as IngestionRowLabels['spendingTreatment'] })} /></td><td className="p-1"><select className="h-7 min-w-28 rounded border bg-transparent px-1" value={labels.categoryId ?? ''} onChange={(event) => update({ categoryId: event.target.value ? Number(event.target.value) : undefined })}><option value="">None</option>{categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></td><td className="p-1"><NativeSelect value={labels.recurrence ?? ''} options={['oneOff', 'recurring', 'unknown']} onChange={(value) => update({ recurrence: value as IngestionRowLabels['recurrence'] })} /></td><td className="p-1"><select className="h-7 min-w-32 rounded border bg-transparent px-1" value={row.destinationTableId ?? ''} onChange={(event) => update({}, event.target.value ? Number(event.target.value) : undefined)}><option value="">Choose table</option>{tableDefs.map((table) => <option key={table.id} value={table.id}>{table.name}</option>)}</select></td><td className="max-w-48 p-2">{row.status}{row.validationErrors.length > 0 && <p className="text-amber-600 dark:text-amber-300">{row.validationErrors[0]}</p>}</td></tr>
+function rawColumns(rows: StoredRow<IngestionRow>[]) {
+  return [...new Set(rows.flatMap((row) => Object.keys(row.rawValues)))].sort((a, b) => a.localeCompare(b))
 }
 
-function NativeSelect({ value, options, onChange }: { value: string; options: string[]; onChange: (value: string) => void }) {
-  return <select className="h-7 min-w-28 rounded border bg-transparent px-1" value={value} onChange={(event) => onChange(event.target.value)}><option value="">Choose</option>{options.map((option) => <option key={option} value={option}>{option}</option>)}</select>
+function WorklistRow({ row, sourceName, categories, tableDefs, rawColumns: columns, onChange }: { row: StoredRow<IngestionRow>; sourceName: string; categories: { id: number; name: string }[]; tableDefs: { id: number; name: string }[]; rawColumns: string[]; onChange: (id: number, patch: { mappedValues?: Partial<IngestionRow['mappedValues']>; labels?: IngestionRowLabels; labelValues?: IngestionRowLabelValues; destinationTableId?: number | null }) => Promise<void> }) {
+  function saveData(field: IngestionTargetField, value: string) { void onChange(row.id, { mappedValues: { [field]: value } }) }
+  function saveLabel(field: typeof LABEL_FIELDS[number], value: string) {
+    const labelValues = { ...allLabelValues(row, categories, tableDefs), [field]: value }
+    const parsed = parseLabelValues(labelValues, categories, tableDefs)
+    void onChange(row.id, { labels: parsed.labels, labelValues, destinationTableId: parsed.destinationTableId ?? null })
+  }
+  return <tr className="border-t align-top"><td className="sticky left-0 bg-background p-2 font-medium">{sourceName}</td>{columns.map((column) => <td key={column} className="max-w-52 truncate p-2" title={row.rawValues[column] ?? ''}>{row.rawValues[column] ?? ''}</td>)}{DATA_FIELDS.map((field) => <td key={field} className="p-1"><EditableCell value={String(row.mappedValues[field] ?? '')} onCommit={(value) => saveData(field, value)} /></td>)}{LABEL_FIELDS.map((field) => <td key={field} className="p-1"><EditableCell value={labelValue(row, field, categories, tableDefs)} invalid={labelFieldInvalid(row, field, categories, tableDefs)} onCommit={(value) => saveLabel(field, value)} /></td>)}<td className="max-w-56 p-2">{row.status === 'ready' ? <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-300"><Check className="size-3" />Ready</span> : row.status}{row.validationErrors.length > 0 && <p className="mt-1 text-amber-600 dark:text-amber-300">{row.validationErrors[0]}</p>}</td></tr>
+}
+
+function EditableCell({ value, invalid = false, onCommit }: { value: string; invalid?: boolean; onCommit: (value: string) => void }) {
+  return <Input key={value} defaultValue={value} onBlur={(event) => { if (event.target.value !== value) onCommit(event.target.value) }} className={cn('h-7 min-w-28 text-xs', invalid && 'border-red-500 bg-red-500/10 focus-visible:ring-red-500')} />
+}
+
+function labelValue(row: StoredRow<IngestionRow>, field: typeof LABEL_FIELDS[number], categories: { id: number; name: string }[], tableDefs: { id: number; name: string }[]) {
+  return allLabelValues(row, categories, tableDefs)[field] ?? ''
+}
+
+function allLabelValues(row: StoredRow<IngestionRow>, categories: { id: number; name: string }[], tableDefs: { id: number; name: string }[]): IngestionRowLabelValues {
+  return {
+    financeDestinations: row.labels.financeDestinations?.join(', ') ?? '',
+    flowRole: row.labels.flowRole ?? '',
+    settlementChannel: row.labels.settlementChannel ?? '',
+    spendingTreatment: row.labels.spendingTreatment ?? '',
+    category: categories.find((category) => category.id === row.labels.categoryId)?.name ?? '',
+    recurrence: row.labels.recurrence ?? '',
+    destinationTable: tableDefs.find((table) => table.id === row.destinationTableId)?.name ?? '',
+    ...row.labelValues,
+  }
+}
+
+function parseLabelValues(values: IngestionRowLabelValues, categories: { id: number; name: string }[], tableDefs: { id: number; name: string }[]) {
+  const exact = <T extends string>(value: string | undefined, allowed: readonly T[]) => allowed.find((candidate) => candidate.toLowerCase() === value?.trim().toLowerCase())
+  const destinations = values.financeDestinations?.split(/[,;|]/).map((value) => exact(value, DESTINATIONS)).filter((value): value is typeof DESTINATIONS[number] => Boolean(value)) ?? []
+  const category = categories.find((candidate) => candidate.name.toLowerCase() === values.category?.trim().toLowerCase())
+  const table = tableDefs.find((candidate) => candidate.name.toLowerCase() === values.destinationTable?.trim().toLowerCase())
+  return { labels: { ...(destinations.length ? { financeDestinations: destinations } : {}), ...(exact(values.flowRole, FLOW_ROLES) ? { flowRole: exact(values.flowRole, FLOW_ROLES) } : {}), ...(exact(values.settlementChannel, CHANNELS) ? { settlementChannel: exact(values.settlementChannel, CHANNELS) } : {}), ...(exact(values.spendingTreatment, SPENDING_TREATMENTS) ? { spendingTreatment: exact(values.spendingTreatment, SPENDING_TREATMENTS) } : {}), ...(category ? { categoryId: category.id } : {}), ...(exact(values.recurrence, RECURRENCES) ? { recurrence: exact(values.recurrence, RECURRENCES) } : {}) }, destinationTableId: table?.id }
+}
+
+function labelFieldInvalid(row: StoredRow<IngestionRow>, field: typeof LABEL_FIELDS[number], categories: { id: number; name: string }[], tableDefs: { id: number; name: string }[]) {
+  const value = labelValue(row, field, categories, tableDefs).trim()
+  if (!value) return false
+  const { labels, destinationTableId } = parseLabelValues({ ...row.labelValues, [field]: value }, categories, tableDefs)
+  if (field === 'financeDestinations') return !labels.financeDestinations || labels.financeDestinations.length !== value.split(/[,;|]/).filter(Boolean).length
+  if (field === 'category') return !labels.categoryId
+  if (field === 'destinationTable') return !destinationTableId
+  return !labels[field as keyof IngestionRowLabels]
 }

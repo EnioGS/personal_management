@@ -198,6 +198,21 @@ export interface IngestionRowLabels {
   recurrence?: RecurrenceLabel
 }
 
+/**
+ * The literal values last typed in the ingestion worklist.  Labels retain only
+ * valid canonical values, while these drafts let the UI keep and flag an
+ * invalid value instead of silently discarding what the user entered.
+ */
+export interface IngestionRowLabelValues {
+  financeDestinations?: string
+  flowRole?: string
+  settlementChannel?: string
+  spendingTreatment?: string
+  category?: string
+  recurrence?: string
+  destinationTable?: string
+}
+
 /** A lossless raw row plus its mapped values, labels and promotion lineage. */
 export interface IngestionRow {
   sourceId: number
@@ -206,6 +221,7 @@ export interface IngestionRow {
   rawValues: Record<string, string>
   mappedValues: Partial<Record<IngestionTargetField, unknown>>
   labels: IngestionRowLabels
+  labelValues?: IngestionRowLabelValues
   status: IngestionRowStatus
   validationErrors: string[]
   destinationTableId?: number

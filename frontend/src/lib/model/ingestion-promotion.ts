@@ -9,7 +9,7 @@ import {
   ingestionRowsTable,
   tableDefsTable,
 } from './model-db'
-import type { Entry, IngestionRow, IngestionRowLabels, TableDef } from './types'
+import type { Entry, IngestionRow, IngestionRowLabels, IngestionRowLabelValues, TableDef } from './types'
 
 const MAPPED_FIELD_FOR_ENTRY_FIELD: Record<string, string> = {
   date: 'date',
@@ -56,6 +56,29 @@ async function entryFromIngestionRow(row: IngestionRow): Promise<Entry> {
   return entry as Entry
 }
 
+async function validateAndSave(
+  rowId: number,
+  next: IngestionRow,
+  actor: 'user' | 'assistant',
+): Promise<IngestionRow> {
+  const errors = ingestionLabelErrors(next.labels, next.destinationTableId)
+  if (errors.length === 0) {
+    try {
+      await entryFromIngestionRow(next)
+    } catch (error) {
+      errors.push(error instanceof Error ? error.message : 'The destination table rejected this row.')
+    }
+  }
+  next.validationErrors = errors
+  next.status = errors.length === 0 ? 'ready' : next.labels.financeDestinations || Object.values(next.labelValues ?? {}).some(Boolean) ? 'invalid' : 'unlabelled'
+  await ingestionRowsTable.update(rowId, { data: next })
+  await ingestionAuditEventsTable.add({
+    createdAt: Date.now(),
+    data: { event: 'labelsChanged', actor, sourceId: next.sourceId, ingestionRowIds: [rowId], details: { status: next.status, errors } },
+  })
+  return next
+}
+
 /** Validates labels and destination data, transitioning the row only between unlabelled/ready/invalid. */
 export async function updateIngestionRowLabels(
   rowId: number,
@@ -67,23 +90,31 @@ export async function updateIngestionRowLabels(
   if (!stored) throw new Error(`Ingestion row ${rowId} was not found.`)
   const current = asIngestionRow(stored.data)
   if (current.status === 'promoted' || current.status === 'reconciledExisting') throw new Error('This row has already been finalized.')
-  const next: IngestionRow = { ...current, labels, destinationTableId }
-  const errors = ingestionLabelErrors(labels, destinationTableId)
-  if (errors.length === 0) {
-    try {
-      await entryFromIngestionRow(next)
-    } catch (error) {
-      errors.push(error instanceof Error ? error.message : 'The destination table rejected this row.')
-    }
+  return validateAndSave(rowId, { ...current, labels, destinationTableId }, actor)
+}
+
+/**
+ * Saves editable worklist cells. Mapped fields may be created on demand, which
+ * lets a sparse source acquire e.g. quantity during label review without
+ * altering the preserved original CSV.
+ */
+export async function updateIngestionRowWorklist(
+  rowId: number,
+  patch: { mappedValues?: Partial<IngestionRow['mappedValues']>; labels?: IngestionRowLabels; labelValues?: IngestionRowLabelValues; destinationTableId?: number | null },
+  actor: 'user' | 'assistant' = 'user',
+): Promise<IngestionRow> {
+  const stored = await ingestionRowsTable.get(rowId)
+  if (!stored) throw new Error(`Ingestion row ${rowId} was not found.`)
+  const current = asIngestionRow(stored.data)
+  if (current.status === 'promoted' || current.status === 'reconciledExisting') throw new Error('This row has already been finalized.')
+  const next: IngestionRow = {
+    ...current,
+    mappedValues: { ...current.mappedValues, ...patch.mappedValues },
+    labels: patch.labels ?? current.labels,
+    labelValues: patch.labelValues ?? current.labelValues,
+    destinationTableId: patch.destinationTableId === undefined ? current.destinationTableId : patch.destinationTableId ?? undefined,
   }
-  next.validationErrors = errors
-  next.status = errors.length === 0 ? 'ready' : labels.financeDestinations ? 'invalid' : 'unlabelled'
-  await ingestionRowsTable.update(rowId, { data: next })
-  await ingestionAuditEventsTable.add({
-    createdAt: Date.now(),
-    data: { event: 'labelsChanged', actor, sourceId: next.sourceId, ingestionRowIds: [rowId], details: { status: next.status, errors } },
-  })
-  return next
+  return validateAndSave(rowId, next, actor)
 }
 
 /** Finalize rows already marked ready. This is called only from the user-confirmed UI action. */

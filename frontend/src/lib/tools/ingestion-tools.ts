@@ -1,6 +1,6 @@
 import { ingestionLabelErrors } from '@/lib/model/ingestion'
 import { createSupplementalColumn, saveIngestionMappings, stageIngestionSource } from '@/lib/model/ingestion-source'
-import { updateIngestionRowLabels } from '@/lib/model/ingestion-promotion'
+import { updateIngestionRowLabels, updateIngestionRowWorklist } from '@/lib/model/ingestion-promotion'
 import { categoriesTable, categoryRulesTable, ingestionColumnMappingsTable, ingestionRowsTable, ingestionSourcesTable, tableDefsTable } from '@/lib/model/model-db'
 import { findMatchingCategoryRule } from '@/lib/model/category-resolver'
 import type { IngestionColumnMapping, IngestionRow, IngestionRowLabels, IngestionTargetField } from '@/lib/model/types'
@@ -80,6 +80,22 @@ export const updateIngestionLabelsTool: ToolDefinition = {
     for (const update of args.updates as Record<string, unknown>[]) {
       if (typeof update.rowId !== 'number' || typeof update.labels !== 'object' || update.labels === null) { result.push({ error: 'rowId and labels are required.' }); continue }
       try { result.push(await updateIngestionRowLabels(update.rowId, update.labels as IngestionRowLabels, typeof update.destinationTableId === 'number' ? update.destinationTableId : undefined, 'assistant')) } catch (error) { result.push({ rowId: update.rowId, error: error instanceof Error ? error.message : 'could not update labels.' }) }
+    }
+    return JSON.stringify(result)
+  },
+}
+
+export const updateIngestionDataFieldsTool: ToolDefinition = {
+  name: 'update_ingestion_data_fields',
+  description: 'Edits canonical data fields on explicit unfinalized ingestion rows. Use it to correct a mapped value or add a missing field such as quantity during labelling. Read the rows first. This never promotes data; the user alone confirms promotion.',
+  parameters: { type: 'object', properties: { updates: { type: 'array', items: { type: 'object', properties: { rowId: { type: 'number' }, values: { type: 'object', additionalProperties: { type: 'string' } }, }, required: ['rowId', 'values'] } } }, required: ['updates'], additionalProperties: false },
+  execute: async (args) => {
+    if (!Array.isArray(args.updates)) return 'Error: updates are required.'
+    const result: unknown[] = []
+    for (const update of args.updates as Record<string, unknown>[]) {
+      if (typeof update.rowId !== 'number' || typeof update.values !== 'object' || update.values === null) { result.push({ error: 'rowId and values are required.' }); continue }
+      const values = Object.fromEntries(Object.entries(update.values as Record<string, unknown>).filter(([field]) => TARGET_FIELDS.includes(field as IngestionTargetField)).map(([field, value]) => [field, String(value ?? '')]))
+      try { result.push(await updateIngestionRowWorklist(update.rowId, { mappedValues: values }, 'assistant')) } catch (error) { result.push({ rowId: update.rowId, error: error instanceof Error ? error.message : 'could not update data fields.' }) }
     }
     return JSON.stringify(result)
   },

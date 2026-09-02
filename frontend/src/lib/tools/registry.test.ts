@@ -23,6 +23,7 @@ describe('findTool', () => {
       'stage_ingestion_source',
       'suggest_ingestion_labels',
       'update_ingestion_labels',
+      'update_ingestion_data_fields',
       'validate_ingestion_rows',
       'add_category',
       'update_category_rule',

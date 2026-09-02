@@ -51,11 +51,11 @@ Add an ingestion model to the existing configurable-model Dexie database:
 
 ## Consequences
 
-The current category-rule resolver remains a non-destructive fallback and
-suggestion mechanism while historical rows are reviewed. It is not removed until
-coverage proves all active records have appropriate labels. Finance analytics can
-migrate to the label sidecars incrementally, keeping their existing behavior for
-unlabelled data during the transition.
+The current category-rule resolver remains a non-destructive suggestion mechanism
+while historical rows are reviewed. It is not an alternative classification path:
+Finance analytics read only entries with a confirmed label sidecar. Staged,
+unlabelled, invalid and merely suggested historical rows are deliberately absent
+from dashboards until the user confirms them.
 
 The export schema gains several typed tables, with JSON columns for lossless raw
 source values and multi-value labels. This is a modest increase in local storage

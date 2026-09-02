@@ -13,7 +13,7 @@ import { resolveFilterRange, useDashboardFilters, type DashboardFilters } from '
 import { useDashboardEntries } from '@/components/dashboard/use-dashboard-entries'
 import { formatDateLabel, formatMonthLabel, groupByKey } from '@/lib/aggregations'
 import { capitalEvolution, type CapitalEvolutionPoint, type InvestmentValueEntry } from '@/lib/dashboard/capital-evolution'
-import { useAccountsStore, useCardsStore, useEntriesStore, useTableDefsStore } from '@/lib/model/model-stores'
+import { useAccountsStore, useCardsStore, useEntriesStore, useEntryLabelsStore, useTableDefsStore } from '@/lib/model/model-stores'
 import { averageCardSpendByCategory, categorySpendChanges, frequentDescriptions, outgoingSpending, spendingByMonth } from './spending-analytics'
 import { currentInvoiceCycle, daysUntil, entriesInInvoice, openInstallments } from './card-analytics'
 import { FinanceTableDrawer } from './finance-table-drawer'
@@ -52,6 +52,7 @@ export function OverviewPanel() {
   const accounts = useAccountsStore((s) => s.items).filter((a) => !a.archived)
   const tableDefs = useTableDefsStore((s) => s.items)
   const allEntries = useEntriesStore((s) => s.items)
+  const entryLabels = useEntryLabelsStore((s) => s.items)
 
   // Capital must begin at the first matching entry, not at the start of the
   // selected window. The displayed points remain scoped to that window, while the
@@ -62,14 +63,17 @@ export function OverviewPanel() {
   )
   const capitalHistoryRows = useDashboardEntries(capitalHistoryFilters)
   const investmentHistory = useMemo<InvestmentValueEntry[]>(() => {
+    const labelsByEntryId = new Map(entryLabels.map((labels) => [labels.entryId, labels]))
     const classByTableId = new Map(
       tableDefs
         .filter((table) => table.kind === 'investmentLedger' && table.investmentClass)
         .map((table) => [table.id, table.investmentClass]),
     )
     return allEntries.flatMap((entry) => {
+      const labels = labelsByEntryId.get(entry.id)
       const investmentClass = classByTableId.get(entry.tableId)
       if (
+        !labels?.financeDestinations.includes('investments') ||
         !investmentClass ||
         typeof entry.date !== 'number' ||
         typeof entry.asset !== 'string' ||
@@ -87,7 +91,7 @@ export function OverviewPanel() {
         deleted: Boolean(entry.deleted),
       }]
     })
-  }, [tableDefs, allEntries])
+  }, [tableDefs, allEntries, entryLabels])
   const capitalData = useMemo(
     () => capitalEvolution(capitalHistoryRows, selectedRange, investmentHistory),
     [capitalHistoryRows, selectedRange, investmentHistory],
@@ -109,15 +113,12 @@ export function OverviewPanel() {
       const tableIds = new Set(
         tableDefs.filter((table) => table.kind === 'bankLedger' && table.accountId === account.id).map((table) => table.id),
       )
-      let balance = 0
-      for (const entry of allEntries) {
-        if (entry.deleted || !tableIds.has(entry.tableId)) continue
-        const amount = typeof entry.amount === 'number' ? entry.amount : 0
-        balance += entry.direction === 'in' ? amount : -amount
-      }
+      const balance = capitalHistoryRows
+        .filter((entry) => tableIds.has(entry.tableId) && entry.financeDestinations?.includes('movements'))
+        .reduce((sum, entry) => sum + (entry.direction === 'in' ? entry.amount : -entry.amount), 0)
       return { key: String(account.id), label: account.name, value: balance }
     })
-  }, [accounts, tableDefs, allEntries])
+  }, [accounts, tableDefs, capitalHistoryRows])
 
   // Every entry in the selected period, not just the most recent — the card scrolls
   // instead of truncating (see DashboardCard's fixed height + overflow-auto body).

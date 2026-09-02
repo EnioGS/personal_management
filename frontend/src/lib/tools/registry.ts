@@ -9,6 +9,7 @@ import {
   stageIngestionSourceTool,
   suggestIngestionLabelsTool,
   updateIngestionLabelsTool,
+  updateIngestionDataFieldsTool,
   validateIngestionRowsTool,
 } from './ingestion-tools'
 import { readCsvTool } from './read-csv'
@@ -38,6 +39,7 @@ export const toolRegistry: ToolDefinition[] = [
   stageIngestionSourceTool,
   suggestIngestionLabelsTool,
   updateIngestionLabelsTool,
+  updateIngestionDataFieldsTool,
   validateIngestionRowsTool,
   addCategoryTool,
   updateCategoryRuleTool,

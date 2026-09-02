@@ -1,8 +1,6 @@
 import { useMemo } from 'react'
 import type { StoredRow } from '@/lib/local-store/create-local-table'
-import { createCategoryResolver } from '@/lib/model/category-resolver'
 import { useAccountsStore, useCardsStore, useCategoriesStore, useCategoryRulesStore, useEntriesStore, useEntryLabelsStore, useTableDefsStore } from '@/lib/model/model-stores'
-import { categoryColumnFor } from '@/lib/model/table-kinds'
 import type { Account, Card, Category, CategoryRule, Entry, EntryLabels, FinanceDestination, RecurrenceLabel, SpendingTreatment, TableDef, TableKind } from '@/lib/model/types'
 import { isWithinRange } from '@/lib/dashboard/date-range'
 import { resolveFilterRange, type DashboardFilters } from './dashboard-filters'
@@ -55,23 +53,14 @@ export function filterMoneyEntries({
   entryLabels = [],
   filters,
 }: FilterMoneyEntriesParams): FilteredEntry[] {
+  // Rules remain an input for API compatibility while migration is in progress;
+  // confirmed sidecar labels are the sole classification path for dashboards.
+  void rules
   const range = resolveFilterRange(filters)
   const accountsById = new Map(accounts.map((a) => [a.id, a]))
   const cardsById = new Map(cards.map((card) => [card.id, card]))
   const labelsByEntryId = new Map(entryLabels.map((labels) => [labels.entryId, labels]))
   const tablesById = new Map(tableDefs.filter((t) => MONEY_KINDS.includes(t.kind)).map((t) => [t.id, t]))
-
-  // One resolver per table kind actually present, not per entry — category rules can
-  // be scope-restricted per kind, so a single shared resolver would apply them wrong.
-  const resolvers = new Map<TableKind, ReturnType<typeof createCategoryResolver>>()
-  function resolverFor(kind: TableKind) {
-    let resolver = resolvers.get(kind)
-    if (!resolver) {
-      resolver = createCategoryResolver(categories, rules, kind)
-      resolvers.set(kind, resolver)
-    }
-    return resolver
-  }
 
   const result: FilteredEntry[] = []
   for (const entry of entries) {
@@ -86,28 +75,28 @@ export function filterMoneyEntries({
     const date = typeof entry.date === 'number' ? entry.date : null
     if (date === null || !isWithinRange(date, range)) continue
 
-    const column = categoryColumnFor(table.kind)
-    const rawCategory = column ? entry[column] : undefined
-    const resolved = resolverFor(table.kind)(rawCategory)
     const labels = labelsByEntryId.get(entry.id)
-    const labelledCategory = labels?.categoryId ? categories.find((category) => category.id === labels.categoryId)?.name : undefined
-    const category = labelledCategory ?? resolved.label
+    // A row is deliberately invisible to finance analytics until the user has
+    // confirmed its labels in the ingestion centre.  Legacy category rules are
+    // useful while labelling, but cannot be a second path into a dashboard.
+    if (!labels) continue
+    const category = labels.categoryId ? categories.find((candidate) => candidate.id === labels.categoryId)?.name ?? 'Uncategorised' : 'Uncategorised'
     if (filters.categories.length > 0 && !filters.categories.includes(category)) continue
 
     result.push({
       tableId: table.id,
       date,
       amount: typeof entry.amount === 'number' ? entry.amount : 0,
-      direction: labels?.flowRole === 'inflow' ? 'in' : labels ? 'out' : table.kind === 'bankLedger' && entry.direction === 'in' ? 'in' : 'out',
+      direction: labels.flowRole === 'inflow' ? 'in' : 'out',
       category,
       description: String(entry.description ?? entry.note ?? ''),
       accountId,
       accountName: accountId ? accountsById.get(accountId)?.name : undefined,
       cardId: table.cardId,
-      labelled: Boolean(labels),
-      financeDestinations: labels?.financeDestinations,
-      spendingTreatment: labels?.spendingTreatment,
-      recurrence: labels?.recurrence,
+      labelled: true,
+      financeDestinations: labels.financeDestinations,
+      spendingTreatment: labels.spendingTreatment,
+      recurrence: labels.recurrence,
     })
   }
   return result

@@ -151,8 +151,10 @@ Two things it optimizes for:
 - Data enters Finance through Settings → Data ingestion centre (adr/0030): CSV
   source columns are mapped without rewriting the original file, sparse sources
   may gain explicitly blank supplemental columns, and only user-confirmed ready
-  rows can be promoted into a destination table. Labels distinguish flow role,
-  settlement channel, spending expense/rebate treatment and Finance destinations.
+  rows can be promoted into a destination table. Pending, unlabelled and invalid
+  rows are excluded from Finance analytics until confirmation. Labels distinguish
+  flow role, settlement channel, spending expense/rebate treatment and Finance
+  destinations.
 - Category rules resolve raw values onto a canonical category at *read*
   time rather than rewriting stored data (adr/0023) — adding a rule months
   later reclassifies all existing history at once, and stays reversible.

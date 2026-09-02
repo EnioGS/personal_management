@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { wipeAllData } from '@/lib/data-file'
 import { entriesTable, entryLabelsTable, ingestionRowsTable, tableDefsTable } from './model-db'
-import { promoteReadyIngestionRows, updateIngestionRowLabels } from './ingestion-promotion'
+import { promoteReadyIngestionRows, updateIngestionRowLabels, updateIngestionRowWorklist } from './ingestion-promotion'
 
 async function addCardRow() {
   const tableId = await tableDefsTable.add({ createdAt: 1, data: { name: 'Nubank', kind: 'cardLedger' } })
@@ -38,6 +38,13 @@ describe('ingestion promotion', () => {
 
     expect(row.status).toBe('invalid')
     expect(row.validationErrors).toContain('Choose a semantic category for a spending row.')
+  })
+
+  it('keeps a worklist row unlabelled when a data field is added before any labels', async () => {
+    const { rowId } = await addCardRow()
+    const row = await updateIngestionRowWorklist(rowId, { mappedValues: { quantity: '' } })
+    expect(row.mappedValues.quantity).toBe('')
+    expect(row.status).toBe('unlabelled')
   })
 
   it('promotes a ready row once and persists its label sidecar', async () => {

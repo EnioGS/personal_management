@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { StoredRow } from '@/lib/local-store/create-local-table'
-import type { Account, Card, Category, CategoryRule, Entry, TableDef } from '@/lib/model/types'
+import type { Account, Card, Category, CategoryRule, Entry, EntryLabels, TableDef } from '@/lib/model/types'
 import { filterMoneyEntries } from './use-dashboard-entries'
 import type { DashboardFilters } from './dashboard-filters'
 
@@ -34,7 +34,24 @@ function entry(id: number, overrides: Partial<Entry> & { tableId: number }): Sto
   return { id, createdAt: 0, date: inYear, amount: 100, ...overrides }
 }
 
+function labelsFor(ids: number[], categoryId?: number): StoredRow<EntryLabels>[] {
+  return ids.map((id) => ({ id: id + 1000, createdAt: 0, entryId: id, financeDestinations: ['movements'], flowRole: id === 1 ? 'inflow' : 'outflow', settlementChannel: 'checkingAccount', spendingTreatment: 'notApplicable', recurrence: 'oneOff', ...(categoryId && id === 1 ? { categoryId } : {}) }))
+}
+
 describe('filterMoneyEntries', () => {
+  it('excludes an unconfirmed entry even when old category rules would match it', () => {
+    const result = filterMoneyEntries({
+      entries: [entry(1, { tableId: 10, direction: 'in', category: 'Salary' })],
+      tableDefs: [bankTable1],
+      accounts: [account1],
+      categories: [],
+      rules: [],
+      entryLabels: [],
+      filters: baseFilters(),
+    })
+    expect(result).toEqual([])
+  })
+
   it('excludes soft-deleted entries', () => {
     const result = filterMoneyEntries({
       entries: [entry(1, { tableId: 13, deleted: true })],
@@ -42,6 +59,7 @@ describe('filterMoneyEntries', () => {
       accounts: [],
       categories: [],
       rules: [],
+      entryLabels: labelsFor([1, 2, 3]),
       filters: baseFilters(),
     })
     expect(result).toHaveLength(0)
@@ -71,7 +89,7 @@ describe('filterMoneyEntries', () => {
     expect(result).toHaveLength(0)
   })
 
-  it('marks bankLedger "in" entries as incoming and everything else as outgoing', () => {
+  it('uses confirmed flow labels for incoming and outgoing rows', () => {
     const result = filterMoneyEntries({
       entries: [
         entry(1, { tableId: 10, direction: 'in' }),
@@ -82,6 +100,7 @@ describe('filterMoneyEntries', () => {
       accounts: [account1],
       categories: [],
       rules: [],
+      entryLabels: labelsFor([1, 2, 3]),
       filters: baseFilters(),
     })
     expect(result.map((r) => r.direction)).toEqual(['in', 'out', 'out'])
@@ -94,6 +113,7 @@ describe('filterMoneyEntries', () => {
       accounts: [account1, account2],
       categories: [],
       rules: [],
+      entryLabels: labelsFor([1, 2, 3]),
       filters: baseFilters({ accountIds: [1] }),
     })
     expect(result).toHaveLength(1)
@@ -108,6 +128,7 @@ describe('filterMoneyEntries', () => {
       cards: [card],
       categories: [],
       rules: [],
+      entryLabels: labelsFor([1]),
       filters: baseFilters({ accountIds: [1] }),
     })
     expect(result).toHaveLength(1)
@@ -121,6 +142,7 @@ describe('filterMoneyEntries', () => {
       accounts: [account1, account2],
       categories: [],
       rules: [],
+      entryLabels: labelsFor([1, 2]),
       filters: baseFilters({ tableIds: [11] }),
     })
     expect(result.map((row) => row.tableId)).toEqual([11])
@@ -133,6 +155,7 @@ describe('filterMoneyEntries', () => {
       accounts: [],
       categories: [],
       rules: [],
+      entryLabels: labelsFor([1, 2]),
       filters: baseFilters({ cardIds: [100] }),
     })
     expect(result).toHaveLength(1)
@@ -158,6 +181,7 @@ describe('filterMoneyEntries', () => {
       accounts: [],
       categories: [category],
       rules: [rule],
+      entryLabels: labelsFor([1, 2], 1),
       filters: baseFilters({ categories: ['Mercado'] }),
     })
     expect(result).toHaveLength(1)
@@ -171,6 +195,7 @@ describe('filterMoneyEntries', () => {
       accounts: [account1],
       categories: [],
       rules: [],
+      entryLabels: labelsFor([1]),
       filters: baseFilters(), // no accountIds/cardIds/categories set
     })
     expect(result).toHaveLength(1)
