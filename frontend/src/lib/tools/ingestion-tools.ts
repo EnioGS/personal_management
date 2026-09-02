@@ -7,10 +7,35 @@ import { FINANCE_DESTINATIONS, FLOW_ROLES, labelValues, matchLabelValue, RECURRE
 import { assistantPromptsTable } from '@/lib/assistant-prompts-db'
 import { categoriesTable, ingestionAuditEventsTable, ingestionColumnMappingsTable, ingestionRowsTable, ingestionSourcesTable } from '@/lib/model/model-db'
 import type { AssistantPrompt } from '@/lib/assistant-prompts'
-import type { Category, IngestionAuditEvent, IngestionColumnMapping, IngestionRow, IngestionRowLabels, IngestionTargetField } from '@/lib/model/types'
+import type { Category, IngestionAuditEvent, IngestionColumnMapping, IngestionRow, IngestionRowLabels, IngestionSource, IngestionTargetField } from '@/lib/model/types'
 import type { ToolDefinition } from './types'
 
 const MAX_ROWS = 100
+
+/**
+ * A source as the model should see it: everything that identifies it, and never its
+ * `rawCsv`. The raw file is provenance measured in tens of kilobytes — spreading the
+ * stored record would put an entire bank statement into the conversation.
+ * Counts are computed from the rows themselves, so a stored `rowCount` that was never
+ * updated (the legacy migration's synthetic source) can't tell the model there is
+ * nothing to read.
+ */
+function summariseSource(stored: { id: number; data: unknown }, rows: IngestionRow[]) {
+  const { rawCsv, ...source } = stored.data as IngestionSource
+  const mine = rows.filter((row) => row.sourceId === stored.id)
+  return {
+    id: stored.id,
+    ...source,
+    rawCsvLength: rawCsv?.length ?? 0,
+    rows: {
+      total: mine.length,
+      unlabelled: mine.filter((row) => row.status === 'unlabelled').length,
+      invalid: mine.filter((row) => row.status === 'invalid').length,
+      ready: mine.filter((row) => row.status === 'ready').length,
+      finalized: mine.filter((row) => row.status === 'promoted' || row.status === 'reconciledExisting').length,
+    },
+  }
+}
 const TARGET_FIELDS: IngestionTargetField[] = ['date', 'amount', 'description', 'rawCategory', 'direction', 'asset', 'investmentType', 'quantity', 'price', 'note', 'destination', 'financeDestination', 'flowRole', 'settlementChannel', 'spendingTreatment', 'categoryId', 'recurrence', 'destinationTableId']
 
 export const listIngestionDatasetsTool: ToolDefinition = {
@@ -18,9 +43,14 @@ export const listIngestionDatasetsTool: ToolDefinition = {
   description: 'Lists the imported-unlabelled worklist and uploaded CSV sources with original filenames, source IDs, mapping state, row count, and ready-row count. Read-only.',
   parameters: { type: 'object', properties: {}, additionalProperties: false },
   execute: async () => {
-    const [sources, rows] = await Promise.all([ingestionSourcesTable.toArray(), ingestionRowsTable.toArray()])
-    const active = rows.map((row) => row.data as IngestionRow).filter((row) => row.status !== 'promoted' && row.status !== 'reconciledExisting')
-    return JSON.stringify({ unlabelled: { count: active.length, ready: active.filter((row) => row.status === 'ready').length }, sources: sources.map((source) => ({ id: source.id, ...(source.data as object) })) })
+    const [sources, storedRows] = await Promise.all([ingestionSourcesTable.toArray(), ingestionRowsTable.toArray()])
+    const rows = storedRows.map((row) => row.data as IngestionRow)
+    const active = rows.filter((row) => row.status !== 'promoted' && row.status !== 'reconciledExisting')
+    return JSON.stringify({
+      unlabelled: { count: active.length, ready: active.filter((row) => row.status === 'ready').length },
+      readTheseWith: 'read_ingestion_table without a sourceId, one page at a time',
+      sources: sources.map((source) => summariseSource(source, rows)),
+    })
   },
 }
 
@@ -32,11 +62,21 @@ export const readIngestionTableTool: ToolDefinition = {
     const offset = typeof args.offset === 'number' && args.offset >= 0 ? Math.floor(args.offset) : 0
     const limit = typeof args.limit === 'number' && args.limit > 0 ? Math.min(MAX_ROWS, Math.floor(args.limit)) : 25
     const sourceId = typeof args.sourceId === 'number' ? args.sourceId : undefined
-    const rows = (await ingestionRowsTable.toArray()).map((row) => ({ id: row.id, ...(row.data as IngestionRow) }))
-    const selected = rows.filter((row) => sourceId === undefined ? row.status !== 'promoted' && row.status !== 'reconciledExisting' : row.sourceId === sourceId)
+    const stored = await ingestionRowsTable.toArray()
+    const rows = stored.map((row) => row.data as IngestionRow)
+    const selected = stored.map((row) => ({ id: row.id, ...(row.data as IngestionRow) })).filter((row) => sourceId === undefined ? row.status !== 'promoted' && row.status !== 'reconciledExisting' : row.sourceId === sourceId)
     const source = sourceId === undefined ? undefined : await ingestionSourcesTable.get(sourceId)
     const mappings = sourceId === undefined ? [] : (await ingestionColumnMappingsTable.toArray()).filter((row) => (row.data as IngestionColumnMapping).sourceId === sourceId).map((row) => row.data)
-    return JSON.stringify({ source: source ? { id: source.id, ...(source.data as object) } : sourceId === undefined ? 'Imported, unlabelled data' : null, total: selected.length, offset, rows: selected.slice(offset, offset + limit), mappings })
+    const page = selected.slice(offset, offset + limit)
+    return JSON.stringify({
+      source: source ? summariseSource(source, rows) : sourceId === undefined ? 'Imported, unlabelled data' : null,
+      total: selected.length,
+      offset,
+      returned: page.length,
+      hasMore: offset + page.length < selected.length,
+      rows: page,
+      mappings,
+    })
   },
 }
 

@@ -58,6 +58,11 @@ export async function migrateExistingEntriesToIngestion(): Promise<{ queued: num
 
   if (pending.length) await ingestionRowsTable.bulkAdd(pending.map((row) => ({ createdAt: Date.now(), data: row })))
   if (movedEntryIds.length) await entriesTable.bulkDelete(movedEntryIds)
+  // The synthetic source has no file, so its rowCount only means anything if this
+  // keeps it current: a stale 0 reads as "there is nothing here to label".
+  const queuedForSource = (await ingestionRowsTable.toArray()).filter((row) => (row.data as IngestionRow).sourceId === sourceId).length
+  const latest = (await ingestionSourcesTable.get(sourceId))!.data as IngestionSource
+  if (latest.rowCount !== queuedForSource) await ingestionSourcesTable.update(sourceId, { data: { ...latest, rowCount: queuedForSource } })
   await ingestionAuditEventsTable.add({ createdAt: Date.now(), data: { event: 'rowsStaged', actor: 'migration', sourceId, entryIds: movedEntryIds, details: { queued: pending.length, skipped, movedOutOfTables: movedEntryIds.length } } })
   return { queued: pending.length, skipped }
 }

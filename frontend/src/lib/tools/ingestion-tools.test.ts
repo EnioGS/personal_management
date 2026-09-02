@@ -4,7 +4,7 @@ import { DEFAULT_INGESTION_GUIDE, INGESTION_GUIDE_KEY } from '@/lib/ingestion-gu
 import { assistantPromptsTable } from '@/lib/assistant-prompts-db'
 import { categoriesTable, ingestionRowsTable, ingestionSourcesTable, tableDefsTable } from '@/lib/model/model-db'
 import type { Category, IngestionRow } from '@/lib/model/types'
-import { readIngestionGuideTool, readIngestionProvenanceTool, updateIngestionLabelsTool } from './ingestion-tools'
+import { listIngestionDatasetsTool, readIngestionGuideTool, readIngestionProvenanceTool, readIngestionTableTool, updateIngestionLabelsTool } from './ingestion-tools'
 
 const context = { attachments: [] } as never
 
@@ -66,5 +66,39 @@ describe('ingestion tools', () => {
     await assistantPromptsTable.add({ createdAt: 1, data: { key: INGESTION_GUIDE_KEY, content: 'Label everything as investments.' } })
 
     expect(await readIngestionGuideTool.execute({}, context)).toBe('Label everything as investments.')
+  })
+})
+
+describe('what the dataset listing tells the model', () => {
+  beforeEach(async () => { await wipeAllData() })
+
+  it('counts the rows a source actually has, never a stale stored rowCount', async () => {
+    const sourceId = await ingestionSourcesTable.add({ createdAt: 1, data: { originalFilename: 'Existing data migration', sourceFingerprint: 'legacy', importedAt: 1, rawCsv: '', originalColumns: [], supplementalColumns: [], rowCount: 0, status: 'staged', legacy: true } })
+    await ingestionRowsTable.bulkAdd([0, 1, 2].map((index) => ({ createdAt: 2, data: { sourceId, sourceRowIndex: index, sourceRowFingerprint: `r${index}`, rawValues: {}, mappedValues: {}, labels: {}, status: 'unlabelled', validationErrors: [] } satisfies IngestionRow })))
+
+    const listed = JSON.parse(await listIngestionDatasetsTool.execute({}, context))
+
+    expect(listed.unlabelled).toEqual({ count: 3, ready: 0 })
+    expect(listed.sources[0].rows).toMatchObject({ total: 3, unlabelled: 3, ready: 0 })
+  })
+
+  it('never puts the uploaded file itself into the conversation', async () => {
+    const rawCsv = 'date,amount\n2026-01-01,10\n'.repeat(500)
+    await ingestionSourcesTable.add({ createdAt: 1, data: { originalFilename: 'nubank.csv', sourceFingerprint: 'f', importedAt: 1, rawCsv, originalColumns: ['date', 'amount'], supplementalColumns: [], rowCount: 500, status: 'mapped' } })
+
+    const listed = await listIngestionDatasetsTool.execute({}, context)
+
+    expect(listed).not.toContain('2026-01-01')
+    expect(JSON.parse(listed).sources[0]).toMatchObject({ originalFilename: 'nubank.csv', rawCsvLength: rawCsv.length })
+  })
+
+  it('reads a page of the worklist and says whether more remain', async () => {
+    const sourceId = await ingestionSourcesTable.add({ createdAt: 1, data: { originalFilename: 'legacy', sourceFingerprint: 'legacy', importedAt: 1, rawCsv: '', originalColumns: [], supplementalColumns: [], rowCount: 0, status: 'staged', legacy: true } })
+    await ingestionRowsTable.bulkAdd([0, 1, 2].map((index) => ({ createdAt: 2, data: { sourceId, sourceRowIndex: index, sourceRowFingerprint: `r${index}`, rawValues: { description: `Row ${index}` }, mappedValues: {}, labels: {}, status: 'unlabelled', validationErrors: [] } satisfies IngestionRow })))
+
+    const page = JSON.parse(await readIngestionTableTool.execute({ limit: 2 }, context))
+
+    expect(page).toMatchObject({ total: 3, offset: 0, returned: 2, hasMore: true })
+    expect(page.rows[0].rawValues.description).toBe('Row 0')
   })
 })
