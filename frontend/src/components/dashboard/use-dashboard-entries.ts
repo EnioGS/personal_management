@@ -1,9 +1,9 @@
 import { useMemo } from 'react'
 import type { StoredRow } from '@/lib/local-store/create-local-table'
 import { createCategoryResolver } from '@/lib/model/category-resolver'
-import { useAccountsStore, useCardsStore, useCategoriesStore, useCategoryRulesStore, useEntriesStore, useTableDefsStore } from '@/lib/model/model-stores'
+import { useAccountsStore, useCardsStore, useCategoriesStore, useCategoryRulesStore, useEntriesStore, useEntryLabelsStore, useTableDefsStore } from '@/lib/model/model-stores'
 import { categoryColumnFor } from '@/lib/model/table-kinds'
-import type { Account, Card, Category, CategoryRule, Entry, TableDef, TableKind } from '@/lib/model/types'
+import type { Account, Card, Category, CategoryRule, Entry, EntryLabels, FinanceDestination, RecurrenceLabel, SpendingTreatment, TableDef, TableKind } from '@/lib/model/types'
 import { isWithinRange } from '@/lib/dashboard/date-range'
 import { resolveFilterRange, type DashboardFilters } from './dashboard-filters'
 
@@ -22,6 +22,11 @@ export interface FilteredEntry {
   accountId?: number
   accountName?: string
   cardId?: number
+  /** Present only when a row has passed through Data ingestion centre. */
+  labelled?: boolean
+  financeDestinations?: FinanceDestination[]
+  spendingTreatment?: SpendingTreatment
+  recurrence?: RecurrenceLabel
 }
 
 interface FilterMoneyEntriesParams {
@@ -31,6 +36,7 @@ interface FilterMoneyEntriesParams {
   cards?: StoredRow<Card>[]
   categories: StoredRow<Category>[]
   rules: StoredRow<CategoryRule>[]
+  entryLabels?: StoredRow<EntryLabels>[]
   filters: DashboardFilters
 }
 
@@ -46,11 +52,13 @@ export function filterMoneyEntries({
   cards = [],
   categories,
   rules,
+  entryLabels = [],
   filters,
 }: FilterMoneyEntriesParams): FilteredEntry[] {
   const range = resolveFilterRange(filters)
   const accountsById = new Map(accounts.map((a) => [a.id, a]))
   const cardsById = new Map(cards.map((card) => [card.id, card]))
+  const labelsByEntryId = new Map(entryLabels.map((labels) => [labels.entryId, labels]))
   const tablesById = new Map(tableDefs.filter((t) => MONEY_KINDS.includes(t.kind)).map((t) => [t.id, t]))
 
   // One resolver per table kind actually present, not per entry — category rules can
@@ -81,18 +89,25 @@ export function filterMoneyEntries({
     const column = categoryColumnFor(table.kind)
     const rawCategory = column ? entry[column] : undefined
     const resolved = resolverFor(table.kind)(rawCategory)
-    if (filters.categories.length > 0 && !filters.categories.includes(resolved.label)) continue
+    const labels = labelsByEntryId.get(entry.id)
+    const labelledCategory = labels?.categoryId ? categories.find((category) => category.id === labels.categoryId)?.name : undefined
+    const category = labelledCategory ?? resolved.label
+    if (filters.categories.length > 0 && !filters.categories.includes(category)) continue
 
     result.push({
       tableId: table.id,
       date,
       amount: typeof entry.amount === 'number' ? entry.amount : 0,
-      direction: table.kind === 'bankLedger' && entry.direction === 'in' ? 'in' : 'out',
-      category: resolved.label,
+      direction: labels?.flowRole === 'inflow' ? 'in' : labels ? 'out' : table.kind === 'bankLedger' && entry.direction === 'in' ? 'in' : 'out',
+      category,
       description: String(entry.description ?? entry.note ?? ''),
       accountId,
       accountName: accountId ? accountsById.get(accountId)?.name : undefined,
       cardId: table.cardId,
+      labelled: Boolean(labels),
+      financeDestinations: labels?.financeDestinations,
+      spendingTreatment: labels?.spendingTreatment,
+      recurrence: labels?.recurrence,
     })
   }
   return result
@@ -106,9 +121,10 @@ export function useDashboardEntries(filters: DashboardFilters): FilteredEntry[] 
   const cards = useCardsStore((s) => s.items)
   const categories = useCategoriesStore((s) => s.items)
   const rules = useCategoryRulesStore((s) => s.items)
+  const entryLabels = useEntryLabelsStore((s) => s.items)
 
   return useMemo(
-    () => filterMoneyEntries({ entries, tableDefs, accounts, cards, categories, rules, filters }),
-    [entries, tableDefs, accounts, cards, categories, rules, filters],
+    () => filterMoneyEntries({ entries, tableDefs, accounts, cards, categories, rules, entryLabels, filters }),
+    [entries, tableDefs, accounts, cards, categories, rules, entryLabels, filters],
   )
 }
