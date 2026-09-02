@@ -3,7 +3,9 @@
 ## Status
 
 Accepted — the Finances section's Overview panel, built on adr/0022's model
-and adr/0024's color system.
+and adr/0024's color system. Extended by adr/0029 (KPI deltas/sparklines,
+titled cards, ranked bars over a pie) without changing anything decided
+here.
 
 ## Context
 

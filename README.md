@@ -24,7 +24,8 @@ Two things it optimizes for:
 │   │   │   ├── ui/            # shadcn/ui primitives (button, resizable, table, chart, dropdown-menu, ...)
 │   │   │   ├── charts/        # thin Recharts wrappers (line/bar/pie/diverging-bar) + the shared color palette
 │   │   │   ├── data-table/    # table workspace (selector + "+ Nova tabela") with an inline draft row + CSV
-│   │   │   ├── dashboard/     # filter bar, stat tiles, dashboard-scoped filtering (Finances Overview)
+│   │   │   ├── dashboard/     # filter bar, stat tile (delta+sparkline), dashboard card,
+│   │   │   │                  # ranked bar list, category pill (Finances Overview and beyond)
 │   │   │   ├── chat/          # global chat panel (mounted at app root, not a section)
 │   │   │   └── layout/        # activity-bar / secondary-bar / app-shell / chart-table-panel
 │   │   ├── sections/          # feature registry — the extensibility mechanism

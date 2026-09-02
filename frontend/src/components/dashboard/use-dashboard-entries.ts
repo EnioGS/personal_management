@@ -16,6 +16,8 @@ export interface FilteredEntry {
   /** Real for bankLedger; generic/cardLedger spend has no direction field, so it counts as 'out'. */
   direction: 'in' | 'out'
   category: string
+  /** bankLedger/cardLedger's own free-text description, or generic's note — whichever the kind has. */
+  description: string
   accountId?: number
   accountName?: string
   cardId?: number
@@ -80,6 +82,7 @@ export function filterMoneyEntries({
       amount: typeof entry.amount === 'number' ? entry.amount : 0,
       direction: table.kind === 'bankLedger' && entry.direction === 'in' ? 'in' : 'out',
       category: resolved.label,
+      description: String(entry.description ?? entry.note ?? ''),
       accountId: table.accountId,
       accountName: table.accountId ? accountsById.get(table.accountId)?.name : undefined,
       cardId: table.cardId,

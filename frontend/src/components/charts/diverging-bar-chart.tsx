@@ -1,5 +1,5 @@
 import { Bar, BarChart, CartesianGrid, ReferenceLine, XAxis, YAxis } from 'recharts'
-import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart'
+import { ChartContainer, ChartLegend, ChartLegendContent, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart'
 import { DIVERGING_PAIR } from './chart-colors'
 
 interface DivergingBarChartProps<T extends Record<string, unknown>> {
@@ -63,6 +63,7 @@ export function DivergingBarChart<T extends Record<string, unknown>>({
         />
         <Bar dataKey={positiveKey} fill={`var(--color-${positiveKey})`} radius={[4, 4, 0, 0]} />
         <Bar dataKey={negativeKey} fill={`var(--color-${negativeKey})`} radius={[0, 0, 4, 4]} />
+        <ChartLegend content={<ChartLegendContent />} />
       </BarChart>
     </ChartContainer>
   )

@@ -17,6 +17,16 @@
     "amount": "Amount",
     "note": "Note"
   },
+  "overview": {
+    "monthlyFlow": "Monthly flow",
+    "whereItWent": "Where it went",
+    "accounts": "Accounts",
+    "recentEntries": "Recent entries",
+    "previousPeriod": "vs. previous period",
+    "noOutgoing": "No outgoing entries in this period yet.",
+    "noAccounts": "No accounts yet.",
+    "noEntries": "No entries in this period yet."
+  },
   "budget": {
     "description": "A monthly target per category, compared against what was actually spent.",
     "previousMonth": "Previous month",

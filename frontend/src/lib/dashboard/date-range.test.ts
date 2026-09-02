@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isWithinRange, resolvePreset } from './date-range'
+import { isWithinRange, previousEquivalentRange, resolvePreset } from './date-range'
 
 // A fixed "now" so presets are deterministic — 2026-03-15 UTC, well into the year.
 const NOW = new Date('2026-03-15T12:34:56Z')
@@ -41,5 +41,14 @@ describe('isWithinRange', () => {
   it('excludes dates just outside either endpoint', () => {
     expect(isWithinRange(range.from - 1, range)).toBe(false)
     expect(isWithinRange(range.to + 1, range)).toBe(false)
+  })
+})
+
+describe('previousEquivalentRange', () => {
+  it('is adjacent to and the same length as the original range', () => {
+    const range = resolvePreset('last30', NOW)
+    const previous = previousEquivalentRange(range)
+    expect(previous.to).toBe(range.from - 1)
+    expect(previous.to - previous.from).toBe(range.to - range.from)
   })
 })

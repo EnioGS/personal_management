@@ -123,3 +123,29 @@
     @apply bg-background text-foreground;
   }
 }
+
+/*
+ * A ThemedColor (light/dark hex) resolved against the current theme outside of a
+ * chart — every user sets --entity-light/--entity-dark inline (see
+ * components/dashboard/category-pill.tsx and ranked-bar-list.tsx), and these two
+ * rules are the one place that pick the right one, mirroring how ChartStyle switches
+ * a chart's own colors on the same .dark class.
+ *
+ * .entity-tint: a translucent fill + matching text — a category pill, where the
+ * label stays the thing being read and the color only carries identity.
+ * .entity-fill: a solid background — a ranked-bar-list bar, a legend dot.
+ */
+.entity-tint {
+  background-color: color-mix(in oklab, var(--entity-light) 16%, transparent);
+  color: var(--entity-light);
+}
+.dark .entity-tint {
+  background-color: color-mix(in oklab, var(--entity-dark) 20%, transparent);
+  color: var(--entity-dark);
+}
+.entity-fill {
+  background-color: var(--entity-light);
+}
+.dark .entity-fill {
+  background-color: var(--entity-dark);
+}

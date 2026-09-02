@@ -17,6 +17,16 @@
     "amount": "Valor",
     "note": "Observação"
   },
+  "overview": {
+    "monthlyFlow": "Fluxo mensal",
+    "whereItWent": "Para onde foi",
+    "accounts": "Contas",
+    "recentEntries": "Últimos lançamentos",
+    "previousPeriod": "vs. período anterior",
+    "noOutgoing": "Nenhuma saída neste período ainda.",
+    "noAccounts": "Nenhuma conta ainda.",
+    "noEntries": "Nenhum lançamento neste período ainda."
+  },
   "budget": {
     "description": "Uma meta mensal por categoria, comparada com o que foi realmente gasto.",
     "previousMonth": "Mês anterior",

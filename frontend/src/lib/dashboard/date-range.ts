@@ -33,3 +33,14 @@ export function resolvePreset(preset: Exclude<DateRangePreset, 'custom'>, now: D
 export function isWithinRange(dateMs: number, range: DateRange): boolean {
   return dateMs >= range.from && dateMs <= range.to
 }
+
+/**
+ * The immediately preceding range of the same length — "vs. last period" for a KPI
+ * delta. A 90-day range ending today compares against the 90 days before that, not a
+ * calendar-aligned "last quarter"; the two ranges are adjacent and equal-length so a
+ * percentage change between them is comparing like with like.
+ */
+export function previousEquivalentRange(range: DateRange): DateRange {
+  const length = range.to - range.from + 1
+  return { from: range.from - length, to: range.from - 1 }
+}
