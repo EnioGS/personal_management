@@ -166,6 +166,11 @@ Two things it optimizes for:
 - The category vocabulary *is* the category labels (adr/0031, superseding
   adr/0023): naming a category on a row creates it. There is no rule engine and
   no Categories settings screen — one classification path, decided per row.
+- A rule ("everything mentioning IOF is a card rebate") is applied with one
+  matched bulk call rather than row by row, and that call previews by default:
+  it returns the match count and examples, changes nothing, and only labels once
+  the user has confirmed the rule really describes those rows. Ready rows sort to
+  the top of the worklist, since they are what the confirmation button acts on.
 - The assistant can map columns, edit staged values, label rows and validate
   them, but has no tool for the two steps that move data (staging a mapped
   source, promoting labelled rows); those are the user's clicks. Its whole
