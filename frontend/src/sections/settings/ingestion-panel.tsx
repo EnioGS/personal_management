@@ -238,6 +238,16 @@ export function IngestionPanel() {
   )
 }
 
+/**
+ * A migrated row carries the entry's own stored value, so its date arrives as epoch
+ * milliseconds. Show the date, not the number — editing it writes back a plain date
+ * string, which the destination table parses just as happily.
+ */
+function displayDataValue(field: IngestionTargetField, value: unknown): string {
+  if (field === 'date' && typeof value === 'number' && Number.isFinite(value)) return new Date(value).toISOString().slice(0, 10)
+  return String(value ?? '')
+}
+
 function rawColumns(rows: StoredRow<IngestionRow>[]) {
   return [...new Set(rows.flatMap((row) => Object.keys(row.rawValues)))].sort((a, b) => a.localeCompare(b))
 }
@@ -250,7 +260,7 @@ function WorklistRow({ row, sourceName, categories, tableDefs, rawColumns: colum
     const categoryId = field === 'category' && !parsed.labels.categoryId ? await ensureCategory(value) : parsed.labels.categoryId
     await onChange(row.id, { labels: { ...parsed.labels, ...(categoryId ? { categoryId } : {}) }, labelValues: draft, destinationTableId: parsed.destinationTableId ?? null })
   }
-  return <tr className="border-t align-top"><td className="sticky left-0 bg-background p-2 font-medium">{sourceName}</td>{columns.map((column) => <td key={column} className="max-w-52 truncate p-2" title={row.rawValues[column] ?? ''}>{row.rawValues[column] ?? ''}</td>)}{DATA_FIELDS.map((field) => <td key={field} className="p-1"><EditableCell value={String(row.mappedValues[field] ?? '')} onCommit={(value) => saveData(field, value)} /></td>)}{LABEL_FIELDS.map((field) => <td key={field} className="p-1"><EditableCell value={labelValue(row, field, categories, tableDefs)} invalid={labelFieldInvalid(row, field, categories, tableDefs)} onCommit={(value) => void saveLabel(field, value)} /></td>)}<td className="max-w-56 p-2">{row.status === 'ready' ? <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-300"><Check className="size-3" />Ready</span> : row.status}{row.validationErrors.length > 0 && <p className="mt-1 text-amber-600 dark:text-amber-300">{row.validationErrors[0]}</p>}</td></tr>
+  return <tr className="border-t align-top"><td className="sticky left-0 bg-background p-2 font-medium">{sourceName}</td>{columns.map((column) => <td key={column} className="max-w-52 truncate p-2" title={row.rawValues[column] ?? ''}>{row.rawValues[column] ?? ''}</td>)}{DATA_FIELDS.map((field) => <td key={field} className="p-1"><EditableCell value={displayDataValue(field, row.mappedValues[field])} onCommit={(value) => saveData(field, value)} /></td>)}{LABEL_FIELDS.map((field) => <td key={field} className="p-1"><EditableCell value={labelValue(row, field, categories, tableDefs)} invalid={labelFieldInvalid(row, field, categories, tableDefs)} onCommit={(value) => void saveLabel(field, value)} /></td>)}<td className="max-w-56 p-2">{row.status === 'ready' ? <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-300"><Check className="size-3" />Ready</span> : row.status}{row.validationErrors.length > 0 && <p className="mt-1 text-amber-600 dark:text-amber-300">{row.validationErrors[0]}</p>}</td></tr>
 }
 
 function EditableCell({ value, invalid = false, onCommit }: { value: string; invalid?: boolean; onCommit: (value: string) => void }) {

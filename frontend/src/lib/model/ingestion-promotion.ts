@@ -1,4 +1,5 @@
 import { coerceValue } from '@/lib/csv'
+import type { ColumnDef } from '@/lib/table-schema'
 import { TABLE_KIND_SCHEMAS } from './table-kinds'
 import { entryLabelsFromIngestionRow, ingestionLabelErrors } from './ingestion'
 import {
@@ -33,6 +34,19 @@ function flowDirection(row: IngestionRow): string {
   return row.labels.flowRole === 'inflow' ? 'in' : 'out'
 }
 
+/**
+ * Mapped values are not always text. A CSV supplies strings, but the legacy migration
+ * carries the entry's own values across, where a date is already epoch milliseconds and
+ * an amount is already a number — stringifying those and re-parsing them would reject
+ * every migrated row ("1725148800000" is not a date any parser accepts).
+ */
+function coerceMappedValue(column: ColumnDef<Entry>, raw: unknown) {
+  if (typeof raw === 'number' && Number.isFinite(raw) && (column.type === 'date' || column.type === 'number')) {
+    return { ok: true as const, value: raw }
+  }
+  return coerceValue(column, raw === undefined || raw === null ? '' : String(raw))
+}
+
 async function entryFromIngestionRow(row: IngestionRow): Promise<Entry> {
   if (!row.destinationTableId) throw new Error('Choose a destination table.')
   const definitionRow = await tableDefsTable.get(row.destinationTableId)
@@ -49,7 +63,7 @@ async function entryFromIngestionRow(row: IngestionRow): Promise<Entry> {
     let raw = mappedField ? row.mappedValues[mappedField as keyof typeof row.mappedValues] : undefined
     if (entryField === 'direction' && (!raw || String(raw).trim() === '')) raw = flowDirection(row)
     if (entryField === 'category' && categoryName) raw = categoryName
-    const result = coerceValue(column, raw === undefined || raw === null ? '' : String(raw))
+    const result = coerceMappedValue(column, raw)
     if (!result.ok) throw new Error(result.message)
     entry[entryField] = result.value
   }
