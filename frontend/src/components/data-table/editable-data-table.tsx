@@ -140,7 +140,10 @@ export function EditableDataTable<T extends Record<string, unknown>>({
 
   return (
     <div className="flex h-full flex-col gap-2 p-2">
-      {actions && <div className="flex justify-end gap-1.5">{actions}</div>}
+      {/* items-center, not the default stretch: the table selector is a 32px Select
+          while every button beside it is 24px, so without it the buttons pin to the
+          top of the row instead of sitting on the selector's centre line. */}
+      {actions && <div className="flex items-center justify-end gap-1.5">{actions}</div>}
       <div className="flex-1 overflow-auto rounded-md border">
         <Table>
           <TableHeader>
