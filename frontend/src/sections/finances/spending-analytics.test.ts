@@ -10,6 +10,7 @@ function entry(overrides: Partial<FilteredEntry>): FilteredEntry {
     category: 'Food',
     description: 'Market',
     financeDestination: 'spending',
+    flowRole: 'outflow',
     spendingTreatment: 'expense',
     ...overrides,
     tableId: overrides.tableId ?? 1,

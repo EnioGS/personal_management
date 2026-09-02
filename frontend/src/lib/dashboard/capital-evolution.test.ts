@@ -104,3 +104,27 @@ describe('capitalEvolution', () => {
     expect(points).toEqual([{ month: '2026-01', cashCapital: 0, variableIncome: 0, fixedIncome: 100, capital: 100, cardSpend: 0 }])
   })
 })
+
+describe('what moves total capital', () => {
+  const range = { from: Date.UTC(2026, 0, 1), to: Date.UTC(2026, 0, 31) }
+
+  it('leaves capital untouched for a transfer between the user\'s own accounts', () => {
+    const points = capitalEvolution([
+      { date: Date.UTC(2026, 0, 5), amount: 100, direction: 'in', financeDestination: 'movements', flowRole: 'inflow' },
+      { date: Date.UTC(2026, 0, 6), amount: 40, direction: 'out', financeDestination: 'movements', flowRole: 'transfer' },
+      { date: Date.UTC(2026, 0, 7), amount: 40, direction: 'in', financeDestination: 'movements', flowRole: 'transfer' },
+    ], range)
+
+    expect(points[0].cashCapital).toBe(100)
+  })
+
+  it('subtracts a card invoice payment once, and the purchase it settles never again', () => {
+    const points = capitalEvolution([
+      { date: Date.UTC(2026, 0, 3), amount: 110, direction: 'out', cardId: 1, financeDestination: 'spending', flowRole: 'outflow', spendingTreatment: 'expense' },
+      { date: Date.UTC(2026, 0, 10), amount: 110, direction: 'out', financeDestination: 'movements', flowRole: 'outflow' },
+    ], range)
+
+    expect(points[0].cashCapital).toBe(-110)
+    expect(points[0].cardSpend).toBe(110)
+  })
+})

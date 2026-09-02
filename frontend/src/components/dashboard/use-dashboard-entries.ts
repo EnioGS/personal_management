@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import type { StoredRow } from '@/lib/local-store/create-local-table'
 import { useAccountsStore, useCardsStore, useCategoriesStore, useEntriesStore, useEntryLabelsStore, useTableDefsStore } from '@/lib/model/model-stores'
-import type { Account, Card, Category, Entry, EntryLabels, FinanceDestination, RecurrenceLabel, SpendingTreatment, TableDef, TableKind } from '@/lib/model/types'
+import type { Account, Card, Category, Entry, EntryLabels, FinanceDestination, FlowRole, RecurrenceLabel, SpendingTreatment, TableDef, TableKind } from '@/lib/model/types'
 import { isWithinRange } from '@/lib/dashboard/date-range'
 import { resolveFilterRange, type DashboardFilters } from './dashboard-filters'
 
@@ -21,6 +21,7 @@ export interface FilteredEntry {
   accountName?: string
   cardId?: number
   financeDestination: FinanceDestination
+  flowRole: FlowRole
   spendingTreatment?: SpendingTreatment
   recurrence?: RecurrenceLabel
 }
@@ -83,13 +84,17 @@ export function filterMoneyEntries({
       tableId: table.id,
       date,
       amount: typeof entry.amount === 'number' ? entry.amount : 0,
-      direction: labels.flowRole === 'inflow' ? 'in' : 'out',
+      // A transfer or an adjustment has no direction of its own in the label, so the
+      // row's own imported direction decides which way the money went — otherwise
+      // money *received* as a transfer would be drawn and summed as if it had left.
+      direction: labels.flowRole === 'inflow' ? 'in' : labels.flowRole === 'outflow' ? 'out' : entry.direction === 'in' ? 'in' : 'out',
       category,
       description: String(entry.description ?? entry.note ?? ''),
       accountId,
       accountName: accountId ? accountsById.get(accountId)?.name : undefined,
       cardId: table.cardId,
       financeDestination: labels.financeDestination,
+      flowRole: labels.flowRole,
       spendingTreatment: labels.spendingTreatment,
       recurrence: labels.recurrence,
     })

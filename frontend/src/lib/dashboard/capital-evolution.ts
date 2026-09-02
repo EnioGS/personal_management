@@ -10,6 +10,7 @@ export interface CapitalEntry {
   direction: 'in' | 'out'
   cardId?: number
   financeDestination?: string
+  flowRole?: string
   spendingTreatment?: 'expense' | 'rebate' | 'notApplicable'
 }
 
@@ -65,13 +66,15 @@ export function capitalEvolution(
   for (const entry of entries) {
     const month = monthKey(entry.date)
     const bucket = byMonth.get(month) ?? { capitalDelta: 0, cardSpend: 0 }
-    // Card purchases are obligations, not cash movements. Their eventual payment
-    // is already represented in the linked bank ledger, so including both would
-    // double-count card spend. Keep card rows only for the red monthly bars.
-    // Spending is money that moved, so it counts towards cash capital exactly like
-    // a plain movement; only the card rows are held back, because a card purchase is
-    // an obligation whose payment already appears in the linked bank ledger.
-    if (!entry.cardId && entry.financeDestination !== 'investments') bucket.capitalDelta += entry.direction === 'in' ? entry.amount : -entry.amount
+    // Card purchases are obligations, not cash movements: the money leaves when the
+    // invoice is paid, and that payment is its own bank row. Counting both would
+    // subtract the same purchase twice, so card rows only feed the red monthly bars.
+    // Spending is otherwise money that moved, and counts towards capital like any
+    // movement. A `transfer` moves between the user's own accounts, so it nets to
+    // zero across them and must not move total capital — paying someone else, or
+    // settling a card invoice, is an `outflow`, not a transfer.
+    const movesCapital = !entry.cardId && entry.financeDestination !== 'investments' && entry.flowRole !== 'transfer'
+    if (movesCapital) bucket.capitalDelta += entry.direction === 'in' ? entry.amount : -entry.amount
     if (entry.cardId && entry.financeDestination === 'spending') {
       if (entry.spendingTreatment === 'rebate') bucket.cardSpend -= entry.amount
       else if (entry.spendingTreatment === 'expense') bucket.cardSpend += entry.amount

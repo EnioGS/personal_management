@@ -40,6 +40,14 @@ reached dashboards — the exact outcome adr/0030 existed to prevent.
   panel are deleted.** The category vocabulary is whatever the category labels
   name: typing a name that does not exist creates it. Rules are gone because two
   classification paths mean a row can enter a dashboard without a decision.
+- **`transfer` is capital-neutral, and a card invoice payment is not a transfer.**
+  Money moving between the user's own accounts leaves one and arrives in the other,
+  so it must not move total capital. Settling a credit-card invoice is an `outflow`:
+  the purchases themselves never touched cash, so the payment is the single moment
+  capital actually drops, and treating it as internal would overstate capital
+  forever. A row whose flow role carries no direction of its own (`transfer`,
+  `adjustment`) takes its direction from the imported row, so money received as a
+  transfer is not summed as if it had left.
 - **Every analytics surface reads labels**, including the Investments section,
   which previously joined entries to tables directly and so ignored the gate.
 - **The assistant gets no tool for either data-moving step.** Staging a mapped

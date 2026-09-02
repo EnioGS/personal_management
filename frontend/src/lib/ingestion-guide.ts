@@ -74,6 +74,12 @@ is Fixed Income or Variable Income. Call read_table to see what exists.
   charge or a reversal; a Pix can be a transfer, income, or a purchase.
 - A card credit is spending + rebate, not an inflow. A refund that lands in the bank
   account is movements + inflow.
+- A credit-card invoice payment is movements + **outflow** from the checking account,
+  never a transfer. Card purchases never touched cash — they were an obligation — so
+  the invoice payment is the one moment that money actually leaves, and it is what
+  makes card spending show up in total capital at all. "transfer" is reserved for
+  money moving between two of the user's own accounts, where one row's loss is
+  another row's gain and total capital does not move.
 - A reversal that cancels a record entirely is flow role cancelled; it stays visible
   as provenance but reaches no total.
 - The destination is single-valued on purpose: a spending row is still counted as a

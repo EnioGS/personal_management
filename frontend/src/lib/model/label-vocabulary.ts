@@ -20,8 +20,8 @@ export const FINANCE_DESTINATIONS: LabelOption<FinanceDestination>[] = [
 
 export const FLOW_ROLES: LabelOption<FlowRole>[] = [
   { value: 'inflow', meaning: 'Money arrived: salary, refund received, interest paid to you.' },
-  { value: 'outflow', meaning: 'Money left: a purchase, a bill, a Pix you sent.' },
-  { value: 'transfer', meaning: 'Money moved between your own accounts; your total capital is unchanged.' },
+  { value: 'outflow', meaning: 'Money left you: a purchase, a bill, a Pix you sent, or a credit-card invoice payment.' },
+  { value: 'transfer', meaning: 'Money moved between two of your own accounts, so it leaves one and arrives in the other and your total capital is unchanged. Paying another person, or paying a credit-card invoice, is an outflow — not a transfer.' },
   { value: 'adjustment', meaning: 'A correction or opening balance that is not real income or spend.' },
   { value: 'cancelled', meaning: 'Voided or reversed — the row is kept as provenance but must not reach any total.' },
 ]
