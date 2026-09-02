@@ -23,7 +23,8 @@ inventing a bespoke layout:
 
 - **One filter row, above everything it scopes** (`components/dashboard/
   filter-bar.tsx`) — never per-chart. Date range leads (presets: 30/90 days,
-  this year, custom), then account/card/category as toggle pills. Every
+  this year, custom), then account/card/category dropdowns; screens that are
+  scoped to one statement or card ledger can add that ledger dropdown. Every
   stat tile and the chart below read the same filtered set
   (`use-dashboard-entries.ts`), so the numbers on screen always agree with
   each other.
@@ -35,11 +36,9 @@ inventing a bespoke layout:
   palette, which encodes identity, not polarity. One axis, one zero
   baseline, in above and out below; the two amounts are never stacked or
   given a second axis.
-- **Combinado / Por conta toggle**: combined reads as the diverging bar;
-  split renders one line per account, reusing `foldTopCategories` +
-  `colorForKey` (adr/0024) so it degrades past the palette's slot count the
-  same way every other multi-series chart in the app already does, rather
-  than needing its own rule.
+- **Combined flow only**: Overview keeps the diverging bar that directly
+  answers money-in versus money-out. A per-account presentation toggle was
+  removed: accounts are a context filter, not a second chart mode.
 
 The filtering itself (`filterMoneyEntries` in `use-dashboard-entries.ts`) is
 a plain function taking already-loaded data, kept separate from the
@@ -54,7 +53,8 @@ nothing."
 Finances now has an actual dashboard rather than one chart with no controls
 around it, and it is built to extend: a new stat tile or a new dimension
 pill is additive, not a rewrite, because the filtering layer is already
-generic over "any money-kind table, any account, any card, any category."
+generic over "any money-kind table, any account, any card, any category, and
+when needed any active ledger."
 The cost is real complexity concentrated in one join (table kind determines
 which columns even exist — direction, category — so the filter/rollup code
 has to branch on kind rather than assuming a uniform row shape); that

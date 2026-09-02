@@ -55,6 +55,18 @@ describe('rowToSqlValues / sqlValuesToRow round-trip', () => {
     expect(restored.data).toMatchObject({ isActive: false })
   })
 
+  it('round-trips category names and normalization rule fields', () => {
+    const category = { id: 7, createdAt: 1, data: { name: 'Recebida pelo Pix', scope: 'bankLedger', archived: false } }
+    const rule = {
+      id: 8,
+      createdAt: 2,
+      data: { categoryId: 7, match: 'contains', pattern: 'recebida pelo pix', caseSensitive: false, priority: 3, scope: 'bankLedger' },
+    }
+
+    expect(sqlValuesToRow(SQLITE_SCHEMAS.categories, rowToSqlValues(SQLITE_SCHEMAS.categories, category))).toEqual(category)
+    expect(sqlValuesToRow(SQLITE_SCHEMAS.categoryRules, rowToSqlValues(SQLITE_SCHEMAS.categoryRules, rule))).toEqual(rule)
+  })
+
   it('round-trips every entries column used across the current table kinds', () => {
     const row = {
       id: 9,

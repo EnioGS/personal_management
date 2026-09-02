@@ -72,14 +72,18 @@
     "rangeTo": "até",
     "accounts": "Contas",
     "cards": "Cartões",
+    "tables": "Extrato",
+    "allAccounts": "Todas as contas",
+    "allCards": "Todos os cartões",
+    "allTables": "Todos os extratos",
     "categories": "Categorias",
+    "allCategories": "Todas as categorias",
+    "selectedCategories": "{{count}} categorias",
     "netBalance": "Saldo líquido",
     "totalIn": "Total de entradas",
     "totalOut": "Total de saídas",
     "cardSpend": "Gasto em cartões",
     "inLabel": "Entrada",
-    "outLabel": "Saída",
-    "aggregate": "Combinado",
-    "splitByAccount": "Por conta"
+    "outLabel": "Saída"
   }
 }

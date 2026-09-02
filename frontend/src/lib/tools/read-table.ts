@@ -10,8 +10,7 @@ function buildDescription(): string {
     .join(', ')
   return (
     "Reads existing rows from a table in the user's records, optionally scoped to a " +
-    'date range. Use this before write_to_table/update_table_rows when reconciling an attached file against ' +
-    'existing data — e.g. to avoid adding rows that are already present, or to find rows that need correcting. ' +
+    'date range. Use this to inspect existing data when answering questions about the user\'s records. ' +
     'Rows may carry a "deleted" flag: such rows are hidden/faded in the app but not physically removed — this ' +
     'tool still returns them (tagged deleted=true) so you can reason about them; treat them as superseded/' +
     'historical, not current data, unless the user is specifically asking about deleted entries. ' +

@@ -156,9 +156,9 @@ Two things it optimizes for:
   its entity (a category, an account) via a stable hash, not the entity's
   position in whatever is currently on screen, so filtering never repaints
   a survivor.
-- Finances' Overview is a real dashboard (adr/0025): one filter row (date
-  range, account, card, category) scoping a KPI row and a diverging in/out
-  chart, with a combined/per-account toggle — not a single hardcoded chart.
+- Finances' Overview is a real dashboard (adr/0025): one dropdown-based
+  context row (date range, account, card, category) scopes a KPI row and a
+  combined diverging in/out chart — not a single hardcoded chart.
 - Orçamento, Recorrentes, Posições, Proventos, Alocação, and a Settings ->
   Tabelas listing every table across every section (adr/0026) all read from
   data the model already had — a budget compares category spend already

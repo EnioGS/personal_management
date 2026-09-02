@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { StoredRow } from '@/lib/local-store/create-local-table'
-import type { Account, Category, CategoryRule, Entry, TableDef } from '@/lib/model/types'
+import type { Account, Card, Category, CategoryRule, Entry, TableDef } from '@/lib/model/types'
 import { filterMoneyEntries } from './use-dashboard-entries'
 import type { DashboardFilters } from './dashboard-filters'
 
@@ -10,6 +10,7 @@ function baseFilters(overrides: Partial<DashboardFilters> = {}): DashboardFilter
     customFrom: '',
     customTo: '',
     accountIds: [],
+    tableIds: [],
     cardIds: [],
     categories: [],
     ...overrides,
@@ -18,6 +19,7 @@ function baseFilters(overrides: Partial<DashboardFilters> = {}): DashboardFilter
 
 const account1: StoredRow<Account> = { id: 1, createdAt: 0, name: 'Banco A', kind: 'checking' }
 const account2: StoredRow<Account> = { id: 2, createdAt: 0, name: 'Banco B', kind: 'checking' }
+const card: StoredRow<Card> = { id: 100, createdAt: 0, name: 'Cartão X', accountId: 1 }
 
 const bankTable1: StoredRow<TableDef> = { id: 10, createdAt: 0, name: 'Extrato A', kind: 'bankLedger', accountId: 1 }
 const bankTable2: StoredRow<TableDef> = { id: 11, createdAt: 0, name: 'Extrato B', kind: 'bankLedger', accountId: 2 }
@@ -96,6 +98,32 @@ describe('filterMoneyEntries', () => {
     })
     expect(result).toHaveLength(1)
     expect(result[0].accountName).toBe('Banco A')
+  })
+
+  it('includes a card ledger when filtering by the card’s settlement account', () => {
+    const result = filterMoneyEntries({
+      entries: [entry(1, { tableId: 12 })],
+      tableDefs: [cardTable],
+      accounts: [account1],
+      cards: [card],
+      categories: [],
+      rules: [],
+      filters: baseFilters({ accountIds: [1] }),
+    })
+    expect(result).toHaveLength(1)
+    expect(result[0].accountName).toBe('Banco A')
+  })
+
+  it('filters by the active ledger table', () => {
+    const result = filterMoneyEntries({
+      entries: [entry(1, { tableId: 10 }), entry(2, { tableId: 11 })],
+      tableDefs: [bankTable1, bankTable2],
+      accounts: [account1, account2],
+      categories: [],
+      rules: [],
+      filters: baseFilters({ tableIds: [11] }),
+    })
+    expect(result.map((row) => row.tableId)).toEqual([11])
   })
 
   it('filters by card, excluding tables with no card', () => {

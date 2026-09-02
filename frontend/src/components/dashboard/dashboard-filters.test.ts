@@ -7,6 +7,7 @@ function filters(overrides: Partial<DashboardFilters> = {}): DashboardFilters {
     customFrom: '',
     customTo: '',
     accountIds: [],
+    tableIds: [],
     cardIds: [],
     categories: [],
     ...overrides,

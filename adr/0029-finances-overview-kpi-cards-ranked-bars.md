@@ -32,27 +32,26 @@ separate query.
 **Every piece of content lives in a titled `DashboardCard`**
 (`components/dashboard/dashboard-card.tsx`) instead of floating on the
 panel background — a header (title + at most one control) and a body,
-optionally a footnote. The Combinado/Por conta toggle moves into the
-"Fluxo mensal" card's own header, where it controls that card specifically,
-rather than sitting between the KPI row and the chart attached to nothing
-in particular.
+  optionally a footnote. The monthly-flow card deliberately has no display
+mode toggle: account is a context filter, while the card remains the one
+combined diverging in/out answer.
 
 **The category pie is replaced by `RankedBarList`.** A pie's slices stop
 being legible well before the categorical palette's own cap, and — found
 during this same pass — degrades to a badly-clipped half-circle at the
 aspect ratios these panels actually render at. A ranked horizontal-bar list
-(label, bar, value, share%) has none of that: it's legible at 7+8 rows
-(folded via the existing `foldTopCategories`/`MAX_CATEGORICAL_SERIES`),
-self-labelling, sortable by construction, and color still follows the
-entity via the same `colorForKey`.
+(label, bar, value, share%) has none of that: it is self-labelling, sortable
+by construction, and scrolls inside its fixed card rather than folding
+small values into "Other". Colour still follows the entity via the same
+`colorForKey`.
 
 **Two more cards answer questions the old screen didn't**: a "Contas" list
 (each account's live balance, computed from its own bankLedger entries —
 deliberately all-time, not scoped to the filtered period, since a balance
-isn't a period-bounded idea) and "Últimos lançamentos" (the 10 most recent
-filtered entries, with a `CategoryPill` instead of plain text). Both reuse
-`RankedBarList`/a small fixed-width table rather than introducing new chart
-types.
+isn't a period-bounded idea) and "Lançamentos" (every entry in the filtered
+period, inside a scrollable compact table with a centred, wrapping
+`CategoryPill`). Both reuse `RankedBarList`/a small fixed-width table rather
+than introducing new chart types.
 
 **`FilteredEntry` gains a `description` field** (bankLedger/cardLedger's
 own text, or generic's `note`) — needed for "Últimos lançamentos" and absent
@@ -79,10 +78,9 @@ overflowing upward into the card's own header instead of scrolling.
 ## Consequences
 
 The same primitives (`DashboardCard`, `RankedBarList`, `CategoryPill`,
-`StatTile`'s delta/sparkline) are what the rest of the review's per-screen
-plan (Movimentações, Gastos, Cartões, Orçamento, Recorrentes, and every
-Investimentos screen) will reuse rather than reinvent — Overview is the
-first screen, not a one-off. `previousEquivalentRange` and the
+`StatTile`'s delta/sparkline) are shared across the implemented Finance
+screens and remain the baseline for future screens — Overview is not a
+one-off. `previousEquivalentRange` and the
 `.entity-tint`/`.entity-fill` CSS pair are both intentionally generic for
 the same reason. The full plan for the remaining screens lives in
 `PLAN.md` at the repo root (gitignored, not part of the shipped app) until

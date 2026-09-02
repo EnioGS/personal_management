@@ -72,14 +72,18 @@
     "rangeTo": "to",
     "accounts": "Accounts",
     "cards": "Cards",
+    "tables": "Ledger",
+    "allAccounts": "All accounts",
+    "allCards": "All cards",
+    "allTables": "All ledgers",
     "categories": "Categories",
+    "allCategories": "All categories",
+    "selectedCategories": "{{count}} categories",
     "netBalance": "Net balance",
     "totalIn": "Total in",
     "totalOut": "Total out",
     "cardSpend": "Card spend",
     "inLabel": "In",
-    "outLabel": "Out",
-    "aggregate": "Combined",
-    "splitByAccount": "By account"
+    "outLabel": "Out"
   }
 }

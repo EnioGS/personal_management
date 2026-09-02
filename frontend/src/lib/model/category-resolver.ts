@@ -28,18 +28,41 @@ function matches(rule: CategoryRule, raw: string): boolean {
   }
 }
 
+/** Builds a first-match lookup using the same ordering as the resolver. */
+export function createCategoryRuleMatcher(
+  categories: StoredRow<Category>[],
+  rules: StoredRow<CategoryRule>[],
+  kind?: TableKind,
+): (raw: unknown) => StoredRow<CategoryRule> | undefined {
+  const categoryIds = new Set(categories.map((category) => category.id))
+  const applicable = rules
+    .filter((rule) => categoryIds.has(rule.categoryId) && (!rule.scope || !kind || rule.scope === kind))
+    .slice()
+    .sort((a, b) => a.priority - b.priority)
+  return (raw) => {
+    const value = typeof raw === 'string' ? raw.trim() : ''
+    return applicable.find((rule) => matches(rule, value))
+  }
+}
+
+/** Returns the first rule that owns a raw value, using the same ordering as the resolver. */
+export function findMatchingCategoryRule(
+  categories: StoredRow<Category>[],
+  rules: StoredRow<CategoryRule>[],
+  raw: unknown,
+  kind?: TableKind,
+): StoredRow<CategoryRule> | undefined {
+  return createCategoryRuleMatcher(categories, rules, kind)(raw)
+}
+
 /**
  * Resolves raw values onto canonical categories.
  *
  * Rules run in `priority` order and the first match wins, so a broad rule ("contains
  * pix") can sit behind a narrow one ("contains pix devolvido") without swallowing it.
  *
- * A value matching no rule but spelled exactly like a category (case-insensitively)
- * resolves to that category too — this is what lets typing a category name straight
- * into a table (see ensure-categories.ts, which registers it) count as "classified"
- * immediately, with no separate rule needed for the plainest case. Only a value that
- * matches neither a rule nor a category name resolves to *itself*, and stays visible in
- * the "unclassified" worklist instead of quietly disappearing into "Outros".
+ * A value matching no rule resolves to itself and stays visible in the category raw
+ * values worklist. Categories are assigned only through their explicit match strings.
  *
  * The returned function memoises per raw string — a table of thousands of rows
  * typically holds a few dozen distinct raw values, so each one is matched against the
@@ -51,7 +74,6 @@ export function createCategoryResolver(
   kind?: TableKind,
 ) {
   const byId = new Map(categories.map((c) => [c.id, c]))
-  const byLowerName = new Map(categories.map((c) => [c.name.toLowerCase(), c]))
   const applicable = rules
     .filter((rule) => !rule.scope || !kind || rule.scope === kind)
     .slice()
@@ -70,11 +92,6 @@ export function createCategoryResolver(
       if (!category) continue // rule pointing at a deleted category — skip, don't crash
       resolved = { label: category.name, categoryId: rule.categoryId }
       break
-    }
-
-    if (resolved.categoryId === null && value) {
-      const exact = byLowerName.get(value.toLowerCase())
-      if (exact) resolved = { label: exact.name, categoryId: exact.id }
     }
 
     cache.set(value, resolved)

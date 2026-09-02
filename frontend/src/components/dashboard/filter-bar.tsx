@@ -1,7 +1,17 @@
 import { useTranslation } from 'react-i18next'
+import { ChevronDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { useAccountsStore, useCardsStore, useCategoriesStore } from '@/lib/model/model-stores'
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { useAccountsStore, useCardsStore, useCategoriesStore, useTableDefsStore } from '@/lib/model/model-stores'
 import type { DateRangePreset } from '@/lib/dashboard/date-range'
+import type { TableKind } from '@/lib/model/types'
 import type { DashboardFilters } from './dashboard-filters'
 
 const PRESETS: DateRangePreset[] = ['last30', 'last90', 'thisYear', 'custom']
@@ -11,33 +21,40 @@ interface FilterBarProps {
   setPreset: (preset: DateRangePreset) => void
   setCustomFrom: (value: string) => void
   setCustomTo: (value: string) => void
-  toggleAccount: (id: number) => void
-  toggleCard: (id: number) => void
+  selectAccount: (id: number | null) => void
+  selectTable: (id: number | null) => void
+  selectCard: (id: number | null) => void
   toggleCategory: (name: string) => void
-  /** Which pill rows this dashboard needs — Investments has no accounts/cards to filter by. */
-  show?: { accounts?: boolean; cards?: boolean; categories?: boolean }
+  clearCategories: () => void
+  /** Which context dimensions this dashboard needs — only relevant filters earn a place in the bar. */
+  show?: { accounts?: boolean; tables?: boolean; cards?: boolean; categories?: boolean }
+  /** Restricts the optional table dropdown to the ledger kinds meaningful on this screen. */
+  tableKinds?: TableKind[]
 }
 
 /**
  * One row, above every chart it scopes — the dataviz skill's filter composition rule.
  * Date range leads (it's the filter every reader reaches for first); dimension filters
- * follow as toggle pills, since there are usually few enough accounts/cards/categories
- * for pills to beat a dropdown on directness.
+ * follow as compact dropdowns for accounts/cards and categories.
  */
 export function FilterBar({
   filters,
   setPreset,
   setCustomFrom,
   setCustomTo,
-  toggleAccount,
-  toggleCard,
+  selectAccount,
+  selectTable,
+  selectCard,
   toggleCategory,
+  clearCategories,
   show = { accounts: true, cards: true, categories: true },
+  tableKinds,
 }: FilterBarProps) {
   const { t } = useTranslation('common')
   const accounts = useAccountsStore((s) => s.items).filter((a) => !a.archived)
   const cards = useCardsStore((s) => s.items).filter((c) => !c.archived)
-  const categories = useCategoriesStore((s) => s.items)
+  const categories = useCategoriesStore((s) => s.items).filter((category) => !category.archived)
+  const tables = useTableDefsStore((s) => s.items).filter((table) => !tableKinds || tableKinds.includes(table.kind))
 
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b p-2">
@@ -75,58 +92,140 @@ export function FilterBar({
       )}
 
       {show.accounts && accounts.length > 0 && (
-        <PillGroup
+        <FilterSelect
           label={t('dashboard.accounts')}
           items={accounts}
-          selected={filters.accountIds}
-          onToggle={toggleAccount}
+          selected={filters.accountIds[0]}
+          allLabel={t('dashboard.allAccounts')}
+          onSelect={selectAccount}
+        />
+      )}
+
+      {show.tables && tables.length > 0 && (
+        <FilterSelect
+          label={t('dashboard.tables')}
+          items={tables}
+          selected={filters.tableIds[0]}
+          allLabel={t('dashboard.allTables')}
+          onSelect={selectTable}
         />
       )}
 
       {show.cards && cards.length > 0 && (
-        <PillGroup label={t('dashboard.cards')} items={cards} selected={filters.cardIds} onToggle={toggleCard} />
+        <FilterSelect
+          label={t('dashboard.cards')}
+          items={cards}
+          selected={filters.cardIds[0]}
+          allLabel={t('dashboard.allCards')}
+          onSelect={selectCard}
+        />
       )}
 
       {show.categories && categories.length > 0 && (
-        <PillGroup
+        <CategoryFilter
           label={t('dashboard.categories')}
           items={categories.map((c) => ({ id: c.name, name: c.name }))}
           selected={filters.categories}
+          allLabel={t('dashboard.allCategories')}
+          selectedLabel={t('dashboard.selectedCategories', { count: filters.categories.length })}
           onToggle={toggleCategory}
+          onClear={clearCategories}
         />
       )}
     </div>
   )
 }
 
-function PillGroup<Id extends string | number>({
+function CategoryFilter({
   label,
   items,
   selected,
+  allLabel,
+  selectedLabel,
   onToggle,
+  onClear,
 }: {
   label: string
-  items: { id: Id; name: string }[]
-  selected: Id[]
-  onToggle: (id: Id) => void
+  items: { id: string; name: string }[]
+  selected: string[]
+  allLabel: string
+  selectedLabel: string
+  onToggle: (name: string) => void
+  onClear: () => void
 }) {
+  const selectedNames = items.filter((item) => selected.includes(item.id)).map((item) => item.name)
+  const triggerLabel = selectedNames.length === 0 ? allLabel : selectedNames.length === 1 ? selectedNames[0] : selectedLabel
+
   return (
     <div className="flex items-center gap-1.5">
       <span className="text-muted-foreground text-xs">{label}:</span>
-      <div className="flex flex-wrap gap-1">
-        {items.map((item) => (
-          <Button
-            key={item.id}
-            type="button"
-            variant={selected.includes(item.id) ? 'secondary' : 'outline'}
-            size="xs"
-            aria-pressed={selected.includes(item.id)}
-            onClick={() => onToggle(item.id)}
-          >
-            {item.name}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button type="button" variant="outline" size="xs" className="min-w-32 justify-between font-normal">
+            <span className="max-w-44 truncate">{triggerLabel}</span>
+            <ChevronDown aria-hidden="true" className="text-muted-foreground ml-2 size-3" />
           </Button>
-        ))}
-      </div>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start">
+          <DropdownMenuItem className="text-xs" onSelect={onClear}>{allLabel}</DropdownMenuItem>
+          <DropdownMenuSeparator />
+          {items.map((item) => (
+            <DropdownMenuCheckboxItem
+              key={item.id}
+              className="text-xs"
+              checked={selected.includes(item.id)}
+              onCheckedChange={() => onToggle(item.id)}
+            >
+              {item.name}
+            </DropdownMenuCheckboxItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
+  )
+}
+
+function FilterSelect({
+  label,
+  items,
+  selected,
+  allLabel,
+  onSelect,
+}: {
+  label: string
+  items: { id: number; name: string }[]
+  selected?: number
+  allLabel: string
+  onSelect: (id: number | null) => void
+}) {
+  const selectedItem = items.find((item) => item.id === selected)
+  const triggerLabel = selectedItem?.name ?? allLabel
+
+  return (
+    <div className="flex items-center gap-1.5">
+      <span className="text-muted-foreground text-xs">{label}:</span>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button type="button" variant="outline" size="xs" className="min-w-32 justify-between font-normal">
+            <span className="max-w-44 truncate">{triggerLabel}</span>
+            <ChevronDown aria-hidden="true" className="text-muted-foreground ml-2 size-3" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start">
+          <DropdownMenuItem className="text-xs" onSelect={() => onSelect(null)}>{allLabel}</DropdownMenuItem>
+          <DropdownMenuSeparator />
+          {items.map((item) => (
+            <DropdownMenuCheckboxItem
+              key={item.id}
+              className="text-xs"
+              checked={selected === item.id}
+              onCheckedChange={() => onSelect(item.id)}
+            >
+              {item.name}
+            </DropdownMenuCheckboxItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   )
 }

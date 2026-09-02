@@ -6,10 +6,11 @@ import { cn } from '@/lib/utils'
 import { GRIP_WIDTH, MAX_PANEL_WIDTH, useChatPanelStore } from '@/store/chat-panel-store'
 import { useChatStore } from '@/store/chat-store'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { Textarea } from '@/components/ui/textarea'
 
 const DRAG_THRESHOLD = 4
+const MAX_COMPOSER_LINES = 8
 
 /**
  * Global chat overlay — mounted once at the app root (see App.tsx), not inside
@@ -42,6 +43,23 @@ export function ChatPanel() {
   const didDrag = useRef(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const scrollAreaRef = useRef<HTMLDivElement>(null)
+  const composerRef = useRef<HTMLTextAreaElement>(null)
+
+  function resizeComposer() {
+    const composer = composerRef.current
+    if (!composer) return
+
+    const styles = window.getComputedStyle(composer)
+    const lineHeight = Number.parseFloat(styles.lineHeight)
+    const verticalPadding = Number.parseFloat(styles.paddingTop) + Number.parseFloat(styles.paddingBottom)
+    const verticalBorder = Number.parseFloat(styles.borderTopWidth) + Number.parseFloat(styles.borderBottomWidth)
+    const maxHeight = lineHeight * MAX_COMPOSER_LINES + verticalPadding + verticalBorder
+
+    // Reset before measuring so deleting text immediately shrinks the composer again.
+    composer.style.height = 'auto'
+    composer.style.height = `${Math.min(composer.scrollHeight, maxHeight)}px`
+    composer.style.overflowY = composer.scrollHeight > maxHeight ? 'auto' : 'hidden'
+  }
 
   useEffect(() => {
     // Scroll only the message list's own viewport directly — `scrollIntoView` walks up
@@ -52,6 +70,10 @@ export function ChatPanel() {
     const viewport = scrollAreaRef.current?.querySelector<HTMLDivElement>('[data-slot="scroll-area-viewport"]')
     viewport?.scrollTo({ top: viewport.scrollHeight, behavior: 'smooth' })
   }, [messages, status])
+
+  useEffect(() => {
+    resizeComposer()
+  }, [draft])
 
   async function handleFilesSelected(files: FileList | File[]) {
     for (const file of Array.from(files)) {
@@ -116,6 +138,12 @@ export function ChatPanel() {
     // the screen edge, so dragging the grip left (negative delta) widens the panel and
     // dragging it right narrows it — hence subtracting, not adding, delta here.
     setPanelWidth(dragStartWidth.current - delta)
+  }
+
+  function submitDraft() {
+    if (!draft.trim() || isSending) return
+    void sendMessage(draft.trim())
+    setDraft('')
   }
 
   // While actively dragging, track the pointer directly instead of the (not-yet-committed)
@@ -234,12 +262,10 @@ export function ChatPanel() {
         )}
 
         <form
-          className={cn('flex gap-2 p-3', attachments.length === 0 && 'border-t')}
+          className={cn('flex items-end gap-2 p-3', attachments.length === 0 && 'border-t')}
           onSubmit={(e) => {
             e.preventDefault()
-            if (!draft.trim() || isSending) return
-            void sendMessage(draft.trim())
-            setDraft('')
+            submitDraft()
           }}
         >
           <input
@@ -271,11 +297,20 @@ export function ChatPanel() {
           >
             <Trash2 className="size-4" />
           </Button>
-          <Input
+          <Textarea
+            ref={composerRef}
+            rows={1}
             placeholder={t('panel.inputPlaceholder')}
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault()
+                submitDraft()
+              }
+            }}
             disabled={isSending}
+            className="[field-sizing:fixed] min-h-0 resize-none overflow-y-hidden leading-5"
           />
           <Button type="submit" disabled={!draft.trim() || isSending} className="shrink-0">
             {t('panel.send')}

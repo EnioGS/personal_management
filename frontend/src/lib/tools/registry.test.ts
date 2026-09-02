@@ -10,16 +10,23 @@ describe('findTool', () => {
     expect(findTool('does_not_exist')).toBeUndefined()
   })
 
-  it('registers all seven tools', () => {
+  it('registers read-only tools and category-management tools', () => {
     expect(toolRegistry.map((t) => t.name)).toEqual([
       'read_text_file',
       'read_csv',
-      'write_to_table',
       'read_table',
-      'update_table_rows',
-      'delete_table_rows',
-      'restore_table_rows',
+      'read_category_raw_values',
+      'add_category',
+      'update_category_rule',
+      'delete_category_rule',
     ])
+  })
+
+  it('does not expose row-mutating tools', () => {
+    expect(findTool('write_to_table')).toBeUndefined()
+    expect(findTool('update_table_rows')).toBeUndefined()
+    expect(findTool('delete_table_rows')).toBeUndefined()
+    expect(findTool('restore_table_rows')).toBeUndefined()
   })
 })
 

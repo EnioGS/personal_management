@@ -1,6 +1,6 @@
 import { Bar, BarChart, CartesianGrid, ReferenceLine, XAxis, YAxis } from 'recharts'
 import { ChartContainer, ChartLegend, ChartLegendContent, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart'
-import { DIVERGING_PAIR } from './chart-colors'
+import { DIVERGING_PAIR, type ThemedColor } from './chart-colors'
 
 interface DivergingBarChartProps<T extends Record<string, unknown>> {
   data: T[]
@@ -14,6 +14,9 @@ interface DivergingBarChartProps<T extends Record<string, unknown>> {
   xFormatter?: (value: string | number) => string
   /** Formats a bar's absolute value for the tooltip (the sign is already shown by position). */
   valueFormatter?: (value: number) => string
+  /** Defaults suit incoming/outgoing flow; spending-change charts supply semantic colours instead. */
+  positiveColor?: ThemedColor
+  negativeColor?: ThemedColor
 }
 
 /**
@@ -31,12 +34,14 @@ export function DivergingBarChart<T extends Record<string, unknown>>({
   negativeLabel,
   xFormatter,
   valueFormatter,
+  positiveColor = DIVERGING_PAIR.positive,
+  negativeColor = DIVERGING_PAIR.negative,
 }: DivergingBarChartProps<T>) {
   const chartData = data.map((row) => ({ ...row, [negativeKey]: -(row[negativeKey] as number) }))
 
   const config: ChartConfig = {
-    [positiveKey]: { label: positiveLabel, theme: DIVERGING_PAIR.positive },
-    [negativeKey]: { label: negativeLabel, theme: DIVERGING_PAIR.negative },
+    [positiveKey]: { label: positiveLabel, theme: positiveColor },
+    [negativeKey]: { label: negativeLabel, theme: negativeColor },
   }
 
   return (

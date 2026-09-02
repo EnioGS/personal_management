@@ -7,7 +7,6 @@ import { EditableDataTable } from '@/components/data-table/editable-data-table'
 import { AddTableDialog } from '@/components/data-table/add-table-dialog'
 import { TableMenu } from '@/components/data-table/table-menu'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { ensureCategoriesExist } from '@/lib/model/ensure-categories'
 import { entriesForTable, useCategoriesStore, useEntriesStore, useTableDefsStore } from '@/lib/model/model-stores'
 import { categoryColumnFor, TABLE_KIND_SCHEMAS } from '@/lib/model/table-kinds'
 import type { Entry, TableKind } from '@/lib/model/types'
@@ -39,7 +38,6 @@ export function TableWorkspace({ workspaceId, kinds }: TableWorkspaceProps) {
   const activeTableByWorkspace = useUiStore((s) => s.activeTableByWorkspace)
   const selectTable = useUiStore((s) => s.selectTable)
   const categories = useCategoriesStore((s) => s.items)
-  const addCategory = useCategoriesStore((s) => s.addItem)
 
   const available = useMemo(() => tableDefs.filter((def) => kinds.includes(def.kind)), [tableDefs, kinds])
 
@@ -51,8 +49,8 @@ export function TableWorkspace({ workspaceId, kinds }: TableWorkspaceProps) {
   const rows = useMemo(() => (active ? entriesForTable(entries, active.id) : []), [entries, active])
   const flagged = rows.filter((row) => row.deleted)
 
-  // The category vocabulary is shared across every table, not per-table: a value typed
-  // (or imported) once anywhere shows up as a suggestion everywhere else too.
+  // The category vocabulary is shared across every table. Raw values stay raw until
+  // the user explicitly adds a category and a match string in Settings.
   const categoryColumn = active ? categoryColumnFor(active.kind) : null
   const schema = useMemo(() => {
     if (!active) return []
@@ -62,12 +60,6 @@ export function TableWorkspace({ workspaceId, kinds }: TableWorkspaceProps) {
       col.key === categoryColumn ? { ...col, options: [...new Set([...(col.options ?? []), ...categoryNames])] } : col,
     )
   }, [active, categoryColumn, categories])
-
-  function registerNewCategories(values: unknown[]) {
-    if (!categoryColumn) return
-    const raw = values.filter((v): v is string => typeof v === 'string')
-    if (raw.length > 0) void ensureCategoriesExist(raw, categories, addCategory)
-  }
 
   // Deleting a table takes its rows with it — nothing else can reach an entry once its
   // tableId no longer resolves to a definition, so leaving them behind would only be
@@ -129,7 +121,6 @@ export function TableWorkspace({ workspaceId, kinds }: TableWorkspaceProps) {
       schema={schema}
       rows={rows}
       onAddRow={(row) => {
-        if (categoryColumn) registerNewCategories([(row as Record<string, unknown>)[categoryColumn]])
         void addEntry({ ...(row as Entry), tableId: active.id })
       }}
       onDeleteRow={(id) => void deleteEntry(id)}
@@ -140,9 +131,6 @@ export function TableWorkspace({ workspaceId, kinds }: TableWorkspaceProps) {
           <CsvImportDialog
             schema={schema}
             onImport={(imported) => {
-              if (categoryColumn) {
-                registerNewCategories(imported.map((row) => (row as Record<string, unknown>)[categoryColumn]))
-              }
               void addEntries(imported.map((row) => ({ ...(row as Entry), tableId: active.id })))
             }}
           />

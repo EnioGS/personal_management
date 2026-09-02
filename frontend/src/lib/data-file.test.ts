@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { createLocalTable } from '@/lib/local-store/create-local-table'
-import { entriesTable, tableDefsTable } from '@/lib/model/model-db'
+import { categoriesTable, categoryRulesTable, entriesTable, tableDefsTable } from '@/lib/model/model-db'
 import { notesTable } from '@/sections/notes/notes-db'
 import {
   DATA_EXPORT_VERSION,
@@ -83,6 +83,37 @@ describe('data-file', () => {
     const restored = await tableDefsTable.toArray()
     expect(restored).toHaveLength(1)
     expect((restored[0].data as { name: string }).name).toBe('Nubank')
+  })
+
+  it('round-trips category names, match strings, and rule priority', async () => {
+    const categoryId = await categoriesTable.add({
+      createdAt: 1,
+      data: { name: 'Recebida pelo Pix', scope: 'bankLedger', archived: false },
+    })
+    await categoryRulesTable.bulkAdd([
+      { createdAt: 2, data: { categoryId, match: 'contains', pattern: 'pix', priority: 1, caseSensitive: false } },
+      { createdAt: 3, data: { categoryId, match: 'contains', pattern: 'recebida pelo pix', priority: 0 } },
+    ])
+
+    const exported = await exportData()
+    expect(exported.tables.categories).toHaveLength(1)
+    expect(exported.tables.categoryRules.map((row) => row.data)).toEqual([
+      { categoryId, match: 'contains', pattern: 'pix', priority: 1, caseSensitive: false },
+      { categoryId, match: 'contains', pattern: 'recebida pelo pix', priority: 0 },
+    ])
+
+    await wipeAllData()
+    await importData(exported)
+
+    expect((await categoriesTable.toArray())[0].data).toEqual({
+      name: 'Recebida pelo Pix',
+      scope: 'bankLedger',
+      archived: false,
+    })
+    expect((await categoryRulesTable.toArray()).map((row) => row.data)).toEqual([
+      { categoryId, match: 'contains', pattern: 'pix', priority: 1, caseSensitive: false },
+      { categoryId, match: 'contains', pattern: 'recebida pelo pix', priority: 0 },
+    ])
   })
 
   describe('parseDataExportFile', () => {

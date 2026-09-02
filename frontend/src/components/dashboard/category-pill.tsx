@@ -3,12 +3,12 @@ import { Badge } from '@/components/ui/badge'
 import { colorForKey } from '@/components/charts/chart-colors'
 
 /** A category name as a tinted pill instead of plain text — see the .entity-tint rule in index.css. */
-export function CategoryPill({ label }: { label: string }) {
+export function CategoryPill({ label, wrap = false }: { label: string; wrap?: boolean }) {
   const color = colorForKey(label || ' ')
   return (
     <Badge
       variant="outline"
-      className="entity-tint border-transparent font-normal"
+      className={`entity-tint border-transparent font-normal${wrap ? ' max-w-full whitespace-normal break-words' : ''}`}
       style={{ '--entity-light': color.light, '--entity-dark': color.dark } as CSSProperties}
     >
       {label || '—'}

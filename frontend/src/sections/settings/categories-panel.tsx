@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ArrowDown, ArrowUp, Check, Plus, Trash2 } from 'lucide-react'
+import { ArrowDown, ArrowUp, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import {
   AlertDialog,
@@ -13,21 +13,9 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useCategoriesStore, useCategoryRulesStore } from '@/lib/model/model-stores'
-import type { CategoryMatch } from '@/lib/model/types'
-import { useUnclassifiedValues } from '@/lib/model/use-unclassified-values'
-
-const MATCH_TYPES: CategoryMatch[] = ['contains', 'equals', 'startsWith', 'regex']
+import { useCategoryRawValues } from '@/lib/model/use-unclassified-values'
 
 export function CategoriesPanel() {
   return (
@@ -39,71 +27,41 @@ export function CategoriesPanel() {
   )
 }
 
-/** New values found in the data with no rule pointing at them — promote or assign in one click. */
+/** Every raw category value found in the data, with the rule that currently owns it. */
 function UnclassifiedSection() {
   const { t } = useTranslation('settings')
-  const unclassified = useUnclassifiedValues()
-  const categories = useCategoriesStore((s) => s.items)
-  const addCategory = useCategoriesStore((s) => s.addItem)
-  const addRule = useCategoryRulesStore((s) => s.addItem)
-  const rules = useCategoryRulesStore((s) => s.items)
-  const [assigningTo, setAssigningTo] = useState<Record<string, string>>({})
-
-  const nextPriority = rules.length > 0 ? Math.max(...rules.map((r) => r.priority)) + 1 : 0
-
-  async function promote(value: string) {
-    const categoryId = await addCategory({ name: value })
-    await addRule({ categoryId, match: 'equals', pattern: value, priority: nextPriority })
-  }
-
-  async function assign(value: string, categoryId: number) {
-    await addRule({ categoryId, match: 'equals', pattern: value, priority: nextPriority })
-  }
-
-  if (unclassified.length === 0) return null
+  const rawValues = useCategoryRawValues()
 
   return (
     <section className="flex flex-col gap-3">
       <div>
-        <h2 className="text-sm font-medium">{t('categories.unclassifiedHeading')}</h2>
-        <p className="text-muted-foreground text-xs">{t('categories.unclassifiedDescription')}</p>
+        <h2 className="text-sm font-medium">{t('categories.rawValuesHeading')}</h2>
+        <p className="text-muted-foreground text-xs">{t('categories.rawValuesDescription')}</p>
       </div>
-      <div className="flex flex-col divide-y rounded-md border">
-        {unclassified.map(({ value, count }) => (
-          <div key={value} className="flex items-center justify-between gap-2 p-2">
+      <div className="flex max-h-72 flex-col divide-y overflow-y-auto rounded-md border">
+        {rawValues.length === 0 ? (
+          <p className="text-muted-foreground p-3 text-xs">{t('categories.noRawValues')}</p>
+        ) : rawValues.map(({ value, count, matchingStrings, unmatched }) => (
+          <div key={value} className="flex items-center justify-between gap-3 p-2.5">
             <div className="min-w-0">
-              <p className="truncate text-sm">{value}</p>
-              <p className="text-muted-foreground text-xs">{t('categories.unclassifiedCount', { count })}</p>
+              <p className="truncate text-sm" title={value}>{value}</p>
+              <p className="text-muted-foreground text-xs">{t('categories.rawValueCount', { count })}</p>
             </div>
-            <div className="flex shrink-0 items-center gap-1.5">
-              {categories.length > 0 && (
-                <Select value={assigningTo[value] ?? ''} onValueChange={(v) => setAssigningTo((a) => ({ ...a, [value]: v }))}>
-                  <SelectTrigger size="sm" className="h-7 w-36 text-xs">
-                    <SelectValue placeholder={t('categories.assignToExisting')} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {categories.map((c) => (
-                      <SelectItem key={c.id} value={String(c.id)} className="text-xs">
-                        {c.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+            <div className="flex shrink-0 items-center gap-1.5 text-xs">
+              {matchingStrings.length > 0 && (
+                <div className="flex max-w-64 flex-wrap justify-end gap-1" title={matchingStrings.join(', ')}>
+                  {matchingStrings.map((matchingString) => (
+                    <span key={matchingString} className="bg-muted rounded px-1.5 py-0.5 font-mono">
+                      {matchingString}
+                    </span>
+                  ))}
+                </div>
               )}
-              <Button
-                type="button"
-                variant="outline"
-                size="xs"
-                disabled={!assigningTo[value]}
-                onClick={() => void assign(value, Number(assigningTo[value]))}
-              >
-                <Check className="size-3.5" />
-                {t('categories.assign')}
-              </Button>
-              <Button type="button" variant="outline" size="xs" onClick={() => void promote(value)}>
-                <Plus className="size-3.5" />
-                {t('categories.promote')}
-              </Button>
+              {unmatched && (
+                <span className="border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300 rounded border px-1.5 py-0.5 font-medium">
+                  {t('categories.unmatched')}
+                </span>
+              )}
             </div>
           </div>
         ))}
@@ -116,18 +74,10 @@ function CategoriesSection() {
   const { t } = useTranslation('settings')
   const categories = useCategoriesStore((s) => s.items)
   const addCategory = useCategoriesStore((s) => s.addItem)
-  const deleteCategory = useCategoriesStore((s) => s.deleteItem)
   const rules = useCategoryRulesStore((s) => s.items)
-  const deleteRules = useCategoryRulesStore((s) => s.deleteItems)
-  const [draft, setDraft] = useState('')
-
-  async function handleDelete(categoryId: number) {
-    // A rule pointing at a deleted category is inert (the resolver skips it) but is
-    // clutter left behind for no reason, so it goes with the category it names.
-    const orphaned = rules.filter((r) => r.categoryId === categoryId).map((r) => r.id)
-    if (orphaned.length > 0) await deleteRules(orphaned)
-    await deleteCategory(categoryId)
-  }
+  const addRule = useCategoryRulesStore((s) => s.addItem)
+  const [name, setName] = useState('')
+  const [matchString, setMatchString] = useState('')
 
   return (
     <section className="flex flex-col gap-3">
@@ -137,44 +87,33 @@ function CategoriesSection() {
       </div>
 
       <form
-        className="flex gap-2"
-        onSubmit={(e) => {
+        className="grid items-end gap-2 sm:grid-cols-[1fr_1fr_auto]"
+        onSubmit={async (e) => {
           e.preventDefault()
-          if (!draft.trim()) return
-          void addCategory({ name: draft.trim() })
-          setDraft('')
+          const trimmedName = name.trim()
+          const trimmedMatchString = matchString.trim()
+          if (!trimmedName || !trimmedMatchString) return
+          const existingCategory = categories.find((category) => category.name.toLowerCase() === trimmedName.toLowerCase())
+          const categoryId = existingCategory?.id ?? await addCategory({ name: trimmedName })
+          const nextPriority = rules.length > 0 ? Math.max(...rules.map((r) => r.priority)) + 1 : 0
+          await addRule({ categoryId, match: 'contains', pattern: trimmedMatchString, priority: nextPriority })
+          setName('')
+          setMatchString('')
         }}
       >
-        <Input
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          placeholder={t('categories.newCategoryPlaceholder')}
-          className="h-8"
-        />
-        <Button type="submit" size="sm" disabled={!draft.trim()}>
+        <label className="flex flex-col gap-1">
+          <span className="text-xs font-medium">{t('categories.categoryName')}</span>
+          <Input value={name} onChange={(e) => setName(e.target.value)} className="h-8" />
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="text-xs font-medium">{t('categories.matchString')}</span>
+          <Input value={matchString} onChange={(e) => setMatchString(e.target.value)} className="h-8" />
+        </label>
+        <Button type="submit" size="sm" disabled={!name.trim() || !matchString.trim()}>
           {t('categories.addCategory')}
         </Button>
       </form>
 
-      {categories.length === 0 ? (
-        <p className="text-muted-foreground rounded-md border border-dashed p-3 text-xs">{t('categories.noCategories')}</p>
-      ) : (
-        <div className="flex flex-wrap gap-1.5">
-          {categories.map((category) => (
-            <span key={category.id} className="bg-muted flex items-center gap-1 rounded-full py-1 pr-1 pl-2.5 text-xs">
-              {category.name}
-              <button
-                type="button"
-                aria-label={t('categories.deleteCategory', { name: category.name })}
-                onClick={() => void handleDelete(category.id)}
-                className="hover:bg-background/60 rounded-full p-0.5"
-              >
-                <Trash2 className="size-3" />
-              </button>
-            </span>
-          ))}
-        </div>
-      )}
     </section>
   )
 }
@@ -184,26 +123,12 @@ function RulesSection() {
   const rules = useCategoryRulesStore((s) => s.items)
   const updateRule = useCategoryRulesStore((s) => s.updateItem)
   const deleteRule = useCategoryRulesStore((s) => s.deleteItem)
-  const addRule = useCategoryRulesStore((s) => s.addItem)
   const categories = useCategoriesStore((s) => s.items)
-
-  const [dialogOpen, setDialogOpen] = useState(false)
-  const [pattern, setPattern] = useState('')
-  const [match, setMatch] = useState<CategoryMatch>('contains')
-  const [caseSensitive, setCaseSensitive] = useState(false)
-  const [categoryId, setCategoryId] = useState('')
 
   const sorted = [...rules].sort((a, b) => a.priority - b.priority)
 
   function categoryName(id: number) {
     return categories.find((c) => c.id === id)?.name ?? '—'
-  }
-
-  function reset() {
-    setPattern('')
-    setMatch('contains')
-    setCaseSensitive(false)
-    setCategoryId('')
   }
 
   // Swaps this rule's priority with its neighbor — the whole point of priority is
@@ -221,97 +146,9 @@ function RulesSection() {
 
   return (
     <section className="flex flex-col gap-3">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-sm font-medium">{t('categories.rulesHeading')}</h2>
-          <p className="text-muted-foreground text-xs">{t('categories.rulesDescription')}</p>
-        </div>
-        <Dialog
-          open={dialogOpen}
-          onOpenChange={(open) => {
-            setDialogOpen(open)
-            if (!open) reset()
-          }}
-        >
-          <DialogTrigger asChild>
-            <Button type="button" variant="outline" size="xs" disabled={categories.length === 0}>
-              <Plus className="size-3.5" />
-              {t('categories.addRule')}
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>{t('categories.addRule')}</DialogTitle>
-            </DialogHeader>
-            <div className="flex flex-col gap-3">
-              <label className="flex flex-col gap-1.5">
-                <span className="text-xs font-medium">{t('categories.rulePattern')}</span>
-                <Input value={pattern} onChange={(e) => setPattern(e.target.value)} autoFocus />
-              </label>
-              <label className="flex flex-col gap-1.5">
-                <span className="text-xs font-medium">{t('categories.ruleMatch')}</span>
-                <Select value={match} onValueChange={(v) => setMatch(v as CategoryMatch)}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {MATCH_TYPES.map((option) => (
-                      <SelectItem key={option} value={option}>
-                        {t(`categories.matchTypes.${option}` as never)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </label>
-              <label className="flex items-center gap-2">
-                <Button
-                  type="button"
-                  variant={caseSensitive ? 'secondary' : 'outline'}
-                  size="sm"
-                  aria-pressed={caseSensitive}
-                  onClick={() => setCaseSensitive((v) => !v)}
-                >
-                  {t('categories.caseSensitive')}
-                </Button>
-              </label>
-              <label className="flex flex-col gap-1.5">
-                <span className="text-xs font-medium">{t('categories.ruleCategory')}</span>
-                <Select value={categoryId} onValueChange={setCategoryId}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {categories.map((c) => (
-                      <SelectItem key={c.id} value={String(c.id)}>
-                        {c.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </label>
-            </div>
-            <DialogFooter>
-              <Button
-                type="button"
-                disabled={!pattern.trim() || !categoryId}
-                onClick={() => {
-                  const nextPriority = rules.length > 0 ? Math.max(...rules.map((r) => r.priority)) + 1 : 0
-                  void addRule({
-                    categoryId: Number(categoryId),
-                    match,
-                    pattern: pattern.trim(),
-                    caseSensitive: caseSensitive || undefined,
-                    priority: nextPriority,
-                  })
-                  setDialogOpen(false)
-                  reset()
-                }}
-              >
-                {t('categories.addRuleConfirm')}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+      <div>
+        <h2 className="text-sm font-medium">{t('categories.rulesHeading')}</h2>
+        <p className="text-muted-foreground text-xs">{t('categories.rulesDescription')}</p>
       </div>
 
       {sorted.length === 0 ? (

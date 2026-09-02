@@ -1,9 +1,9 @@
 import { useMemo } from 'react'
 import type { StoredRow } from '@/lib/local-store/create-local-table'
 import { createCategoryResolver } from '@/lib/model/category-resolver'
-import { useAccountsStore, useCategoriesStore, useCategoryRulesStore, useEntriesStore, useTableDefsStore } from '@/lib/model/model-stores'
+import { useAccountsStore, useCardsStore, useCategoriesStore, useCategoryRulesStore, useEntriesStore, useTableDefsStore } from '@/lib/model/model-stores'
 import { categoryColumnFor } from '@/lib/model/table-kinds'
-import type { Account, Category, CategoryRule, Entry, TableDef, TableKind } from '@/lib/model/types'
+import type { Account, Card, Category, CategoryRule, Entry, TableDef, TableKind } from '@/lib/model/types'
 import { isWithinRange } from '@/lib/dashboard/date-range'
 import { resolveFilterRange, type DashboardFilters } from './dashboard-filters'
 
@@ -11,6 +11,7 @@ import { resolveFilterRange, type DashboardFilters } from './dashboard-filters'
 export const MONEY_KINDS: TableKind[] = ['bankLedger', 'generic', 'cardLedger']
 
 export interface FilteredEntry {
+  tableId: number
   date: number
   amount: number
   /** Real for bankLedger; generic/cardLedger spend has no direction field, so it counts as 'out'. */
@@ -27,6 +28,7 @@ interface FilterMoneyEntriesParams {
   entries: StoredRow<Entry>[]
   tableDefs: StoredRow<TableDef>[]
   accounts: StoredRow<Account>[]
+  cards?: StoredRow<Card>[]
   categories: StoredRow<Category>[]
   rules: StoredRow<CategoryRule>[]
   filters: DashboardFilters
@@ -41,12 +43,14 @@ export function filterMoneyEntries({
   entries,
   tableDefs,
   accounts,
+  cards = [],
   categories,
   rules,
   filters,
 }: FilterMoneyEntriesParams): FilteredEntry[] {
   const range = resolveFilterRange(filters)
   const accountsById = new Map(accounts.map((a) => [a.id, a]))
+  const cardsById = new Map(cards.map((card) => [card.id, card]))
   const tablesById = new Map(tableDefs.filter((t) => MONEY_KINDS.includes(t.kind)).map((t) => [t.id, t]))
 
   // One resolver per table kind actually present, not per entry — category rules can
@@ -66,7 +70,9 @@ export function filterMoneyEntries({
     if (entry.deleted) continue
     const table = tablesById.get(entry.tableId)
     if (!table) continue
-    if (filters.accountIds.length > 0 && (!table.accountId || !filters.accountIds.includes(table.accountId))) continue
+    const accountId = table.accountId ?? (table.cardId ? cardsById.get(table.cardId)?.accountId : undefined)
+    if (filters.tableIds.length > 0 && !filters.tableIds.includes(table.id)) continue
+    if (filters.accountIds.length > 0 && (!accountId || !filters.accountIds.includes(accountId))) continue
     if (filters.cardIds.length > 0 && (!table.cardId || !filters.cardIds.includes(table.cardId))) continue
 
     const date = typeof entry.date === 'number' ? entry.date : null
@@ -78,13 +84,14 @@ export function filterMoneyEntries({
     if (filters.categories.length > 0 && !filters.categories.includes(resolved.label)) continue
 
     result.push({
+      tableId: table.id,
       date,
       amount: typeof entry.amount === 'number' ? entry.amount : 0,
       direction: table.kind === 'bankLedger' && entry.direction === 'in' ? 'in' : 'out',
       category: resolved.label,
       description: String(entry.description ?? entry.note ?? ''),
-      accountId: table.accountId,
-      accountName: table.accountId ? accountsById.get(table.accountId)?.name : undefined,
+      accountId,
+      accountName: accountId ? accountsById.get(accountId)?.name : undefined,
       cardId: table.cardId,
     })
   }
@@ -96,11 +103,12 @@ export function useDashboardEntries(filters: DashboardFilters): FilteredEntry[] 
   const tableDefs = useTableDefsStore((s) => s.items)
   const entries = useEntriesStore((s) => s.items)
   const accounts = useAccountsStore((s) => s.items)
+  const cards = useCardsStore((s) => s.items)
   const categories = useCategoriesStore((s) => s.items)
   const rules = useCategoryRulesStore((s) => s.items)
 
   return useMemo(
-    () => filterMoneyEntries({ entries, tableDefs, accounts, categories, rules, filters }),
-    [entries, tableDefs, accounts, categories, rules, filters],
+    () => filterMoneyEntries({ entries, tableDefs, accounts, cards, categories, rules, filters }),
+    [entries, tableDefs, accounts, cards, categories, rules, filters],
   )
 }

@@ -30,7 +30,7 @@ export function RankedBarList({ items, valueFormatter, emptyLabel }: RankedBarLi
   const max = Math.max(...sorted.map((item) => Math.max(item.value, 0)), 1)
 
   return (
-    <div className="flex h-full flex-col justify-center gap-2.5 overflow-y-auto">
+    <div className="flex h-full flex-col gap-2.5 overflow-y-auto">
       {sorted.map((item) => {
         const color = colorForKey(item.key)
         const share = total > 0 ? (item.value / total) * 100 : 0
