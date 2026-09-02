@@ -6,7 +6,10 @@
     "overview": "Visão Geral",
     "variableIncome": "Renda Variável",
     "fixedIncome": "Renda Fixa",
-    "contributions": "Aportes"
+    "contributions": "Aportes",
+    "positions": "Posições",
+    "dividends": "Proventos",
+    "allocation": "Alocação"
   },
   "columns": {
     "date": "Data",
@@ -17,5 +20,18 @@
     "note": "Observação",
     "destination": "Destino",
     "amount": "Valor"
+  },
+  "positions": {
+    "description": "Posições atuais em todas as carteiras — quantidade, preço médio pago e valor pelo preço da última transação (não é uma cotação ao vivo).",
+    "averagePrice": "Preço médio",
+    "currentValue": "Valor",
+    "shareOfPortfolio": "% da carteira",
+    "noPositions": "Nenhuma posição em aberto ainda."
+  },
+  "allocation": {
+    "description": "Participação-alvo por ativo comparada com a divisão atual, para ver o que está acima ou abaixo do planejado.",
+    "actual": "Atual",
+    "target": "Alvo",
+    "noAssets": "Nenhuma posição ou alvo ainda."
   }
 }

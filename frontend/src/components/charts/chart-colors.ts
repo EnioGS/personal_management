@@ -102,4 +102,5 @@ export const DOMAIN_COLOR = {
   fixedIncome: CATEGORICAL_PALETTE[4],
   contributions: CATEGORICAL_PALETTE[5],
   cards: CATEGORICAL_PALETTE[6],
+  dividends: CATEGORICAL_PALETTE[7],
 } as const

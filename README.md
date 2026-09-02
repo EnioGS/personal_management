@@ -32,9 +32,9 @@ Two things it optimizes for:
 │   │   │   ├── index.ts       # aggregates all sections into one array
 │   │   │   ├── vault/         # brand-mark section: Data (export/import/clear) + About
 │   │   │   ├── notes/         # notes.section.ts + panel/store/notes-db + locales/
-│   │   │   ├── finances/      # Overview (dashboard) / Movimentações / Gastos / Cartões — see lib/model/
-│   │   │   ├── investments/   # variable/fixed income (transaction ledger) + contributions
-│   │   │   └── settings/      # settings.section.ts + appearance/general/assistant/accounts-cards/categories
+│   │   │   ├── finances/      # Overview / Movimentações / Gastos / Cartões / Orçamento / Recorrentes
+│   │   │   ├── investments/   # Overview / Posições / ledgers / Aportes / Proventos / Alocação
+│   │   │   └── settings/      # appearance/general/assistant/accounts-cards/categories/tables panels
 │   │   ├── store/
 │   │   │   ├── ui-store.ts     # active section/item, secondary-bar mode (expanded/icons/hidden)
 │   │   │   ├── theme-store.ts  # light/dark/system theme
@@ -147,6 +147,12 @@ Two things it optimizes for:
 - Finances' Overview is a real dashboard (adr/0025): one filter row (date
   range, account, card, category) scoping a KPI row and a diverging in/out
   chart, with a combined/per-account toggle — not a single hardcoded chart.
+- Orçamento, Recorrentes, Posições, Proventos, Alocação, and a Settings ->
+  Tabelas listing every table across every section (adr/0026) all read from
+  data the model already had — a budget compares category spend already
+  computed elsewhere, positions/allocation share one weighted-average-price
+  calculation (`lib/current-value.ts`), recurring detection is pattern
+  matching over existing entries, not a declared schedule.
 - Nothing the assistant does to an existing row in a writable table is ever a
   hard delete or in-place overwrite — a `deleted` soft-flag column marks rows
   for removal (faded, not hidden, in the table UI) or the original of a

@@ -1,6 +1,14 @@
-import { Landmark, LayoutDashboard, LineChart, PiggyBank, TrendingUp } from 'lucide-react'
+import { Landmark, LayoutDashboard, LineChart, PieChart, PiggyBank, Sparkles, TrendingUp, Wallet } from 'lucide-react'
 import type { AppSection } from '../types'
-import { ContributionsPanel, FixedIncomePanel, OverviewPanel, VariableIncomePanel } from './investments-panels'
+import { AllocationPanel } from './allocation-panel'
+import {
+  ContributionsPanel,
+  DividendsPanel,
+  FixedIncomePanel,
+  OverviewPanel,
+  VariableIncomePanel,
+} from './investments-panels'
+import { PositionsPanel } from './positions-panel'
 
 export const investmentsSection: AppSection = {
   id: 'investments',
@@ -8,6 +16,7 @@ export const investmentsSection: AppSection = {
   icon: LineChart,
   items: [
     { id: 'overview', labelKey: 'investments:items.overview', icon: LayoutDashboard, component: OverviewPanel },
+    { id: 'positions', labelKey: 'investments:items.positions', icon: Wallet, component: PositionsPanel },
     {
       id: 'variableIncome',
       labelKey: 'investments:items.variableIncome',
@@ -26,5 +35,7 @@ export const investmentsSection: AppSection = {
       icon: PiggyBank,
       component: ContributionsPanel,
     },
+    { id: 'dividends', labelKey: 'investments:items.dividends', icon: Sparkles, component: DividendsPanel },
+    { id: 'allocation', labelKey: 'investments:items.allocation', icon: PieChart, component: AllocationPanel },
   ],
 }

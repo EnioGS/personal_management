@@ -7,7 +7,8 @@
     "general": "Geral",
     "assistant": "Assistente",
     "accountsCards": "Contas e Cartões",
-    "categories": "Categorias"
+    "categories": "Categorias",
+    "tables": "Tabelas"
   },
   "appearance": {
     "themeLabel": "Tema",
@@ -100,5 +101,19 @@
     "deleteRule": "Excluir regra",
     "deleteRuleDialogTitle": "Excluir esta regra?",
     "deleteRuleDialogDescription": "Os valores que ela combinava voltam a ficar não classificados — nada mais muda."
+  },
+  "tables": {
+    "heading": "Todas as tabelas",
+    "description": "Todas as tabelas de todas as seções, em um só lugar — renomeie ou exclua uma que você não está vendo agora.",
+    "noTables": "Nenhuma tabela ainda.",
+    "rowCount": "{{count}} linha(s)",
+    "rename": "Renomear",
+    "delete": "Excluir tabela",
+    "renameTitle": "Renomear tabela",
+    "renameConfirm": "Renomear",
+    "cancel": "Cancelar",
+    "deleteTitle": "Excluir \"{{name}}\"?",
+    "deleteDescription": "Isso exclui permanentemente a tabela e todas as suas linhas. Não pode ser desfeito.",
+    "deleteConfirm": "Excluir tabela"
   }
 }

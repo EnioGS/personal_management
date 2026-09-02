@@ -6,7 +6,9 @@
     "overview": "Overview",
     "movements": "Movements",
     "spending": "Spending",
-    "cards": "Cards"
+    "cards": "Cards",
+    "budget": "Budget",
+    "recurring": "Recurring"
   },
   "columns": {
     "date": "Date",
@@ -14,5 +16,18 @@
     "source": "Source",
     "amount": "Amount",
     "note": "Note"
+  },
+  "budget": {
+    "description": "A monthly target per category, compared against what was actually spent.",
+    "previousMonth": "Previous month",
+    "nextMonth": "Next month",
+    "setBudget": "Set budget",
+    "noRows": "No categories with a budget or spending this month yet."
+  },
+  "recurring": {
+    "description": "Charges that repeated in the same category and amount across several months — subscriptions and other recurring spend, detected from history.",
+    "noneFound": "Nothing recurring found yet in this range.",
+    "monthCount": "{{count}} month(s)",
+    "lastSeen": "last seen {{date}}"
   }
 }

@@ -28,6 +28,8 @@ function emptyTables(): DataExportFile['tables'] {
     categories: [],
     categoryRules: [],
     entries: [],
+    budgets: [],
+    allocationTargets: [],
     notes: [],
     assistantPrompts: [],
     assistantConfig: [],

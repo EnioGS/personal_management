@@ -6,7 +6,10 @@
     "overview": "Overview",
     "variableIncome": "Variable Income",
     "fixedIncome": "Fixed Income",
-    "contributions": "Contributions"
+    "contributions": "Contributions",
+    "positions": "Positions",
+    "dividends": "Dividends",
+    "allocation": "Allocation"
   },
   "columns": {
     "date": "Date",
@@ -17,5 +20,18 @@
     "note": "Note",
     "destination": "Destination",
     "amount": "Amount"
+  },
+  "positions": {
+    "description": "Current holdings across every ledger — quantity, average price paid, and value at the last transaction price (not a live quote).",
+    "averagePrice": "Avg. price",
+    "currentValue": "Value",
+    "shareOfPortfolio": "% of portfolio",
+    "noPositions": "No open positions yet."
+  },
+  "allocation": {
+    "description": "Target share per asset vs. the actual current split, so you can see what's over- or under-allocated.",
+    "actual": "Actual",
+    "target": "Target",
+    "noAssets": "No positions or targets yet."
   }
 }

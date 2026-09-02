@@ -22,3 +22,35 @@ export function getCurrentValue(asset: string, transactions: Transaction[]): num
   const lastPrice = assetTx.at(-1)?.price ?? 0
   return quantity * lastPrice
 }
+
+export interface Position {
+  asset: string
+  quantity: number
+  /** Weighted average of buy prices only — what was actually paid, not affected by sells. */
+  averagePrice: number
+  /** See getCurrentValue's own caveat: book value from the last transaction, not a live quote. */
+  currentValue: number
+}
+
+/**
+ * One row per asset still held (Posições) — an asset fully sold off (quantity settles
+ * to ~0) drops out, since "current holdings" isn't the place for closed positions.
+ */
+export function computePositions(transactions: Transaction[]): Position[] {
+  const visible = transactions.filter((t) => !t.deleted)
+  const assets = [...new Set(visible.map((t) => t.asset))]
+
+  return assets
+    .map((asset): Position => {
+      const assetTx = visible.filter((t) => t.asset === asset).sort((a, b) => a.date - b.date)
+      const quantity = assetTx.reduce((q, t) => q + (t.type === 'buy' ? t.quantity : -t.quantity), 0)
+
+      const buys = assetTx.filter((t) => t.type === 'buy')
+      const buyQuantity = buys.reduce((q, t) => q + t.quantity, 0)
+      const buyCost = buys.reduce((c, t) => c + t.quantity * t.price, 0)
+      const averagePrice = buyQuantity > 0 ? buyCost / buyQuantity : 0
+
+      return { asset, quantity, averagePrice, currentValue: getCurrentValue(asset, visible) }
+    })
+    .filter((position) => Math.abs(position.quantity) > 1e-9)
+}

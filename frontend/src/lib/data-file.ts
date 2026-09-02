@@ -5,6 +5,8 @@ import type { LocalRow } from '@/lib/local-store/create-local-table'
 import { buildModelFromLegacy, LEGACY_TABLE_KEYS, type LegacyTables } from '@/lib/model/legacy-migration'
 import {
   accountsTable,
+  allocationTargetsTable,
+  budgetsTable,
   cardsTable,
   categoriesTable,
   categoryRulesTable,
@@ -32,6 +34,8 @@ const TABLES = {
   categories: categoriesTable,
   categoryRules: categoryRulesTable,
   entries: entriesTable,
+  budgets: budgetsTable,
+  allocationTargets: allocationTargetsTable,
   notes: notesTable,
   assistantPrompts: assistantPromptsTable,
   assistantConfig: assistantConfigTable,
@@ -104,6 +108,8 @@ function upgradeV2(record: Record<string, unknown>): DataExportFile {
       categories: [],
       categoryRules: [],
       entries,
+      budgets: [],
+      allocationTargets: [],
       notes: asRows(tables.notes),
       assistantPrompts: asRows(tables.assistantPrompts),
       assistantConfig: asRows(tables.assistantConfig),

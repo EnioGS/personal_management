@@ -131,3 +131,32 @@ export function ContributionsPanel() {
     </div>
   )
 }
+
+export function DividendsPanel() {
+  const { t } = useTranslation('investments')
+  const rows = useActiveTableEntries('dividends', ['dividends'])
+  const visible = rows.filter((row) => !row.deleted)
+
+  const barData = bucketByMonth(visible, 'date', 'amount').map((d) => ({ month: d.month, amount: d.total }))
+
+  return (
+    <div className="flex h-full flex-col">
+      <div className="min-h-0 flex-1">
+        <ChartTablePanel
+          id="dividends"
+          chart={
+            <div className="h-full p-4">
+              <AppBarChart
+                data={barData}
+                xKey="month"
+                xFormatter={formatMonthLabel}
+                series={{ key: 'amount', label: t('items.dividends'), color: DOMAIN_COLOR.dividends }}
+              />
+            </div>
+          }
+          table={<TableWorkspace workspaceId="dividends" kinds={['dividends']} />}
+        />
+      </div>
+    </div>
+  )
+}

@@ -6,7 +6,9 @@
     "overview": "Visão Geral",
     "movements": "Movimentações",
     "spending": "Gastos",
-    "cards": "Cartões"
+    "cards": "Cartões",
+    "budget": "Orçamento",
+    "recurring": "Recorrentes"
   },
   "columns": {
     "date": "Data",
@@ -14,5 +16,18 @@
     "source": "Origem",
     "amount": "Valor",
     "note": "Observação"
+  },
+  "budget": {
+    "description": "Uma meta mensal por categoria, comparada com o que foi realmente gasto.",
+    "previousMonth": "Mês anterior",
+    "nextMonth": "Próximo mês",
+    "setBudget": "Definir orçamento",
+    "noRows": "Nenhuma categoria com orçamento ou gasto neste mês ainda."
+  },
+  "recurring": {
+    "description": "Cobranças que se repetiram na mesma categoria e valor ao longo de vários meses — assinaturas e outros gastos recorrentes, detectados a partir do histórico.",
+    "noneFound": "Nada recorrente encontrado neste período ainda.",
+    "monthCount": "{{count}} mês(es)",
+    "lastSeen": "visto por último em {{date}}"
   }
 }

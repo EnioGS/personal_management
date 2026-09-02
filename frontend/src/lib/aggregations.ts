@@ -3,7 +3,7 @@ import type { Transaction } from './current-value'
 // Dates are stored as UTC-midnight epoch ms (parsed from "YYYY-MM-DD" strings via Date.parse,
 // which is always UTC per spec) — bucket/format in UTC too, or the day/month shifts for any
 // reader west of UTC.
-function monthKey(epochMs: number): string {
+export function monthKey(epochMs: number): string {
   const d = new Date(epochMs)
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`
 }

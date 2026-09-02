@@ -38,7 +38,7 @@ export interface Card {
  * per credit card, say); the column sets are not, so CSV, charts and the assistant's
  * tools stay schema-driven. See table-kinds.ts.
  */
-export type TableKind = 'bankLedger' | 'cardLedger' | 'investmentLedger' | 'contributions' | 'generic'
+export type TableKind = 'bankLedger' | 'cardLedger' | 'investmentLedger' | 'contributions' | 'dividends' | 'generic'
 
 export interface TableDef {
   name: string
@@ -84,4 +84,16 @@ export interface Entry {
   deleted?: boolean
   /** Column values, keyed by the schema of the table's kind. */
   [field: string]: unknown
+}
+
+/** A monthly spending target for one category — Orçamento compares this to actual spend. */
+export interface Budget {
+  categoryId: number
+  monthlyAmount: number
+}
+
+/** A target portfolio share for one asset — Alocação compares this to the actual current split. */
+export interface AllocationTarget {
+  asset: string
+  targetPercent: number
 }

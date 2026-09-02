@@ -52,7 +52,8 @@
     "cardLedger": "Cartão de crédito",
     "investmentLedger": "Carteira de investimentos",
     "contributions": "Aportes",
-    "generic": "Tabela genérica"
+    "generic": "Tabela genérica",
+    "dividends": "Proventos"
   },
   "direction": {
     "in": "Entrada",

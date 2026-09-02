@@ -7,7 +7,8 @@
     "general": "General",
     "assistant": "Assistant",
     "accountsCards": "Accounts & Cards",
-    "categories": "Categories"
+    "categories": "Categories",
+    "tables": "Tables"
   },
   "appearance": {
     "themeLabel": "Theme",
@@ -100,5 +101,19 @@
     "deleteRule": "Delete rule",
     "deleteRuleDialogTitle": "Delete this rule?",
     "deleteRuleDialogDescription": "Values it matched go back to unclassified — nothing else changes."
+  },
+  "tables": {
+    "heading": "All tables",
+    "description": "Every table across every section, in one place — rename or delete one you're not currently looking at.",
+    "noTables": "No tables yet.",
+    "rowCount": "{{count}} row(s)",
+    "rename": "Rename",
+    "delete": "Delete table",
+    "renameTitle": "Rename table",
+    "renameConfirm": "Rename",
+    "cancel": "Cancel",
+    "deleteTitle": "Delete \"{{name}}\"?",
+    "deleteDescription": "This permanently deletes the table and every row in it. This cannot be undone.",
+    "deleteConfirm": "Delete table"
   }
 }

@@ -66,6 +66,12 @@ export const TABLE_KIND_SCHEMAS: Record<TableKind, TableSchema<any>> = {
     { key: 'destination', labelKey: 'common:columns.destination', type: 'combobox' },
     amountColumn,
   ],
+  dividends: [
+    dateColumn,
+    { key: 'asset', labelKey: 'common:columns.asset', type: 'text', required: true },
+    amountColumn,
+    noteColumn,
+  ],
   generic: [dateColumn, categoryColumn, amountColumn, noteColumn],
 }
 

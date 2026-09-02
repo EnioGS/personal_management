@@ -52,7 +52,8 @@
     "cardLedger": "Credit card",
     "investmentLedger": "Investment ledger",
     "contributions": "Contributions",
-    "generic": "Generic table"
+    "generic": "Generic table",
+    "dividends": "Dividends/interest"
   },
   "direction": {
     "in": "In",

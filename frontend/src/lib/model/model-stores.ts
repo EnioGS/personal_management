@@ -2,19 +2,23 @@ import { createLocalListStore } from '@/lib/local-store/create-local-list-store'
 import type { StoredRow } from '@/lib/local-store/create-local-table'
 import {
   accountsTable,
+  allocationTargetsTable,
+  budgetsTable,
   cardsTable,
   categoriesTable,
   categoryRulesTable,
   entriesTable,
   tableDefsTable,
 } from './model-db'
-import type { Account, Card, Category, CategoryRule, Entry, TableDef } from './types'
+import type { Account, AllocationTarget, Budget, Card, Category, CategoryRule, Entry, TableDef } from './types'
 
 export const useAccountsStore = createLocalListStore<Account>(accountsTable)
 export const useCardsStore = createLocalListStore<Card>(cardsTable)
 export const useTableDefsStore = createLocalListStore<TableDef>(tableDefsTable)
 export const useCategoriesStore = createLocalListStore<Category>(categoriesTable)
 export const useCategoryRulesStore = createLocalListStore<CategoryRule>(categoryRulesTable)
+export const useBudgetsStore = createLocalListStore<Budget>(budgetsTable)
+export const useAllocationTargetsStore = createLocalListStore<AllocationTarget>(allocationTargetsTable)
 
 /**
  * Every user table's rows, in one store. Consumers filter by `tableId` — see

@@ -17,6 +17,8 @@ const db = new Dexie('app-model-db') as Dexie & {
   categories: EntityTable<LocalRow, 'id'>
   categoryRules: EntityTable<LocalRow, 'id'>
   entries: EntityTable<LocalRow, 'id'>
+  budgets: EntityTable<LocalRow, 'id'>
+  allocationTargets: EntityTable<LocalRow, 'id'>
 }
 
 db.version(1).stores({
@@ -28,9 +30,19 @@ db.version(1).stores({
   entries: '++id, createdAt',
 })
 
+// Additive — Dexie carries every unmentioned table over from version 1 unchanged, so
+// this only needs to declare the two new ones (Orçamento's per-category targets and
+// Alocação's per-asset targets).
+db.version(2).stores({
+  budgets: '++id, createdAt',
+  allocationTargets: '++id, createdAt',
+})
+
 export const accountsTable = db.accounts
 export const cardsTable = db.cards
 export const tableDefsTable = db.tableDefs
 export const categoriesTable = db.categories
 export const categoryRulesTable = db.categoryRules
 export const entriesTable = db.entries
+export const budgetsTable = db.budgets
+export const allocationTargetsTable = db.allocationTargets
