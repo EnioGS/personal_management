@@ -50,7 +50,9 @@ export async function seedDefaultTables(): Promise<{ created: string[] }> {
 }
 
 async function runSeed(): Promise<{ created: string[] }> {
-  return tableDefsTable.db.transaction('rw', tableDefsTable, accountsTable, async () => {
+  // Every table the seed writes has to be named up front — Dexie refuses a write to
+  // one the transaction did not declare, which is what adding the card first hit.
+  return tableDefsTable.db.transaction('rw', tableDefsTable, accountsTable, cardsTable, async () => {
     // Only a genuinely empty vault is seeded: a user who deleted a table meant to.
     if ((await tableDefsTable.count()) > 0) return { created: [] }
 
