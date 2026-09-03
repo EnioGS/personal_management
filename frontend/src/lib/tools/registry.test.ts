@@ -31,6 +31,10 @@ describe('findTool', () => {
       'label_ingestion_rows_by_match',
       'update_ingestion_data_fields',
       'validate_ingestion_rows',
+      'list_label_rules',
+      'save_label_rule',
+      'apply_label_rules',
+      'delete_label_rule',
       'write_to_table',
     ])
   })

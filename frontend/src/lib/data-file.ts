@@ -16,6 +16,7 @@ import {
   ingestionColumnMappingsTable,
   ingestionRowsTable,
   ingestionSourcesTable,
+  labelRulesTable,
   tableDefsTable,
 } from '@/lib/model/model-db'
 import { notesTable } from '@/sections/notes/notes-db'
@@ -28,9 +29,9 @@ import { notesTable } from '@/sections/notes/notes-db'
  * the user's whole setup rather than a pile of untitled data. v4 also includes
  * ingestion sources, staged rows, label sidecars and their audit events. v5 drops
  * category rules: a row's category is a label set in the ingestion centre, so a rule
- * store no longer exists to round-trip.
+ * store no longer exists to round-trip. v6 adds standing labelling rules.
  */
-export const DATA_EXPORT_VERSION = 5 as const
+export const DATA_EXPORT_VERSION = 6 as const
 export const DATA_FILE_NAME = 'personal-management-data.db'
 export const DATA_FILE_EXTENSION = '.db'
 /** Still accepted on import (see `data-panel.tsx`) — a backup made before adr/0028. */
@@ -50,6 +51,7 @@ const TABLES = {
   ingestionRows: ingestionRowsTable,
   entryLabels: entryLabelsTable,
   ingestionAuditEvents: ingestionAuditEventsTable,
+  labelRules: labelRulesTable,
   notes: notesTable,
   assistantPrompts: assistantPromptsTable,
   assistantConfig: assistantConfigTable,
@@ -116,6 +118,7 @@ function emptyIngestionTables() {
     ingestionRows: [] as LocalRow[],
     entryLabels: [] as LocalRow[],
     ingestionAuditEvents: [] as LocalRow[],
+    labelRules: [] as LocalRow[],
   }
 }
 
@@ -172,7 +175,7 @@ function upgradeV3(record: Record<string, unknown>): DataExportFile {
   }
 }
 
-/** v4 files carry a categoryRules table this version no longer has; the rest is identical. */
+/** v4 carries a categoryRules table this version dropped; v5 simply predates labelRules. */
 function upgradeV4(record: Record<string, unknown>): DataExportFile {
   const tables = record.tables as Record<string, unknown>
   return {
@@ -198,7 +201,7 @@ export function parseDataExportFile(value: unknown): DataExportFile {
 
   if (record.version === 2) return upgradeV2(record)
   if (record.version === 3) return upgradeV3(record)
-  if (record.version === 4) return upgradeV4(record)
+  if (record.version === 4 || record.version === 5) return upgradeV4(record)
 
   if (record.version !== DATA_EXPORT_VERSION) {
     throw new Error(`Unsupported data export version: ${String(record.version)}.`)

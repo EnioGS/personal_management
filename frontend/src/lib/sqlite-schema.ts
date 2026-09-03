@@ -154,6 +154,20 @@ export const SQLITE_SCHEMAS: Record<DataTableKey, SqliteTableSchema> = {
       { column: 'source_ingestion_row_id', key: 'sourceIngestionRowId', type: 'integer' },
     ],
   },
+  labelRules: {
+    sqlName: 'label_rules',
+    columns: [
+      { column: 'name', key: 'name', type: 'text' },
+      { column: 'field', key: 'field', type: 'text' },
+      { column: 'contains', key: 'contains', type: 'text' },
+      { column: 'case_sensitive', key: 'caseSensitive', type: 'boolean' },
+      { column: 'labels', key: 'labels', type: 'json' },
+      { column: 'destination_table_id', key: 'destinationTableId', type: 'integer' },
+      { column: 'rationale', key: 'rationale', type: 'text' },
+      { column: 'created_by', key: 'createdBy', type: 'text' },
+      { column: 'created_at', key: 'createdAt', type: 'integer' },
+    ],
+  },
   ingestionAuditEvents: {
     sqlName: 'ingestion_audit_events',
     columns: [

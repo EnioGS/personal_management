@@ -7,6 +7,7 @@ import { ColumnSortMenu, type ColumnSort } from '@/components/data-table/column-
 import { useProgressiveRows } from '@/components/data-table/use-progressive-rows'
 import { queryRows } from '@/lib/model/row-query'
 import { cn } from '@/lib/utils'
+import { LabellingRules } from './labelling-rules'
 import {
   createIngestionSource,
   createSupplementalColumn,
@@ -404,6 +405,8 @@ export function IngestionPanel() {
           </div>
         </section>
       )}
+
+      <LabellingRules onChanged={refresh} />
 
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-dashed p-3">
         <div className="text-xs"><p className="font-medium">Import data</p><p className="text-muted-foreground">Drop files anywhere on this screen, or choose them. An exported .db is split into one dataset per table it contains.</p></div>

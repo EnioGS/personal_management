@@ -9,6 +9,7 @@ import {
   entryLabelsTable,
   entriesTable,
   ingestionAuditEventsTable,
+  labelRulesTable,
   ingestionColumnMappingsTable,
   ingestionRowsTable,
   ingestionSourcesTable,
@@ -25,6 +26,7 @@ import type {
   IngestionAuditEvent,
   IngestionColumnMapping,
   IngestionRow,
+  LabelRule,
   IngestionSource,
   TableDef,
 } from './types'
@@ -38,6 +40,7 @@ export const useAllocationTargetsStore = createLocalListStore<AllocationTarget>(
 export const useIngestionSourcesStore = createLocalListStore<IngestionSource>(ingestionSourcesTable)
 export const useIngestionColumnMappingsStore = createLocalListStore<IngestionColumnMapping>(ingestionColumnMappingsTable)
 export const useIngestionRowsStore = createLocalListStore<IngestionRow>(ingestionRowsTable)
+export const useLabelRulesStore = createLocalListStore<LabelRule>(labelRulesTable)
 export const useEntryLabelsStore = createLocalListStore<EntryLabels>(entryLabelsTable)
 export const useIngestionAuditEventsStore = createLocalListStore<IngestionAuditEvent>(ingestionAuditEventsTable)
 

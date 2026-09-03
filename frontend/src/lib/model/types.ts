@@ -237,6 +237,8 @@ export interface IngestionRow {
   promotedEntryId?: number
   /** Why the row was discarded, and by whom, so the decision can be reviewed. */
   discardReason?: string
+  /** Rules that filled labels on this row, in the order they were applied. */
+  appliedRuleIds?: number[]
   /**
    * Stamped onto a row when its source file is removed after everything in it was
    * dealt with, so a confirmed row can still say which file it came from once the
@@ -251,9 +253,36 @@ export interface IngestionRow {
   hasPendingChange?: boolean
 }
 
+/**
+ * A standing decision: rows whose text matches get these labels the moment they are
+ * staged, so what was worked out once is not worked out again on the next import.
+ *
+ * A rule fills only labels a row does not already have — a judgement made by hand or
+ * by the assistant always outranks a standing rule — and it records itself on the row,
+ * which is what lets the rule report honestly on how it has done.
+ */
+export interface LabelRule {
+  /** Short name for the list; falls back to the matched text when absent. */
+  name?: string
+  /** Which field the text is looked for in — 'description' unless stated. */
+  field: string
+  contains: string
+  caseSensitive?: boolean
+  labels: IngestionRowLabels
+  destinationTableId?: number
+  /**
+   * Why this label set is safe for everything matching this text. Written by whoever
+   * created the rule, edited freely afterwards: a rule nobody can justify later is a
+   * rule nobody can safely keep.
+   */
+  rationale?: string
+  createdBy: 'user' | 'assistant'
+  createdAt: number
+}
+
 /** Append-only trace of user/assistant classification actions. */
 export interface IngestionAuditEvent {
-  event: 'sourceUploaded' | 'mappingChanged' | 'rowsStaged' | 'labelsChanged' | 'rowsPromoted' | 'rowsReconciled' | 'rowsReallocated' | 'rowsDiscarded' | 'promotionFailed'
+  event: 'sourceUploaded' | 'mappingChanged' | 'rowsStaged' | 'labelsChanged' | 'rowsPromoted' | 'rowsReconciled' | 'rowsReallocated' | 'rowsDiscarded' | 'rulesApplied' | 'promotionFailed'
   actor: 'user' | 'assistant' | 'migration'
   sourceId?: number
   ingestionRowIds?: number[]

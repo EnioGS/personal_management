@@ -40,7 +40,7 @@ function emptyTables(): DataExportFile['tables'] {
     ingestionColumnMappings: [],
     ingestionRows: [],
     entryLabels: [],
-    ingestionAuditEvents: [],
+    ingestionAuditEvents: [], labelRules: [],
     notes: [],
     assistantPrompts: [],
     assistantConfig: [],

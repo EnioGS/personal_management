@@ -17,6 +17,7 @@ import {
   updateIngestionDataFieldsTool,
   validateIngestionRowsTool,
 } from './ingestion-tools'
+import { applyLabelRulesTool, deleteLabelRuleTool, listLabelRulesTool, saveLabelRuleTool } from './label-rule-tools'
 import { readCsvTool } from './read-csv'
 import { readTableTool } from './read-table'
 import { readTextFileTool } from './read-text-file'
@@ -52,6 +53,10 @@ export const toolRegistry: ToolDefinition[] = [
   labelIngestionRowsByMatchTool,
   updateIngestionDataFieldsTool,
   validateIngestionRowsTool,
+  listLabelRulesTool,
+  saveLabelRuleTool,
+  applyLabelRulesTool,
+  deleteLabelRuleTool,
   writeToTableTool,
 ]
 

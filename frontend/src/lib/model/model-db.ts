@@ -25,6 +25,7 @@ const db = new Dexie('app-model-db') as Dexie & {
   ingestionRows: EntityTable<LocalRow, 'id'>
   entryLabels: EntityTable<LocalRow, 'id'>
   ingestionAuditEvents: EntityTable<LocalRow, 'id'>
+  labelRules: EntityTable<LocalRow, 'id'>
 }
 
 db.version(1).stores({
@@ -128,6 +129,9 @@ db.version(7).stores({}).upgrade(async (tx) => {
   })
 })
 
+// Standing labelling rules: what was worked out for one import applies to the next.
+db.version(8).stores({ labelRules: '++id, createdAt' })
+
 export const accountsTable = db.accounts
 export const cardsTable = db.cards
 export const tableDefsTable = db.tableDefs
@@ -140,3 +144,4 @@ export const ingestionColumnMappingsTable = db.ingestionColumnMappings
 export const ingestionRowsTable = db.ingestionRows
 export const entryLabelsTable = db.entryLabels
 export const ingestionAuditEventsTable = db.ingestionAuditEvents
+export const labelRulesTable = db.labelRules

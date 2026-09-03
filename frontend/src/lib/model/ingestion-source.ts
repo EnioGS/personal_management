@@ -7,6 +7,7 @@ import {
   ingestionSourcesTable,
 } from './model-db'
 import { allPotentialIngestionFields } from './ingestion'
+import { applyLabelRulesToRows } from './label-rules-repository'
 import { FINANCE_DESTINATIONS, FLOW_ROLES, matchLabelValue, RECURRENCES, SETTLEMENT_CHANNELS, SPENDING_TREATMENTS } from './label-vocabulary'
 import type { IngestionColumnMapping, IngestionRow, IngestionSource, IngestionTargetField } from './types'
 
@@ -218,6 +219,9 @@ export async function stageIngestionSource(sourceId: number): Promise<{ staged: 
     await ingestionRowsTable.bulkAdd(staged.map((row) => ({ createdAt: Date.now(), data: row })))
   }
   await ingestionSourcesTable.update(sourceId, { data: { ...source, status: 'staged' } })
+  // Standing rules meet the rows the moment they arrive, so an import that a rule
+  // fully covers lands ready instead of waiting for the same decision to be made again.
+  if (staged.length > 0) await applyLabelRulesToRows()
   await ingestionAuditEventsTable.add({
     createdAt: Date.now(),
     data: { event: 'rowsStaged', actor: 'user', sourceId, details: { staged: staged.length, duplicates } },
