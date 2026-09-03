@@ -109,11 +109,40 @@ export async function clearStoredData(): Promise<void> {
   await refreshAllLocalStores()
 }
 
+export interface ImportReport {
+  /** Stores the file did not carry at all; they come back empty rather than missing. */
+  absentStores: DataTableKey[]
+  /** Stores the file carried that this version knows nothing about — kept in the file, not imported. */
+  unknownStores: string[]
+  /** Tables beyond the ones each screen needs. They are imported and kept. */
+  extraTables: string[]
+}
+
+/**
+ * What a file will and will not bring in, worked out before anything is written.
+ *
+ * A file from an older build simply lacks stores this one has, and a file from a newer
+ * one carries stores it does not — neither is a reason to refuse it. The first are
+ * restored empty; the second stay in the file, and the user is told rather than left
+ * to discover it. Extra tables are the user's own and are kept as they are.
+ */
+export function describeImport(file: DataExportFile, knownKeys: readonly string[] = TABLE_KEYS): ImportReport {
+  const carried = Object.keys(file.tables ?? {})
+  const namedTables = (file.tables?.tableDefs ?? []).map((row) => (row.data as { name?: string })?.name ?? 'unnamed')
+  return {
+    absentStores: TABLE_KEYS.filter((key) => !carried.includes(key)),
+    unknownStores: carried.filter((key) => !knownKeys.includes(key)),
+    extraTables: namedTables.slice(3),
+  }
+}
+
 /** Wipes all tables, then restores the imported rows — bulkPut preserves their original ids. */
-export async function importData(file: DataExportFile): Promise<void> {
+export async function importData(file: DataExportFile): Promise<ImportReport> {
+  const report = describeImport(file)
   await Promise.all(TABLE_KEYS.map((key) => TABLES[key].clear()))
   await Promise.all(TABLE_KEYS.map((key) => TABLES[key].bulkPut(file.tables[key] ?? [])))
   await refreshAllLocalStores()
+  return report
 }
 
 function asRows(value: unknown): LocalRow[] {

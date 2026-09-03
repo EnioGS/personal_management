@@ -20,6 +20,7 @@ import {
   hasAnyData,
   importData,
   clearStoredData,
+  describeImport,
   parseDataExportFile,
   wipeAllData,
   type DataExportFile,
@@ -323,5 +324,36 @@ describe('what an export carries, and what clearing keeps', () => {
     expect(await accountsTable.count()).toBe(1)
     expect(await entriesTable.count()).toBe(0)
     expect(await ingestionRowsTable.count()).toBe(0)
+  })
+})
+
+describe('importing a file this version did not write', () => {
+  beforeEach(async () => { await wipeAllData() })
+
+  it('reports the stores it lacks and the ones it does not understand, and keeps extra tables', async () => {
+    const file = {
+      version: DATA_EXPORT_VERSION,
+      exportedAt: 1,
+      tables: {
+        tableDefs: [
+          { id: 1, createdAt: 1, data: { name: 'Movements', kind: 'bankLedger' } },
+          { id: 2, createdAt: 1, data: { name: 'Spending', kind: 'cardLedger' } },
+          { id: 3, createdAt: 1, data: { name: 'Investments', kind: 'investmentLedger' } },
+          { id: 4, createdAt: 1, data: { name: 'Um extra do usuário', kind: 'generic' } },
+        ],
+        entries: [],
+        somethingNewer: [{ id: 1, createdAt: 1, data: {} }],
+      },
+    } as unknown as DataExportFile
+
+    const report = describeImport(file)
+
+    expect(report.extraTables).toEqual(['Um extra do usuário'])
+    expect(report.unknownStores).toEqual(['somethingNewer'])
+    expect(report.absentStores).toContain('labelRules')
+
+    await importData(file)
+
+    expect(await tableDefsTable.count()).toBe(4)
   })
 })

@@ -8,8 +8,13 @@ import { SecondaryBar } from './secondary-bar'
  * activity bar's expanded → icons → hidden cycle (store/ui-store.ts), and a
  * drag handle on top of that gave two competing ways to size the same column.
  */
+/**
+ * Expanded, the bar is as wide as its longest item needs and no wider — a fixed 14rem
+ * left a gap beside short names and clipped long ones. The cap keeps a section with a
+ * very long label from taking half the window.
+ */
 const SECONDARY_BAR_WIDTH = {
-  expanded: 'w-56',
+  expanded: 'w-max max-w-72',
   icons: 'w-12',
 } as const
 

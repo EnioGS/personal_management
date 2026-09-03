@@ -115,7 +115,7 @@ export function SecondaryBar() {
                 data-secondary-bar-toggle
                 className={cn(
                   'text-sidebar-foreground/80 hover:text-sidebar-foreground relative h-8 gap-2 text-sm font-normal',
-                  iconsOnly ? 'w-9 justify-center px-0' : 'w-full justify-start px-2',
+                  iconsOnly ? 'w-9 justify-center px-0' : 'w-full justify-start px-2 whitespace-nowrap',
                   isActive && 'bg-sidebar-accent text-sidebar-foreground',
                 )}
               >
