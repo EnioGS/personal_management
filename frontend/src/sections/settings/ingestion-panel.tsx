@@ -398,7 +398,7 @@ export function IngestionPanel() {
             <p className="text-muted-foreground">This dataset has no source file: its rows were moved out of the Finance tables when the label workflow was introduced, so they are already mapped. There are no columns to assign — pick <span className="font-medium">Imported, unlabelled data</span> to label them.</p>
           </section>
         ) : (
-        <section className="flex min-h-[60vh] flex-1 shrink-0 flex-col gap-2 rounded-md border p-2">
+        <section className="flex min-h-[78vh] flex-1 shrink-0 flex-col gap-2 rounded-md border p-2">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="text-xs"><span className="font-medium">{selectedSource.originalFilename}</span><span className="text-muted-foreground"> · original columns stay unchanged; supplemental columns are blank by design.</span></div>
             <div className="flex items-center gap-1">
@@ -435,7 +435,7 @@ export function IngestionPanel() {
         </section>
         )
       ) : (
-        <section className="flex min-h-[60vh] flex-1 shrink-0 flex-col gap-2 rounded-md border p-2">
+        <section className="flex min-h-[78vh] flex-1 shrink-0 flex-col gap-2 rounded-md border p-2">
           <p className="text-muted-foreground text-xs">{showingConfirmed
             ? 'These rows are already in a Finance table. Editing a label or a data field marks the row for reallocation — its entry is rewritten, and every Finance screen follows, only when you confirm below.'
             : 'Source data is shown in its own columns. Canonical fields can be edited here; label cells accept text and turn red when the value is not one of the accepted options. Typing a category name that does not exist yet creates it.'}</p>

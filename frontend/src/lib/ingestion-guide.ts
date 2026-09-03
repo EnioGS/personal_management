@@ -28,7 +28,10 @@ Step 1 — Source mapping. An uploaded CSV keeps its original columns untouched.
 source column is assigned to one canonical field, and one canonical field takes at
 most one source column. A source that lacks a field some destination will need gets
 an explicitly blank supplemental column instead (add_ingestion_blank_column); this
-never edits the CSV. When every required field is covered, the *user* presses "Add
+never edits the CSV. Those columns can then be written into with fill_source_column,
+which is also how provenance the file does not carry gets in: a card export whose rows
+say only "Uber Trip" carries nothing about which statement it belongs to, and the
+filename is often the only record of it. Write what the file supports, not guesses. When every required field is covered, the *user* presses "Add
 to imported unlabelled data". You may map and explain, but you cannot perform that
 step.
 

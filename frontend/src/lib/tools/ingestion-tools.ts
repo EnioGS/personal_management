@@ -1,7 +1,7 @@
 import { DEFAULT_INGESTION_GUIDE, INGESTION_GUIDE_KEY } from '@/lib/ingestion-guide'
 import { ingestionLabelErrors } from '@/lib/model/ingestion'
 import { ensureCategoryByName } from '@/lib/model/category-vocabulary'
-import { createSupplementalColumn, markSourceRows, parseIngestionCsv, planIngestionStaging, saveIngestionMappings, stageIngestionSource } from '@/lib/model/ingestion-source'
+import { createSupplementalColumn, fillSupplementalColumn, markSourceRows, parseIngestionCsv, planIngestionStaging, saveIngestionMappings, stageIngestionSource, supplementalValueFor } from '@/lib/model/ingestion-source'
 import { discardIngestionRows, updateIngestionRowLabels, updateIngestionRowWorklist } from '@/lib/model/ingestion-promotion'
 import { ingestionFieldContext, INGESTION_QUERY_FIELDS, resolveIngestionField } from '@/lib/model/ingestion-fields'
 import { groupRows, queryRows, type RowFilter, type RowQuery } from '@/lib/model/row-query'
@@ -122,7 +122,15 @@ export const readIngestionTableTool: ToolDefinition = {
       ...(file ? {
         sourceColumns: file.columns,
         sourceRowCount: file.rows.length,
-        sourceRows: file.rows.slice(offset, offset + limit).map((values, index) => ({ rowIndex: offset + index, mark: (source!.data as IngestionSource).rowMarks?.[String(offset + index)] ?? null, values })),
+        sourceRows: file.rows.slice(offset, offset + limit).map((values, index) => {
+          const rowIndex = offset + index
+          const stored = source!.data as IngestionSource
+          return {
+            rowIndex,
+            mark: stored.rowMarks?.[String(rowIndex)] ?? null,
+            values: { ...values, ...Object.fromEntries(stored.supplementalColumns.map((column) => [column, supplementalValueFor(stored, column, rowIndex)])) },
+          }
+        }),
       } : {}),
       total: selected.length,
       offset,
@@ -170,7 +178,7 @@ export const assignIngestionColumnsTool: ToolDefinition = {
 
 export const addIngestionBlankColumnTool: ToolDefinition = {
   name: 'add_ingestion_blank_column',
-  description: 'Adds an explicitly blank supplemental column to a sparse uploaded source so it can satisfy a possible future destination. Name it after the canonical field it stands in for (quantity, asset, price...) and it is assigned to that field in the same step; any other name still has to be assigned with assign_ingestion_columns. This does not alter the original CSV; inspect the source first and explain why the blank field is needed.',
+  description: 'Adds an explicitly blank supplemental column to a sparse uploaded source — so it can satisfy a field a destination needs, or so information the file does not carry can be written into it with fill_source_column (a description saying which statement a row came from, say, when the filename is the only record of that). Name it after the canonical field it stands in for (description, quantity, asset, price...) and it is assigned to that field in the same step; any other name still has to be assigned with assign_ingestion_columns. This does not alter the original CSV; inspect the source first and explain why the blank field is needed.',
   parameters: { type: 'object', properties: { sourceId: { type: 'number' }, name: { type: 'string' } }, required: ['sourceId', 'name'], additionalProperties: false },
   execute: async (args) => {
     if (typeof args.sourceId !== 'number' || typeof args.name !== 'string') return 'Error: sourceId and name are required.'
@@ -188,6 +196,35 @@ export const addIngestionBlankColumnTool: ToolDefinition = {
       const merged = await mergedMappings(sourceId, [{ sourceId, sourceColumn: name, targetField: target, isSupplemental: true }], false)
       return JSON.stringify({ source, assignedTo: target, validation: await saveIngestionMappings(sourceId, merged) })
     } catch (error) { return `Error: ${error instanceof Error ? error.message : 'could not add blank column.'}` }
+  },
+}
+
+export const fillSourceColumnTool: ToolDefinition = {
+  name: 'fill_source_column',
+  description: 'Writes into a supplemental column of an uploaded file: one value for every row, or values for named rows. This is how information the file does not carry gets in — above all where a row came from. A card export whose rows say only "Uber Trip" says nothing about which statement it belongs to, and the filename is often the only record of that: add a description column with add_ingestion_blank_column and fill it here, or add a note column alongside an existing description. Say what you are writing and why, and never invent a value the file cannot support — provenance, not guesses. Original columns are never touched; only supplemental ones can be written.',
+  parameters: {
+    type: 'object',
+    properties: {
+      sourceId: { type: 'number' },
+      column: { type: 'string', description: 'A supplemental column of this source. Add it first if it does not exist.' },
+      value: { type: 'string', description: 'Written into every row of that column.' },
+      rows: { type: 'object', additionalProperties: { type: 'string' }, description: 'Per-row values, keyed by row index, overriding the shared one.' },
+    },
+    required: ['sourceId', 'column'],
+    additionalProperties: false,
+  },
+  execute: async (args) => {
+    if (typeof args.sourceId !== 'number' || typeof args.column !== 'string') return 'Error: sourceId and column are required.'
+    const rejection = await rejectIfLegacy(args.sourceId)
+    if (rejection) return rejection
+    const rows = typeof args.rows === 'object' && args.rows !== null
+      ? Object.fromEntries(Object.entries(args.rows as Record<string, unknown>).map(([index, value]) => [index, String(value ?? '')]))
+      : undefined
+    if (typeof args.value !== 'string' && !rows) return 'Error: pass value, rows, or both.'
+    try {
+      const source = await fillSupplementalColumn(args.sourceId, args.column, { all: typeof args.value === 'string' ? args.value : undefined, rows })
+      return JSON.stringify({ file: source.originalFilename, column: args.column, filledEveryRow: typeof args.value === 'string' ? args.value : null, namedRows: rows ? Object.keys(rows).length : 0 })
+    } catch (error) { return `Error: ${error instanceof Error ? error.message : 'could not fill that column.'}` }
   },
 }
 

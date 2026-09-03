@@ -64,14 +64,13 @@ export function OverviewPanel() {
   const capitalHistoryRows = useDashboardEntries(capitalHistoryFilters)
   const investmentHistory = useMemo<InvestmentValueEntry[]>(() => {
     const labelsByEntryId = new Map(entryLabels.map((labels) => [labels.entryId, labels]))
-    const classByTableId = new Map(
-      tableDefs
-        .filter((table) => table.kind === 'investmentLedger' && table.investmentClass)
-        .map((table) => [table.id, table.investmentClass]),
-    )
+    const investmentTableIds = new Set(tableDefs.filter((table) => table.kind === 'investmentLedger').map((table) => table.id))
     return allEntries.flatMap((entry) => {
       const labels = labelsByEntryId.get(entry.id)
-      const investmentClass = classByTableId.get(entry.tableId)
+      // Each row carries its own class now, so one ledger can hold both.
+      const investmentClass = investmentTableIds.has(entry.tableId) && (entry.investmentClass === 'fixedIncome' || entry.investmentClass === 'variableIncome')
+        ? entry.investmentClass
+        : undefined
       if (
         labels?.financeDestination !== 'investments' ||
         !investmentClass ||

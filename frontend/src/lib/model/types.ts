@@ -161,6 +161,13 @@ export interface IngestionSource {
   originalColumns: string[]
   /** Virtual empty columns supplement sparse source files without changing rawCsv. */
   supplementalColumns: string[]
+  /**
+   * What those virtual columns hold. `all` fills every row — which is how a file's own
+   * provenance gets into the data, e.g. a description column saying which statement a
+   * row came from — and `rows` overrides individual ones by index. The uploaded file
+   * is never touched; this is the app's own annotation of it.
+   */
+  supplementalValues?: Record<string, { all?: string; rows?: Record<string, string> }>
   rowCount: number
   status: IngestionSourceStatus
   /** True only for the synthetic source that links pre-existing app entries. */

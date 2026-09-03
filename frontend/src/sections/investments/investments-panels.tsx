@@ -4,15 +4,12 @@ import { AppBarChart } from '@/components/charts/bar-chart'
 import { colorForKey, DOMAIN_COLOR, MAX_CATEGORICAL_SERIES } from '@/components/charts/chart-colors'
 import { AppLineChart } from '@/components/charts/line-chart'
 import { AppPieChart } from '@/components/charts/pie-chart'
-import { ChartTablePanel } from '@/components/layout/chart-table-panel'
 import { DashboardCard } from '@/components/dashboard/dashboard-card'
 import { RankedBarList } from '@/components/dashboard/ranked-bar-list'
 import { StatTile } from '@/components/dashboard/stat-tile'
-import { TableWorkspace } from '@/components/data-table/table-workspace'
 import { bucketByMonth, foldTopCategories, formatDateLabel, formatMonthLabel, runningPositionOverTime } from '@/lib/aggregations'
 import { computePositions, getCurrentValue, type Transaction } from '@/lib/current-value'
-import { useActiveTableEntries, useEntriesOfKinds } from '@/lib/model/use-model-data'
-import { useTableDefsStore } from '@/lib/model/model-stores'
+import { useEntriesOfKinds } from '@/lib/model/use-model-data'
 import type { InvestmentClass } from '@/lib/model/types'
 import { AllocationPanel } from './allocation-panel'
 
@@ -46,20 +43,17 @@ export function OverviewPanel() {
  */
 export function InvestmentsPanel() {
   const { t } = useTranslation(['investments', 'common'])
-  const tableDefs = useTableDefsStore((s) => s.items)
   const investmentRows = useEntriesOfKinds(['investmentLedger'])
   const contributionRows = useEntriesOfKinds(['contributions'])
   const dividendRows = useEntriesOfKinds(['dividends'])
   const transactions = investmentRows.filter((row) => !row.deleted) as unknown as Transaction[]
   const positions = useMemo(() => computePositions(transactions), [transactions])
   const totalValue = positions.reduce((sum, position) => sum + position.currentValue, 0)
-  const classByTableId = useMemo(
-    () => new Map(tableDefs.filter((table) => table.kind === 'investmentLedger').map((table) => [table.id, table.investmentClass])),
-    [tableDefs],
-  )
+  // The class is a property of the investment, not of the table it lives in: one
+  // ledger holds both, and each row says which it is.
   const classValue = (investmentClass: InvestmentClass) => computePositions(
     investmentRows
-      .filter((row) => !row.deleted && classByTableId.get(row.tableId) === investmentClass) as unknown as Transaction[],
+      .filter((row) => !row.deleted && row.investmentClass === investmentClass) as unknown as Transaction[],
   ).reduce((sum, position) => sum + position.currentValue, 0)
   const variableValue = classValue('variableIncome')
   const fixedValue = classValue('fixedIncome')
@@ -74,9 +68,7 @@ export function InvestmentsPanel() {
   return (
     <div className="flex h-full flex-col">
       <div className="min-h-0 flex-1">
-        <ChartTablePanel
-          id="investments"
-          chart={
+        
             <div className="h-full overflow-auto p-4">
               <div className="flex flex-col gap-3">
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
@@ -112,9 +104,6 @@ export function InvestmentsPanel() {
                 </div>
               </div>
             </div>
-          }
-          table={<TableWorkspace workspaceId="investments" kinds={['investmentLedger', 'contributions', 'dividends']} />}
-        />
       </div>
     </div>
   )
@@ -135,18 +124,16 @@ function allocationPieData(items: Transaction[], otherLabel: string) {
 }
 
 function TransactionLedgerPanel({
-  workspaceId,
   title,
   color,
   investmentClass,
 }: {
-  workspaceId: string
   title: string
   color: (typeof DOMAIN_COLOR)['variableIncome']
   investmentClass: InvestmentClass
 }) {
   const { t } = useTranslation('common')
-  const rows = useActiveTableEntries(workspaceId, ['investmentLedger'], investmentClass)
+  const rows = useEntriesOfKinds(['investmentLedger']).filter((row) => row.investmentClass === investmentClass)
   const visible = rows.filter((row) => !row.deleted) as unknown as Transaction[]
 
   const lineData = runningPositionOverTime(visible)
@@ -155,9 +142,7 @@ function TransactionLedgerPanel({
   return (
     <div className="flex h-full flex-col">
       <div className="min-h-0 flex-1">
-        <ChartTablePanel
-          id={workspaceId}
-          chart={
+        
             <div className="grid h-full grid-cols-2 gap-4 p-4">
               <AppLineChart
                 data={lineData}
@@ -167,9 +152,6 @@ function TransactionLedgerPanel({
               />
               <AppPieChart data={pieData} />
             </div>
-          }
-          table={<TableWorkspace workspaceId={workspaceId} kinds={['investmentLedger']} investmentClass={investmentClass} />}
-        />
       </div>
     </div>
   )
@@ -179,7 +161,6 @@ export function VariableIncomePanel() {
   const { t } = useTranslation('investments')
   return (
     <TransactionLedgerPanel
-      workspaceId="variableIncome"
       title={t('items.variableIncome')}
       color={DOMAIN_COLOR.variableIncome}
       investmentClass="variableIncome"
@@ -191,7 +172,6 @@ export function FixedIncomePanel() {
   const { t } = useTranslation('investments')
   return (
     <TransactionLedgerPanel
-      workspaceId="fixedIncome"
       title={t('items.fixedIncome')}
       color={DOMAIN_COLOR.fixedIncome}
       investmentClass="fixedIncome"
@@ -201,7 +181,7 @@ export function FixedIncomePanel() {
 
 export function ContributionsPanel() {
   const { t } = useTranslation('investments')
-  const rows = useActiveTableEntries('contributions', ['contributions'])
+  const rows = useEntriesOfKinds(['contributions'])
   const visible = rows.filter((row) => !row.deleted)
 
   const barData = bucketByMonth(visible, 'date', 'amount').map((d) => ({ month: d.month, amount: d.total }))
@@ -209,9 +189,7 @@ export function ContributionsPanel() {
   return (
     <div className="flex h-full flex-col">
       <div className="min-h-0 flex-1">
-        <ChartTablePanel
-          id="contributions"
-          chart={
+        
             <div className="h-full p-4">
               <AppBarChart
                 data={barData}
@@ -220,9 +198,6 @@ export function ContributionsPanel() {
                 series={{ key: 'amount', label: t('items.contributions'), color: DOMAIN_COLOR.contributions }}
               />
             </div>
-          }
-          table={<TableWorkspace workspaceId="contributions" kinds={['contributions']} />}
-        />
       </div>
     </div>
   )
@@ -230,7 +205,7 @@ export function ContributionsPanel() {
 
 export function DividendsPanel() {
   const { t } = useTranslation('investments')
-  const rows = useActiveTableEntries('dividends', ['dividends'])
+  const rows = useEntriesOfKinds(['dividends'])
   const visible = rows.filter((row) => !row.deleted)
 
   const barData = bucketByMonth(visible, 'date', 'amount').map((d) => ({ month: d.month, amount: d.total }))
@@ -238,9 +213,7 @@ export function DividendsPanel() {
   return (
     <div className="flex h-full flex-col">
       <div className="min-h-0 flex-1">
-        <ChartTablePanel
-          id="dividends"
-          chart={
+        
             <div className="h-full p-4">
               <AppBarChart
                 data={barData}
@@ -249,9 +222,6 @@ export function DividendsPanel() {
                 series={{ key: 'amount', label: t('items.dividends'), color: DOMAIN_COLOR.dividends }}
               />
             </div>
-          }
-          table={<TableWorkspace workspaceId="dividends" kinds={['dividends']} />}
-        />
       </div>
     </div>
   )

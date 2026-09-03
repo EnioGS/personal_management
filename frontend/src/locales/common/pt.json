@@ -45,7 +45,8 @@
     "transactionType": "Operação",
     "quantity": "Quantidade",
     "price": "Preço",
-    "destination": "Destino"
+    "destination": "Destino",
+    "investmentClass": "Classe"
   },
   "tableKinds": {
     "bankLedger": "Extrato bancário",

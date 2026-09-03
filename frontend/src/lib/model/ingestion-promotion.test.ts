@@ -147,9 +147,11 @@ describe('relabelling a row that is already in a Finance table', () => {
     const edited = await updateIngestionRowLabels(rowId, { financeDestination: 'investments', flowRole: 'outflow', settlementChannel: 'investment', spendingTreatment: 'notApplicable', recurrence: 'oneOff' }, investmentId)
     const result = await reallocateConfirmedIngestionRows([rowId])
 
-    expect(edited.validationErrors[0]).toContain('asset')
+    // An investment ledger asks for a class, an asset, a quantity and a price; a bank
+    // row has none of them, and the first one missing is what the row is told about.
+    expect(edited.validationErrors[0]).toMatch(/investmentClass|asset|quantity|price/)
     expect(result.reallocated).toBe(0)
-    expect(result.errors[0]).toContain('asset')
+    expect(result.errors[0]).toMatch(/investmentClass|asset|quantity|price/)
   })
 
   it('ignores a confirmed row nobody edited', async () => {

@@ -24,6 +24,7 @@ describe('findTool', () => {
       'group_ingestion_rows',
       'assign_ingestion_columns',
       'add_ingestion_blank_column',
+      'fill_source_column',
       'mark_source_rows',
       'stage_ingestion_source',
       'find_ingestion_duplicates',

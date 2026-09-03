@@ -45,7 +45,8 @@
     "transactionType": "Operation",
     "quantity": "Quantity",
     "price": "Price",
-    "destination": "Destination"
+    "destination": "Destination",
+    "investmentClass": "Class"
   },
   "tableKinds": {
     "bankLedger": "Bank statement",

@@ -49,6 +49,14 @@ export const TABLE_KIND_SCHEMAS: Record<TableKind, TableSchema<any>> = {
   cardLedger: [dateColumn, categoryColumn, descriptionColumn, amountColumn],
   investmentLedger: [
     dateColumn,
+    {
+      key: 'investmentClass',
+      labelKey: 'common:columns.investmentClass',
+      type: 'select',
+      options: ['variableIncome', 'fixedIncome'],
+      required: true,
+      format: (v: unknown) => (v === 'fixedIncome' ? 'Renda Fixa' : 'Renda Variável'),
+    },
     categoryColumn,
     { key: 'asset', labelKey: 'common:columns.asset', type: 'text', required: true },
     {

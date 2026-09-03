@@ -143,6 +143,40 @@ export async function saveIngestionMappings(sourceId: number, mappings: Ingestio
   return validation
 }
 
+/** What a virtual column holds for one row: its per-row value, else its fill, else blank. */
+export function supplementalValueFor(source: IngestionSource, column: string, rowIndex: number): string {
+  const values = source.supplementalValues?.[column]
+  return values?.rows?.[String(rowIndex)] ?? values?.all ?? ''
+}
+
+/**
+ * Writes into a virtual column: one value for every row, or values for named rows.
+ *
+ * This is how information the file itself does not carry gets in — most often where a
+ * row came from, when the filename is the only thing that says so. The uploaded CSV is
+ * never rewritten; the column is the app's own annotation, and it is marked as such.
+ */
+export async function fillSupplementalColumn(
+  sourceId: number,
+  column: string,
+  value: { all?: string; rows?: Record<string, string> },
+): Promise<IngestionSource> {
+  const sourceRow = await ingestionSourcesTable.get(sourceId)
+  if (!sourceRow) throw new Error(`Ingestion source ${sourceId} was not found.`)
+  const source = sourceData(sourceRow)
+  if (!source.supplementalColumns.includes(column)) throw new Error(`"${column}" is not a supplemental column of this source. Add it first; original columns are never rewritten.`)
+  const existing = source.supplementalValues?.[column] ?? {}
+  const next: IngestionSource = {
+    ...source,
+    supplementalValues: {
+      ...(source.supplementalValues ?? {}),
+      [column]: { all: value.all ?? existing.all, rows: { ...(existing.rows ?? {}), ...(value.rows ?? {}) } },
+    },
+  }
+  await ingestionSourcesTable.update(sourceId, { data: next })
+  return next
+}
+
 /** Persists one explicitly named virtual blank column for a sparse source. */
 export async function createSupplementalColumn(sourceId: number, name: string): Promise<IngestionSource> {
   const sourceRow = await ingestionSourcesTable.get(sourceId)
@@ -245,7 +279,7 @@ export async function stageIngestionSource(sourceId: number, options: { readyOnl
     if (mark === 'duplicate' && options.readyOnly) { skippedDuplicateMarks += 1; continue }
     const rawValues = Object.fromEntries([
       ...Object.entries(rawOriginalValues),
-      ...source.supplementalColumns.map((column) => [column, '']),
+      ...source.supplementalColumns.map((column) => [column, supplementalValueFor(source, column, sourceRowIndex)]),
     ])
     const sourceRowFingerprint = await fingerprintIngestionValue(stableRowValue(rawValues))
     if (existingFingerprints.has(sourceRowFingerprint)) {
