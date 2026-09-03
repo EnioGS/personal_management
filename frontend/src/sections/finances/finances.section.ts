@@ -9,9 +9,9 @@ export const financesSection: AppSection = {
   labelKey: 'finances:section.label',
   icon: Wallet,
   items: [
-    { id: 'overview', labelKey: 'finances:items.movements', icon: ArrowLeftRight, component: OverviewPanel, tableKinds: ['bankLedger', 'generic'] },
-    { id: 'spending', labelKey: 'finances:items.spending', icon: Receipt, component: SpendingPanel, tableKinds: ['cardLedger'] },
-    { id: 'investments', labelKey: 'investments:section.label', icon: LineChart, component: InvestmentsPanel, tableKinds: ['investmentLedger', 'contributions', 'dividends'] },
+    { id: 'overview', labelKey: 'finances:items.movements', icon: ArrowLeftRight, component: OverviewPanel },
+    { id: 'spending', labelKey: 'finances:items.spending', icon: Receipt, component: SpendingPanel },
+    { id: 'investments', labelKey: 'investments:section.label', icon: LineChart, component: InvestmentsPanel },
     { id: 'recurring', labelKey: 'finances:items.recurring', icon: Repeat, component: RecurringPanel },
   ],
 }

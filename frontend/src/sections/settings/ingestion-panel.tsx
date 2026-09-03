@@ -6,10 +6,10 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ColumnFilterMenu, type ColumnFilter } from '@/components/data-table/column-filter-menu'
 import { ColumnSortMenu, type ColumnSort } from '@/components/data-table/column-sort-menu'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { sections as appSections } from '@/sections'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { useProgressiveRows } from '@/components/data-table/use-progressive-rows'
 import { queryRows } from '@/lib/model/row-query'
+import { tableDisplayName } from '@/lib/model/table-name'
 import { cn } from '@/lib/utils'
 import { LabellingRules } from './labelling-rules'
 import {
@@ -33,7 +33,7 @@ import {
   useTableDefsStore,
 } from '@/lib/model/model-stores'
 import { FINANCE_DESTINATIONS, FLOW_ROLES, labelValues, matchLabelValue, RECURRENCES, SETTLEMENT_CHANNELS, SPENDING_TREATMENTS } from '@/lib/model/label-vocabulary'
-import type { IngestionColumnMapping, IngestionRowLabels, IngestionRowLabelValues, IngestionTargetField, TableKind } from '@/lib/model/types'
+import type { IngestionColumnMapping, IngestionRowLabels, IngestionRowLabelValues, IngestionTargetField } from '@/lib/model/types'
 import type { StoredRow } from '@/lib/local-store/create-local-table'
 import type { IngestionRow } from '@/lib/model/types'
 
@@ -128,6 +128,7 @@ export function IngestionPanel() {
     const finalized = rowStore.items.filter((row) => row.status === 'promoted' || row.status === 'reconciledExisting')
     return [...finalized].sort((left, right) => Number(right.hasPendingChange) - Number(left.hasPendingChange))
   }, [rowStore.items])
+  const tableName = (table?: { name: string; nameKey?: string }) => (table ? tableDisplayName(table, (key) => String(t(key as never))) : '')
   const showingConfirmed = selected === CONFIRMED_DATASET
   const datasetRows = showingConfirmed ? confirmedRows : showDiscarded ? discardedRows : rows
   // Sorting is applied to the whole dataset before the window is taken, so ordering a
@@ -376,7 +377,7 @@ export function IngestionPanel() {
         <div className="flex shrink-0 items-center gap-2">
           <span className="flex">
             <Button type="button" size="sm" variant={selected === CONFIRMED_DATASET ? 'default' : 'outline'} className="rounded-r-none" onClick={() => { selectDataset(CONFIRMED_DATASET); setConfirmedTableId(null) }}>
-              Confirmed{confirmedTableId !== null && `: ${tableDefs.find((table) => table.id === confirmedTableId)?.name ?? ''}`}
+              Confirmed{confirmedTableId !== null && `: ${tableName(tableDefs.find((table) => table.id === confirmedTableId))}`}
             </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -386,21 +387,11 @@ export function IngestionPanel() {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="text-xs">
                 <DropdownMenuItem onClick={() => { selectDataset(CONFIRMED_DATASET); setConfirmedTableId(null) }}>Every table</DropdownMenuItem>
-                {tablesBySection(tableDefs, (key) => String(t(key as never))).map((group) => (
-                  <div key={group.sectionId}>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuLabel>{group.sectionLabel}</DropdownMenuLabel>
-                    {group.items.map((item) => (
-                      <div key={item.itemId}>
-                        <DropdownMenuLabel className="text-muted-foreground pl-4 font-normal">{item.itemLabel}</DropdownMenuLabel>
-                        {item.tables.map((table) => (
-                          <DropdownMenuItem key={table.id} className="pl-6" onClick={() => { selectDataset(CONFIRMED_DATASET); setConfirmedTableId(table.id) }}>
-                            {table.name}
-                          </DropdownMenuItem>
-                        ))}
-                      </div>
-                    ))}
-                  </div>
+                <DropdownMenuSeparator />
+                {tableDefs.map((table) => (
+                  <DropdownMenuItem key={table.id} onClick={() => { selectDataset(CONFIRMED_DATASET); setConfirmedTableId(table.id) }}>
+                    {tableDisplayName(table, (key) => String(t(key as never)))}
+                  </DropdownMenuItem>
                 ))}
               </DropdownMenuContent>
             </DropdownMenu>
@@ -549,26 +540,6 @@ function displayDataValue(field: IngestionTargetField, value: unknown): string {
   return String(value ?? '')
 }
 
-/**
- * The user's tables, grouped the way the app is navigated: a heading per section, a
- * sub-heading per item, and only the ones that actually own tables — a section whose
- * screens hold no data has nothing to offer here.
- */
-function tablesBySection(tableDefs: { id: number; name: string; kind: TableKind }[], translate: (key: string) => string) {
-  const groups: { sectionId: string; sectionLabel: string; items: { itemId: string; itemLabel: string; tables: { id: number; name: string }[] }[] }[] = []
-  for (const section of appSections) {
-    const items = section.items
-      .map((item) => ({
-        itemId: item.id,
-        itemLabel: translate(item.labelKey),
-        tables: tableDefs.filter((table) => (item.tableKinds ?? []).includes(table.kind)),
-      }))
-      .filter((item) => item.tables.length > 0)
-    if (items.length > 0) groups.push({ sectionId: section.id, sectionLabel: translate(section.labelKey), items })
-  }
-  return groups
-}
-
 /** What a column shows, for sorting — the same value the cell renders. */
 function rowCellValue(row: StoredRow<IngestionRow>, field: string, categories: { id: number; name: string }[], tableDefs: { id: number; name: string }[]): unknown {
   if (field === 'source') return row.sourceFilename ?? ''
@@ -666,7 +637,8 @@ function allLabelValues(row: StoredRow<IngestionRow>, categories: { id: number; 
 
 function parseLabelValues(values: IngestionRowLabelValues, categories: { id: number; name: string }[], tableDefs: { id: number; name: string }[]) {
   const category = categories.find((candidate) => candidate.name.trim().toLowerCase() === values.category?.trim().toLowerCase())
-  const table = tableDefs.find((candidate) => candidate.name.trim().toLowerCase() === values.destinationTable?.trim().toLowerCase())
+  const wanted = values.destinationTable?.trim().toLowerCase()
+  const table = tableDefs.find((candidate) => candidate.name.trim().toLowerCase() === wanted)
   const destination = matchLabelValue(FINANCE_DESTINATIONS, values.financeDestination)
   const flowRole = matchLabelValue(FLOW_ROLES, values.flowRole)
   const settlementChannel = matchLabelValue(SETTLEMENT_CHANNELS, values.settlementChannel)

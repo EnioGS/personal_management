@@ -10,6 +10,8 @@ import { StatTile } from '@/components/dashboard/stat-tile'
 import { bucketByMonth, foldTopCategories, formatDateLabel, formatMonthLabel, runningPositionOverTime } from '@/lib/aggregations'
 import { computePositions, getCurrentValue, type Transaction } from '@/lib/current-value'
 import { useEntriesOfKinds } from '@/lib/model/use-model-data'
+import type { StoredRow } from '@/lib/local-store/create-local-table'
+import type { Entry } from '@/lib/model/types'
 import type { InvestmentClass } from '@/lib/model/types'
 import { AllocationPanel } from './allocation-panel'
 
@@ -44,8 +46,10 @@ export function OverviewPanel() {
 export function InvestmentsPanel() {
   const { t } = useTranslation(['investments', 'common'])
   const investmentRows = useEntriesOfKinds(['investmentLedger'])
-  const contributionRows = useEntriesOfKinds(['contributions'])
-  const dividendRows = useEntriesOfKinds(['dividends'])
+  // Contributions and dividends were tables of their own; they are the same ledger
+  // read two ways — money put in, and money the holdings paid out.
+  const contributionRows = investmentRows.filter((row) => row.type === 'buy').map(withInvestedAmount)
+  const dividendRows = investmentRows.filter((row) => row.type === 'income').map(withInvestedAmount)
   const transactions = investmentRows.filter((row) => !row.deleted) as unknown as Transaction[]
   const positions = useMemo(() => computePositions(transactions), [transactions])
   const totalValue = positions.reduce((sum, position) => sum + position.currentValue, 0)
@@ -181,8 +185,8 @@ export function FixedIncomePanel() {
 
 export function ContributionsPanel() {
   const { t } = useTranslation('investments')
-  const rows = useEntriesOfKinds(['contributions'])
-  const visible = rows.filter((row) => !row.deleted)
+  const rows = useEntriesOfKinds(['investmentLedger'])
+  const visible = rows.filter((row) => !row.deleted && row.type === 'buy').map(withInvestedAmount)
 
   const barData = bucketByMonth(visible, 'date', 'amount').map((d) => ({ month: d.month, amount: d.total }))
 
@@ -205,8 +209,8 @@ export function ContributionsPanel() {
 
 export function DividendsPanel() {
   const { t } = useTranslation('investments')
-  const rows = useEntriesOfKinds(['dividends'])
-  const visible = rows.filter((row) => !row.deleted)
+  const rows = useEntriesOfKinds(['investmentLedger'])
+  const visible = rows.filter((row) => !row.deleted && row.type === 'income').map(withInvestedAmount)
 
   const barData = bucketByMonth(visible, 'date', 'amount').map((d) => ({ month: d.month, amount: d.total }))
 
@@ -225,4 +229,11 @@ export function DividendsPanel() {
       </div>
     </div>
   )
+}
+
+/** An investment row states quantity and price; what it moved is their product. */
+function withInvestedAmount(row: StoredRow<Entry>): StoredRow<Entry> & { amount: number } {
+  const quantity = typeof row.quantity === 'number' ? row.quantity : 0
+  const price = typeof row.price === 'number' ? row.price : 0
+  return { ...row, amount: quantity * price }
 }

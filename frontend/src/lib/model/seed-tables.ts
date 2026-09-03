@@ -13,13 +13,17 @@ import type { Account, TableDef } from './types'
  */
 const DEFAULT_ACCOUNT: Account = { name: 'Conta principal', kind: 'checking' }
 
+/**
+ * One table per screen, carrying that screen's own name.
+ *
+ * What used to be several tables is one plus labels: contributions and dividends are
+ * investment rows of a particular kind, and a "general" table was a place for rows
+ * nobody had decided about — which is what the ingestion worklist is for now.
+ */
 const DEFAULT_TABLES: TableDef[] = [
-  { name: 'Extrato bancário', kind: 'bankLedger' },
-  { name: 'Fatura do cartão', kind: 'cardLedger' },
-  { name: 'Investimentos', kind: 'investmentLedger' },
-  { name: 'Aportes', kind: 'contributions' },
-  { name: 'Proventos', kind: 'dividends' },
-  { name: 'Outros lançamentos', kind: 'generic' },
+  { name: 'Movimentações', nameKey: 'finances:items.movements', kind: 'bankLedger' },
+  { name: 'Gastos', nameKey: 'finances:items.spending', kind: 'cardLedger' },
+  { name: 'Investimentos', nameKey: 'investments:section.label', kind: 'investmentLedger' },
 ]
 
 /**

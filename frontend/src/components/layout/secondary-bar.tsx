@@ -158,10 +158,14 @@ function SlipEdge({ width, height }: { width: number; height: number }) {
   // the flat run that meets the activity bar. Two roundings and a straight between
   // them, all of fixed size: at 224px the flat run is simply longer.
   const span = Math.min(DIAGONAL, width)
-  const turn = [
-    `C${width} ${height * 0.42}, ${width - span * 0.2} ${height * 0.3}, ${width - span * 0.55} ${height * 0.7}`,
-    `C${width - span * 0.78} ${height * 0.93}, ${width - span * 0.9} ${height}, ${width - span} ${height}`,
-  ].join(' ')
+  // The second easing exists to meet the flat run; on a bar too narrow to have one it
+  // would curl at the left edge instead, so there the diagonal simply runs into it.
+  const turn = span < width
+    ? [
+      `C${width} ${height * 0.42}, ${width - span * 0.2} ${height * 0.3}, ${width - span * 0.55} ${height * 0.7}`,
+      `C${width - span * 0.78} ${height * 0.93}, ${width - span * 0.9} ${height}, ${width - span} ${height}`,
+    ].join(' ')
+    : `C${width} ${height * 0.42}, ${width * 0.72} ${height * 0.3}, 0 ${height}`
   return (
     <svg aria-hidden className="pointer-events-none shrink-0" width={width} height={height} viewBox={`0 0 ${width} ${height}`} fill="none">
       <path d={`M0 0 H${width} ${turn} H0 Z`} className="fill-sidebar" />

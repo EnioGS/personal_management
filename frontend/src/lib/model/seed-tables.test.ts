@@ -10,9 +10,10 @@ describe('a fresh vault', () => {
   it('opens with a table behind every screen, and one investments ledger for both classes', async () => {
     await seedDefaultTables()
 
-    const kinds = (await tableDefsTable.toArray()).map((row) => (row.data as TableDef).kind)
-    expect(kinds).toEqual(['bankLedger', 'cardLedger', 'investmentLedger', 'contributions', 'dividends', 'generic'])
-    expect(kinds.filter((kind) => kind === 'investmentLedger')).toHaveLength(1)
+    const tables = (await tableDefsTable.toArray()).map((row) => row.data as TableDef)
+    expect(tables.map((table) => table.kind)).toEqual(['bankLedger', 'cardLedger', 'investmentLedger'])
+    // Every one is named after the screen it belongs to, by key rather than by string.
+    expect(tables.every((table) => Boolean(table.nameKey))).toBe(true)
     expect(await accountsTable.count()).toBe(1)
   })
 
@@ -30,7 +31,7 @@ describe('seeding twice at once', () => {
   it('creates one set, not two — StrictMode runs the effect twice', async () => {
     await Promise.all([seedDefaultTables(), seedDefaultTables()])
 
-    expect(await tableDefsTable.count()).toBe(6)
+    expect(await tableDefsTable.count()).toBe(3)
     expect(await accountsTable.count()).toBe(1)
   })
 })

@@ -44,7 +44,14 @@ export type TableKind = 'bankLedger' | 'cardLedger' | 'investmentLedger' | 'cont
 export type InvestmentClass = 'variableIncome' | 'fixedIncome'
 
 export interface TableDef {
+  /** Shown when there is no `nameKey`; the fallback for anything imported or legacy. */
   name: string
+  /**
+   * i18next key for tables the app owns. One table belongs to one screen, so its name
+   * is that screen's name — and a name that is a stored string would stay in whatever
+   * language it was created in when the user switches.
+   */
+  nameKey?: string
   kind: TableKind
   /** Set for bankLedger — which account this table records. */
   accountId?: number
