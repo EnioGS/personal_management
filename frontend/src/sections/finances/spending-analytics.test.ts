@@ -78,3 +78,19 @@ describe('spending analytics', () => {
     ])
   })
 })
+
+describe('a purchase paid straight from the bank', () => {
+  it('counts on Spending as well as Movements, without a card anywhere', () => {
+    const pix = entry({
+      description: 'Transferência enviada pelo Pix - MERCADO SAO JORGE',
+      category: 'Supermercado',
+      amount: 284.9,
+      subsections: ['overview', 'spending'],
+      spendingTreatment: 'expense',
+      cardId: undefined,
+    })
+
+    expect(outgoingSpending([pix])).toEqual([pix])
+    expect(spendingByMonth(outgoingSpending([pix]))[0].amount).toBe(284.9)
+  })
+})

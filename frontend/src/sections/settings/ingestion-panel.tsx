@@ -8,6 +8,7 @@ import { ColumnFilterMenu, type ColumnFilter } from '@/components/data-table/col
 import { ColumnSortMenu, type ColumnSort } from '@/components/data-table/column-sort-menu'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { useProgressiveRows } from '@/components/data-table/use-progressive-rows'
+import { refreshAllLocalStores } from '@/lib/local-store/create-local-list-store'
 import { queryRows } from '@/lib/model/row-query'
 import { markValue } from '@/lib/model/source-row-marks'
 import { tableDisplayName } from '@/lib/model/table-name'
@@ -173,8 +174,15 @@ export function IngestionPanel() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once per mount, over whatever is loaded
   }, [])
 
+  /**
+   * Everything, not only this screen's own stores.
+   *
+   * Promoting a row writes an entry and a label sidecar, which the Finance screens
+   * read from stores this panel never touched — so refreshing three of them left the
+   * dashboards showing the state from before the click, and the row looked lost.
+   */
   async function refresh() {
-    await Promise.all([sourceStore.refresh(), mappingStore.refresh(), rowStore.refresh()])
+    await refreshAllLocalStores()
   }
 
   /** The category label is the whole category vocabulary: a name nobody used yet creates one. */
