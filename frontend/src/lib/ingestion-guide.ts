@@ -101,7 +101,10 @@ update_ingestion_data_fields, or say what is missing and let the user decide.
 ## How to work
 
 1. list_ingestion_datasets for the worklist, the sources and the destination tables.
-2. read_ingestion_table for the rows themselves. Work one page at a time — never
+2. read_ingestion_table for the rows themselves — dataset "worklist" (default) for
+   rows awaiting labels, "confirmed" for rows already in a table, or a sourceId for an
+   uploaded file, which returns that file's own columns and values so a mapping can be
+   judged from real data. Work one page at a time — never
    page through the whole worklist before answering. A backlog of hundreds of rows
    is normal; read a page, label what you can, report, and offer to continue.
 3. read_ingestion_provenance when a row's meaning depends on its raw values.

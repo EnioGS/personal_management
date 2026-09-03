@@ -1,7 +1,7 @@
 import { DEFAULT_INGESTION_GUIDE, INGESTION_GUIDE_KEY } from '@/lib/ingestion-guide'
 import { ingestionLabelErrors } from '@/lib/model/ingestion'
 import { ensureCategoryByName } from '@/lib/model/category-vocabulary'
-import { createSupplementalColumn, saveIngestionMappings } from '@/lib/model/ingestion-source'
+import { createSupplementalColumn, parseIngestionCsv, saveIngestionMappings } from '@/lib/model/ingestion-source'
 import { updateIngestionRowLabels, updateIngestionRowWorklist } from '@/lib/model/ingestion-promotion'
 import { FINANCE_DESTINATIONS, FLOW_ROLES, labelValues, matchLabelValue, RECURRENCES, SETTLEMENT_CHANNELS, SPENDING_TREATMENTS } from '@/lib/model/label-vocabulary'
 import { assistantPromptsTable } from '@/lib/assistant-prompts-db'
@@ -77,9 +77,20 @@ export const listIngestionDatasetsTool: ToolDefinition = {
   },
 }
 
+/** The uploaded file itself, parsed. Null for the migration's source, which has none. */
+function readSourceFile(stored: { data: unknown }) {
+  const { rawCsv } = stored.data as IngestionSource
+  if (!rawCsv) return null
+  try {
+    return parseIngestionCsv(rawCsv)
+  } catch {
+    return null
+  }
+}
+
 export const readIngestionTableTool: ToolDefinition = {
   name: 'read_ingestion_table',
-  description: 'Reads a paged slice of the imported-unlabelled worklist, the confirmed rows, or one uploaded source — including original filename, raw values, mappings, labels, status and validation errors. Read-only. The result reports the total, so read ONE page (25-100 rows), act on it, and answer the user — never loop through an entire backlog before replying.',
+  description: 'Reads a paged slice of one of the three datasets: the imported-unlabelled worklist, the confirmed rows already in a Finance table, or one uploaded source file. For a source file it returns that file\'s own columns and rows exactly as uploaded (sourceColumns/sourceRows), which is what a column mapping must be judged from, plus any rows already staged from it. Read-only. The result reports the total, so read ONE page (25-100 rows), act on it, and answer the user — never loop through an entire backlog before replying.',
   parameters: { type: 'object', properties: { dataset: { type: 'string', enum: ['worklist', 'confirmed'], description: 'worklist (default) = rows waiting to be labelled; confirmed = rows already in a Finance table, which can still be relabelled for reallocation.' }, sourceId: { type: 'number', description: 'Uploaded source ID. Omit to read the chosen dataset across all sources.' }, offset: { type: 'number' }, limit: { type: 'number' } }, additionalProperties: false },
   execute: async (args) => {
     const offset = typeof args.offset === 'number' && args.offset >= 0 ? Math.floor(args.offset) : 0
@@ -96,8 +107,13 @@ export const readIngestionTableTool: ToolDefinition = {
     const source = sourceId === undefined ? undefined : await ingestionSourcesTable.get(sourceId)
     const mappings = sourceId === undefined ? [] : (await ingestionColumnMappingsTable.toArray()).filter((row) => (row.data as IngestionColumnMapping).sourceId === sourceId).map((row) => row.data)
     const page = selected.slice(offset, offset + limit)
+    // A source file's own contents are not ingestion rows — those exist only once it
+    // has been staged. Mapping happens before that, so the file's parsed columns and a
+    // page of its values have to come back too, or the mapping would be guesswork.
+    const file = source ? readSourceFile(source) : null
     return JSON.stringify({
       source: source ? summariseSource(source, rows) : sourceId === undefined ? 'Imported, unlabelled data' : null,
+      ...(file ? { sourceColumns: file.columns, sourceRowCount: file.rows.length, sourceRows: file.rows.slice(offset, offset + limit) } : {}),
       total: selected.length,
       offset,
       returned: page.length,

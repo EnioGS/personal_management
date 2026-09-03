@@ -238,3 +238,30 @@ describe('confirmed rows through the assistant', () => {
     expect(included).toMatchObject({ matched: 1, pendingReallocation: 1 })
   })
 })
+
+describe('reading an uploaded source before it is staged', () => {
+  beforeEach(async () => { await wipeAllData() })
+
+  it('returns the file\'s own columns and values, which is what a mapping is judged from', async () => {
+    const sourceId = await ingestionSourcesTable.add({
+      createdAt: 1,
+      data: { originalFilename: 'nubank.csv', sourceFingerprint: 'f', importedAt: 1, rawCsv: 'Data,Valor,Descrição\n2026-01-02,-12.50,Coffee\n2026-01-03,100,Salary\n', originalColumns: ['Data', 'Valor', 'Descrição'], supplementalColumns: [], rowCount: 2, status: 'draftSource' },
+    })
+
+    const read = JSON.parse(await readIngestionTableTool.execute({ sourceId }, context))
+
+    expect(read.sourceColumns).toEqual(['Data', 'Valor', 'Descrição'])
+    expect(read.sourceRowCount).toBe(2)
+    expect(read.sourceRows[0]).toEqual({ Data: '2026-01-02', Valor: '-12.50', 'Descrição': 'Coffee' })
+    expect(read.rows).toEqual([])
+  })
+
+  it('says nothing about a file for the migration source, which has none', async () => {
+    const sourceId = await ingestionSourcesTable.add({ createdAt: 1, data: { originalFilename: 'Existing data migration', sourceFingerprint: 'existing-app-data-v1', importedAt: 1, rawCsv: '', originalColumns: [], supplementalColumns: [], rowCount: 0, status: 'staged', legacy: true } })
+
+    const read = JSON.parse(await readIngestionTableTool.execute({ sourceId }, context))
+
+    expect(read).not.toHaveProperty('sourceRows')
+    expect(read.source.note).toContain('only need labels')
+  })
+})
