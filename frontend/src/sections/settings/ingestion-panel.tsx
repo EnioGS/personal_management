@@ -65,6 +65,7 @@ export function IngestionPanel() {
   const [message, setMessage] = useState<string | null>(null)
   const [worklistFieldName, setWorklistFieldName] = useState('')
   const [showDiscarded, setShowDiscarded] = useState(false)
+  const [isDropTarget, setIsDropTarget] = useState(false)
   const fileInput = useRef<HTMLInputElement>(null)
 
   const selectedSource = sourceStore.items.find((source) => String(source.id) === selected)
@@ -202,8 +203,30 @@ export function IngestionPanel() {
     }
   }
 
+  /**
+   * The whole panel accepts a drop, not just the strip at the bottom: aiming at a
+   * 60-pixel target is not what dropping a file should require, and a near miss used
+   * to make the browser navigate away from the app to open the file.
+   *
+   * Both dragenter and dragover must be cancelled for a drop to be allowed at all —
+   * cancelling only dragover leaves some drags refused depending on which child the
+   * pointer happens to be over.
+   */
+  function handleDragOver(event: DragEvent<HTMLDivElement>) {
+    if (!event.dataTransfer.types.includes('Files')) return
+    event.preventDefault()
+    event.dataTransfer.dropEffect = 'copy'
+    setIsDropTarget(true)
+  }
+
+  function handleDragLeave(event: DragEvent<HTMLDivElement>) {
+    if (event.currentTarget.contains(event.relatedTarget as Node | null)) return
+    setIsDropTarget(false)
+  }
+
   function handleDrop(event: DragEvent<HTMLDivElement>) {
     event.preventDefault()
+    setIsDropTarget(false)
     void handleFiles(event.dataTransfer.files)
   }
 
@@ -247,7 +270,18 @@ export function IngestionPanel() {
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-3 overflow-auto p-4">
+    <div
+      className={cn('relative flex h-full min-h-0 flex-col gap-3 overflow-auto p-4', isDropTarget && 'outline-primary -outline-offset-2 outline-2 outline-dashed')}
+      onDragEnter={handleDragOver}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
+      {isDropTarget && (
+        <div className="bg-background/80 text-primary pointer-events-none absolute inset-0 z-40 flex items-center justify-center text-sm font-medium">
+          Drop to import — CSV files, or an exported .db
+        </div>
+      )}
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
           <h2 className="text-sm font-medium">Data ingestion centre</h2>
@@ -330,8 +364,8 @@ export function IngestionPanel() {
         </section>
       )}
 
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-dashed p-3" onDragOver={(event) => event.preventDefault()} onDrop={handleDrop}>
-        <div className="text-xs"><p className="font-medium">Import data</p><p className="text-muted-foreground">Drop CSV files here, or an exported .db — a database is split into one dataset per table it contains.</p></div>
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-dashed p-3">
+        <div className="text-xs"><p className="font-medium">Import data</p><p className="text-muted-foreground">Drop files anywhere on this screen, or choose them. An exported .db is split into one dataset per table it contains.</p></div>
         <div className="flex gap-2"><input ref={fileInput} type="file" accept=".csv,text/csv,.db,.pmdata,application/vnd.sqlite3" multiple className="hidden" onChange={(event: ChangeEvent<HTMLInputElement>) => void handleFiles(event.target.files)} /><Button type="button" variant="outline" size="sm" onClick={() => fileInput.current?.click()}><FilePlus2 className="size-3.5" />Import data</Button>{selectedSource
             ? <Button type="button" size="sm" disabled={!!validation?.errors.length || selectedSource.legacy || selectedSource.originalColumns.length === 0} onClick={() => void saveAndStage()}><Upload className="size-3.5" />Add to imported unlabelled data</Button>
             : showingConfirmed
