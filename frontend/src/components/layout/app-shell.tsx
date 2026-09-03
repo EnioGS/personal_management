@@ -11,7 +11,6 @@ import { SecondaryBar } from './secondary-bar'
 const SECONDARY_BAR_WIDTH = {
   expanded: 'w-56',
   icons: 'w-12',
-  hidden: 'hidden',
 } as const
 
 export function AppShell() {

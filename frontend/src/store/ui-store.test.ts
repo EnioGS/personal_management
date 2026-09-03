@@ -14,35 +14,42 @@ describe('ui-store', () => {
     expect(DEFAULT_SECTION_ID).toBe(sections[0].id)
   })
 
-  it('defaults to the first registered section, expanded, with no remembered items', () => {
+  it('rests on the icon strip, with no remembered items', () => {
     const state = useUiStore.getState()
     expect(state.activeSectionId).toBe(sections[0].id)
-    expect(state.secondaryBarMode).toBe('expanded')
+    expect(state.secondaryBarMode).toBe('icons')
     expect(state.activeItemBySection).toEqual({})
   })
 
-  it('selecting a different section switches to it and force-expands the secondary bar', () => {
-    useUiStore.getState().setSecondaryBarMode('hidden')
+  it('selecting a different section switches to it and returns the bar to icons', () => {
+    useUiStore.getState().setSecondaryBarMode('expanded')
     const otherSectionId = sections[1].id
 
     useUiStore.getState().selectSection(otherSectionId)
 
     expect(useUiStore.getState().activeSectionId).toBe(otherSectionId)
-    expect(useUiStore.getState().secondaryBarMode).toBe('expanded')
+    expect(useUiStore.getState().secondaryBarMode).toBe('icons')
   })
 
-  it('re-selecting the active section cycles expanded -> icons -> hidden -> expanded', () => {
+  it('re-selecting the active section toggles the labels on and off, with no hidden state', () => {
     const activeId = useUiStore.getState().activeSectionId
 
     useUiStore.getState().selectSection(activeId)
     expect(useUiStore.getState().activeSectionId).toBe(activeId)
-    expect(useUiStore.getState().secondaryBarMode).toBe('icons')
-
-    useUiStore.getState().selectSection(activeId)
-    expect(useUiStore.getState().secondaryBarMode).toBe('hidden')
-
-    useUiStore.getState().selectSection(activeId)
     expect(useUiStore.getState().secondaryBarMode).toBe('expanded')
+
+    useUiStore.getState().selectSection(activeId)
+    expect(useUiStore.getState().secondaryBarMode).toBe('icons')
+  })
+
+  it('collapses the labels again once an item has been chosen with them', () => {
+    const [section] = sections
+    useUiStore.getState().setSecondaryBarMode('expanded')
+
+    useUiStore.getState().selectItem(section.id, 'item-a')
+
+    expect(useUiStore.getState().secondaryBarMode).toBe('icons')
+    expect(useUiStore.getState().activeItemBySection).toEqual({ [section.id]: 'item-a' })
   })
 
   it('remembers the last-selected item per section without clobbering other sections', () => {

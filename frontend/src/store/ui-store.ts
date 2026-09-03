@@ -3,15 +3,13 @@ import { DEFAULT_SECTION_ID } from '@/sections/default-section'
 
 /**
  * How much of the secondary bar is showing. Clicking the active section's
- * activity-bar icon cycles through these in order (see selectSection).
+ * activity-bar icon toggles between the two (see selectSection).
+ *
+ * `icons` is the resting state: the icon strip costs almost nothing horizontally
+ * while still letting any item be reached in one click, so labels are what gets
+ * asked for, not what has to be dismissed.
  */
-export type SecondaryBarMode = 'expanded' | 'icons' | 'hidden'
-
-const MODE_CYCLE: Record<SecondaryBarMode, SecondaryBarMode> = {
-  expanded: 'icons',
-  icons: 'hidden',
-  hidden: 'expanded',
-}
+export type SecondaryBarMode = 'expanded' | 'icons'
 
 interface UiState {
   activeSectionId: string
@@ -30,19 +28,21 @@ export const useUiStore = create<UiState>((set, get) => ({
   activeSectionId: DEFAULT_SECTION_ID,
   activeItemBySection: {},
   activeTableByWorkspace: {},
-  secondaryBarMode: 'expanded',
+  secondaryBarMode: 'icons',
 
   selectSection: (id) => {
     const { activeSectionId, secondaryBarMode } = get()
     if (id === activeSectionId) {
-      set({ secondaryBarMode: MODE_CYCLE[secondaryBarMode] })
+      set({ secondaryBarMode: secondaryBarMode === 'icons' ? 'expanded' : 'icons' })
     } else {
-      set({ activeSectionId: id, secondaryBarMode: 'expanded' })
+      set({ activeSectionId: id, secondaryBarMode: 'icons' })
     }
   },
 
+  // Choosing an item is what the labels were opened for, so the bar gives the width
+  // back as soon as that choice is made.
   selectItem: (sectionId, itemId) =>
-    set((s) => ({ activeItemBySection: { ...s.activeItemBySection, [sectionId]: itemId } })),
+    set((s) => ({ activeItemBySection: { ...s.activeItemBySection, [sectionId]: itemId }, secondaryBarMode: 'icons' })),
 
   selectTable: (workspaceId, tableId) =>
     set((s) => ({ activeTableByWorkspace: { ...s.activeTableByWorkspace, [workspaceId]: tableId } })),

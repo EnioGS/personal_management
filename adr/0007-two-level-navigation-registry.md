@@ -3,7 +3,7 @@
 ## Status
 
 Accepted — supersedes an initial implementation built on shadcn/ui's
-`Sidebar`. Refined by adr/0020 (secondary bar: three-state cycle, fixed
+`Sidebar`. Refined by adr/0020 (secondary bar: labels on demand, fixed
 widths, no titles).
 
 ## Context
