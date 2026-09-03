@@ -72,10 +72,19 @@ export function buildDuplicateCorpus(
 }
 
 /**
- * Marks every row of a parsed file that already exists elsewhere in the data — in
- * another uploaded file, in the worklist, in the confirmed rows, or in a finance
- * table. Rows already marked keep their mark: a decision to eliminate outranks a
- * fresh scan.
+ * Marks the rows of a parsed file that already exist somewhere else.
+ *
+ * "Already" is meant literally, and it is what keeps this from destroying data: only
+ * files imported *before* this one count, so a row shared by two statements is
+ * flagged in the later one and kept in the earlier. Flagging both would mean
+ * importing the new values from each and losing the row from both.
+ *
+ * A file can also repeat itself, and there the same rule applies to position: the
+ * second occurrence is the copy, the first is the row.
+ *
+ * Existing marks are never cleared. A scan can say "this looks like a copy"; only a
+ * person or the assistant can say "this is one, drop it", and a later scan must not
+ * quietly undo that.
  */
 export function markDuplicateSourceRows(
   source: IngestionSource,
@@ -83,16 +92,16 @@ export function markDuplicateSourceRows(
   storedRows: IngestionRow[],
   entries: Entry[],
   existing: SourceRowMarks = {},
-  otherFiles: { originalColumns: readonly string[]; rows: Record<string, string>[] }[] = [],
+  earlierFiles: { originalColumns: readonly string[]; rows: Record<string, string>[] }[] = [],
 ): SourceRowMarks {
-  const corpus = buildDuplicateCorpus(storedRows, entries, otherFiles)
+  const corpus = buildDuplicateCorpus(storedRows, entries, earlierFiles)
   const marks: SourceRowMarks = { ...existing }
+  const seen: Record<string, string>[] = []
   fileRows.forEach((row, index) => {
     const key = String(index)
-    if (marks[key] === 'eliminate') return
     const values = originalValues(row, source.originalColumns)
-    if (isDuplicateOfStored(values, corpus)) marks[key] = 'duplicate'
-    else if (marks[key] === 'duplicate') delete marks[key]
+    if (!marks[key] && (isDuplicateOfStored(values, corpus) || isDuplicateOfStored(values, seen))) marks[key] = 'duplicate'
+    seen.push(values)
   })
   return marks
 }

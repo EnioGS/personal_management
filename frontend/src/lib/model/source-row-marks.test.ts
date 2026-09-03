@@ -49,10 +49,16 @@ describe('marking a file against everything stored', () => {
     expect(markDuplicateSourceRows(source, fileRows, [], [entry])).toEqual({ '1': 'duplicate' })
   })
 
-  it('keeps a decision to eliminate, and clears a stale duplicate mark', () => {
+  it('never undoes a mark somebody made, however a later scan reads the row', () => {
     const marks = markDuplicateSourceRows(source, fileRows, [], [], { '0': 'eliminate', '1': 'duplicate' })
 
-    expect(marks).toEqual({ '0': 'eliminate' })
+    expect(marks).toEqual({ '0': 'eliminate', '1': 'duplicate' })
+  })
+
+  it('flags the second copy inside one file and keeps the first', () => {
+    const twice = [fileRows[0], fileRows[1], { ...fileRows[0] }]
+
+    expect(markDuplicateSourceRows(source, twice, [], [])).toEqual({ '2': 'duplicate' })
   })
 })
 
@@ -71,6 +77,11 @@ describe('files dropped together', () => {
     const marks = markDuplicateSourceRows(september, septemberRows, [], [], {}, [august])
 
     expect(marks).toEqual({ '0': 'duplicate' })
+  })
+
+  it('leaves the earlier file alone: a shared row is a copy only where it arrived second', () => {
+    // September is checked against August, never the other way round.
+    expect(markDuplicateSourceRows({ ...source, originalColumns: august.originalColumns as unknown as string[] }, august.rows, [], [], {}, [])).toEqual({})
   })
 
   it('finds nothing when the files do not overlap', () => {

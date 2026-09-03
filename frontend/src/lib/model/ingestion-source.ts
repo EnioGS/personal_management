@@ -364,9 +364,10 @@ export async function rescanSourceRowDuplicates(sourceId: number): Promise<Inges
   const storedRows = (await ingestionRowsTable.toArray()).map((row) => row.data as IngestionRow)
   const entries = (await entriesTable.toArray()).map((row) => row.data as Entry).filter((entry) => !entry.deleted)
   // Files dropped together overlap with each other far more often than with what is
-  // already stored, so the other uploads are part of what this one is checked against.
-  const otherFiles = (await ingestionSourcesTable.toArray())
-    .filter((row) => row.id !== sourceId)
+  // already stored, so earlier uploads are part of what this one is checked against —
+  // earlier only, so a shared row is flagged here and kept where it first arrived.
+  const earlierFiles = (await ingestionSourcesTable.toArray())
+    .filter((row) => row.id < sourceId)
     .map((row) => sourceData(row))
     .flatMap((other) => {
       if (!other.rawCsv) return []
@@ -376,7 +377,7 @@ export async function rescanSourceRowDuplicates(sourceId: number): Promise<Inges
         return []
       }
     })
-  const rowMarks = markDuplicateSourceRows(source, parsed.rows, storedRows, entries, source.rowMarks ?? {}, otherFiles)
+  const rowMarks = markDuplicateSourceRows(source, parsed.rows, storedRows, entries, source.rowMarks ?? {}, earlierFiles)
   const next = { ...source, rowMarks }
   await ingestionSourcesTable.update(sourceId, { data: next })
   return next
