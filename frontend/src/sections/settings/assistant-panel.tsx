@@ -235,10 +235,12 @@ function PromptSection({ promptKey, defaultContent, label, description, resetLab
     }
   }, [isLoading, draft, promptRow, defaultContent])
 
-  // Collapsed to one line unless focused, then grows to fit the full text —
-  // measured via scrollHeight rather than relying solely on field-sizing:
-  // content (already on the base Textarea), since that alone always shows
-  // full content rather than collapsing again once focus is lost.
+  // Resting height is eight lines, enough to read and edit a prompt without
+  // focusing it first. Focusing grows the box to fit the whole text, measured via
+  // scrollHeight rather than relying solely on field-sizing: content (already on the
+  // base Textarea), since that alone always shows full content rather than collapsing
+  // again once focus is lost. A long prompt is clamped to most of the viewport and
+  // scrolls inside itself, so the settings page never becomes one endless textarea.
   useEffect(() => {
     const el = textareaRef.current
     if (!el) return
@@ -281,7 +283,7 @@ function PromptSection({ promptKey, defaultContent, label, description, resetLab
           setIsFocused(false)
           void persist(e.target.value)
         }}
-        className={cn('resize-none font-mono text-sm', !isFocused && 'h-9 min-h-0 overflow-hidden')}
+        className={cn('max-h-[70vh] resize-none overflow-auto font-mono text-sm', !isFocused && 'h-72 min-h-0')}
         disabled={draft === null}
       />
     </div>
