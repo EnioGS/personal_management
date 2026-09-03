@@ -1,3 +1,5 @@
+import { useEffect, useRef } from 'react'
+import { PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
 import { sections } from '@/sections'
@@ -6,24 +8,88 @@ import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
+/** How long the labels stay up on their own before the bar gives the width back. */
+const AUTO_COLLAPSE_MS = 3000
+
 /**
- * Items of the active section. Rendered either with labels or as an icon-only
- * strip — the `icons` step of the activity bar's expanded → icons → hidden
- * cycle (see store/ui-store.ts). The buttons keep the same height and icon size
- * in both, so cycling only changes the width the bar takes from the content.
+ * Items of the active section, as an icon strip or with labels (see store/ui-store.ts).
+ * The buttons keep the same height and icon size in both, so the toggle only changes
+ * the width the bar takes from the content.
+ *
+ * Expanded, it behaves like a flyout rather than a second permanent column: a click
+ * anywhere else puts it away at once, and it puts itself away about three seconds
+ * after opening. That countdown is suspended while the pointer or the keyboard focus
+ * is inside it — a bar that collapses while someone is reading it would be worse than
+ * one that never collapsed.
  */
 export function SecondaryBar() {
   const { t } = useTranslation()
   const activeSectionId = useUiStore((s) => s.activeSectionId)
   const activeItemBySection = useUiStore((s) => s.activeItemBySection)
   const selectItem = useUiStore((s) => s.selectItem)
+  const toggleBar = useUiStore((s) => s.toggleSecondaryBar)
+  const setMode = useUiStore((s) => s.setSecondaryBarMode)
   const iconsOnly = useUiStore((s) => s.secondaryBarMode) === 'icons'
+  const barRef = useRef<HTMLDivElement>(null)
+  const pointerInside = useRef(false)
 
+  useEffect(() => {
+    if (iconsOnly) return
+    const collapse = () => setMode('icons')
+
+    const onPointerDown = (event: PointerEvent) => {
+      if (!barRef.current?.contains(event.target as Node)) collapse()
+    }
+    let timer = window.setTimeout(collapse, AUTO_COLLAPSE_MS)
+    const restart = () => {
+      window.clearTimeout(timer)
+      if (!pointerInside.current) timer = window.setTimeout(collapse, AUTO_COLLAPSE_MS)
+    }
+    const onEnter = () => { pointerInside.current = true; restart() }
+    const onLeave = () => { pointerInside.current = false; restart() }
+
+    const bar = barRef.current
+    document.addEventListener('pointerdown', onPointerDown)
+    bar?.addEventListener('pointerenter', onEnter)
+    bar?.addEventListener('pointerleave', onLeave)
+    bar?.addEventListener('focusin', onEnter)
+    bar?.addEventListener('focusout', onLeave)
+    return () => {
+      window.clearTimeout(timer)
+      document.removeEventListener('pointerdown', onPointerDown)
+      bar?.removeEventListener('pointerenter', onEnter)
+      bar?.removeEventListener('pointerleave', onLeave)
+      bar?.removeEventListener('focusin', onEnter)
+      bar?.removeEventListener('focusout', onLeave)
+    }
+  }, [iconsOnly, setMode])
+
+  // Typed keys are generated from the app's own namespaces; these two live in the
+  // shared common bundle, which the generated union does not cover (see activity-bar).
+  const toggleLabel = String(t((iconsOnly ? 'common:nav.showLabels' : 'common:nav.hideLabels') as never))
   const section = sections.find((s) => s.id === activeSectionId) ?? sections[0]
   const activeItemId = activeItemBySection[section.id] ?? section.items[0].id
 
   return (
-    <div className="bg-sidebar flex h-full flex-col pt-2">
+    <div ref={barRef} className="bg-sidebar flex h-full flex-col pt-2">
+      <div className={cn('flex pb-1', iconsOnly ? 'justify-center px-1.5' : 'justify-end px-2')}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-xs"
+              aria-label={toggleLabel}
+              aria-expanded={!iconsOnly}
+              onClick={toggleBar}
+              className="text-sidebar-foreground/60 hover:text-sidebar-foreground"
+            >
+              {iconsOnly ? <PanelLeftOpen className="size-3.5" /> : <PanelLeftClose className="size-3.5" />}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="right">{toggleLabel}</TooltipContent>
+        </Tooltip>
+      </div>
       <ScrollArea className="flex-1">
         <nav className={cn('flex flex-col gap-0.5 pb-2', iconsOnly ? 'px-1.5' : 'px-2')}>
           {section.items.map((item) => {

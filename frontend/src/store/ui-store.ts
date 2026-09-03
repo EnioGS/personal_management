@@ -22,6 +22,7 @@ interface UiState {
   selectItem: (sectionId: string, itemId: string) => void
   selectTable: (workspaceId: string, tableId: number) => void
   setSecondaryBarMode: (mode: SecondaryBarMode) => void
+  toggleSecondaryBar: () => void
 }
 
 export const useUiStore = create<UiState>((set, get) => ({
@@ -48,4 +49,7 @@ export const useUiStore = create<UiState>((set, get) => ({
     set((s) => ({ activeTableByWorkspace: { ...s.activeTableByWorkspace, [workspaceId]: tableId } })),
 
   setSecondaryBarMode: (mode) => set({ secondaryBarMode: mode }),
+
+  /** Same toggle as the activity-bar icon, reachable from inside the bar itself. */
+  toggleSecondaryBar: () => set((s) => ({ secondaryBarMode: s.secondaryBarMode === 'icons' ? 'expanded' : 'icons' })),
 }))

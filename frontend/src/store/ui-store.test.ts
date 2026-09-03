@@ -64,3 +64,15 @@ describe('ui-store', () => {
     })
   })
 })
+
+describe('the secondary bar as a flyout', () => {
+  it('toggles from inside the bar as well as from the activity icon', () => {
+    expect(useUiStore.getState().secondaryBarMode).toBe('icons')
+
+    useUiStore.getState().toggleSecondaryBar()
+    expect(useUiStore.getState().secondaryBarMode).toBe('expanded')
+
+    useUiStore.getState().toggleSecondaryBar()
+    expect(useUiStore.getState().secondaryBarMode).toBe('icons')
+  })
+})

@@ -85,5 +85,9 @@
     "cardSpend": "Gasto em cartões",
     "inLabel": "Entrada",
     "outLabel": "Saída"
+  },
+  "nav": {
+    "showLabels": "Mostrar nomes",
+    "hideLabels": "Ocultar nomes"
   }
 }

@@ -85,5 +85,9 @@
     "cardSpend": "Card spend",
     "inLabel": "In",
     "outLabel": "Out"
+  },
+  "nav": {
+    "showLabels": "Show labels",
+    "hideLabels": "Hide labels"
   }
 }
