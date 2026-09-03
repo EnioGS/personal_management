@@ -100,6 +100,13 @@ export function IngestionPanel() {
   const visibleRows = showingConfirmed ? confirmedRows : rows
   const reallocatable = confirmedRows.filter((row) => row.hasPendingChange && row.validationErrors.length === 0)
 
+  function selectDataset(value: string) {
+    if (value === '__none__') return
+    setSelected(value)
+    setDraftMappings(null)
+    setMessage(null)
+  }
+
   async function refresh() {
     await Promise.all([sourceStore.refresh(), mappingStore.refresh(), rowStore.refresh()])
   }
@@ -139,16 +146,16 @@ export function IngestionPanel() {
 
   async function confirmReallocation() {
     if (reallocatable.length === 0) return
-    if (!window.confirm(`Move ${reallocatable.length} confirmed row(s) to where their new labels say they belong? Their entries are rewritten in place and every Finance screen updates immediately.`)) return
     const result = await reallocateConfirmedIngestionRows(reallocatable.map((row) => row.id))
     await refresh()
     setMessage(`Reallocated ${result.reallocated} row(s).${result.errors.length ? ` ${result.errors.join(' ')}` : ''}`)
   }
 
   async function confirmPromotion() {
+    // The button itself is the confirmation: it names the action, is disabled until
+    // something is actually ready, and every row it moves was reviewed to get there.
     const ready = rows.filter((row) => row.status === 'ready')
     if (ready.length === 0) return
-    if (!window.confirm(`Move ${ready.length} ready row(s) into their destination tables? This cannot be undone from this screen.`)) return
     const result = await promoteReadyIngestionRows(ready.map((row) => row.id))
     await refresh()
     setMessage(`Promoted ${result.promoted} row(s), reconciled ${result.reconciled} existing row(s).${result.errors.length ? ` ${result.errors.join(' ')}` : ''}`)
@@ -237,14 +244,24 @@ export function IngestionPanel() {
           <h2 className="text-sm font-medium">Data ingestion centre</h2>
           <p className="text-muted-foreground text-xs">Map raw source columns, then review and label staged rows before they can enter a Finance table.</p>
         </div>
-        <Select value={selected} onValueChange={(value) => { setSelected(value); setDraftMappings(null); setMessage(null) }}>
-          <SelectTrigger className="w-72"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value={UNLABELLED_DATASET}>Imported, unlabelled data ({rows.length}; {rows.filter((row) => row.status === 'ready').length} ready)</SelectItem>
-            <SelectItem value={CONFIRMED_DATASET}>Confirmed data ({confirmedRows.length}; {reallocatable.length} to reallocate)</SelectItem>
-            {sourceStore.items.map((source) => <SelectItem key={source.id} value={String(source.id)}>{source.originalFilename} · {source.legacy ? `${rowStore.items.filter((row) => row.sourceId === source.id).length} queued rows` : `${source.rowCount} rows`}</SelectItem>)}
-          </SelectContent>
-        </Select>
+        {/* The two worklists are not source files — they are the stages every file
+            passes through — so they are their own buttons, and the dropdown keeps only
+            the uploaded sources still waiting to be mapped. */}
+        <div className="flex flex-wrap items-center gap-2">
+          <Button type="button" size="sm" variant={selected === UNLABELLED_DATASET ? 'default' : 'outline'} onClick={() => selectDataset(UNLABELLED_DATASET)}>
+            Imported, unlabelled ({rows.length}; {rows.filter((row) => row.status === 'ready').length} ready)
+          </Button>
+          <Button type="button" size="sm" variant={selected === CONFIRMED_DATASET ? 'default' : 'outline'} onClick={() => selectDataset(CONFIRMED_DATASET)}>
+            Confirmed ({confirmedRows.length}; {reallocatable.length} to reallocate)
+          </Button>
+          <Select value={selectedSource ? String(selectedSource.id) : ''} onValueChange={selectDataset}>
+            <SelectTrigger className="w-72"><SelectValue placeholder={`Source files (${sourceStore.items.length})`} /></SelectTrigger>
+            <SelectContent>
+              {sourceStore.items.map((source) => <SelectItem key={source.id} value={String(source.id)}>{source.originalFilename} · {source.legacy ? `${rowStore.items.filter((row) => row.sourceId === source.id).length} queued rows` : `${source.rowCount} rows`}</SelectItem>)}
+              {sourceStore.items.length === 0 && <SelectItem value="__none__" disabled>No source files imported yet</SelectItem>}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {message && <p className="text-muted-foreground rounded-md border p-2 text-xs">{message}</p>}
@@ -285,7 +302,7 @@ export function IngestionPanel() {
             ? 'These rows are already in a Finance table. Editing a label or a data field marks the row for reallocation — its entry is rewritten, and every Finance screen follows, only when you confirm below.'
             : 'Source data is shown in its own columns. Canonical fields can be edited here; label cells accept text and turn red when the value is not one of the accepted options. Typing a category name that does not exist yet creates it.'}</p>
           <div className="min-h-0 flex-1 overflow-auto rounded border">
-            <table className="min-w-max text-left text-xs"><thead className="bg-muted/30"><tr><th className="sticky left-0 z-10 bg-muted/30 p-2">Source</th>{rawColumns(visibleRows).map((column) => <th key={`raw-${column}`} className="min-w-36 p-2">{column}</th>)}{DATA_FIELDS.map((field) => <th key={field} className="min-w-32 p-2">{field}</th>)}{LABEL_FIELDS.map((field) => <th key={field} className="min-w-40 p-2 align-top">{field}<p className="text-muted-foreground font-normal">{LABEL_OPTIONS[field]}</p></th>)}<th className="min-w-44 p-2">Status</th></tr></thead><tbody>{visibleRows.map((row) => <WorklistRow key={row.id} row={row} sourceName={sourceStore.items.find((source) => source.id === row.sourceId)?.originalFilename ?? 'Existing data'} categories={categories} tableDefs={tableDefs} rawColumns={rawColumns(visibleRows)} onChange={updateWorklist} ensureCategory={ensureCategory} />)}{visibleRows.length === 0 && <tr><td colSpan={1 + DATA_FIELDS.length + LABEL_FIELDS.length} className="text-muted-foreground p-4 text-center">{showingConfirmed ? 'Nothing has been confirmed yet.' : 'No staged data yet.'}</td></tr>}</tbody></table>
+            <table className="min-w-max text-left text-xs"><thead className="bg-muted/30"><tr><th className="bg-muted/30 sticky left-0 z-20 w-40 min-w-40 p-2">Source</th><th className="bg-muted/30 sticky left-40 z-20 w-44 min-w-44 border-r p-2">Status</th>{rawColumns(visibleRows).map((column) => <th key={`raw-${column}`} className="min-w-36 p-2">{column}</th>)}{DATA_FIELDS.map((field) => <th key={field} className="min-w-32 p-2">{field}</th>)}{LABEL_FIELDS.map((field) => <th key={field} className="min-w-40 p-2 align-top">{field}<p className="text-muted-foreground font-normal">{LABEL_OPTIONS[field]}</p></th>)}</tr></thead><tbody>{visibleRows.map((row) => <WorklistRow key={row.id} row={row} sourceName={sourceStore.items.find((source) => source.id === row.sourceId)?.originalFilename ?? 'Existing data'} categories={categories} tableDefs={tableDefs} rawColumns={rawColumns(visibleRows)} onChange={updateWorklist} ensureCategory={ensureCategory} />)}{visibleRows.length === 0 && <tr><td colSpan={2 + DATA_FIELDS.length + LABEL_FIELDS.length} className="text-muted-foreground p-4 text-center">{showingConfirmed ? 'Nothing has been confirmed yet.' : 'No staged data yet.'}</td></tr>}</tbody></table>
           </div>
           <div className="flex items-center gap-2 text-xs"><Input value={worklistFieldName} onChange={(event) => setWorklistFieldName(event.target.value)} placeholder="Add blank canonical field, e.g. quantity" className="h-7 w-60 text-xs" /><Button type="button" size="xs" variant="outline" onClick={() => void addWorklistField()} disabled={!worklistFieldName.trim()}><Plus className="size-3" />Add blank data field</Button></div>
         </section>
@@ -325,7 +342,21 @@ function WorklistRow({ row, sourceName, categories, tableDefs, rawColumns: colum
     const categoryId = field === 'category' && !parsed.labels.categoryId ? await ensureCategory(value) : parsed.labels.categoryId
     await onChange(row.id, { labels: { ...parsed.labels, ...(categoryId ? { categoryId } : {}) }, labelValues: draft, destinationTableId: parsed.destinationTableId ?? null })
   }
-  return <tr className="border-t align-top"><td className="sticky left-0 bg-background p-2 font-medium">{sourceName}</td>{columns.map((column) => <td key={column} className="max-w-52 truncate p-2" title={row.rawValues[column] ?? ''}>{row.rawValues[column] ?? ''}</td>)}{DATA_FIELDS.map((field) => <td key={field} className="p-1"><EditableCell value={displayDataValue(field, row.mappedValues[field])} onCommit={(value) => saveData(field, value)} /></td>)}{LABEL_FIELDS.map((field) => <td key={field} className="p-1"><EditableCell value={labelValue(row, field, categories, tableDefs)} invalid={labelFieldInvalid(row, field, categories, tableDefs)} onCommit={(value) => void saveLabel(field, value)} /></td>)}<td className="max-w-56 p-2">{row.hasPendingChange ? <span className="text-amber-600 dark:text-amber-300">Pending reallocation</span> : row.status === 'ready' ? <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-300"><Check className="size-3" />Ready</span> : row.status}{row.validationErrors.length > 0 && <p className="mt-1 text-amber-600 dark:text-amber-300">{row.validationErrors[0]}</p>}</td></tr>
+  return <tr className="border-t align-top"><td className="bg-background sticky left-0 z-10 w-40 min-w-40 max-w-40 truncate p-2 font-medium" title={sourceName}>{sourceName}</td><td className="bg-background sticky left-40 z-10 w-44 min-w-44 border-r p-2">{statusCell(row)}</td>{columns.map((column) => <td key={column} className="max-w-52 truncate p-2" title={row.rawValues[column] ?? ''}>{row.rawValues[column] ?? ''}</td>)}{DATA_FIELDS.map((field) => <td key={field} className="p-1"><EditableCell value={displayDataValue(field, row.mappedValues[field])} onCommit={(value) => saveData(field, value)} /></td>)}{LABEL_FIELDS.map((field) => <td key={field} className="p-1"><EditableCell value={labelValue(row, field, categories, tableDefs)} invalid={labelFieldInvalid(row, field, categories, tableDefs)} onCommit={(value) => void saveLabel(field, value)} /></td>)}</tr>
+}
+
+/** Kept beside the source name and pinned with it: the state is why a row is on screen. */
+function statusCell(row: StoredRow<IngestionRow>) {
+  return (
+    <>
+      {row.hasPendingChange
+        ? <span className="text-amber-600 dark:text-amber-300">Pending reallocation</span>
+        : row.status === 'ready'
+          ? <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-300"><Check className="size-3" />Ready</span>
+          : row.status}
+      {row.validationErrors.length > 0 && <p className="mt-1 text-amber-600 dark:text-amber-300">{row.validationErrors[0]}</p>}
+    </>
+  )
 }
 
 function EditableCell({ value, invalid = false, onCommit }: { value: string; invalid?: boolean; onCommit: (value: string) => void }) {
