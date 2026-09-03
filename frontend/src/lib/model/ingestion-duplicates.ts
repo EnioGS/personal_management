@@ -132,3 +132,22 @@ export function findDuplicateMatches(
   }
   return matches
 }
+
+/**
+ * The same file can repeat a row inside itself — an export run twice into one CSV, or
+ * a statement that lists a charge and its instalment line. Comparing a batch against
+ * what is already stored never sees that, so the batch is also compared against
+ * itself, each pair reported once.
+ *
+ * A genuine repeat is indistinguishable from a duplicate here (two 9.90 charges on one
+ * day are a real thing), so these are reported separately and judged, not assumed.
+ */
+export function findDuplicateMatchesWithin(rows: ComparableRow[], maxMatchesPerCandidate = 5): DuplicateMatch[] {
+  const seenPairs = new Set<string>()
+  return findDuplicateMatches(rows, rows, maxMatchesPerCandidate).filter((match) => {
+    const pair = [match.candidateKey, match.matchKey].sort().join('|')
+    if (seenPairs.has(pair)) return false
+    seenPairs.add(pair)
+    return true
+  })
+}

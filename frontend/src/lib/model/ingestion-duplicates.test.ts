@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { findDuplicateMatches, normalizeAmount, normalizeDate, type ComparableRow } from './ingestion-duplicates'
+import { findDuplicateMatches, findDuplicateMatchesWithin, normalizeAmount, normalizeDate, type ComparableRow } from './ingestion-duplicates'
 
 function row(key: string, overrides: Partial<ComparableRow> = {}): ComparableRow {
   return { key, date: '2026-01-02', amount: 19.9, description: 'amazonprimebr assinatura', ...overrides }
@@ -43,6 +43,13 @@ describe('finding duplicates across partial data', () => {
     const matches = findDuplicateMatches([row('new')], [row('old', { context: { status: 'promoted', table: 'Fatura Nubank' } })])
 
     expect(matches[0].context).toEqual({ status: 'promoted', table: 'Fatura Nubank' })
+  })
+
+  it('finds a batch repeating itself, reporting each pair once and never a row against itself', () => {
+    const matches = findDuplicateMatchesWithin([row('a'), row('b'), row('c', { amount: 5, description: 'padaria' })])
+
+    expect(matches).toHaveLength(1)
+    expect([matches[0].candidateKey, matches[0].matchKey].sort()).toEqual(['a', 'b'])
   })
 
   it('normalises the shapes the same value arrives in', () => {

@@ -89,6 +89,10 @@ before labelling them. It compares only the fields both rows have, so a file mis
 a column is still checked on the columns it does have; a missing column is never
 evidence that two rows differ.
 
+It also reports rows a file repeats inside itself, under withinTheSameBatch. Treat
+those with more care than the rest: two identical charges on one day are a normal
+thing, so ask the user rather than discarding one.
+
 Judge what it returns rather than trusting it: an identical fingerprint is proof,
 three agreeing fields is strong, and two agreeing with the third missing means look
 at it. When a row really is a copy, discard_ingestion_rows sets it aside with a

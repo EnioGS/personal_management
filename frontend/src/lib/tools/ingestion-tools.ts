@@ -3,7 +3,7 @@ import { ingestionLabelErrors } from '@/lib/model/ingestion'
 import { ensureCategoryByName } from '@/lib/model/category-vocabulary'
 import { createSupplementalColumn, parseIngestionCsv, saveIngestionMappings } from '@/lib/model/ingestion-source'
 import { discardIngestionRows, updateIngestionRowLabels, updateIngestionRowWorklist } from '@/lib/model/ingestion-promotion'
-import { findDuplicateMatches, normalizeAmount, normalizeDate, normalizeText, type ComparableRow } from '@/lib/model/ingestion-duplicates'
+import { findDuplicateMatches, findDuplicateMatchesWithin, normalizeAmount, normalizeDate, normalizeText, type ComparableRow } from '@/lib/model/ingestion-duplicates'
 import { FINANCE_DESTINATIONS, FLOW_ROLES, labelValues, matchLabelValue, RECURRENCES, SETTLEMENT_CHANNELS, SPENDING_TREATMENTS } from '@/lib/model/label-vocabulary'
 import { assistantPromptsTable } from '@/lib/assistant-prompts-db'
 import { categoriesTable, entriesTable, ingestionAuditEventsTable, ingestionColumnMappingsTable, ingestionRowsTable, ingestionSourcesTable, tableDefsTable } from '@/lib/model/model-db'
@@ -354,7 +354,7 @@ async function duplicateCorpus(excludeRowIds: Set<number>): Promise<ComparableRo
 
 export const findIngestionDuplicatesTool: ToolDefinition = {
   name: 'find_ingestion_duplicates',
-  description: 'Checks rows against everything already stored — the unlabelled worklist, the confirmed rows, and entries written by hand — and returns the ones that look like copies. ALWAYS run this on new data: on an uploaded source before its mapping is finished, and again on staged rows before labelling them, because the same transaction arrives twice from a bank as easily as from two overlapping files. It compares only the fields both rows actually have, so a file missing a column is still checked on the columns it does have: a match on date+amount+description is high confidence, an identical fingerprint is proof, and two fields agreeing with the third missing is medium — real, but worth a human eye. Read-only; discard_ingestion_rows is what acts on the answer.',
+  description: 'Checks rows against everything already stored — the unlabelled worklist, the confirmed rows, and entries written by hand — and returns the ones that look like copies. ALWAYS run this on new data: on an uploaded source before its mapping is finished, and again on staged rows before labelling them, because the same transaction arrives twice from a bank as easily as from two overlapping files. It reports matches against stored data and, separately, rows the batch repeats within itself. It compares only the fields both rows actually have, so a file missing a column is still checked on the columns it does have: a match on date+amount+description is high confidence, an identical fingerprint is proof, and two fields agreeing with the third missing is medium — real, but worth a human eye. Read-only; discard_ingestion_rows is what acts on the answer.',
   parameters: {
     type: 'object',
     properties: {
@@ -425,12 +425,14 @@ export const findIngestionDuplicatesTool: ToolDefinition = {
     }
 
     const matches = findDuplicateMatches(candidates, await duplicateCorpus(excluded))
+    const withinTheSameBatch = findDuplicateMatchesWithin(candidates)
     return JSON.stringify({
       checked: candidates.length,
       offset,
       candidatesWithMatches: new Set(matches.map((match) => match.candidateKey)).size,
       matches,
-      note: 'Medium confidence means two fields agreed and a third was missing on one side — judge it, do not assume it. Nothing was changed.',
+      withinTheSameBatch,
+      note: 'Medium confidence means two fields agreed and a third was missing on one side — judge it, do not assume it. withinTheSameBatch is the file repeating itself, where a real repeated charge looks identical to a duplicate: never discard one of those without asking. Nothing was changed.',
     })
   },
 }
