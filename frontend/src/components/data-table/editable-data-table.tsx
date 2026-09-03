@@ -8,6 +8,9 @@ import { ComboboxInput } from './combobox-input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { coerceValue } from '@/lib/csv'
+import { queryRows } from '@/lib/model/row-query'
+import { ColumnSortMenu, type ColumnSort } from './column-sort-menu'
+import { useProgressiveRows } from './use-progressive-rows'
 import type { StoredRow } from '@/lib/local-store/create-local-table'
 import type { ColumnDef, TableSchema } from '@/lib/table-schema'
 
@@ -40,6 +43,7 @@ export function EditableDataTable<T extends Record<string, unknown>>({
 }: EditableDataTableProps<T>) {
   const { t } = useTranslation()
   const [draft, setDraft] = useState<Record<string, string>>({})
+  const [sort, setSort] = useState<ColumnSort | null>(null)
 
   // Per-field validity of what's currently typed in the draft row — used only to flag
   // an invalid value (e.g. a malformed date) visually; an empty, not-yet-filled field is
@@ -105,7 +109,13 @@ export function EditableDataTable<T extends Record<string, unknown>>({
     [schema, t, onDeleteRow, onUpdateRow, suggestionsByColumn],
   )
 
-  const table = useReactTable({ data: rows, columns, getCoreRowModel: getCoreRowModel() })
+  // Sorting and windowing are applied to the rows themselves rather than through
+  // TanStack's models: the same query engine orders every table in the app, so a
+  // column sorts identically here and in the ingestion centre, and only the visible
+  // window is handed to the table.
+  const sortedRows = useMemo(() => (sort ? queryRows(rows, (row, field) => (row as Record<string, unknown>)[field], { sort }).rows : rows), [rows, sort])
+  const { visible, onScroll, shown, total, hasMore } = useProgressiveRows(sortedRows, `${sort?.field}:${sort?.direction}:${sort?.type}`)
+  const table = useReactTable({ data: visible, columns, getCoreRowModel: getCoreRowModel() })
 
   function updateDraftField(key: string, value: string) {
     setDraft((d) => ({ ...d, [key]: value }))
@@ -153,17 +163,26 @@ export function EditableDataTable<T extends Record<string, unknown>>({
       {/* items-center, not the default stretch: the table selector is a 32px Select
           while every button beside it is 24px, so without it the buttons pin to the
           top of the row instead of sitting on the selector's centre line. */}
-      {actions && <div className="flex items-center justify-end gap-1.5">{actions}</div>}
-      <div className="flex-1 overflow-auto rounded-md border">
+      <div className="flex items-center justify-end gap-1.5">
+        {hasMore && <span className="text-muted-foreground mr-auto text-xs">{t('table.showingOfTotal', { shown, total, defaultValue: `Showing ${shown} of ${total} — scroll for more` })}</span>}
+        {actions}
+      </div>
+      <div className="flex-1 overflow-auto rounded-md border" onScroll={onScroll}>
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
-                {headerGroup.headers.map((header) => (
-                  <TableHead key={header.id}>
-                    {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
-                  </TableHead>
-                ))}
+                {headerGroup.headers.map((header) => {
+                  const field = header.column.id
+                  const sortable = schema.some((column) => String(column.key) === field)
+                  return (
+                    <TableHead key={header.id}>
+                      {header.isPlaceholder ? null : sortable
+                        ? <ColumnSortMenu field={field} label={String(flexRender(header.column.columnDef.header, header.getContext()))} sort={sort} onSort={setSort} />
+                        : flexRender(header.column.columnDef.header, header.getContext())}
+                    </TableHead>
+                  )
+                })}
               </TableRow>
             ))}
           </TableHeader>
