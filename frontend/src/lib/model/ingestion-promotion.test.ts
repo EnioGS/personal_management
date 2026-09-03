@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { wipeAllData } from '@/lib/data-file'
-import { entriesTable, entryLabelsTable, ingestionRowsTable, tableDefsTable } from './model-db'
-import { promoteReadyIngestionRows, updateIngestionRowLabels, updateIngestionRowWorklist } from './ingestion-promotion'
+import { categoriesTable, entriesTable, entryLabelsTable, ingestionRowsTable, tableDefsTable } from './model-db'
+import { promoteReadyIngestionRows, reallocateConfirmedIngestionRows, updateIngestionRowLabels, updateIngestionRowWorklist } from './ingestion-promotion'
 import type { IngestionRow } from './types'
 
 async function addCardRow() {
@@ -95,5 +95,66 @@ describe('values that were never text', () => {
 
     const promoted = (await entriesTable.toArray())[0].data as Record<string, unknown>
     expect(promoted).toMatchObject({ tableId, date, amount: 1200, direction: 'in' })
+  })
+})
+
+describe('relabelling a row that is already in a Finance table', () => {
+  beforeEach(async () => { await wipeAllData() })
+
+  async function confirmedRow() {
+    const bankId = await tableDefsTable.add({ createdAt: 1, data: { name: 'Extrato Nubank', kind: 'bankLedger' } })
+    const cardId = await tableDefsTable.add({ createdAt: 1, data: { name: 'Fatura Nubank', kind: 'cardLedger' } })
+    const rowId = await ingestionRowsTable.add({
+      createdAt: 2,
+      data: { sourceId: 1, sourceRowIndex: 0, sourceRowFingerprint: 'r0', rawValues: { description: 'Assinatura' }, mappedValues: { date: '2026-01-02', amount: '19.90', description: 'Assinatura', direction: 'out', rawCategory: 'Assinatura' }, labels: {}, status: 'unlabelled', validationErrors: [] } satisfies IngestionRow,
+    })
+    await updateIngestionRowLabels(rowId, { financeDestination: 'movements', flowRole: 'outflow', settlementChannel: 'checkingAccount', spendingTreatment: 'notApplicable', recurrence: 'oneOff' }, bankId)
+    await promoteReadyIngestionRows([rowId])
+    return { rowId, bankId, cardId, entryId: ((await ingestionRowsTable.get(rowId))!.data as IngestionRow).promotedEntryId! }
+  }
+
+  it('holds the edit until it is confirmed, leaving the live entry alone', async () => {
+    const { rowId, cardId, entryId } = await confirmedRow()
+    const categoryId = await categoriesTable.add({ createdAt: 1, data: { name: 'Assinaturas' } })
+
+    const edited = await updateIngestionRowLabels(rowId, { financeDestination: 'spending', flowRole: 'outflow', settlementChannel: 'creditCard', spendingTreatment: 'expense', categoryId, recurrence: 'recurring' }, cardId)
+
+    expect(edited.hasPendingChange).toBe(true)
+    expect(edited.status).toBe('promoted')
+    // The live entry still belongs to the bank table it was promoted into.
+    expect(((await entriesTable.get(entryId))!.data as Record<string, unknown>).tableId).not.toBe(cardId)
+  })
+
+  it('rewrites the entry in place and its labels with it, keeping the same entry id', async () => {
+    const { rowId, cardId, entryId } = await confirmedRow()
+    const categoryId = await categoriesTable.add({ createdAt: 1, data: { name: 'Assinaturas' } })
+    await updateIngestionRowLabels(rowId, { financeDestination: 'spending', flowRole: 'outflow', settlementChannel: 'creditCard', spendingTreatment: 'expense', categoryId, recurrence: 'recurring' }, cardId)
+
+    const result = await reallocateConfirmedIngestionRows([rowId])
+
+    expect(result).toEqual({ reallocated: 1, errors: [] })
+    expect(await entriesTable.count()).toBe(1)
+    expect((await entriesTable.get(entryId))!.data).toMatchObject({ tableId: cardId, amount: 19.9 })
+    const labels = (await entryLabelsTable.toArray())[0].data as Record<string, unknown>
+    expect(labels).toMatchObject({ entryId, financeDestination: 'spending', spendingTreatment: 'expense', recurrence: 'recurring' })
+    expect(((await ingestionRowsTable.get(rowId))!.data as IngestionRow).hasPendingChange).toBe(false)
+  })
+
+  it('refuses to move a row whose new destination cannot hold it, and says why', async () => {
+    const { rowId } = await confirmedRow()
+    const investmentId = await tableDefsTable.add({ createdAt: 1, data: { name: 'Renda Variável', kind: 'investmentLedger', investmentClass: 'variableIncome' } })
+
+    const edited = await updateIngestionRowLabels(rowId, { financeDestination: 'investments', flowRole: 'outflow', settlementChannel: 'investment', spendingTreatment: 'notApplicable', recurrence: 'oneOff' }, investmentId)
+    const result = await reallocateConfirmedIngestionRows([rowId])
+
+    expect(edited.validationErrors[0]).toContain('asset')
+    expect(result.reallocated).toBe(0)
+    expect(result.errors[0]).toContain('asset')
+  })
+
+  it('ignores a confirmed row nobody edited', async () => {
+    const { rowId } = await confirmedRow()
+
+    expect(await reallocateConfirmedIngestionRows([rowId])).toEqual({ reallocated: 0, errors: [] })
   })
 })

@@ -3,6 +3,7 @@ import { wipeAllData } from '@/lib/data-file'
 import { DEFAULT_INGESTION_GUIDE, INGESTION_GUIDE_KEY } from '@/lib/ingestion-guide'
 import { assistantPromptsTable } from '@/lib/assistant-prompts-db'
 import { categoriesTable, ingestionRowsTable, ingestionSourcesTable, tableDefsTable } from '@/lib/model/model-db'
+import { promoteReadyIngestionRows } from '@/lib/model/ingestion-promotion'
 import type { Category, IngestionRow } from '@/lib/model/types'
 import { addIngestionBlankColumnTool, assignIngestionColumnsTool, labelIngestionRowsByMatchTool, listIngestionDatasetsTool, readIngestionGuideTool, readIngestionProvenanceTool, readIngestionTableTool, updateIngestionLabelsTool } from './ingestion-tools'
 
@@ -190,5 +191,50 @@ describe('labelling by a rule instead of row by row', () => {
     const preview = JSON.parse(await labelIngestionRowsByMatchTool.execute({ contains: 'iof', labels: { flowRole: 'inflow' } }, context))
 
     expect(preview.matched).toBe(0)
+  })
+})
+
+describe('confirmed rows through the assistant', () => {
+  beforeEach(async () => { await wipeAllData() })
+
+  async function promotedRow() {
+    const tableId = await tableDefsTable.add({ createdAt: 1, data: { name: 'Extrato Nubank', kind: 'bankLedger' } })
+    const rowId = await ingestionRowsTable.add({
+      createdAt: 2,
+      data: { sourceId: 1, sourceRowIndex: 0, sourceRowFingerprint: 'r0', rawValues: { description: 'Assinatura' }, mappedValues: { date: '2026-01-02', amount: '19.90', description: 'Assinatura', direction: 'out', rawCategory: 'Assinatura' }, labels: {}, status: 'unlabelled', validationErrors: [] } satisfies IngestionRow,
+    })
+    await updateIngestionLabelsTool.execute({ updates: [{ rowId, financeDestination: 'movements', flowRole: 'outflow', settlementChannel: 'checkingAccount', spendingTreatment: 'notApplicable', recurrence: 'oneOff', destinationTableId: tableId }] }, context)
+    await promoteReadyIngestionRows([rowId])
+    return { rowId, tableId }
+  }
+
+  it('reads them only when asked for the confirmed dataset', async () => {
+    const { rowId } = await promotedRow()
+
+    expect(JSON.parse(await readIngestionTableTool.execute({}, context)).total).toBe(0)
+    const confirmed = JSON.parse(await readIngestionTableTool.execute({ dataset: 'confirmed' }, context))
+    expect(confirmed.rows.map((row: { id: number }) => row.id)).toEqual([rowId])
+  })
+
+  it('relabels one into a pending reallocation without touching the live entry', async () => {
+    const { rowId } = await promotedRow()
+
+    const result = JSON.parse(await updateIngestionLabelsTool.execute({ updates: [{ rowId, recurrence: 'recurring' }] }, context))
+
+    expect(result[0].status).toBe('promoted')
+    const stored = (await ingestionRowsTable.get(rowId))!.data as IngestionRow
+    expect(stored.hasPendingChange).toBe(true)
+    expect(stored.labels.recurrence).toBe('recurring')
+    expect(JSON.parse(await listIngestionDatasetsTool.execute({}, context)).confirmed).toMatchObject({ count: 1, pendingReallocation: 1 })
+  })
+
+  it('leaves confirmed rows out of a bulk rule unless it says otherwise', async () => {
+    await promotedRow()
+
+    const guarded = JSON.parse(await labelIngestionRowsByMatchTool.execute({ contains: 'assinatura', labels: { recurrence: 'recurring' } }, context))
+    const included = JSON.parse(await labelIngestionRowsByMatchTool.execute({ contains: 'assinatura', includeConfirmed: true, apply: true, labels: { recurrence: 'recurring' } }, context))
+
+    expect(guarded.matched).toBe(0)
+    expect(included).toMatchObject({ matched: 1, pendingReallocation: 1 })
   })
 })

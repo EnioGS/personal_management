@@ -166,6 +166,11 @@ Two things it optimizes for:
 - The category vocabulary *is* the category labels (adr/0031, superseding
   adr/0023): naming a category on a row creates it. There is no rule engine and
   no Categories settings screen — one classification path, decided per row.
+- Confirmed rows stay editable: the ingestion centre's third dataset lists what
+  is already in a Finance table, relabelling one marks it for reallocation, and
+  *Confirm and reallocate rows* rewrites that entry in place — same entry id, new
+  destination and labels, every Finance screen following immediately. An edit
+  whose new destination cannot hold the row keeps its error and stays put.
 - A rule ("everything mentioning IOF is a card rebate") is applied with one
   matched bulk call rather than row by row, and that call previews by default:
   it returns the match count and examples, changes nothing, and only labels once

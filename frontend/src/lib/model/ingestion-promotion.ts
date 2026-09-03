@@ -97,6 +97,34 @@ async function validateAndSave(
   return next
 }
 
+function isFinalized(row: IngestionRow): boolean {
+  return row.status === 'promoted' || row.status === 'reconciledExisting'
+}
+
+/**
+ * Records an edit to a row whose entry already exists. The live entry is deliberately
+ * left alone: a confirmed row keeps showing what it currently shows on every dashboard
+ * until the user clicks reallocate, exactly as a staged row waits for promotion.
+ */
+async function saveConfirmedEdit(rowId: number, next: IngestionRow, actor: 'user' | 'assistant'): Promise<IngestionRow> {
+  const errors = ingestionLabelErrors(next.labels, next.destinationTableId)
+  if (errors.length === 0) {
+    try {
+      await entryFromIngestionRow(next)
+    } catch (error) {
+      errors.push(error instanceof Error ? error.message : 'The destination table rejected this row.')
+    }
+  }
+  next.validationErrors = errors
+  next.hasPendingChange = true
+  await ingestionRowsTable.update(rowId, { data: next })
+  await ingestionAuditEventsTable.add({
+    createdAt: Date.now(),
+    data: { event: 'labelsChanged', actor, sourceId: next.sourceId, ingestionRowIds: [rowId], details: { pendingReallocation: true, errors } },
+  })
+  return next
+}
+
 /** Validates labels and destination data, transitioning the row only between unlabelled/ready/invalid. */
 export async function updateIngestionRowLabels(
   rowId: number,
@@ -107,8 +135,8 @@ export async function updateIngestionRowLabels(
   const stored = await ingestionRowsTable.get(rowId)
   if (!stored) throw new Error(`Ingestion row ${rowId} was not found.`)
   const current = asIngestionRow(stored.data)
-  if (current.status === 'promoted' || current.status === 'reconciledExisting') throw new Error('This row has already been finalized.')
-  return validateAndSave(rowId, { ...current, labels, destinationTableId }, actor)
+  const next = { ...current, labels, destinationTableId }
+  return isFinalized(current) ? saveConfirmedEdit(rowId, next, actor) : validateAndSave(rowId, next, actor)
 }
 
 /**
@@ -124,7 +152,6 @@ export async function updateIngestionRowWorklist(
   const stored = await ingestionRowsTable.get(rowId)
   if (!stored) throw new Error(`Ingestion row ${rowId} was not found.`)
   const current = asIngestionRow(stored.data)
-  if (current.status === 'promoted' || current.status === 'reconciledExisting') throw new Error('This row has already been finalized.')
   const next: IngestionRow = {
     ...current,
     mappedValues: { ...current.mappedValues, ...patch.mappedValues },
@@ -132,7 +159,7 @@ export async function updateIngestionRowWorklist(
     labelValues: patch.labelValues ?? current.labelValues,
     destinationTableId: patch.destinationTableId === undefined ? current.destinationTableId : patch.destinationTableId ?? undefined,
   }
-  return validateAndSave(rowId, next, actor)
+  return isFinalized(current) ? saveConfirmedEdit(rowId, next, actor) : validateAndSave(rowId, next, actor)
 }
 
 /** Finalize rows already marked ready. This is called only from the user-confirmed UI action. */
@@ -203,6 +230,66 @@ export async function promoteReadyIngestionRows(rowIds: number[]): Promise<{ pro
         ingestionRowIds: ids,
         details: result,
       },
+    })
+  })
+  return result
+}
+
+/**
+ * Applies edits made to already-confirmed rows: the promoted entry is rewritten in
+ * place — same entry id, so budgets, positions and provenance links survive — against
+ * whichever destination table the row now names, and its labels are rewritten with it.
+ *
+ * This is how a row is moved between Finance surfaces after the fact. It is the second
+ * user-only action, for the same reason promotion is: it is the moment stored data
+ * changes. A row whose edit does not validate keeps its errors and is left untouched,
+ * so a half-relabelled row can never land in a table that cannot hold it.
+ */
+export async function reallocateConfirmedIngestionRows(rowIds: number[]): Promise<{ reallocated: number; errors: string[] }> {
+  const ids = [...new Set(rowIds)]
+  const result = { reallocated: 0, errors: [] as string[] }
+  const now = Date.now()
+  const prepared = new Map<number, { entryId: number; entry: Entry; row: IngestionRow }>()
+
+  // Table and category reads happen before the write transaction: Dexie requires every
+  // table a transaction touches to be declared up front.
+  for (const rowId of ids) {
+    const stored = await ingestionRowsTable.get(rowId)
+    const row = stored ? asIngestionRow(stored.data) : undefined
+    if (!row) { result.errors.push(`Row ${rowId} no longer exists.`); continue }
+    if (!isFinalized(row) || !row.hasPendingChange) continue
+    const entryId = row.promotedEntryId ?? row.existingEntryId
+    if (!entryId) { result.errors.push(`Row ${rowId} has no confirmed entry to update.`); continue }
+    if (row.validationErrors.length > 0) { result.errors.push(`Row ${rowId}: ${row.validationErrors[0]}`); continue }
+    try {
+      prepared.set(rowId, { entryId, entry: await entryFromIngestionRow(row), row })
+    } catch (error) {
+      result.errors.push(`Row ${rowId}: ${error instanceof Error ? error.message : 'could not be reallocated.'}`)
+    }
+  }
+
+  if (prepared.size === 0) return result
+
+  await entriesTable.db.transaction('rw', entriesTable, entryLabelsTable, ingestionRowsTable, ingestionAuditEventsTable, async () => {
+    const allLabels = await entryLabelsTable.toArray()
+    for (const [rowId, { entryId, entry, row }] of prepared) {
+      try {
+        if (!(await entriesTable.get(entryId))) throw new Error('the confirmed entry no longer exists.')
+        await entriesTable.update(entryId, { data: entry })
+        const labels = { ...entryLabelsFromIngestionRow(entryId, row), sourceIngestionRowId: rowId }
+        const previous = allLabels.find((candidate) => (candidate.data as { entryId?: number }).entryId === entryId)
+        if (previous) await entryLabelsTable.update(previous.id, { data: labels })
+        else await entryLabelsTable.add({ createdAt: now, data: labels })
+        await ingestionRowsTable.update(rowId, { data: { ...row, hasPendingChange: false, validationErrors: [] } })
+        result.reallocated += 1
+      } catch (error) {
+        result.errors.push(`Row ${rowId}: ${error instanceof Error ? error.message : 'could not be reallocated.'}`)
+      }
+    }
+
+    await ingestionAuditEventsTable.add({
+      createdAt: now,
+      data: { event: 'rowsReallocated', actor: 'user', ingestionRowIds: [...prepared.keys()], entryIds: [...prepared.values()].map(({ entryId }) => entryId), details: result },
     })
   })
   return result

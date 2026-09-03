@@ -233,11 +233,17 @@ export interface IngestionRow {
   existingEntryId?: number
   /** Present after a newly staged row is promoted to an app entry. */
   promotedEntryId?: number
+  /**
+   * True when a confirmed row's labels or data have been edited but its promoted
+   * entry has not been rewritten yet. Reallocation — a user click, like promotion —
+   * applies the edit and clears this.
+   */
+  hasPendingChange?: boolean
 }
 
 /** Append-only trace of user/assistant classification actions. */
 export interface IngestionAuditEvent {
-  event: 'sourceUploaded' | 'mappingChanged' | 'rowsStaged' | 'labelsChanged' | 'rowsPromoted' | 'rowsReconciled' | 'promotionFailed'
+  event: 'sourceUploaded' | 'mappingChanged' | 'rowsStaged' | 'labelsChanged' | 'rowsPromoted' | 'rowsReconciled' | 'rowsReallocated' | 'promotionFailed'
   actor: 'user' | 'assistant' | 'migration'
   sourceId?: number
   ingestionRowIds?: number[]

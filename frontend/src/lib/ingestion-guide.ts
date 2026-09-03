@@ -68,6 +68,17 @@ Destination table — one of the user's own tables. It carries the details label
 not: which account or card the row belongs to, and for investments whether the table
 is Fixed Income or Variable Income. Call read_table to see what exists.
 
+## Correcting a row that is already confirmed
+
+A confirmed row is not frozen. Relabelling one — including changing its destination
+table — is allowed and is how a mistake gets fixed: read it with read_ingestion_table
+using dataset "confirmed", then label it as usual. The row's entry keeps its current
+meaning on every dashboard until the user clicks "Confirm and reallocate rows", which
+rewrites that entry in place. That click is theirs, like promotion; you have no tool
+for it. Moving a row to a table of another kind may need data the row never had (an
+investment ledger wants asset, type, quantity and price): fill those in with
+update_ingestion_data_fields, or say what is missing and let the user decide.
+
 ## Judgment rules
 
 - Never apply a blanket rule to IOF, Pix, or any merchant word. An IOF line can be a

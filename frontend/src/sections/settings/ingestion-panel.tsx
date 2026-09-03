@@ -13,7 +13,7 @@ import {
   validateIngestionMappings,
 } from '@/lib/model/ingestion-source'
 import { createIngestionSourcesFromDatabaseFile } from '@/lib/model/ingestion-database-file'
-import { promoteReadyIngestionRows, updateIngestionRowWorklist } from '@/lib/model/ingestion-promotion'
+import { promoteReadyIngestionRows, reallocateConfirmedIngestionRows, updateIngestionRowWorklist } from '@/lib/model/ingestion-promotion'
 import {
   useCategoriesStore,
   useIngestionColumnMappingsStore,
@@ -32,6 +32,7 @@ const TARGET_FIELDS: IngestionTargetField[] = [
 ]
 
 const UNLABELLED_DATASET = '__unlabelled__'
+const CONFIRMED_DATASET = '__confirmed__'
 const LABEL_FIELDS = ['financeDestination', 'flowRole', 'settlementChannel', 'spendingTreatment', 'category', 'recurrence', 'destinationTable'] as const
 const DATA_FIELDS = TARGET_FIELDS.filter((field) => !['financeDestination', 'flowRole', 'settlementChannel', 'spendingTreatment', 'categoryId', 'recurrence', 'destinationTableId'].includes(field))
 /** The accepted values of each closed label column, shown as the cell's own hint. */
@@ -72,7 +73,16 @@ export function IngestionPanel() {
   const validation = selectedSource
     ? validateIngestionMappings(selectedSource.originalColumns, selectedSource.supplementalColumns, mappings)
     : null
-  const sourcePreview = useMemo(() => (selectedSource ? parseIngestionCsv(selectedSource.rawCsv).rows : []), [selectedSource])
+  // A source with no file (the migration's own) has nothing to parse, and a parser
+  // error must never escape into the render — it would unmount the whole app.
+  const sourcePreview = useMemo(() => {
+    if (!selectedSource?.rawCsv) return []
+    try {
+      return parseIngestionCsv(selectedSource.rawCsv).rows
+    } catch {
+      return []
+    }
+  }, [selectedSource])
   // Ready rows first. They are the only rows the confirmation button acts on, and a
   // backlog of hundreds otherwise buries them; the sort is stable, so everything else
   // keeps the order it was queued in.
@@ -80,6 +90,15 @@ export function IngestionPanel() {
     const active = rowStore.items.filter((row) => row.status !== 'promoted' && row.status !== 'reconciledExisting')
     return [...active].sort((left, right) => Number(right.status === 'ready') - Number(left.status === 'ready'))
   }, [rowStore.items])
+  // Rows whose entry already exists. Edits here wait for reallocation the same way a
+  // staged row waits for promotion, so a pending change sorts to the top.
+  const confirmedRows = useMemo(() => {
+    const finalized = rowStore.items.filter((row) => row.status === 'promoted' || row.status === 'reconciledExisting')
+    return [...finalized].sort((left, right) => Number(right.hasPendingChange) - Number(left.hasPendingChange))
+  }, [rowStore.items])
+  const showingConfirmed = selected === CONFIRMED_DATASET
+  const visibleRows = showingConfirmed ? confirmedRows : rows
+  const reallocatable = confirmedRows.filter((row) => row.hasPendingChange && row.validationErrors.length === 0)
 
   async function refresh() {
     await Promise.all([sourceStore.refresh(), mappingStore.refresh(), rowStore.refresh()])
@@ -116,6 +135,14 @@ export function IngestionPanel() {
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Could not add the blank data field.')
     }
+  }
+
+  async function confirmReallocation() {
+    if (reallocatable.length === 0) return
+    if (!window.confirm(`Move ${reallocatable.length} confirmed row(s) to where their new labels say they belong? Their entries are rewritten in place and every Finance screen updates immediately.`)) return
+    const result = await reallocateConfirmedIngestionRows(reallocatable.map((row) => row.id))
+    await refresh()
+    setMessage(`Reallocated ${result.reallocated} row(s).${result.errors.length ? ` ${result.errors.join(' ')}` : ''}`)
   }
 
   async function confirmPromotion() {
@@ -214,6 +241,7 @@ export function IngestionPanel() {
           <SelectTrigger className="w-72"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value={UNLABELLED_DATASET}>Imported, unlabelled data ({rows.length}; {rows.filter((row) => row.status === 'ready').length} ready)</SelectItem>
+            <SelectItem value={CONFIRMED_DATASET}>Confirmed data ({confirmedRows.length}; {reallocatable.length} to reallocate)</SelectItem>
             {sourceStore.items.map((source) => <SelectItem key={source.id} value={String(source.id)}>{source.originalFilename} · {source.legacy ? `${rowStore.items.filter((row) => row.sourceId === source.id).length} queued rows` : `${source.rowCount} rows`}</SelectItem>)}
           </SelectContent>
         </Select>
@@ -222,6 +250,12 @@ export function IngestionPanel() {
       {message && <p className="text-muted-foreground rounded-md border p-2 text-xs">{message}</p>}
 
       {selectedSource ? (
+        selectedSource.legacy || selectedSource.originalColumns.length === 0 ? (
+          <section className="flex flex-col gap-2 rounded-md border p-3 text-xs">
+            <p className="font-medium">{selectedSource.originalFilename}</p>
+            <p className="text-muted-foreground">This dataset has no source file: its rows were moved out of the Finance tables when the label workflow was introduced, so they are already mapped. There are no columns to assign — pick <span className="font-medium">Imported, unlabelled data</span> to label them.</p>
+          </section>
+        ) : (
         <section className="flex min-h-0 flex-1 flex-col gap-2 rounded-md border p-2">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="text-xs"><span className="font-medium">{selectedSource.originalFilename}</span><span className="text-muted-foreground"> · original columns stay unchanged; supplemental columns are blank by design.</span></div>
@@ -244,11 +278,14 @@ export function IngestionPanel() {
           </div>
           {validation && <p className={cn('text-xs', validation.errors.length ? 'text-amber-600 dark:text-amber-300' : 'text-emerald-600 dark:text-emerald-300')}>{validation.errors.length ? validation.errors.join(' ') : 'Mapping covers every possible destination table. Individual blank values are checked later.'}</p>}
         </section>
+        )
       ) : (
         <section className="flex min-h-0 flex-1 flex-col gap-2 rounded-md border p-2">
-          <p className="text-muted-foreground text-xs">Source data is shown in its own columns. Canonical fields can be edited here; label cells accept text and turn red when the value is not one of the accepted options. Typing a category name that does not exist yet creates it.</p>
+          <p className="text-muted-foreground text-xs">{showingConfirmed
+            ? 'These rows are already in a Finance table. Editing a label or a data field marks the row for reallocation — its entry is rewritten, and every Finance screen follows, only when you confirm below.'
+            : 'Source data is shown in its own columns. Canonical fields can be edited here; label cells accept text and turn red when the value is not one of the accepted options. Typing a category name that does not exist yet creates it.'}</p>
           <div className="min-h-0 flex-1 overflow-auto rounded border">
-            <table className="min-w-max text-left text-xs"><thead className="bg-muted/30"><tr><th className="sticky left-0 z-10 bg-muted/30 p-2">Source</th>{rawColumns(rows).map((column) => <th key={`raw-${column}`} className="min-w-36 p-2">{column}</th>)}{DATA_FIELDS.map((field) => <th key={field} className="min-w-32 p-2">{field}</th>)}{LABEL_FIELDS.map((field) => <th key={field} className="min-w-40 p-2 align-top">{field}<p className="text-muted-foreground font-normal">{LABEL_OPTIONS[field]}</p></th>)}<th className="min-w-44 p-2">Status</th></tr></thead><tbody>{rows.map((row) => <WorklistRow key={row.id} row={row} sourceName={sourceStore.items.find((source) => source.id === row.sourceId)?.originalFilename ?? 'Existing data'} categories={categories} tableDefs={tableDefs} rawColumns={rawColumns(rows)} onChange={updateWorklist} ensureCategory={ensureCategory} />)}{rows.length === 0 && <tr><td colSpan={1 + DATA_FIELDS.length + LABEL_FIELDS.length} className="text-muted-foreground p-4 text-center">No staged data yet.</td></tr>}</tbody></table>
+            <table className="min-w-max text-left text-xs"><thead className="bg-muted/30"><tr><th className="sticky left-0 z-10 bg-muted/30 p-2">Source</th>{rawColumns(visibleRows).map((column) => <th key={`raw-${column}`} className="min-w-36 p-2">{column}</th>)}{DATA_FIELDS.map((field) => <th key={field} className="min-w-32 p-2">{field}</th>)}{LABEL_FIELDS.map((field) => <th key={field} className="min-w-40 p-2 align-top">{field}<p className="text-muted-foreground font-normal">{LABEL_OPTIONS[field]}</p></th>)}<th className="min-w-44 p-2">Status</th></tr></thead><tbody>{visibleRows.map((row) => <WorklistRow key={row.id} row={row} sourceName={sourceStore.items.find((source) => source.id === row.sourceId)?.originalFilename ?? 'Existing data'} categories={categories} tableDefs={tableDefs} rawColumns={rawColumns(visibleRows)} onChange={updateWorklist} ensureCategory={ensureCategory} />)}{visibleRows.length === 0 && <tr><td colSpan={1 + DATA_FIELDS.length + LABEL_FIELDS.length} className="text-muted-foreground p-4 text-center">{showingConfirmed ? 'Nothing has been confirmed yet.' : 'No staged data yet.'}</td></tr>}</tbody></table>
           </div>
           <div className="flex items-center gap-2 text-xs"><Input value={worklistFieldName} onChange={(event) => setWorklistFieldName(event.target.value)} placeholder="Add blank canonical field, e.g. quantity" className="h-7 w-60 text-xs" /><Button type="button" size="xs" variant="outline" onClick={() => void addWorklistField()} disabled={!worklistFieldName.trim()}><Plus className="size-3" />Add blank data field</Button></div>
         </section>
@@ -256,7 +293,11 @@ export function IngestionPanel() {
 
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-dashed p-3" onDragOver={(event) => event.preventDefault()} onDrop={handleDrop}>
         <div className="text-xs"><p className="font-medium">Import data</p><p className="text-muted-foreground">Drop CSV files here, or an exported .db — a database is split into one dataset per table it contains.</p></div>
-        <div className="flex gap-2"><input ref={fileInput} type="file" accept=".csv,text/csv,.db,.pmdata,application/vnd.sqlite3" multiple className="hidden" onChange={(event: ChangeEvent<HTMLInputElement>) => void handleFiles(event.target.files)} /><Button type="button" variant="outline" size="sm" onClick={() => fileInput.current?.click()}><FilePlus2 className="size-3.5" />Import data</Button>{selectedSource ? <Button type="button" size="sm" disabled={!!validation?.errors.length} onClick={() => void saveAndStage()}><Upload className="size-3.5" />Add to imported unlabelled data</Button> : <Button type="button" size="sm" disabled={!rows.some((row) => row.status === 'ready')} onClick={() => void confirmPromotion()}><Check className="size-3.5" />Confirm and move ready rows</Button>}</div>
+        <div className="flex gap-2"><input ref={fileInput} type="file" accept=".csv,text/csv,.db,.pmdata,application/vnd.sqlite3" multiple className="hidden" onChange={(event: ChangeEvent<HTMLInputElement>) => void handleFiles(event.target.files)} /><Button type="button" variant="outline" size="sm" onClick={() => fileInput.current?.click()}><FilePlus2 className="size-3.5" />Import data</Button>{selectedSource
+            ? <Button type="button" size="sm" disabled={!!validation?.errors.length || selectedSource.legacy || selectedSource.originalColumns.length === 0} onClick={() => void saveAndStage()}><Upload className="size-3.5" />Add to imported unlabelled data</Button>
+            : showingConfirmed
+              ? <Button type="button" size="sm" disabled={reallocatable.length === 0} onClick={() => void confirmReallocation()}><Check className="size-3.5" />Confirm and reallocate rows</Button>
+              : <Button type="button" size="sm" disabled={!rows.some((row) => row.status === 'ready')} onClick={() => void confirmPromotion()}><Check className="size-3.5" />Confirm and move ready rows</Button>}</div>
       </div>
     </div>
   )
@@ -284,7 +325,7 @@ function WorklistRow({ row, sourceName, categories, tableDefs, rawColumns: colum
     const categoryId = field === 'category' && !parsed.labels.categoryId ? await ensureCategory(value) : parsed.labels.categoryId
     await onChange(row.id, { labels: { ...parsed.labels, ...(categoryId ? { categoryId } : {}) }, labelValues: draft, destinationTableId: parsed.destinationTableId ?? null })
   }
-  return <tr className="border-t align-top"><td className="sticky left-0 bg-background p-2 font-medium">{sourceName}</td>{columns.map((column) => <td key={column} className="max-w-52 truncate p-2" title={row.rawValues[column] ?? ''}>{row.rawValues[column] ?? ''}</td>)}{DATA_FIELDS.map((field) => <td key={field} className="p-1"><EditableCell value={displayDataValue(field, row.mappedValues[field])} onCommit={(value) => saveData(field, value)} /></td>)}{LABEL_FIELDS.map((field) => <td key={field} className="p-1"><EditableCell value={labelValue(row, field, categories, tableDefs)} invalid={labelFieldInvalid(row, field, categories, tableDefs)} onCommit={(value) => void saveLabel(field, value)} /></td>)}<td className="max-w-56 p-2">{row.status === 'ready' ? <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-300"><Check className="size-3" />Ready</span> : row.status}{row.validationErrors.length > 0 && <p className="mt-1 text-amber-600 dark:text-amber-300">{row.validationErrors[0]}</p>}</td></tr>
+  return <tr className="border-t align-top"><td className="sticky left-0 bg-background p-2 font-medium">{sourceName}</td>{columns.map((column) => <td key={column} className="max-w-52 truncate p-2" title={row.rawValues[column] ?? ''}>{row.rawValues[column] ?? ''}</td>)}{DATA_FIELDS.map((field) => <td key={field} className="p-1"><EditableCell value={displayDataValue(field, row.mappedValues[field])} onCommit={(value) => saveData(field, value)} /></td>)}{LABEL_FIELDS.map((field) => <td key={field} className="p-1"><EditableCell value={labelValue(row, field, categories, tableDefs)} invalid={labelFieldInvalid(row, field, categories, tableDefs)} onCommit={(value) => void saveLabel(field, value)} /></td>)}<td className="max-w-56 p-2">{row.hasPendingChange ? <span className="text-amber-600 dark:text-amber-300">Pending reallocation</span> : row.status === 'ready' ? <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-300"><Check className="size-3" />Ready</span> : row.status}{row.validationErrors.length > 0 && <p className="mt-1 text-amber-600 dark:text-amber-300">{row.validationErrors[0]}</p>}</td></tr>
 }
 
 function EditableCell({ value, invalid = false, onCommit }: { value: string; invalid?: boolean; onCommit: (value: string) => void }) {

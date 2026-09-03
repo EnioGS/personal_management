@@ -62,6 +62,11 @@ export const listIngestionDatasetsTool: ToolDefinition = {
     const active = rows.filter((row) => row.status !== 'promoted' && row.status !== 'reconciledExisting')
     return JSON.stringify({
       unlabelled: { count: active.length, ready: active.filter((row) => row.status === 'ready').length },
+      confirmed: {
+        count: rows.length - active.length,
+        pendingReallocation: rows.filter((row) => row.hasPendingChange).length,
+        note: 'Rows already in a Finance table. Relabelling one marks it for reallocation; the user alone confirms that, exactly as with promotion.',
+      },
       readTheseWith: 'read_ingestion_table without a sourceId, one page at a time',
       sources: sources.map((source) => summariseSource(source, rows)),
       // A destination table is required on every row, and an empty table is still a
@@ -74,15 +79,20 @@ export const listIngestionDatasetsTool: ToolDefinition = {
 
 export const readIngestionTableTool: ToolDefinition = {
   name: 'read_ingestion_table',
-  description: 'Reads a paged slice of the imported-unlabelled worklist or one uploaded source, including its original filename, raw values, mappings, labels, status and validation errors. Read-only. The result reports the total, so read ONE page (25-100 rows), act on it, and answer the user — never loop through an entire backlog before replying.',
-  parameters: { type: 'object', properties: { sourceId: { type: 'number', description: 'Uploaded source ID. Omit to read imported unlabelled rows.' }, offset: { type: 'number' }, limit: { type: 'number' } }, additionalProperties: false },
+  description: 'Reads a paged slice of the imported-unlabelled worklist, the confirmed rows, or one uploaded source — including original filename, raw values, mappings, labels, status and validation errors. Read-only. The result reports the total, so read ONE page (25-100 rows), act on it, and answer the user — never loop through an entire backlog before replying.',
+  parameters: { type: 'object', properties: { dataset: { type: 'string', enum: ['worklist', 'confirmed'], description: 'worklist (default) = rows waiting to be labelled; confirmed = rows already in a Finance table, which can still be relabelled for reallocation.' }, sourceId: { type: 'number', description: 'Uploaded source ID. Omit to read the chosen dataset across all sources.' }, offset: { type: 'number' }, limit: { type: 'number' } }, additionalProperties: false },
   execute: async (args) => {
     const offset = typeof args.offset === 'number' && args.offset >= 0 ? Math.floor(args.offset) : 0
     const limit = typeof args.limit === 'number' && args.limit > 0 ? Math.min(MAX_ROWS, Math.floor(args.limit)) : 25
     const sourceId = typeof args.sourceId === 'number' ? args.sourceId : undefined
     const stored = await ingestionRowsTable.toArray()
     const rows = stored.map((row) => row.data as IngestionRow)
-    const selected = stored.map((row) => ({ id: row.id, ...(row.data as IngestionRow) })).filter((row) => sourceId === undefined ? row.status !== 'promoted' && row.status !== 'reconciledExisting' : row.sourceId === sourceId)
+    const confirmedOnly = args.dataset === 'confirmed'
+    const isConfirmed = (row: IngestionRow) => row.status === 'promoted' || row.status === 'reconciledExisting'
+    const selected = stored.map((row) => ({ id: row.id, ...(row.data as IngestionRow) })).filter((row) => {
+      if (sourceId !== undefined && row.sourceId !== sourceId) return false
+      return confirmedOnly ? isConfirmed(row) : !isConfirmed(row)
+    })
     const source = sourceId === undefined ? undefined : await ingestionSourcesTable.get(sourceId)
     const mappings = sourceId === undefined ? [] : (await ingestionColumnMappingsTable.toArray()).filter((row) => (row.data as IngestionColumnMapping).sourceId === sourceId).map((row) => row.data)
     const page = selected.slice(offset, offset + limit)
@@ -128,7 +138,7 @@ export const addIngestionBlankColumnTool: ToolDefinition = {
 
 export const updateIngestionLabelsTool: ToolDefinition = {
   name: 'update_ingestion_labels',
-  description: `Sets or clears labels and the destination table for explicit imported rows. Read the rows first with read_ingestion_table, and read_ingestion_guide if you have not already, since every value below is closed except the category. financeDestination: ${labelValues(FINANCE_DESTINATIONS).join(' | ')}. flowRole: ${labelValues(FLOW_ROLES).join(' | ')}. settlementChannel: ${labelValues(SETTLEMENT_CHANNELS).join(' | ')}. spendingTreatment: ${labelValues(SPENDING_TREATMENTS).join(' | ')}. recurrence: ${labelValues(RECURRENCES).join(' | ')}. category is free text and a new name creates that category. Reports each row's readiness; this tool can never confirm or move rows into a Finance table — only the user can.`,
+  description: `Sets or clears labels and the destination table for explicit imported rows. Read the rows first with read_ingestion_table, and read_ingestion_guide if you have not already, since every value below is closed except the category. financeDestination: ${labelValues(FINANCE_DESTINATIONS).join(' | ')}. flowRole: ${labelValues(FLOW_ROLES).join(' | ')}. settlementChannel: ${labelValues(SETTLEMENT_CHANNELS).join(' | ')}. spendingTreatment: ${labelValues(SPENDING_TREATMENTS).join(' | ')}. recurrence: ${labelValues(RECURRENCES).join(' | ')}. category is free text and a new name creates that category. It also relabels a row that is already confirmed: the change is held as a pending reallocation and the live entry keeps its current meaning until the user confirms it. Reports each row's readiness; this tool can never confirm, promote or reallocate — only the user can.`,
   parameters: {
     type: 'object',
     properties: {
@@ -210,6 +220,7 @@ export const labelIngestionRowsByMatchTool: ToolDefinition = {
       caseSensitive: { type: 'boolean' },
       sourceId: { type: 'number', description: 'Restrict to one dataset.' },
       apply: { type: 'boolean', description: 'false (default) previews the match without changing anything; true applies the labels.' },
+      includeConfirmed: { type: 'boolean', description: 'false (default) matches only rows waiting to be labelled; true also relabels rows already in a Finance table, marking them for the user to reallocate.' },
       labels: { type: 'object', properties: LABEL_PROPERTIES, additionalProperties: false },
     },
     required: ['contains', 'labels'],
@@ -226,7 +237,8 @@ export const labelIngestionRowsByMatchTool: ToolDefinition = {
     const stored = await ingestionRowsTable.toArray()
     const matches = stored.filter((row) => {
       const data = row.data as IngestionRow
-      if (data.status === 'promoted' || data.status === 'reconciledExisting') return false
+      const confirmed = data.status === 'promoted' || data.status === 'reconciledExisting'
+      if (confirmed && args.includeConfirmed !== true) return false
       if (typeof args.sourceId === 'number' && data.sourceId !== args.sourceId) return false
       const text = searchableText(data, field)
       return (caseSensitive ? text : text.toLowerCase()).includes(needle)
@@ -238,7 +250,7 @@ export const labelIngestionRowsByMatchTool: ToolDefinition = {
     }
 
     const categoryId = typeof update.category === 'string' ? await ensureCategoryByName(update.category) : undefined
-    const result = { applied: true, matched: matches.length, ready: 0, invalid: 0, unchanged: 0, errors: [] as string[] }
+    const result = { applied: true, matched: matches.length, ready: 0, invalid: 0, pendingReallocation: 0, unchanged: 0, errors: [] as string[] }
     for (const row of matches) {
       const current = row.data as IngestionRow
       const labels: IngestionRowLabels = {
@@ -253,7 +265,8 @@ export const labelIngestionRowsByMatchTool: ToolDefinition = {
       const destinationTableId = typeof update.destinationTableId === 'number' ? update.destinationTableId : current.destinationTableId
       try {
         const next = await updateIngestionRowLabels(row.id, labels, destinationTableId, 'assistant')
-        if (next.status === 'ready') result.ready += 1
+        if (next.hasPendingChange) result.pendingReallocation += 1
+        else if (next.status === 'ready') result.ready += 1
         else if (next.status === 'invalid') result.invalid += 1
         else result.unchanged += 1
       } catch (error) {

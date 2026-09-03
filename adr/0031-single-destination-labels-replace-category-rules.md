@@ -50,6 +50,11 @@ reached dashboards — the exact outcome adr/0030 existed to prevent.
   transfer is not summed as if it had left.
 - **Every analytics surface reads labels**, including the Investments section,
   which previously joined entries to tables directly and so ignored the gate.
+- **A confirmed row can be relabelled and reallocated.** Its entry is rewritten in
+  place, keeping the entry id so budgets, positions and provenance links survive,
+  and its label sidecar is rewritten with it. This is the third moment stored data
+  changes shape, so it is a user click like staging and promotion; the assistant may
+  prepare the edit, which waits as a pending reallocation, but cannot apply it.
 - **The assistant gets no tool for either data-moving step.** Staging a mapped
   source and promoting labelled rows are the two moments data changes shape;
   both stay user-only. Its ingestion knowledge lives in one retrievable guide
