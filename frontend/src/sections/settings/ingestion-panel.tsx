@@ -239,23 +239,19 @@ export function IngestionPanel() {
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-3 overflow-auto p-4">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
           <h2 className="text-sm font-medium">Data ingestion centre</h2>
-          <p className="text-muted-foreground text-xs">Map raw source columns, then review and label staged rows before they can enter a Finance table.</p>
+          <p className="text-muted-foreground truncate text-xs">Map raw source columns, then review and label staged rows before they can enter a Finance table.</p>
         </div>
         {/* The two worklists are not source files — they are the stages every file
             passes through — so they are their own buttons, and the dropdown keeps only
             the uploaded sources still waiting to be mapped. */}
-        <div className="flex flex-wrap items-center gap-2">
-          <Button type="button" size="sm" variant={selected === UNLABELLED_DATASET ? 'default' : 'outline'} onClick={() => selectDataset(UNLABELLED_DATASET)}>
-            Imported, unlabelled ({rows.length}; {rows.filter((row) => row.status === 'ready').length} ready)
-          </Button>
-          <Button type="button" size="sm" variant={selected === CONFIRMED_DATASET ? 'default' : 'outline'} onClick={() => selectDataset(CONFIRMED_DATASET)}>
-            Confirmed ({confirmedRows.length}; {reallocatable.length} to reallocate)
-          </Button>
+        <div className="flex shrink-0 items-center gap-2">
+          <Button type="button" size="sm" variant={selected === CONFIRMED_DATASET ? 'default' : 'outline'} onClick={() => selectDataset(CONFIRMED_DATASET)}>Confirmed</Button>
+          <Button type="button" size="sm" variant={selected === UNLABELLED_DATASET ? 'default' : 'outline'} onClick={() => selectDataset(UNLABELLED_DATASET)}>Imported, unlabelled</Button>
           <Select value={selectedSource ? String(selectedSource.id) : ''} onValueChange={selectDataset}>
-            <SelectTrigger className="w-72"><SelectValue placeholder={`Source files (${sourceStore.items.length})`} /></SelectTrigger>
+            <SelectTrigger className="w-56"><SelectValue placeholder={`Source files (${sourceStore.items.length})`} /></SelectTrigger>
             <SelectContent>
               {sourceStore.items.map((source) => <SelectItem key={source.id} value={String(source.id)}>{source.originalFilename} · {source.legacy ? `${rowStore.items.filter((row) => row.sourceId === source.id).length} queued rows` : `${source.rowCount} rows`}</SelectItem>)}
               {sourceStore.items.length === 0 && <SelectItem value="__none__" disabled>No source files imported yet</SelectItem>}
@@ -302,9 +298,17 @@ export function IngestionPanel() {
             ? 'These rows are already in a Finance table. Editing a label or a data field marks the row for reallocation — its entry is rewritten, and every Finance screen follows, only when you confirm below.'
             : 'Source data is shown in its own columns. Canonical fields can be edited here; label cells accept text and turn red when the value is not one of the accepted options. Typing a category name that does not exist yet creates it.'}</p>
           <div className="min-h-0 flex-1 overflow-auto rounded border">
-            <table className="min-w-max text-left text-xs"><thead className="bg-muted/30"><tr><th className="bg-muted/30 sticky left-0 z-20 w-40 min-w-40 p-2">Source</th><th className="bg-muted/30 sticky left-40 z-20 w-44 min-w-44 border-r p-2">Status</th>{rawColumns(visibleRows).map((column) => <th key={`raw-${column}`} className="min-w-36 p-2">{column}</th>)}{DATA_FIELDS.map((field) => <th key={field} className="min-w-32 p-2">{field}</th>)}{LABEL_FIELDS.map((field) => <th key={field} className="min-w-40 p-2 align-top">{field}<p className="text-muted-foreground font-normal">{LABEL_OPTIONS[field]}</p></th>)}</tr></thead><tbody>{visibleRows.map((row) => <WorklistRow key={row.id} row={row} sourceName={sourceStore.items.find((source) => source.id === row.sourceId)?.originalFilename ?? 'Existing data'} categories={categories} tableDefs={tableDefs} rawColumns={rawColumns(visibleRows)} onChange={updateWorklist} ensureCategory={ensureCategory} />)}{visibleRows.length === 0 && <tr><td colSpan={2 + DATA_FIELDS.length + LABEL_FIELDS.length} className="text-muted-foreground p-4 text-center">{showingConfirmed ? 'Nothing has been confirmed yet.' : 'No staged data yet.'}</td></tr>}</tbody></table>
+            <table className="min-w-max text-left text-xs"><thead className="bg-muted"><tr><th className="bg-muted sticky left-0 z-30 w-40 min-w-40 p-2">Source</th><th className="bg-muted sticky left-40 z-30 w-44 min-w-44 border-r p-2">Status</th>{rawColumns(visibleRows).map((column) => <th key={`raw-${column}`} className="min-w-36 p-2">{column}</th>)}{DATA_FIELDS.map((field) => <th key={field} className="min-w-32 p-2">{field}</th>)}{LABEL_FIELDS.map((field) => <th key={field} className="min-w-40 p-2 align-top">{field}<p className="text-muted-foreground font-normal">{LABEL_OPTIONS[field]}</p></th>)}</tr></thead><tbody>{visibleRows.map((row) => <WorklistRow key={row.id} row={row} sourceName={sourceStore.items.find((source) => source.id === row.sourceId)?.originalFilename ?? 'Existing data'} categories={categories} tableDefs={tableDefs} rawColumns={rawColumns(visibleRows)} onChange={updateWorklist} ensureCategory={ensureCategory} />)}{visibleRows.length === 0 && <tr><td colSpan={2 + DATA_FIELDS.length + LABEL_FIELDS.length} className="text-muted-foreground p-4 text-center">{showingConfirmed ? 'Nothing has been confirmed yet.' : 'No staged data yet.'}</td></tr>}</tbody></table>
           </div>
-          <div className="flex items-center gap-2 text-xs"><Input value={worklistFieldName} onChange={(event) => setWorklistFieldName(event.target.value)} placeholder="Add blank canonical field, e.g. quantity" className="h-7 w-60 text-xs" /><Button type="button" size="xs" variant="outline" onClick={() => void addWorklistField()} disabled={!worklistFieldName.trim()}><Plus className="size-3" />Add blank data field</Button></div>
+          <div className="flex items-center justify-between gap-2 text-xs">
+            <div className="flex items-center gap-2">
+              <Input value={worklistFieldName} onChange={(event) => setWorklistFieldName(event.target.value)} placeholder="Add blank canonical field, e.g. quantity" className="h-7 w-60 text-xs" />
+              <Button type="button" size="xs" variant="outline" onClick={() => void addWorklistField()} disabled={!worklistFieldName.trim()}><Plus className="size-3" />Add blank data field</Button>
+            </div>
+            <p className="text-muted-foreground shrink-0">{showingConfirmed
+              ? `${confirmedRows.length} confirmed row(s) · ${reallocatable.length} to reallocate`
+              : `${rows.length} row(s) · ${rows.filter((row) => row.status === 'ready').length} ready`}</p>
+          </div>
         </section>
       )}
 
