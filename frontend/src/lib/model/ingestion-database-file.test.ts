@@ -7,7 +7,7 @@ import type { IngestionSource } from './types'
 
 const emptyTables = {
   accounts: [], cards: [], tableDefs: [], categories: [], entries: [], budgets: [], allocationTargets: [],
-  ingestionSources: [], ingestionColumnMappings: [], ingestionRows: [], entryLabels: [], ingestionAuditEvents: [], labelRules: [],
+  ingestionSources: [], ingestionColumnMappings: [], ingestionRows: [], entryLabels: [], ingestionAuditEvents: [], labelRules: [], preferences: [],
   notes: [], assistantPrompts: [], assistantConfig: [],
 } as DataExportFile['tables']
 

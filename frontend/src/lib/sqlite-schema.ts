@@ -154,6 +154,13 @@ export const SQLITE_SCHEMAS: Record<DataTableKey, SqliteTableSchema> = {
       { column: 'source_ingestion_row_id', key: 'sourceIngestionRowId', type: 'integer' },
     ],
   },
+  preferences: {
+    sqlName: 'preferences',
+    columns: [
+      { column: 'key', key: 'key', type: 'text' },
+      { column: 'value', key: 'value', type: 'text' },
+    ],
+  },
   labelRules: {
     sqlName: 'label_rules',
     columns: [

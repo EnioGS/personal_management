@@ -20,7 +20,7 @@ import {
   exportData,
   importData,
   parseDataExportFile,
-  wipeAllData,
+  clearStoredData,
 } from '@/lib/data-file'
 import { saveBinaryFile } from '@/lib/file-io'
 import { seedDefaultTables } from '@/lib/model/seed-tables'
@@ -100,9 +100,9 @@ export function DataPanel() {
   }
 
   async function handleWipe() {
-    await wipeAllData()
-    // The tables every screen needs come straight back: clearing the data means the
-    // rows, not the shape of the app.
+    // Clearing the data means the rows. The accounts, cards and tables a person set up
+    // stay, and the seed only fills in a table set that is somehow missing entirely.
+    await clearStoredData()
     await seedDefaultTables()
     await refreshCount()
   }

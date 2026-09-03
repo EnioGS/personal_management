@@ -1,8 +1,12 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { createLocalTable } from '@/lib/local-store/create-local-table'
+import { assistantConfigTable } from '@/lib/assistant-config-db'
+import { assistantPromptsTable } from '@/lib/assistant-prompts-db'
 import {
+  accountsTable,
   categoriesTable,
   entriesTable,
+  labelRulesTable,
   ingestionColumnMappingsTable,
   ingestionRowsTable,
   ingestionSourcesTable,
@@ -15,6 +19,7 @@ import {
   exportData,
   hasAnyData,
   importData,
+  clearStoredData,
   parseDataExportFile,
   wipeAllData,
   type DataExportFile,
@@ -40,7 +45,7 @@ function emptyTables(): DataExportFile['tables'] {
     ingestionColumnMappings: [],
     ingestionRows: [],
     entryLabels: [],
-    ingestionAuditEvents: [], labelRules: [],
+    ingestionAuditEvents: [], labelRules: [], preferences: [],
     notes: [],
     assistantPrompts: [],
     assistantConfig: [],
@@ -277,5 +282,46 @@ describe('data-file', () => {
     expect(parsed.version).toBe(DATA_EXPORT_VERSION)
     expect(parsed.tables.ingestionSources).toEqual([])
     expect(parsed.tables.entryLabels).toEqual([])
+  })
+})
+
+describe('what an export carries, and what clearing keeps', () => {
+  beforeEach(async () => { await wipeAllData() })
+
+  it('takes the whole setup with it — connections, prompts, rules and preferences included', async () => {
+    await assistantConfigTable.add({ createdAt: 1, data: { provider: 'openrouter', apiKey: 'sk-or-secret', model: 'openai/gpt-5.6-luna', isActive: true } })
+    await assistantPromptsTable.add({ createdAt: 1, data: { key: 'system', content: 'Be brief.' } })
+    await labelRulesTable.add({ createdAt: 1, data: { field: 'description', contains: 'fatura', labels: { flowRole: 'outflow' }, rationale: 'Paying the card bill.', createdBy: 'user', createdAt: 1 } })
+    localStorage.setItem('theme', 'dark')
+    localStorage.setItem('locale', 'en')
+
+    const exported = await exportData()
+
+    expect(exported.tables.assistantConfig).toHaveLength(1)
+    expect(exported.tables.assistantPrompts).toHaveLength(1)
+    expect(exported.tables.labelRules).toHaveLength(1)
+    expect(exported.tables.preferences.map((row) => row.data)).toEqual([{ key: 'theme', value: 'dark' }, { key: 'locale', value: 'en' }])
+
+    localStorage.setItem('theme', 'light')
+    await wipeAllData()
+    await importData(exported)
+
+    expect((await assistantConfigTable.toArray())[0].data).toMatchObject({ apiKey: 'sk-or-secret' })
+    expect((await labelRulesTable.toArray())[0].data).toMatchObject({ contains: 'fatura' })
+    expect(localStorage.getItem('theme')).toBe('dark')
+  })
+
+  it('keeps the accounts, cards and tables when the data is cleared', async () => {
+    const accountId = await accountsTable.add({ createdAt: 1, data: { name: 'Conta principal', kind: 'checking' } })
+    const tableId = await tableDefsTable.add({ createdAt: 1, data: { name: 'Extrato bancário', kind: 'bankLedger', accountId } })
+    await entriesTable.add({ createdAt: 2, data: { tableId, date: 1, amount: 10 } })
+    await ingestionRowsTable.add({ createdAt: 2, data: { sourceId: 1, sourceRowIndex: 0, sourceRowFingerprint: 'r', rawValues: {}, mappedValues: {}, labels: {}, status: 'unlabelled', validationErrors: [] } })
+
+    await clearStoredData()
+
+    expect(await tableDefsTable.count()).toBe(1)
+    expect(await accountsTable.count()).toBe(1)
+    expect(await entriesTable.count()).toBe(0)
+    expect(await ingestionRowsTable.count()).toBe(0)
   })
 })

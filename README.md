@@ -142,6 +142,12 @@ Two things it optimizes for:
   list from `lib/tools/writable-tables.ts` fresh on every call rather than a
   fixed array, so a table created in the UI mid-conversation is visible to
   the very next tool call.
+- One export carries a whole setup, not only its rows: accounts, cards, tables,
+  entries, labels, ingestion sources and staged rows, standing rules, notes,
+  budgets, the assistant's prompts and its API keys, and the interface
+  preferences (theme, language) that live outside Dexie. Clearing the data is
+  narrower on purpose — it keeps the accounts, cards and tables, since the table
+  set is fixed and an account is configuration rather than a transaction.
 - Tables, accounts, cards and the category vocabulary are user data, not
   compile-time constants (`lib/model/`, see adr/0022) — a `TableKind` fixes
   a table's columns, but the number of tables, accounts and cards is
