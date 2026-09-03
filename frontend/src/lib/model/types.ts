@@ -141,6 +141,7 @@ export type IngestionTargetField =
   | 'quantity'
   | 'price'
   | 'investmentType'
+  | 'investmentClass'
   | 'note'
   | 'destination'
   | 'sections'

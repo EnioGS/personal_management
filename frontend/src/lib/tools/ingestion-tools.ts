@@ -7,13 +7,14 @@ import { discardIngestionRows, updateIngestionRowLabels, updateIngestionRowWorkl
 import { ingestionFieldContext, INGESTION_QUERY_FIELDS, resolveIngestionField } from '@/lib/model/ingestion-fields'
 import { groupRows, queryRows, type RowFilter, type RowQuery } from '@/lib/model/row-query'
 import { findDuplicateMatches, findDuplicateMatchesWithin, normalizeAmount, normalizeDate, normalizeText, type ComparableRow } from '@/lib/model/ingestion-duplicates'
+import { buildDuplicateCorpus, isDuplicateOfStored, originalValues } from '@/lib/model/source-row-marks'
 import { FLOW_ROLES, labelValues, matchLabelValue, RECURRENCES, SETTLEMENT_CHANNELS, SPENDING_TREATMENTS } from '@/lib/model/label-vocabulary'
 import { parsePlacementLabels, resolveSectionLabel, resolveSubsectionLabel } from '@/lib/model/label-catalogue'
 import { buildLabelCatalogue } from '@/lib/label-catalogue-source'
 import { assistantPromptsTable } from '@/lib/assistant-prompts-db'
 import { categoriesTable, entriesTable, ingestionAuditEventsTable, ingestionColumnMappingsTable, ingestionRowsTable, ingestionSourcesTable, tableDefsTable } from '@/lib/model/model-db'
 import type { AssistantPrompt } from '@/lib/assistant-prompts'
-import type { Category, IngestionAuditEvent, IngestionColumnMapping, IngestionRow, IngestionRowLabels, IngestionSource, IngestionTargetField, TableDef } from '@/lib/model/types'
+import type { Category, Entry, IngestionAuditEvent, IngestionColumnMapping, IngestionRow, IngestionRowLabels, IngestionSource, IngestionTargetField, TableDef } from '@/lib/model/types'
 import type { ToolDefinition } from './types'
 
 const MAX_ROWS = 100
@@ -48,7 +49,7 @@ function summariseSource(stored: { id: number; data: unknown }, rows: IngestionR
     },
   }
 }
-const TARGET_FIELDS: IngestionTargetField[] = ['date', 'amount', 'description', 'rawCategory', 'direction', 'asset', 'investmentType', 'quantity', 'price', 'note', 'destination', 'sections', 'subsections', 'flowRole', 'settlementChannel', 'spendingTreatment', 'categoryId', 'recurrence', 'destinationTableId']
+const TARGET_FIELDS: IngestionTargetField[] = ['date', 'amount', 'description', 'rawCategory', 'direction', 'asset', 'investmentType', 'quantity', 'price', 'investmentClass', 'note', 'destination', 'sections', 'subsections', 'flowRole', 'settlementChannel', 'spendingTreatment', 'categoryId', 'recurrence', 'destinationTableId']
 
 /** Mapping tools act on an uploaded file; the migration's synthetic source has none. */
 async function rejectIfLegacy(sourceId: number): Promise<string | null> {
@@ -534,18 +535,42 @@ export const findIngestionDuplicatesTool: ToolDefinition = {
       for (const stored of staged) excluded.add(stored.id)
       const file = readSourceFile(source)
       if (file) {
-        // Before staging there are no row ids, so a file row is named by its position.
-        const columnFor = (names: string[]) => file.columns.find((column) => names.some((name) => normalizeText(column).includes(name)))
-        const dateColumn = columnFor(['date', 'data'])
-        const amountColumn = columnFor(['amount', 'valor', 'value'])
-        const descriptionColumn = columnFor(['description', 'descricao', 'historico', 'estabelecimento', 'title'])
-        file.rows.slice(offset, offset + limit).forEach((row, index) => {
-          candidates.push({
-            key: `file-row:${offset + index}`,
-            date: normalizeDate(dateColumn ? row[dateColumn] : undefined),
-            amount: normalizeAmount(amountColumn ? row[amountColumn] : undefined),
-            description: normalizeText(descriptionColumn ? row[descriptionColumn] : ''),
-          })
+        // A file's own rows are compared whole — every column it actually has, against
+        // every column the other side has — rather than through three guessed fields.
+        // Guessing which column is the description fails on a broker export whose
+        // narration is called "observacao", and downgrades an obvious repeat to a maybe.
+        const thisSource = source.data as IngestionSource
+        const corpus = buildDuplicateCorpus(
+          storedRows.map((row) => row.data as IngestionRow).filter((row) => row.sourceId !== sourceId),
+          (await entriesTable.toArray()).map((row) => row.data as Entry).filter((entry) => !(entry as { deleted?: boolean }).deleted),
+          (await ingestionSourcesTable.toArray())
+            .filter((row) => row.id !== sourceId)
+            .flatMap((row) => {
+              const other = row.data as IngestionSource
+              if (!other.rawCsv) return []
+              try { return [{ originalColumns: other.originalColumns, rows: parseIngestionCsv(other.rawCsv).rows }] } catch { return [] }
+            }),
+        )
+        const page = file.rows.slice(offset, offset + limit)
+        const wholeRowMatches = page.map((row, index) => ({
+          rowIndex: offset + index,
+          values: originalValues(row, thisSource.originalColumns),
+          duplicate: isDuplicateOfStored(originalValues(row, thisSource.originalColumns), corpus),
+        }))
+        const withinFile = page.map((row, index) => ({
+          rowIndex: offset + index,
+          duplicate: isDuplicateOfStored(
+            originalValues(row, thisSource.originalColumns),
+            file.rows.filter((_other, otherIndex) => otherIndex !== offset + index).map((other) => originalValues(other, thisSource.originalColumns)),
+          ),
+        }))
+        return JSON.stringify({
+          checked: page.length,
+          offset,
+          mark: 'nothing was changed; use mark_source_rows to act on this',
+          duplicatesOfStoredData: wholeRowMatches.filter((row) => row.duplicate).map((row) => ({ rowIndex: row.rowIndex, values: row.values })),
+          repeatedWithinThisFile: withinFile.filter((row) => row.duplicate).map((row) => row.rowIndex),
+          note: 'A row counts as a duplicate only when every field both rows have agrees; columns this app added are not evidence. Repeats within one file can be genuine — two identical charges in a day happen — so ask before discarding one.',
         })
       } else {
         for (const stored of staged.slice(offset, offset + limit)) {

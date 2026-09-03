@@ -55,3 +55,27 @@ describe('marking a file against everything stored', () => {
     expect(marks).toEqual({ '0': 'eliminate' })
   })
 })
+
+describe('files dropped together', () => {
+  const august = { originalColumns: ['Data', 'Descrição', 'Valor'] as const, rows: [
+    { Data: '22/08/2026', 'Descrição': 'Pix - JOAO P ALMEIDA', Valor: '-75.00' },
+    { Data: '27/08/2026', 'Descrição': 'Rendimento poupança', Valor: '18.44' },
+  ] }
+  const september = { ...source, originalColumns: ['Data', 'Descrição', 'Valor'] }
+  const septemberRows = [
+    { Data: '22/08/2026', 'Descrição': 'Pix - JOAO P ALMEIDA', Valor: '-75.00' },
+    { Data: '01/09/2026', 'Descrição': 'Salário', Valor: '7450.00' },
+  ]
+
+  it('flags the rows a second statement repeats from the first, before either is staged', () => {
+    const marks = markDuplicateSourceRows(september, septemberRows, [], [], {}, [august])
+
+    expect(marks).toEqual({ '0': 'duplicate' })
+  })
+
+  it('finds nothing when the files do not overlap', () => {
+    const marks = markDuplicateSourceRows(september, septemberRows.slice(1), [], [], {}, [august])
+
+    expect(marks).toEqual({})
+  })
+})

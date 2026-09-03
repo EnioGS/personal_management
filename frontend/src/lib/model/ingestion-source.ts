@@ -112,8 +112,9 @@ export async function createIngestionSource(originalFilename: string, rawCsv: st
     createdAt: importedAt,
     data: { event: 'sourceUploaded', actor: 'user', sourceId, details: { originalFilename, rowCount: parsed.rows.length } },
   })
-  // Duplicates are found when the file arrives, not when someone thinks to ask.
-  await rescanSourceRowDuplicates(sourceId)
+  // Duplicates are found when the file arrives, not when someone thinks to ask — and
+  // a new file can reveal one in a file uploaded before it, so every source is rescanned.
+  for (const row of await ingestionSourcesTable.toArray()) await rescanSourceRowDuplicates(row.id)
   return sourceId
 }
 
@@ -362,7 +363,20 @@ export async function rescanSourceRowDuplicates(sourceId: number): Promise<Inges
   const parsed = parseIngestionCsv(source.rawCsv)
   const storedRows = (await ingestionRowsTable.toArray()).map((row) => row.data as IngestionRow)
   const entries = (await entriesTable.toArray()).map((row) => row.data as Entry).filter((entry) => !entry.deleted)
-  const rowMarks = markDuplicateSourceRows(source, parsed.rows, storedRows, entries, source.rowMarks ?? {})
+  // Files dropped together overlap with each other far more often than with what is
+  // already stored, so the other uploads are part of what this one is checked against.
+  const otherFiles = (await ingestionSourcesTable.toArray())
+    .filter((row) => row.id !== sourceId)
+    .map((row) => sourceData(row))
+    .flatMap((other) => {
+      if (!other.rawCsv) return []
+      try {
+        return [{ originalColumns: other.originalColumns, rows: parseIngestionCsv(other.rawCsv).rows }]
+      } catch {
+        return []
+      }
+    })
+  const rowMarks = markDuplicateSourceRows(source, parsed.rows, storedRows, entries, source.rowMarks ?? {}, otherFiles)
   const next = { ...source, rowMarks }
   await ingestionSourcesTable.update(sourceId, { data: next })
   return next

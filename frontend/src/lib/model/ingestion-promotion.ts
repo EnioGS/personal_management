@@ -20,6 +20,7 @@ const MAPPED_FIELD_FOR_ENTRY_FIELD: Record<string, string> = {
   amount: 'amount',
   asset: 'asset',
   type: 'investmentType',
+  investmentClass: 'investmentClass',
   quantity: 'quantity',
   price: 'price',
   note: 'note',

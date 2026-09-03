@@ -17,6 +17,7 @@ const TARGET_FOR_ENTRY_COLUMN: Record<string, IngestionTargetField> = {
   amount: 'amount',
   asset: 'asset',
   type: 'investmentType',
+  investmentClass: 'investmentClass',
   quantity: 'quantity',
   price: 'price',
   note: 'note',

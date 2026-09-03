@@ -40,7 +40,7 @@ import type { StoredRow } from '@/lib/local-store/create-local-table'
 import type { IngestionRow } from '@/lib/model/types'
 
 const TARGET_FIELDS: IngestionTargetField[] = [
-  'date', 'amount', 'description', 'rawCategory', 'direction', 'asset', 'investmentType', 'quantity', 'price', 'note', 'destination',
+  'date', 'amount', 'description', 'rawCategory', 'direction', 'asset', 'investmentType', 'quantity', 'price', 'investmentClass', 'note', 'destination',
   'sections', 'subsections', 'flowRole', 'settlementChannel', 'spendingTreatment', 'categoryId', 'recurrence', 'destinationTableId',
 ]
 

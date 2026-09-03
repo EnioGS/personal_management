@@ -15,7 +15,7 @@ import { wipeAllData } from '@/lib/data-file'
 import type { IngestionTargetField } from './types'
 
 const RAW_CSV = 'Date,Description,Amount\n2026-01-01,Coffee,10\n2026-01-02,Market,20'
-const SUPPLEMENTAL_FIELDS: IngestionTargetField[] = ['direction', 'rawCategory', 'asset', 'investmentType', 'quantity', 'price', 'note', 'destination']
+const SUPPLEMENTAL_FIELDS: IngestionTargetField[] = ['direction', 'rawCategory', 'asset', 'investmentType', 'investmentClass', 'quantity', 'price', 'note', 'destination']
 
 describe('ingestion source staging', () => {
   beforeEach(async () => {

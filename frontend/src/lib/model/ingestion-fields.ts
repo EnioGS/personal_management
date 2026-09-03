@@ -9,7 +9,7 @@ import type { IngestionRow, TableDef } from './types'
  * `raw.<column>` and `mapped.<field>` address anything this list does not name.
  */
 export const INGESTION_QUERY_FIELDS = [
-  'date', 'amount', 'description', 'rawCategory', 'note', 'asset', 'quantity', 'price', 'investmentType', 'direction', 'destination',
+  'date', 'amount', 'description', 'rawCategory', 'note', 'asset', 'quantity', 'price', 'investmentType', 'investmentClass', 'direction', 'destination',
   'status', 'source', 'destinationTable', 'discardReason',
   'sections', 'subsections', 'flowRole', 'settlementChannel', 'spendingTreatment', 'recurrence', 'category',
 ] as const

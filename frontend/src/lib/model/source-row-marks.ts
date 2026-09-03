@@ -52,9 +52,30 @@ export function isDuplicateOfStored(candidate: Record<string, string>, stored: R
 }
 
 /**
+ * Everything a new file's rows could already be a copy of.
+ *
+ * Including *other uploaded files* matters more than it sounds: statements are
+ * exported in overlapping periods and dropped in together, so the copy a person most
+ * wants caught is usually sitting in the file beside this one — not yet staged, not
+ * yet in any table, and therefore invisible to a corpus built only from stored data.
+ */
+export function buildDuplicateCorpus(
+  storedRows: IngestionRow[],
+  entries: Entry[],
+  otherFiles: { originalColumns: readonly string[]; rows: Record<string, string>[] }[] = [],
+): Record<string, string>[] {
+  return [
+    ...storedRows.map((row) => storedValues(row.rawValues)),
+    ...entries.map((entry) => storedValues(Object.fromEntries(Object.entries(entry).filter(([key]) => key !== 'tableId' && key !== 'deleted').map(([key, value]) => [key, String(value ?? '')])))),
+    ...otherFiles.flatMap((file) => file.rows.map((row) => originalValues(row, file.originalColumns))),
+  ]
+}
+
+/**
  * Marks every row of a parsed file that already exists elsewhere in the data — in
- * another source, in the worklist, in the confirmed rows, or in a finance table.
- * Rows already marked keep their mark: a decision to eliminate outranks a fresh scan.
+ * another uploaded file, in the worklist, in the confirmed rows, or in a finance
+ * table. Rows already marked keep their mark: a decision to eliminate outranks a
+ * fresh scan.
  */
 export function markDuplicateSourceRows(
   source: IngestionSource,
@@ -62,11 +83,9 @@ export function markDuplicateSourceRows(
   storedRows: IngestionRow[],
   entries: Entry[],
   existing: SourceRowMarks = {},
+  otherFiles: { originalColumns: readonly string[]; rows: Record<string, string>[] }[] = [],
 ): SourceRowMarks {
-  const corpus = [
-    ...storedRows.map((row) => storedValues(row.rawValues)),
-    ...entries.map((entry) => storedValues(Object.fromEntries(Object.entries(entry).filter(([key]) => key !== 'tableId' && key !== 'deleted').map(([key, value]) => [key, String(value ?? '')])))),
-  ]
+  const corpus = buildDuplicateCorpus(storedRows, entries, otherFiles)
   const marks: SourceRowMarks = { ...existing }
   fileRows.forEach((row, index) => {
     const key = String(index)
