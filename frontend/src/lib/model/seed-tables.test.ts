@@ -62,3 +62,27 @@ describe('a vault made before one table per screen', () => {
     expect(await tableDefsTable.get(tableId)).toBeDefined()
   })
 })
+
+describe('the six tables an earlier version seeded', () => {
+  beforeEach(async () => { await wipeAllData() })
+
+  it('become the three each screen owns, with the empty leftovers gone', async () => {
+    for (const [name, kind] of [
+      ['Extrato bancário', 'bankLedger'], ['Fatura do cartão', 'cardLedger'], ['Investimentos', 'investmentLedger'],
+      ['Aportes', 'contributions'], ['Proventos', 'dividends'], ['Outros lançamentos', 'generic'],
+    ] as const) {
+      await tableDefsTable.add({ createdAt: 1, data: { name, kind } })
+    }
+
+    const result = await alignDefaultTables()
+
+    const tables = (await tableDefsTable.toArray()).map((row) => row.data as TableDef)
+    expect(tables).toHaveLength(3)
+    expect(tables.map((table) => table.nameKey)).toEqual([
+      'finances:items.movements',
+      'finances:items.spending',
+      'investments:section.label',
+    ])
+    expect(result.retired.sort()).toEqual(['Aportes', 'Outros lançamentos', 'Proventos'])
+  })
+})

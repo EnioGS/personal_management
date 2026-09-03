@@ -37,6 +37,8 @@ const DEFAULT_TABLES: TableDef[] = [
 let seeding: Promise<{ created: string[] }> | null = null
 
 export async function seedDefaultTables(): Promise<{ created: string[] }> {
+  // The shared promise is dropped as soon as it settles, so a run that fails does not
+  // become the answer every later caller gets.
   seeding ??= runSeed().finally(() => { seeding = null })
   return seeding
 }
