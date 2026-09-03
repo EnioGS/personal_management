@@ -192,6 +192,11 @@ Two things it optimizes for:
   everything matching it. A rule may claim a row only when the user confirmed it
   with the rule's own labels intact — computed from the rows every time rather
   than tallied, so "overridden" honestly reports a rule that was wrong.
+- Confirmed rows can be read table by table: the Confirmed button carries an arrow
+  that lists the user's tables grouped the way the app is navigated — a heading per
+  section, a sub-heading per screen, and only the ones that own tables. Any column
+  also filters, by text or by a numeric range where leaving one side empty means
+  "above" or "below".
 - Tables sort from any column header (alphabetic or numeric, either direction,
   chosen rather than sniffed) and render one page at a time, growing as the
   container nears the bottom. The assistant asks the same questions through

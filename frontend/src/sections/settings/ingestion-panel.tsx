@@ -1,9 +1,13 @@
 import { useMemo, useRef, useState, type ChangeEvent, type DragEvent } from 'react'
-import { Check, FilePlus2, Plus, Trash2, Upload } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
+import { Check, ChevronDown, FilePlus2, Plus, Trash2, Upload } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { ColumnFilterMenu, type ColumnFilter } from '@/components/data-table/column-filter-menu'
 import { ColumnSortMenu, type ColumnSort } from '@/components/data-table/column-sort-menu'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { sections as appSections } from '@/sections'
 import { useProgressiveRows } from '@/components/data-table/use-progressive-rows'
 import { queryRows } from '@/lib/model/row-query'
 import { cn } from '@/lib/utils'
@@ -29,7 +33,7 @@ import {
   useTableDefsStore,
 } from '@/lib/model/model-stores'
 import { FINANCE_DESTINATIONS, FLOW_ROLES, labelValues, matchLabelValue, RECURRENCES, SETTLEMENT_CHANNELS, SPENDING_TREATMENTS } from '@/lib/model/label-vocabulary'
-import type { IngestionColumnMapping, IngestionRowLabels, IngestionRowLabelValues, IngestionTargetField } from '@/lib/model/types'
+import type { IngestionColumnMapping, IngestionRowLabels, IngestionRowLabelValues, IngestionTargetField, TableKind } from '@/lib/model/types'
 import type { StoredRow } from '@/lib/local-store/create-local-table'
 import type { IngestionRow } from '@/lib/model/types'
 
@@ -60,6 +64,7 @@ const LABEL_OPTIONS: Record<typeof LABEL_FIELDS[number], string> = {
  * in the next phase, so this screen intentionally never writes an app entry.
  */
 export function IngestionPanel() {
+  const { t } = useTranslation()
   const sourceStore = useIngestionSourcesStore()
   const mappingStore = useIngestionColumnMappingsStore()
   const rowStore = useIngestionRowsStore()
@@ -74,6 +79,8 @@ export function IngestionPanel() {
   const [showDiscarded, setShowDiscarded] = useState(false)
   const [isDropTarget, setIsDropTarget] = useState(false)
   const [sort, setSort] = useState<ColumnSort | null>(null)
+  const [filters, setFilters] = useState<ColumnFilter[]>([])
+  const [confirmedTableId, setConfirmedTableId] = useState<number | null>(null)
   const [pendingStage, setPendingStage] = useState<{ duplicates: number } | null>(null)
   const fileInput = useRef<HTMLInputElement>(null)
 
@@ -126,10 +133,11 @@ export function IngestionPanel() {
   // Sorting is applied to the whole dataset before the window is taken, so ordering a
   // column never means "ordering the hundred rows that happen to be rendered".
   const visibleRows = useMemo(() => {
-    if (!sort) return datasetRows
-    return queryRows(datasetRows, (row, field) => rowCellValue(row, field, categories, tableDefs), { sort }).rows
-  }, [datasetRows, sort, categories, tableDefs])
-  const { visible: windowedRows, onScroll: onRowsScroll, shown, total } = useProgressiveRows(visibleRows, `${selected}:${showDiscarded}:${sort?.field}:${sort?.direction}:${sort?.type}`)
+    const scoped = showingConfirmed && confirmedTableId !== null ? datasetRows.filter((row) => row.destinationTableId === confirmedTableId) : datasetRows
+    if (!sort && filters.length === 0) return scoped
+    return queryRows(scoped, (row, field) => rowCellValue(row, field, categories, tableDefs), { sort: sort ?? undefined, filters }).rows
+  }, [datasetRows, sort, filters, categories, tableDefs, showingConfirmed, confirmedTableId])
+  const { visible: windowedRows, onScroll: onRowsScroll, shown, total } = useProgressiveRows(visibleRows, `${selected}:${showDiscarded}:${confirmedTableId}:${sort?.field}:${sort?.direction}:${sort?.type}:${filters.length}`)
   const reallocatable = confirmedRows.filter((row) => row.hasPendingChange && row.validationErrors.length === 0)
   // A source file is finished when nothing of it is still waiting: every row either
   // reached a Finance table or was set aside as a duplicate. Duplicates count as dealt
@@ -366,7 +374,37 @@ export function IngestionPanel() {
             passes through — so they are their own buttons, and the dropdown keeps only
             the uploaded sources still waiting to be mapped. */}
         <div className="flex shrink-0 items-center gap-2">
-          <Button type="button" size="sm" variant={selected === CONFIRMED_DATASET ? 'default' : 'outline'} onClick={() => selectDataset(CONFIRMED_DATASET)}>Confirmed</Button>
+          <span className="flex">
+            <Button type="button" size="sm" variant={selected === CONFIRMED_DATASET ? 'default' : 'outline'} className="rounded-r-none" onClick={() => { selectDataset(CONFIRMED_DATASET); setConfirmedTableId(null) }}>
+              Confirmed{confirmedTableId !== null && `: ${tableDefs.find((table) => table.id === confirmedTableId)?.name ?? ''}`}
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button type="button" size="sm" variant={selected === CONFIRMED_DATASET ? 'default' : 'outline'} aria-label="Confirmed rows by table" className="rounded-l-none border-l px-1.5">
+                  <ChevronDown className="size-3.5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="text-xs">
+                <DropdownMenuItem onClick={() => { selectDataset(CONFIRMED_DATASET); setConfirmedTableId(null) }}>Every table</DropdownMenuItem>
+                {tablesBySection(tableDefs, (key) => String(t(key as never))).map((group) => (
+                  <div key={group.sectionId}>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuLabel>{group.sectionLabel}</DropdownMenuLabel>
+                    {group.items.map((item) => (
+                      <div key={item.itemId}>
+                        <DropdownMenuLabel className="text-muted-foreground pl-4 font-normal">{item.itemLabel}</DropdownMenuLabel>
+                        {item.tables.map((table) => (
+                          <DropdownMenuItem key={table.id} className="pl-6" onClick={() => { selectDataset(CONFIRMED_DATASET); setConfirmedTableId(table.id) }}>
+                            {table.name}
+                          </DropdownMenuItem>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </span>
           <Button type="button" size="sm" variant={selected === UNLABELLED_DATASET ? 'default' : 'outline'} onClick={() => selectDataset(UNLABELLED_DATASET)}>Imported, unlabelled</Button>
           <Select value={selectedSource ? String(selectedSource.id) : ''} onValueChange={selectDataset}>
             <SelectTrigger className="w-56"><SelectValue placeholder={`Source files (${sourceStore.items.length})`} /></SelectTrigger>
@@ -440,7 +478,7 @@ export function IngestionPanel() {
             ? 'These rows are already in a Finance table. Editing a label or a data field marks the row for reallocation — its entry is rewritten, and every Finance screen follows, only when you confirm below.'
             : 'Source data is shown in its own columns. Canonical fields can be edited here; label cells accept text and turn red when the value is not one of the accepted options. Typing a category name that does not exist yet creates it.'}</p>
           <div className="min-h-0 flex-1 overflow-auto rounded border" onScroll={onRowsScroll}>
-            <table className="min-w-max text-left text-xs"><thead className="bg-muted"><tr><th className="bg-muted sticky left-0 z-30 w-40 min-w-40 p-2"><ColumnSortMenu field="source" label="Source" sort={sort} onSort={setSort} /></th><th className="bg-muted sticky left-40 z-30 w-22 min-w-22 border-r p-2"><ColumnSortMenu field="status" label="Status" sort={sort} onSort={setSort} /></th>{rawColumns(visibleRows).map((column) => <th key={`raw-${column}`} className="min-w-36 p-2"><ColumnSortMenu field={`raw.${column}`} label={column} sort={sort} onSort={setSort} /></th>)}{DATA_FIELDS.map((field) => <th key={field} className="min-w-32 p-2"><ColumnSortMenu field={`mapped.${field}`} label={field} sort={sort} onSort={setSort} /></th>)}{LABEL_FIELDS.map((field) => <th key={field} className="min-w-40 p-2 align-top"><ColumnSortMenu field={field} label={field} sort={sort} onSort={setSort} /><p className="text-muted-foreground font-normal">{LABEL_OPTIONS[field]}</p></th>)}</tr></thead><tbody>{windowedRows.map((row) => <WorklistRow key={row.id} row={row} sourceName={sourceStore.items.find((source) => source.id === row.sourceId)?.originalFilename ?? row.sourceFilename ?? 'Existing data'} categories={categories} tableDefs={tableDefs} rawColumns={rawColumns(visibleRows)} onChange={updateWorklist} ensureCategory={ensureCategory} onRestore={restoreRow} onEliminate={eliminateRow} />)}{windowedRows.length === 0 && <tr><td colSpan={2 + DATA_FIELDS.length + LABEL_FIELDS.length} className="text-muted-foreground p-4 text-center">{showingConfirmed ? 'Nothing has been confirmed yet.' : 'No staged data yet.'}</td></tr>}</tbody></table>
+            <table className="min-w-max text-left text-xs"><thead className="bg-muted"><tr><th className="bg-muted sticky left-0 z-30 w-40 min-w-40 p-2"><ColumnSortMenu field="source" label="Source" sort={sort} onSort={setSort} /></th><th className="bg-muted sticky left-40 z-30 w-22 min-w-22 border-r p-2"><ColumnSortMenu field="status" label="Status" sort={sort} onSort={setSort} /></th>{rawColumns(visibleRows).map((column) => <th key={`raw-${column}`} className="min-w-36 p-2"><span className="flex items-center gap-0.5"><ColumnSortMenu field={`raw.${column}`} label={column} sort={sort} onSort={setSort} /><ColumnFilterMenu field={`raw.${column}`} label={column} filters={filters} onChange={setFilters} /></span></th>)}{DATA_FIELDS.map((field) => <th key={field} className="min-w-32 p-2"><span className="flex items-center gap-0.5"><ColumnSortMenu field={`mapped.${field}`} label={field} sort={sort} onSort={setSort} /><ColumnFilterMenu field={`mapped.${field}`} label={field} filters={filters} onChange={setFilters} /></span></th>)}{LABEL_FIELDS.map((field) => <th key={field} className="min-w-40 p-2 align-top"><span className="flex items-center gap-0.5"><ColumnSortMenu field={field} label={field} sort={sort} onSort={setSort} /><ColumnFilterMenu field={field} label={field} filters={filters} onChange={setFilters} /></span><p className="text-muted-foreground font-normal">{LABEL_OPTIONS[field]}</p></th>)}</tr></thead><tbody>{windowedRows.map((row) => <WorklistRow key={row.id} row={row} sourceName={sourceStore.items.find((source) => source.id === row.sourceId)?.originalFilename ?? row.sourceFilename ?? 'Existing data'} categories={categories} tableDefs={tableDefs} rawColumns={rawColumns(visibleRows)} onChange={updateWorklist} ensureCategory={ensureCategory} onRestore={restoreRow} onEliminate={eliminateRow} />)}{windowedRows.length === 0 && <tr><td colSpan={2 + DATA_FIELDS.length + LABEL_FIELDS.length} className="text-muted-foreground p-4 text-center">{showingConfirmed ? 'Nothing has been confirmed yet.' : 'No staged data yet.'}</td></tr>}</tbody></table>
           </div>
           <div className="flex items-center justify-between gap-2 text-xs">
             <div className="flex items-center gap-2">
@@ -448,6 +486,9 @@ export function IngestionPanel() {
               <Button type="button" size="xs" variant="outline" onClick={() => void addWorklistField()} disabled={!worklistFieldName.trim()}><Plus className="size-3" />Add blank data field</Button>
             </div>
             <div className="flex shrink-0 items-center gap-3">
+              {filters.length > 0 && (
+                <Button type="button" size="xs" variant="ghost" onClick={() => setFilters([])}>Clear {filters.length} filter(s)</Button>
+              )}
               {!showingConfirmed && discardedRows.length > 0 && (
                 <Button type="button" size="xs" variant={showDiscarded ? 'default' : 'ghost'} onClick={() => setShowDiscarded(!showDiscarded)}>
                   {showDiscarded ? 'Back to the worklist' : `Show discarded (${discardedRows.length})`}
@@ -506,6 +547,26 @@ export function IngestionPanel() {
 function displayDataValue(field: IngestionTargetField, value: unknown): string {
   if (field === 'date' && typeof value === 'number' && Number.isFinite(value)) return new Date(value).toISOString().slice(0, 10)
   return String(value ?? '')
+}
+
+/**
+ * The user's tables, grouped the way the app is navigated: a heading per section, a
+ * sub-heading per item, and only the ones that actually own tables — a section whose
+ * screens hold no data has nothing to offer here.
+ */
+function tablesBySection(tableDefs: { id: number; name: string; kind: TableKind }[], translate: (key: string) => string) {
+  const groups: { sectionId: string; sectionLabel: string; items: { itemId: string; itemLabel: string; tables: { id: number; name: string }[] }[] }[] = []
+  for (const section of appSections) {
+    const items = section.items
+      .map((item) => ({
+        itemId: item.id,
+        itemLabel: translate(item.labelKey),
+        tables: tableDefs.filter((table) => (item.tableKinds ?? []).includes(table.kind)),
+      }))
+      .filter((item) => item.tables.length > 0)
+    if (items.length > 0) groups.push({ sectionId: section.id, sectionLabel: translate(section.labelKey), items })
+  }
+  return groups
 }
 
 /** What a column shows, for sorting — the same value the cell renders. */
