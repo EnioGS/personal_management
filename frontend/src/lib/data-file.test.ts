@@ -143,7 +143,7 @@ describe('data-file', () => {
         sourceRowFingerprint: 'row-hash',
         rawValues: { Data: '2026-01-01', Valor: '10' },
         mappedValues: { date: 1767225600000, amount: 10 },
-        labels: { financeDestination: 'movements', flowRole: 'inflow' },
+        labels: { sections: ['finances'], subsections: ['overview'], flowRole: 'inflow' },
         status: 'unlabelled',
         validationErrors: ['Choose a destination table.'],
       },
@@ -157,7 +157,7 @@ describe('data-file', () => {
     expect(await ingestionColumnMappingsTable.toArray()).toHaveLength(1)
     expect((await ingestionRowsTable.toArray())[0].data).toMatchObject({
       rawValues: { Data: '2026-01-01', Valor: '10' },
-      labels: { financeDestination: 'movements', flowRole: 'inflow' },
+      labels: { sections: ['finances'], subsections: ['overview'], flowRole: 'inflow' },
     })
   })
 

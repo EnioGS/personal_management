@@ -3,7 +3,7 @@ import { addItemsFor } from './writable-tables'
 import { clearTables, seedTable } from './test-utils'
 import { readTableTool } from './read-table'
 
-const context = { attachments: [] }
+const context = { attachments: [], translate: (key: string) => key }
 
 describe('readTableTool', () => {
   beforeEach(clearTables)

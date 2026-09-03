@@ -80,7 +80,7 @@ describe('rowToSqlValues / sqlValuesToRow round-trip', () => {
         sourceRowFingerprint: 'row-hash',
         rawValues: { Data: '2026-01-01', Valor: '10,00' },
         mappedValues: { amount: 10 },
-        labels: { financeDestination: 'spending', flowRole: 'outflow' },
+        labels: { sections: ['finances'], subsections: ['spending'], flowRole: 'outflow' },
         status: 'unlabelled',
         validationErrors: ['Choose a destination table.'],
       },

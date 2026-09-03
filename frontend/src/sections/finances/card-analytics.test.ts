@@ -3,7 +3,7 @@ import type { FilteredEntry } from '@/components/dashboard/use-dashboard-entries
 import { currentInvoiceCycle, daysUntil, entriesInInvoice, openInstallments } from './card-analytics'
 
 function entry(overrides: Partial<FilteredEntry> = {}): FilteredEntry {
-  return { tableId: 1, date: Date.UTC(2026, 7, 30), amount: 100, direction: 'out', category: 'Food', description: 'Market', financeDestination: 'spending', flowRole: 'outflow', ...overrides }
+  return { tableId: 1, date: Date.UTC(2026, 7, 30), amount: 100, direction: 'out', category: 'Food', description: 'Market', subsections: ['spending'], flowRole: 'outflow', ...overrides }
 }
 
 describe('card analytics', () => {

@@ -30,7 +30,7 @@ describe('ingestion promotion', () => {
   it('does not make a row ready until required labels and destination data are valid', async () => {
     const { rowId, tableId } = await addCardRow()
     const row = await updateIngestionRowLabels(rowId, {
-      financeDestination: 'spending',
+      sections: ['finances'], subsections: ['spending'],
       flowRole: 'outflow',
       settlementChannel: 'creditCard',
       spendingTreatment: 'expense',
@@ -51,7 +51,7 @@ describe('ingestion promotion', () => {
   it('promotes a ready row once and persists its label sidecar', async () => {
     const { rowId, tableId } = await addCardRow()
     await updateIngestionRowLabels(rowId, {
-      financeDestination: 'movements',
+      sections: ['finances'], subsections: ['overview'],
       flowRole: 'outflow',
       settlementChannel: 'creditCard',
       spendingTreatment: 'notApplicable',
@@ -86,7 +86,7 @@ describe('values that were never text', () => {
       } satisfies IngestionRow,
     })
 
-    const validated = await updateIngestionRowLabels(rowId, { financeDestination: 'movements', flowRole: 'inflow', settlementChannel: 'checkingAccount', spendingTreatment: 'notApplicable', recurrence: 'oneOff' }, tableId)
+    const validated = await updateIngestionRowLabels(rowId, { sections: ['finances'], subsections: ['overview'], flowRole: 'inflow', settlementChannel: 'checkingAccount', spendingTreatment: 'notApplicable', recurrence: 'oneOff' }, tableId)
 
     expect(validated.validationErrors).toEqual([])
     expect(validated.status).toBe('ready')
@@ -108,7 +108,7 @@ describe('relabelling a row that is already in a Finance table', () => {
       createdAt: 2,
       data: { sourceId: 1, sourceRowIndex: 0, sourceRowFingerprint: 'r0', rawValues: { description: 'Assinatura' }, mappedValues: { date: '2026-01-02', amount: '19.90', description: 'Assinatura', direction: 'out', rawCategory: 'Assinatura' }, labels: {}, status: 'unlabelled', validationErrors: [] } satisfies IngestionRow,
     })
-    await updateIngestionRowLabels(rowId, { financeDestination: 'movements', flowRole: 'outflow', settlementChannel: 'checkingAccount', spendingTreatment: 'notApplicable', recurrence: 'oneOff' }, bankId)
+    await updateIngestionRowLabels(rowId, { sections: ['finances'], subsections: ['overview'], flowRole: 'outflow', settlementChannel: 'checkingAccount', spendingTreatment: 'notApplicable', recurrence: 'oneOff' }, bankId)
     await promoteReadyIngestionRows([rowId])
     return { rowId, bankId, cardId, entryId: ((await ingestionRowsTable.get(rowId))!.data as IngestionRow).promotedEntryId! }
   }
@@ -117,7 +117,7 @@ describe('relabelling a row that is already in a Finance table', () => {
     const { rowId, cardId, entryId } = await confirmedRow()
     const categoryId = await categoriesTable.add({ createdAt: 1, data: { name: 'Assinaturas' } })
 
-    const edited = await updateIngestionRowLabels(rowId, { financeDestination: 'spending', flowRole: 'outflow', settlementChannel: 'creditCard', spendingTreatment: 'expense', categoryId, recurrence: 'recurring' }, cardId)
+    const edited = await updateIngestionRowLabels(rowId, { sections: ['finances'], subsections: ['spending'], flowRole: 'outflow', settlementChannel: 'creditCard', spendingTreatment: 'expense', categoryId, recurrence: 'recurring' }, cardId)
 
     expect(edited.hasPendingChange).toBe(true)
     expect(edited.status).toBe('promoted')
@@ -128,7 +128,7 @@ describe('relabelling a row that is already in a Finance table', () => {
   it('rewrites the entry in place and its labels with it, keeping the same entry id', async () => {
     const { rowId, cardId, entryId } = await confirmedRow()
     const categoryId = await categoriesTable.add({ createdAt: 1, data: { name: 'Assinaturas' } })
-    await updateIngestionRowLabels(rowId, { financeDestination: 'spending', flowRole: 'outflow', settlementChannel: 'creditCard', spendingTreatment: 'expense', categoryId, recurrence: 'recurring' }, cardId)
+    await updateIngestionRowLabels(rowId, { sections: ['finances'], subsections: ['spending'], flowRole: 'outflow', settlementChannel: 'creditCard', spendingTreatment: 'expense', categoryId, recurrence: 'recurring' }, cardId)
 
     const result = await reallocateConfirmedIngestionRows([rowId])
 
@@ -136,7 +136,7 @@ describe('relabelling a row that is already in a Finance table', () => {
     expect(await entriesTable.count()).toBe(1)
     expect((await entriesTable.get(entryId))!.data).toMatchObject({ tableId: cardId, amount: 19.9 })
     const labels = (await entryLabelsTable.toArray())[0].data as Record<string, unknown>
-    expect(labels).toMatchObject({ entryId, financeDestination: 'spending', spendingTreatment: 'expense', recurrence: 'recurring' })
+    expect(labels).toMatchObject({ entryId, sections: ['finances'], subsections: ['spending'], spendingTreatment: 'expense', recurrence: 'recurring' })
     expect(((await ingestionRowsTable.get(rowId))!.data as IngestionRow).hasPendingChange).toBe(false)
   })
 
@@ -144,7 +144,7 @@ describe('relabelling a row that is already in a Finance table', () => {
     const { rowId } = await confirmedRow()
     const investmentId = await tableDefsTable.add({ createdAt: 1, data: { name: 'Renda Variável', kind: 'investmentLedger', investmentClass: 'variableIncome' } })
 
-    const edited = await updateIngestionRowLabels(rowId, { financeDestination: 'investments', flowRole: 'outflow', settlementChannel: 'investment', spendingTreatment: 'notApplicable', recurrence: 'oneOff' }, investmentId)
+    const edited = await updateIngestionRowLabels(rowId, { sections: ['finances'], subsections: ['investments'], flowRole: 'outflow', settlementChannel: 'investment', spendingTreatment: 'notApplicable', recurrence: 'oneOff' }, investmentId)
     const result = await reallocateConfirmedIngestionRows([rowId])
 
     // An investment ledger asks for a class, an asset, a quantity and a price; a bank

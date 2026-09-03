@@ -1,13 +1,19 @@
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_INGESTION_GUIDE } from './ingestion-guide'
 import { DEFAULT_SYSTEM_PROMPT } from './assistant-prompts'
-import { FINANCE_DESTINATIONS, FLOW_ROLES, RECURRENCES, SETTLEMENT_CHANNELS, SPENDING_TREATMENTS, labelValues } from './model/label-vocabulary'
+import { FLOW_ROLES, RECURRENCES, SETTLEMENT_CHANNELS, SPENDING_TREATMENTS, labelValues } from './model/label-vocabulary'
+import { PROMPT_PLACEHOLDERS } from './prompt-placeholders'
 
 describe('the ingestion guide', () => {
   it('documents every accepted value of every label dimension', () => {
-    for (const value of [FINANCE_DESTINATIONS, FLOW_ROLES, SETTLEMENT_CHANNELS, SPENDING_TREATMENTS, RECURRENCES].flatMap(labelValues)) {
+    for (const value of [FLOW_ROLES, SETTLEMENT_CHANNELS, SPENDING_TREATMENTS, RECURRENCES].flatMap(labelValues)) {
       expect(DEFAULT_INGESTION_GUIDE).toContain(`- ${value}:`)
     }
+  })
+
+  it('leaves the placement labels to the app, as placeholders rather than a stale list', () => {
+    expect(DEFAULT_INGESTION_GUIDE).toContain(PROMPT_PLACEHOLDERS.sections)
+    expect(DEFAULT_INGESTION_GUIDE).toContain(PROMPT_PLACEHOLDERS.subsections)
   })
 
   it('states the two boundaries the assistant may not cross', () => {

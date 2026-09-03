@@ -9,7 +9,7 @@ function entry(overrides: Partial<FilteredEntry>): FilteredEntry {
     direction: 'out',
     category: 'Food',
     description: 'Market',
-    financeDestination: 'spending',
+    subsections: ['spending'],
     flowRole: 'outflow',
     spendingTreatment: 'expense',
     ...overrides,
@@ -21,8 +21,8 @@ describe('spending analytics', () => {
   it('keeps labelled spending rows and drops rows labelled for another destination', () => {
     expect(outgoingSpending([
       entry({ amount: 120 }),
-      entry({ financeDestination: 'movements', spendingTreatment: 'notApplicable', amount: 120 }),
-      entry({ financeDestination: 'investments', spendingTreatment: 'notApplicable', amount: 20 }),
+      entry({ subsections: ['overview'], spendingTreatment: 'notApplicable', amount: 120 }),
+      entry({ subsections: ['investments'], spendingTreatment: 'notApplicable', amount: 20 }),
     ])).toEqual([entry({ amount: 120 })])
   })
 

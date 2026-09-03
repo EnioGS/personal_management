@@ -12,7 +12,7 @@ function rule(overrides: Partial<StoredRule> = {}): StoredRule {
     id: 1,
     field: 'description',
     contains: 'pagamento de fatura',
-    labels: { financeDestination: 'movements', flowRole: 'outflow', settlementChannel: 'checkingAccount', spendingTreatment: 'notApplicable', recurrence: 'oneOff' },
+    labels: { sections: ['finances'], subsections: ['overview'], flowRole: 'outflow', settlementChannel: 'checkingAccount', spendingTreatment: 'notApplicable', recurrence: 'oneOff' },
     destinationTableId: 7,
     createdBy: 'assistant',
     createdAt: 1,
@@ -38,7 +38,7 @@ describe('applying standing rules', () => {
   it('fills a matching row, whatever the case or accents', () => {
     const result = applyLabelRules(row({ mappedValues: { description: 'PAGAMENTO DE FATURA' } }), [rule()], resolve)
 
-    expect(result.labels).toMatchObject({ financeDestination: 'movements', flowRole: 'outflow' })
+    expect(result.labels).toMatchObject({ sections: ['finances'], subsections: ['overview'], flowRole: 'outflow' })
     expect(result.destinationTableId).toBe(7)
     expect(result.appliedRuleIds).toEqual([1])
     expect(result.filled[0].fields).toContain('flowRole')
@@ -116,7 +116,7 @@ describe('rules meeting real rows', () => {
 
   it('fills staged rows as they arrive, and a fully covered row lands ready', async () => {
     const tableId = await tableDefsTable.add({ createdAt: 1, data: { name: 'Extrato Nubank', kind: 'bankLedger' } })
-    await saveLabelRule({ field: 'description', contains: 'pagamento de fatura', labels: { financeDestination: 'movements', flowRole: 'outflow', settlementChannel: 'checkingAccount', spendingTreatment: 'notApplicable', recurrence: 'oneOff' }, destinationTableId: tableId, rationale: 'Paying the card bill moves money out of checking; the purchases are already counted on the card side.', createdBy: 'assistant', createdAt: 1 })
+    await saveLabelRule({ field: 'description', contains: 'pagamento de fatura', labels: { sections: ['finances'], subsections: ['overview'], flowRole: 'outflow', settlementChannel: 'checkingAccount', spendingTreatment: 'notApplicable', recurrence: 'oneOff' }, destinationTableId: tableId, rationale: 'Paying the card bill moves money out of checking; the purchases are already counted on the card side.', createdBy: 'assistant', createdAt: 1 })
     const rowId = await ingestionRowsTable.add({ createdAt: 2, data: { sourceId: 1, sourceRowIndex: 0, sourceRowFingerprint: 'r0', rawValues: {}, mappedValues: { date: '2026-01-02', amount: '2539.24', description: 'Pagamento de fatura', direction: 'out', rawCategory: 'Pagamento' }, labels: {}, status: 'unlabelled', validationErrors: [] } satisfies IngestionRow })
 
     const result = await applyLabelRulesToRows()

@@ -1,4 +1,5 @@
-import { FINANCE_DESTINATIONS, FLOW_ROLES, RECURRENCES, SETTLEMENT_CHANNELS, SPENDING_TREATMENTS, type LabelOption } from '@/lib/model/label-vocabulary'
+import { FLOW_ROLES, RECURRENCES, SETTLEMENT_CHANNELS, SPENDING_TREATMENTS, type LabelOption } from '@/lib/model/label-vocabulary'
+import { PROMPT_PLACEHOLDERS } from '@/lib/prompt-placeholders'
 
 export const INGESTION_GUIDE_KEY = 'ingestionGuide'
 
@@ -53,7 +54,19 @@ contributions date/destination/amount; dividends date/asset/amount/note.
 
 ## The labels
 
-${options('Finance destination — exactly one, and it decides which screen owns the row:', FINANCE_DESTINATIONS)}
+Where the row belongs — two labels, and the only ones that are not a fixed list.
+"Sections" names the parts of the app it belongs to, "screens" the pages inside them.
+Both take more than one value, separated by commas, for a row that genuinely belongs
+to several; most rows name one of each. A value is valid when it names something that
+exists right now — either its id or the name currently shown — and these are what
+exist as this is written:
+
+- sections: ${PROMPT_PLACEHOLDERS.sections}
+- screens: ${PROMPT_PLACEHOLDERS.subsections}
+
+Use the id where you can. A row placed on the spending screen is what the spending
+figures count; one placed on movements is what capital follows; one placed on
+investments is a position, not everyday cash.
 
 ${options('Flow role — the economic direction, never inferred from the sign of the amount:', FLOW_ROLES)}
 
@@ -141,8 +154,8 @@ every dashboard, which restoring undoes. Nothing is erased, so a mistake costs a
   another row's gain and total capital does not move.
 - A reversal that cancels a record entirely is flow role cancelled; it stays visible
   as provenance but reaches no total.
-- The destination is single-valued on purpose: a spending row is still counted as a
-  movement by the dashboards, so never ask the user to pick both.
+- Place a row on every screen it genuinely belongs to, and no more: a card purchase
+  belongs on spending, and the invoice payment that settles it belongs on movements.
 - When the evidence is ambiguous, label what you are sure of, leave the rest empty,
   and tell the user exactly which rows and which fields you left for them.
 

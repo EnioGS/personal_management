@@ -10,7 +10,7 @@ import {
 import { allPotentialIngestionFields } from './ingestion'
 import { applyLabelRulesToRows } from './label-rules-repository'
 import { markDuplicateSourceRows, type SourceRowMark } from './source-row-marks'
-import { FINANCE_DESTINATIONS, FLOW_ROLES, matchLabelValue, RECURRENCES, SETTLEMENT_CHANNELS, SPENDING_TREATMENTS } from './label-vocabulary'
+import { FLOW_ROLES, matchLabelValue, RECURRENCES, SETTLEMENT_CHANNELS, SPENDING_TREATMENTS } from './label-vocabulary'
 import type { Entry, IngestionColumnMapping, IngestionRow, IngestionSource, IngestionTargetField } from './types'
 
 export interface ParsedIngestionCsv {
@@ -194,13 +194,11 @@ function stableRowValue(rawValues: Record<string, string>): string {
 function labelsFromMappedValues(values: IngestionRow['mappedValues']): IngestionRow['labels'] {
   const text = (field: keyof IngestionRow['mappedValues']) => (typeof values[field] === 'string' ? (values[field] as string) : undefined)
   const categoryId = typeof values.categoryId === 'string' && /^\d+$/.test(values.categoryId) ? Number(values.categoryId) : undefined
-  const destination = matchLabelValue(FINANCE_DESTINATIONS, text('financeDestination'))
   const flowRole = matchLabelValue(FLOW_ROLES, text('flowRole'))
   const settlementChannel = matchLabelValue(SETTLEMENT_CHANNELS, text('settlementChannel'))
   const spendingTreatment = matchLabelValue(SPENDING_TREATMENTS, text('spendingTreatment'))
   const recurrence = matchLabelValue(RECURRENCES, text('recurrence'))
   return {
-    ...(destination ? { financeDestination: destination } : {}),
     ...(flowRole ? { flowRole } : {}),
     ...(settlementChannel ? { settlementChannel } : {}),
     ...(spendingTreatment ? { spendingTreatment } : {}),

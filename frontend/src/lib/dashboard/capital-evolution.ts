@@ -9,7 +9,7 @@ export interface CapitalEntry {
   amount: number
   direction: 'in' | 'out'
   cardId?: number
-  financeDestination?: string
+  subsections?: string[]
   flowRole?: string
   spendingTreatment?: 'expense' | 'rebate' | 'notApplicable'
 }
@@ -73,9 +73,9 @@ export function capitalEvolution(
     // movement. A `transfer` moves between the user's own accounts, so it nets to
     // zero across them and must not move total capital — paying someone else, or
     // settling a card invoice, is an `outflow`, not a transfer.
-    const movesCapital = !entry.cardId && entry.financeDestination !== 'investments' && entry.flowRole !== 'transfer'
+    const movesCapital = !entry.cardId && !entry.subsections?.includes('investments') && entry.flowRole !== 'transfer'
     if (movesCapital) bucket.capitalDelta += entry.direction === 'in' ? entry.amount : -entry.amount
-    if (entry.cardId && entry.financeDestination === 'spending') {
+    if (entry.cardId && entry.subsections?.includes('spending')) {
       if (entry.spendingTreatment === 'rebate') bucket.cardSpend -= entry.amount
       else if (entry.spendingTreatment === 'expense') bucket.cardSpend += entry.amount
     }

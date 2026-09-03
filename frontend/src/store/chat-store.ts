@@ -8,6 +8,7 @@ import { formatAttachmentsForPrompt, type ChatAttachment } from '@/lib/chat-atta
 import type { OpenRouterMessage } from '@/lib/openrouter'
 import { toolsForRequest } from '@/lib/tools/registry'
 import { runConversation, type ConversationStatus } from '@/lib/tools/run-conversation'
+import { toolContext } from '@/lib/tools/tool-context'
 import { modelFactsFor } from '@/lib/model-context-window'
 import { useChatPanelStore } from './chat-panel-store'
 
@@ -109,7 +110,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         apiKey: connection.apiKey,
         model: connection.model,
         messages: apiMessages,
-        context: { attachments },
+        context: toolContext(attachments),
         tools: toolsForRequest(),
         requestFn,
         onStatus: (status) => set({ status }),

@@ -38,7 +38,8 @@
     "systemPromptDescription": "Sent to the model at the start of every conversation. Not translated — always saved and used in whatever language you write it in.",
     "resetPrompt": "Reset to default",
     "ingestionGuideLabel": "Ingestion guide",
-    "ingestionGuideDescription": "The step-by-step guide the assistant reads before helping with importing, mapping and labelling. Edit it to change how it works, or reset it to the default."
+    "ingestionGuideDescription": "The step-by-step guide the assistant reads before helping with importing, mapping and labelling. Edit it to change how it works, or reset it to the default.",
+    "placeholderMissing": "This instruction needs {{placeholders}} — that is where the app fills in the sections and screens that exist right now. Without it the assistant would be told to use labels without being told which ones there are, so it will refuse this instruction until you put it back, or reset it to the default."
   },
   "accountsCards": {
     "accountsHeading": "Bank accounts",

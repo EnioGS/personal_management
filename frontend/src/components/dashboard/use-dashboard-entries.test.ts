@@ -35,7 +35,7 @@ function entry(id: number, overrides: Partial<Entry> & { tableId: number }): Sto
 }
 
 function labelsFor(ids: number[], categoryId?: number): StoredRow<EntryLabels>[] {
-  return ids.map((id) => ({ id: id + 1000, createdAt: 0, entryId: id, financeDestination: 'movements', flowRole: id === 1 ? 'inflow' : 'outflow', settlementChannel: 'checkingAccount', spendingTreatment: 'notApplicable', recurrence: 'oneOff', ...(categoryId && id === 1 ? { categoryId } : {}) }))
+  return ids.map((id) => ({ id: id + 1000, createdAt: 0, entryId: id, sections: ['finances'], subsections: ['overview'], flowRole: id === 1 ? 'inflow' : 'outflow', settlementChannel: 'checkingAccount', spendingTreatment: 'notApplicable', recurrence: 'oneOff', ...(categoryId && id === 1 ? { categoryId } : {}) }))
 }
 
 describe('filterMoneyEntries', () => {
@@ -191,8 +191,8 @@ describe('cancelled rows', () => {
       accounts: [account1],
       categories: [],
       entryLabels: [
-        { id: 1001, createdAt: 0, entryId: 1, financeDestination: 'movements', flowRole: 'cancelled', settlementChannel: 'checkingAccount', spendingTreatment: 'notApplicable', recurrence: 'oneOff' },
-        { id: 1002, createdAt: 0, entryId: 2, financeDestination: 'movements', flowRole: 'outflow', settlementChannel: 'checkingAccount', spendingTreatment: 'notApplicable', recurrence: 'oneOff' },
+        { id: 1001, createdAt: 0, entryId: 1, sections: ['finances'], subsections: ['overview'], flowRole: 'cancelled', settlementChannel: 'checkingAccount', spendingTreatment: 'notApplicable', recurrence: 'oneOff' },
+        { id: 1002, createdAt: 0, entryId: 2, sections: ['finances'], subsections: ['overview'], flowRole: 'outflow', settlementChannel: 'checkingAccount', spendingTreatment: 'notApplicable', recurrence: 'oneOff' },
       ],
       filters: baseFilters(),
     })

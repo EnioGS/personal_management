@@ -68,7 +68,7 @@ export function outgoingSpending(rows: FilteredEntry[]): FilteredEntry[] {
 
 /** Only an explicitly labelled spending row counts, whichever table it came from. */
 function isSpendingRow(row: FilteredEntry): boolean {
-  return row.financeDestination === 'spending' && (row.spendingTreatment === 'expense' || row.spendingTreatment === 'rebate')
+  return row.subsections.includes('spending') && (row.spendingTreatment === 'expense' || row.spendingTreatment === 'rebate')
 }
 
 export function spendingByMonth(rows: FilteredEntry[]): MonthlySpend[] {

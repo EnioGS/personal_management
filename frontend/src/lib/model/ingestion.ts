@@ -1,4 +1,5 @@
 import { TABLE_KIND_SCHEMAS } from './table-kinds'
+import type { LabelCatalogue } from './label-catalogue'
 import type {
   EntryLabels,
   IngestionRow,
@@ -43,16 +44,30 @@ export function allPotentialIngestionFields(): IngestionTargetField[] {
   return requiredIngestionFieldsForKinds(Object.keys(TABLE_KIND_SCHEMAS) as TableKind[])
 }
 
-/** Reports the required label and destination choices still missing from a staged row. */
-export function ingestionLabelErrors(labels: IngestionRowLabels, destinationTableId?: number): string[] {
+/**
+ * Reports what a staged row still needs.
+ *
+ * The placement labels are checked against the catalogue the app currently has rather
+ * than a list written here, so adding a screen adds a valid label with nothing to
+ * update. Callers that have no catalogue to hand (a pure validity check on values
+ * already resolved) can omit it and get the completeness checks alone.
+ */
+export function ingestionLabelErrors(labels: IngestionRowLabels, destinationTableId?: number, catalogue?: LabelCatalogue): string[] {
   const errors: string[] = []
-  if (!labels.financeDestination) errors.push('Choose a Finance destination.')
+  if (!labels.sections?.length) errors.push('Name the section this row belongs to.')
+  if (!labels.subsections?.length) errors.push('Name the screen this row belongs to.')
+  if (catalogue) {
+    const unknownSections = (labels.sections ?? []).filter((value) => !catalogue.sections.some((section) => section.id === value))
+    const unknownScreens = (labels.subsections ?? []).filter((value) => !catalogue.subsections.some((item) => item.id === value))
+    if (unknownSections.length > 0) errors.push(`No section is called ${unknownSections.join(', ')}.`)
+    if (unknownScreens.length > 0) errors.push(`No screen is called ${unknownScreens.join(', ')}.`)
+  }
   if (!labels.flowRole) errors.push('Choose a flow role.')
   if (!labels.settlementChannel) errors.push('Choose a settlement channel.')
   if (!labels.recurrence) errors.push('Choose a recurrence label.')
   if (!destinationTableId) errors.push('Choose a destination table.')
 
-  if (labels.financeDestination === 'spending') {
+  if (labels.subsections?.includes('spending')) {
     if (!labels.spendingTreatment || labels.spendingTreatment === 'notApplicable') {
       errors.push('Choose expense or rebate for a spending row.')
     }
@@ -69,7 +84,8 @@ export function entryLabelsFromIngestionRow(entryId: number, row: IngestionRow):
 
   return {
     entryId,
-    financeDestination: row.labels.financeDestination!,
+    sections: row.labels.sections!,
+    subsections: row.labels.subsections!,
     flowRole: row.labels.flowRole!,
     settlementChannel: row.labels.settlementChannel!,
     spendingTreatment: row.labels.spendingTreatment!,

@@ -3,7 +3,7 @@ import type { OpenRouterMessage } from '@/lib/openrouter'
 import { runConversation } from './run-conversation'
 import type { ToolContext } from './types'
 
-const context: ToolContext = { attachments: [{ id: 'f1', name: 'notes.txt', type: 'text/plain', content: 'file body' }] }
+const context: ToolContext = { attachments: [{ id: 'f1', name: 'notes.txt', type: 'text/plain', content: 'file body' }], translate: (key: string) => key }
 const baseMessages: OpenRouterMessage[] = [{ role: 'system', content: 'system prompt' }]
 
 function textMessage(content: string) {

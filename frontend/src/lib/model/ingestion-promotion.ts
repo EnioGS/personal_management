@@ -88,7 +88,7 @@ async function validateAndSave(
     }
   }
   next.validationErrors = errors
-  next.status = errors.length === 0 ? 'ready' : next.labels.financeDestination || Object.values(next.labelValues ?? {}).some(Boolean) ? 'invalid' : 'unlabelled'
+  next.status = errors.length === 0 ? 'ready' : next.labels.subsections?.length || Object.values(next.labelValues ?? {}).some(Boolean) ? 'invalid' : 'unlabelled'
   await ingestionRowsTable.update(rowId, { data: next })
   await ingestionAuditEventsTable.add({
     createdAt: Date.now(),

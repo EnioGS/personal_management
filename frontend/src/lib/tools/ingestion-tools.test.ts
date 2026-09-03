@@ -1,13 +1,13 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { wipeAllData } from '@/lib/data-file'
-import { DEFAULT_INGESTION_GUIDE, INGESTION_GUIDE_KEY } from '@/lib/ingestion-guide'
+import { INGESTION_GUIDE_KEY } from '@/lib/ingestion-guide'
 import { assistantPromptsTable } from '@/lib/assistant-prompts-db'
 import { categoriesTable, ingestionRowsTable, ingestionSourcesTable, tableDefsTable } from '@/lib/model/model-db'
 import { promoteReadyIngestionRows } from '@/lib/model/ingestion-promotion'
 import type { Category, IngestionRow } from '@/lib/model/types'
 import { addIngestionBlankColumnTool, assignIngestionColumnsTool, countIngestionRowsTool, discardIngestionRowsTool, findIngestionDuplicatesTool, groupIngestionRowsTool, labelIngestionRowsByMatchTool, listIngestionDatasetsTool, queryIngestionRowsTool, readIngestionGuideTool, readIngestionProvenanceTool, readIngestionTableTool, updateIngestionLabelsTool } from './ingestion-tools'
 
-const context = { attachments: [] } as never
+const context = { attachments: [], translate: (key: string) => key } as never
 
 async function seedRow(): Promise<{ rowId: number; tableId: number }> {
   const tableId = await tableDefsTable.add({ createdAt: 1, data: { name: 'Nubank', kind: 'bankLedger' } })
@@ -25,19 +25,19 @@ describe('ingestion tools', () => {
   it('labels a row by value names and creates the category that was named', async () => {
     const { rowId, tableId } = await seedRow()
 
-    const result = await updateIngestionLabelsTool.execute({ updates: [{ rowId, financeDestination: 'spending', flowRole: 'outflow', settlementChannel: 'checkingAccount', spendingTreatment: 'expense', recurrence: 'oneOff', category: 'Mercado', destinationTableId: tableId }] }, context)
+    const result = await updateIngestionLabelsTool.execute({ updates: [{ rowId, sections: 'finances', subsections: 'spending', flowRole: 'outflow', settlementChannel: 'checkingAccount', spendingTreatment: 'expense', recurrence: 'oneOff', category: 'Mercado', destinationTableId: tableId }] }, context)
 
     expect(JSON.parse(result)[0]).toMatchObject({ rowId, status: 'ready', errors: [] })
     expect((await categoriesTable.toArray()).map((row) => (row.data as Category).name)).toEqual(['Mercado'])
     const stored = (await ingestionRowsTable.get(rowId))!.data as IngestionRow
-    expect(stored.labels).toMatchObject({ financeDestination: 'spending', flowRole: 'outflow' })
+    expect(stored.labels).toMatchObject({ sections: ['finances'], subsections: ['spending'], flowRole: 'outflow' })
   })
 
   it('reuses an existing category rather than creating a second spelling of it', async () => {
     const { rowId, tableId } = await seedRow()
     const categoryId = await categoriesTable.add({ createdAt: 1, data: { name: 'Mercado' } })
 
-    await updateIngestionLabelsTool.execute({ updates: [{ rowId, financeDestination: 'spending', flowRole: 'outflow', settlementChannel: 'checkingAccount', spendingTreatment: 'expense', recurrence: 'oneOff', category: 'mercado', destinationTableId: tableId }] }, context)
+    await updateIngestionLabelsTool.execute({ updates: [{ rowId, sections: 'finances', subsections: 'spending', flowRole: 'outflow', settlementChannel: 'checkingAccount', spendingTreatment: 'expense', recurrence: 'oneOff', category: 'mercado', destinationTableId: tableId }] }, context)
 
     expect(await categoriesTable.count()).toBe(1)
     expect(((await ingestionRowsTable.get(rowId))!.data as IngestionRow).labels.categoryId).toBe(categoryId)
@@ -46,7 +46,7 @@ describe('ingestion tools', () => {
   it('reports what is still missing instead of marking an incomplete row ready', async () => {
     const { rowId, tableId } = await seedRow()
 
-    const result = await updateIngestionLabelsTool.execute({ updates: [{ rowId, financeDestination: 'spending', flowRole: 'outflow', destinationTableId: tableId }] }, context)
+    const result = await updateIngestionLabelsTool.execute({ updates: [{ rowId, sections: 'finances', subsections: 'spending', flowRole: 'outflow', destinationTableId: tableId }] }, context)
 
     expect(JSON.parse(result)[0].status).toBe('invalid')
     expect(JSON.parse(result)[0].errors).toContain('Choose a settlement channel.')
@@ -61,12 +61,16 @@ describe('ingestion tools', () => {
     expect(provenance.row.rawValues.description).toContain('Pix')
   })
 
-  it('serves the stored guide when the user has edited it, and the default otherwise', async () => {
-    expect(await readIngestionGuideTool.execute({}, context)).toBe(DEFAULT_INGESTION_GUIDE)
+  it('fills the guide with the sections and screens that exist, and refuses one that lost its placeholder', async () => {
+    const rendered = await readIngestionGuideTool.execute({}, context)
+    expect(rendered).not.toContain('{{sections}}')
+    expect(rendered).toContain('spending')
 
     await assistantPromptsTable.add({ createdAt: 1, data: { key: INGESTION_GUIDE_KEY, content: 'Label everything as investments.' } })
 
-    expect(await readIngestionGuideTool.execute({}, context)).toBe('Label everything as investments.')
+    const broken = await readIngestionGuideTool.execute({}, context)
+    expect(broken).toContain('cannot be used')
+    expect(broken).toContain('Settings → Assistant')
   })
 })
 
@@ -157,7 +161,7 @@ describe('labelling by a rule instead of row by row', () => {
   it('changes nothing until it is told to apply, and shows what it would hit', async () => {
     const { ids, tableId } = await seedCardRows(['IOF de Moonshot Ai', 'IOF de volta de Moonshot Ai', 'Amazonprimebr'])
 
-    const preview = JSON.parse(await labelIngestionRowsByMatchTool.execute({ contains: 'iof', labels: { financeDestination: 'movements', flowRole: 'inflow', settlementChannel: 'creditCard', spendingTreatment: 'notApplicable', recurrence: 'oneOff', destinationTableId: tableId } }, context))
+    const preview = JSON.parse(await labelIngestionRowsByMatchTool.execute({ contains: 'iof', labels: { sections: 'finances', subsections: 'overview', flowRole: 'inflow', settlementChannel: 'creditCard', spendingTreatment: 'notApplicable', recurrence: 'oneOff', destinationTableId: tableId } }, context))
 
     expect(preview).toMatchObject({ applied: false, matched: 2 })
     expect(preview.examples.map((example: { rowId: number }) => example.rowId)).toEqual([ids[0], ids[1]])
@@ -167,20 +171,20 @@ describe('labelling by a rule instead of row by row', () => {
   it('labels every match in one call and reports how many became ready', async () => {
     const { ids, tableId } = await seedCardRows(['IOF de Moonshot Ai', 'IOF de volta de Moonshot Ai', 'Amazonprimebr'])
 
-    const result = JSON.parse(await labelIngestionRowsByMatchTool.execute({ contains: 'IOF', apply: true, labels: { financeDestination: 'movements', flowRole: 'inflow', settlementChannel: 'creditCard', spendingTreatment: 'notApplicable', recurrence: 'oneOff', destinationTableId: tableId } }, context))
+    const result = JSON.parse(await labelIngestionRowsByMatchTool.execute({ contains: 'IOF', apply: true, labels: { sections: 'finances', subsections: 'overview', flowRole: 'inflow', settlementChannel: 'creditCard', spendingTreatment: 'notApplicable', recurrence: 'oneOff', destinationTableId: tableId } }, context))
 
     expect(result).toMatchObject({ applied: true, matched: 2, ready: 2, errors: [] })
-    expect(((await ingestionRowsTable.get(ids[1]))!.data as IngestionRow).labels).toMatchObject({ financeDestination: 'movements', flowRole: 'inflow' })
+    expect(((await ingestionRowsTable.get(ids[1]))!.data as IngestionRow).labels).toMatchObject({ subsections: ['overview'], flowRole: 'inflow' })
     expect(((await ingestionRowsTable.get(ids[2]))!.data as IngestionRow).labels).toEqual({})
   })
 
   it('keeps labels the rule does not mention, so rules can be layered', async () => {
     const { ids, tableId } = await seedCardRows(['Amazonprimebr'])
-    await updateIngestionLabelsTool.execute({ updates: [{ rowId: ids[0], financeDestination: 'spending', flowRole: 'outflow', settlementChannel: 'creditCard', spendingTreatment: 'expense', recurrence: 'oneOff', category: 'Assinaturas', destinationTableId: tableId }] }, context)
+    await updateIngestionLabelsTool.execute({ updates: [{ rowId: ids[0], sections: 'finances', subsections: 'spending', flowRole: 'outflow', settlementChannel: 'creditCard', spendingTreatment: 'expense', recurrence: 'oneOff', category: 'Assinaturas', destinationTableId: tableId }] }, context)
 
     await labelIngestionRowsByMatchTool.execute({ contains: 'prime', apply: true, labels: { recurrence: 'recurring' } }, context)
 
-    expect(((await ingestionRowsTable.get(ids[0]))!.data as IngestionRow).labels).toMatchObject({ financeDestination: 'spending', spendingTreatment: 'expense', recurrence: 'recurring' })
+    expect(((await ingestionRowsTable.get(ids[0]))!.data as IngestionRow).labels).toMatchObject({ subsections: ['spending'], spendingTreatment: 'expense', recurrence: 'recurring' })
   })
 
   it('never touches a row that was already promoted', async () => {
@@ -203,7 +207,7 @@ describe('confirmed rows through the assistant', () => {
       createdAt: 2,
       data: { sourceId: 1, sourceRowIndex: 0, sourceRowFingerprint: 'r0', rawValues: { description: 'Assinatura' }, mappedValues: { date: '2026-01-02', amount: '19.90', description: 'Assinatura', direction: 'out', rawCategory: 'Assinatura' }, labels: {}, status: 'unlabelled', validationErrors: [] } satisfies IngestionRow,
     })
-    await updateIngestionLabelsTool.execute({ updates: [{ rowId, financeDestination: 'movements', flowRole: 'outflow', settlementChannel: 'checkingAccount', spendingTreatment: 'notApplicable', recurrence: 'oneOff', destinationTableId: tableId }] }, context)
+    await updateIngestionLabelsTool.execute({ updates: [{ rowId, sections: 'finances', subsections: 'overview', flowRole: 'outflow', settlementChannel: 'checkingAccount', spendingTreatment: 'notApplicable', recurrence: 'oneOff', destinationTableId: tableId }] }, context)
     await promoteReadyIngestionRows([rowId])
     return { rowId, tableId }
   }
@@ -323,7 +327,7 @@ describe('duplicates and discarding', () => {
     const { entriesTable } = await import('@/lib/model/model-db')
     const tableId = await tableDefsTable.add({ createdAt: 1, data: { name: 'Fatura Nubank', kind: 'cardLedger' } })
     const rowId = await stageRow({ rawCategory: 'Assinatura' }, 'a')
-    await updateIngestionLabelsTool.execute({ updates: [{ rowId, financeDestination: 'spending', flowRole: 'outflow', settlementChannel: 'creditCard', spendingTreatment: 'expense', recurrence: 'recurring', category: 'Assinaturas', destinationTableId: tableId }] }, context)
+    await updateIngestionLabelsTool.execute({ updates: [{ rowId, sections: 'finances', subsections: 'spending', flowRole: 'outflow', settlementChannel: 'creditCard', spendingTreatment: 'expense', recurrence: 'recurring', category: 'Assinaturas', destinationTableId: tableId }] }, context)
     await promoteReadyIngestionRows([rowId])
     const entryId = ((await ingestionRowsTable.get(rowId))!.data as IngestionRow).promotedEntryId!
 

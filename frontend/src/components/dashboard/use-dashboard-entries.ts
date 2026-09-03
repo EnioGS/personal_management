@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import type { StoredRow } from '@/lib/local-store/create-local-table'
 import { useAccountsStore, useCardsStore, useCategoriesStore, useEntriesStore, useEntryLabelsStore, useTableDefsStore } from '@/lib/model/model-stores'
-import type { Account, Card, Category, Entry, EntryLabels, FinanceDestination, FlowRole, RecurrenceLabel, SpendingTreatment, TableDef, TableKind } from '@/lib/model/types'
+import type { Account, Card, Category, Entry, EntryLabels, FlowRole, RecurrenceLabel, SpendingTreatment, TableDef, TableKind } from '@/lib/model/types'
 import { isWithinRange } from '@/lib/dashboard/date-range'
 import { resolveFilterRange, type DashboardFilters } from './dashboard-filters'
 
@@ -20,7 +20,8 @@ export interface FilteredEntry {
   accountId?: number
   accountName?: string
   cardId?: number
-  financeDestination: FinanceDestination
+  /** Screens this row was placed on, as ids: 'overview', 'spending', 'investments'. */
+  subsections: string[]
   flowRole: FlowRole
   spendingTreatment?: SpendingTreatment
   recurrence?: RecurrenceLabel
@@ -93,7 +94,7 @@ export function filterMoneyEntries({
       accountId,
       accountName: accountId ? accountsById.get(accountId)?.name : undefined,
       cardId: table.cardId,
-      financeDestination: labels.financeDestination,
+      subsections: labels.subsections ?? [],
       flowRole: labels.flowRole,
       spendingTreatment: labels.spendingTreatment,
       recurrence: labels.recurrence,

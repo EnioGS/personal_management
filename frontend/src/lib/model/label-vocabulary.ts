@@ -1,7 +1,11 @@
-import type { FinanceDestination, FlowRole, RecurrenceLabel, SettlementChannel, SpendingTreatment } from './types'
+import type { FlowRole, RecurrenceLabel, SettlementChannel, SpendingTreatment } from './types'
 
 /**
- * The single definition of every label value and what it means.
+ * The closed label dimensions and what each value means.
+ *
+ * Where a row *belongs* is not here: those labels name the app's own sections and
+ * screens, which change as it grows, so they are resolved against the live catalogue
+ * (label-catalogue.ts) instead of a list written down once.
  *
  * The worklist cells, the staging prefill, the assistant's tools and the ingestion
  * guide all read this, so a value can never be accepted in one place and rejected
@@ -11,12 +15,6 @@ export interface LabelOption<T extends string> {
   value: T
   meaning: string
 }
-
-export const FINANCE_DESTINATIONS: LabelOption<FinanceDestination>[] = [
-  { value: 'movements', meaning: 'Money that moved in or out of an account without being a purchase — transfers, salary, fees, opening balances.' },
-  { value: 'spending', meaning: 'A purchase or its reversal. Spending rows are still movements, so Movements keeps counting them.' },
-  { value: 'investments', meaning: 'A buy, sell or income event inside an investment ledger. It changes a position rather than everyday cash.' },
-]
 
 export const FLOW_ROLES: LabelOption<FlowRole>[] = [
   { value: 'inflow', meaning: 'Money arrived: salary, refund received, interest paid to you.' },

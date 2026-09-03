@@ -3,7 +3,7 @@ import type { ChatAttachment } from '@/lib/chat-attachments'
 import { readTextFileTool } from './read-text-file'
 
 function makeContext(attachments: ChatAttachment[] = []) {
-  return { attachments }
+  return { attachments, translate: (key: string) => key }
 }
 
 describe('readTextFileTool', () => {

@@ -4,7 +4,7 @@ import type { IngestionRow, IngestionRowLabels, LabelRule } from './types'
 export type StoredRule = LabelRule & { id: number }
 
 /** The label dimensions a rule can set. Destination table is handled separately. */
-const LABEL_KEYS: (keyof IngestionRowLabels)[] = ['financeDestination', 'flowRole', 'settlementChannel', 'spendingTreatment', 'categoryId', 'recurrence']
+const LABEL_KEYS: (keyof IngestionRowLabels)[] = ['sections', 'subsections', 'flowRole', 'settlementChannel', 'spendingTreatment', 'categoryId', 'recurrence']
 
 export function ruleMatchesText(rule: LabelRule, text: unknown): boolean {
   const needle = comparableText(rule.contains, rule.caseSensitive)
@@ -39,7 +39,8 @@ export function applyLabelRules(row: IngestionRow, rules: StoredRule[], resolveF
     const fields: string[] = []
     for (const key of LABEL_KEYS) {
       const value = rule.labels[key]
-      if (value === undefined || labels[key] !== undefined) continue
+      const held = labels[key]
+      if (value === undefined || (Array.isArray(held) ? held.length > 0 : held !== undefined)) continue
       Object.assign(labels, { [key]: value })
       fields.push(key)
     }
@@ -71,7 +72,12 @@ export interface RuleStats {
 function ruleStillHolds(rule: LabelRule, row: IngestionRow): boolean {
   for (const key of LABEL_KEYS) {
     const value = rule.labels[key]
-    if (value !== undefined && row.labels[key] !== value) return false
+    if (value === undefined) continue
+    const held = row.labels[key]
+    // A multi-valued label still holds as long as everything the rule set is there.
+    if (Array.isArray(value)) {
+      if (!Array.isArray(held) || !value.every((entry) => held.includes(entry))) return false
+    } else if (held !== value) return false
   }
   return rule.destinationTableId === undefined || row.destinationTableId === rule.destinationTableId
 }

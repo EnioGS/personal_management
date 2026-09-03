@@ -6,8 +6,8 @@ describe('capitalEvolution', () => {
     const points = capitalEvolution([
       { date: Date.UTC(2026, 0, 5), amount: 100, direction: 'in' },
       { date: Date.UTC(2026, 0, 8), amount: 30, direction: 'out' },
-      { date: Date.UTC(2026, 2, 2), amount: 20, direction: 'out', cardId: 1, financeDestination: 'spending', spendingTreatment: 'expense' },
-      { date: Date.UTC(2026, 2, 5), amount: 5, direction: 'in', cardId: 1, financeDestination: 'spending', spendingTreatment: 'rebate' },
+      { date: Date.UTC(2026, 2, 2), amount: 20, direction: 'out', cardId: 1, subsections: ['spending'], spendingTreatment: 'expense' },
+      { date: Date.UTC(2026, 2, 5), amount: 5, direction: 'in', cardId: 1, subsections: ['spending'], spendingTreatment: 'rebate' },
     ], { from: Date.UTC(2026, 0, 1), to: Date.UTC(2026, 2, 31) })
 
     expect(points).toEqual([
@@ -110,9 +110,9 @@ describe('what moves total capital', () => {
 
   it('leaves capital untouched for a transfer between the user\'s own accounts', () => {
     const points = capitalEvolution([
-      { date: Date.UTC(2026, 0, 5), amount: 100, direction: 'in', financeDestination: 'movements', flowRole: 'inflow' },
-      { date: Date.UTC(2026, 0, 6), amount: 40, direction: 'out', financeDestination: 'movements', flowRole: 'transfer' },
-      { date: Date.UTC(2026, 0, 7), amount: 40, direction: 'in', financeDestination: 'movements', flowRole: 'transfer' },
+      { date: Date.UTC(2026, 0, 5), amount: 100, direction: 'in', subsections: ['overview'], flowRole: 'inflow' },
+      { date: Date.UTC(2026, 0, 6), amount: 40, direction: 'out', subsections: ['overview'], flowRole: 'transfer' },
+      { date: Date.UTC(2026, 0, 7), amount: 40, direction: 'in', subsections: ['overview'], flowRole: 'transfer' },
     ], range)
 
     expect(points[0].cashCapital).toBe(100)
@@ -120,8 +120,8 @@ describe('what moves total capital', () => {
 
   it('subtracts a card invoice payment once, and the purchase it settles never again', () => {
     const points = capitalEvolution([
-      { date: Date.UTC(2026, 0, 3), amount: 110, direction: 'out', cardId: 1, financeDestination: 'spending', flowRole: 'outflow', spendingTreatment: 'expense' },
-      { date: Date.UTC(2026, 0, 10), amount: 110, direction: 'out', financeDestination: 'movements', flowRole: 'outflow' },
+      { date: Date.UTC(2026, 0, 3), amount: 110, direction: 'out', cardId: 1, subsections: ['spending'], flowRole: 'outflow', spendingTreatment: 'expense' },
+      { date: Date.UTC(2026, 0, 10), amount: 110, direction: 'out', subsections: ['overview'], flowRole: 'outflow' },
     ], range)
 
     expect(points[0].cashCapital).toBe(-110)

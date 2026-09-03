@@ -97,13 +97,6 @@ export interface AllocationTarget {
   targetPercent: number
 }
 
-/**
- * The one Finance surface a labelled row belongs to. It is single-valued: a
- * spending row is still money that moved, so Movements reads it too, rather than
- * the row having to claim both. Recurrence is its own dimension, so there is no
- * `recurring` destination competing with `spending`.
- */
-export type FinanceDestination = 'movements' | 'spending' | 'investments'
 
 /**
  * Economic direction, independent from the sign convention used by a source file.
@@ -150,7 +143,8 @@ export type IngestionTargetField =
   | 'investmentType'
   | 'note'
   | 'destination'
-  | 'financeDestination'
+  | 'sections'
+  | 'subsections'
   | 'flowRole'
   | 'settlementChannel'
   | 'spendingTreatment'
@@ -206,7 +200,13 @@ export interface IngestionColumnMapping {
 /** Labels are sidecar data so all table schemas can share the same classification model. */
 export interface EntryLabels {
   entryId: number
-  financeDestination: FinanceDestination
+  /**
+   * Where the row belongs, in the app's own terms: which sections, and which screens
+   * inside them. Stored as ids so a change of language cannot orphan a label, and
+   * multi-valued because one row can genuinely belong to more than one screen.
+   */
+  sections: string[]
+  subsections: string[]
   flowRole: FlowRole
   settlementChannel: SettlementChannel
   spendingTreatment: SpendingTreatment
@@ -216,7 +216,8 @@ export interface EntryLabels {
 }
 
 export interface IngestionRowLabels {
-  financeDestination?: FinanceDestination
+  sections?: string[]
+  subsections?: string[]
   flowRole?: FlowRole
   settlementChannel?: SettlementChannel
   spendingTreatment?: SpendingTreatment
@@ -230,7 +231,8 @@ export interface IngestionRowLabels {
  * invalid value instead of silently discarding what the user entered.
  */
 export interface IngestionRowLabelValues {
-  financeDestination?: string
+  sections?: string
+  subsections?: string
   flowRole?: string
   settlementChannel?: string
   spendingTreatment?: string

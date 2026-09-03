@@ -16,6 +16,7 @@ describe('findTool', () => {
       'read_csv',
       'read_table',
       'read_ingestion_guide',
+      'list_label_options',
       'list_ingestion_datasets',
       'read_ingestion_table',
       'read_ingestion_provenance',

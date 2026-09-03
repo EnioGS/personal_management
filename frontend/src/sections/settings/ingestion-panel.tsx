@@ -32,23 +32,26 @@ import {
   useIngestionSourcesStore,
   useTableDefsStore,
 } from '@/lib/model/model-stores'
-import { FINANCE_DESTINATIONS, FLOW_ROLES, labelValues, matchLabelValue, RECURRENCES, SETTLEMENT_CHANNELS, SPENDING_TREATMENTS } from '@/lib/model/label-vocabulary'
+import { FLOW_ROLES, labelValues, matchLabelValue, RECURRENCES, SETTLEMENT_CHANNELS, SPENDING_TREATMENTS } from '@/lib/model/label-vocabulary'
+import { parsePlacementLabels, resolveSectionLabel, resolveSubsectionLabel, sectionLabelFor, subsectionLabelFor, type LabelCatalogue } from '@/lib/model/label-catalogue'
+import { buildLabelCatalogue } from '@/lib/label-catalogue-source'
 import type { IngestionColumnMapping, IngestionRowLabels, IngestionRowLabelValues, IngestionTargetField } from '@/lib/model/types'
 import type { StoredRow } from '@/lib/local-store/create-local-table'
 import type { IngestionRow } from '@/lib/model/types'
 
 const TARGET_FIELDS: IngestionTargetField[] = [
   'date', 'amount', 'description', 'rawCategory', 'direction', 'asset', 'investmentType', 'quantity', 'price', 'note', 'destination',
-  'financeDestination', 'flowRole', 'settlementChannel', 'spendingTreatment', 'categoryId', 'recurrence', 'destinationTableId',
+  'sections', 'subsections', 'flowRole', 'settlementChannel', 'spendingTreatment', 'categoryId', 'recurrence', 'destinationTableId',
 ]
 
 const UNLABELLED_DATASET = '__unlabelled__'
 const CONFIRMED_DATASET = '__confirmed__'
-const LABEL_FIELDS = ['financeDestination', 'flowRole', 'settlementChannel', 'spendingTreatment', 'category', 'recurrence', 'destinationTable'] as const
-const DATA_FIELDS = TARGET_FIELDS.filter((field) => !['financeDestination', 'flowRole', 'settlementChannel', 'spendingTreatment', 'categoryId', 'recurrence', 'destinationTableId'].includes(field))
+const LABEL_FIELDS = ['sections', 'subsections', 'flowRole', 'settlementChannel', 'spendingTreatment', 'category', 'recurrence', 'destinationTable'] as const
+const DATA_FIELDS = TARGET_FIELDS.filter((field) => !['sections', 'subsections', 'flowRole', 'settlementChannel', 'spendingTreatment', 'categoryId', 'recurrence', 'destinationTableId'].includes(field))
 /** The accepted values of each closed label column, shown as the cell's own hint. */
 const LABEL_OPTIONS: Record<typeof LABEL_FIELDS[number], string> = {
-  financeDestination: labelValues(FINANCE_DESTINATIONS).join(' | '),
+  sections: 'the app\'s sections — several allowed',
+  subsections: 'the screens inside them — several allowed',
   flowRole: labelValues(FLOW_ROLES).join(' | '),
   settlementChannel: labelValues(SETTLEMENT_CHANNELS).join(' | '),
   spendingTreatment: labelValues(SPENDING_TREATMENTS).join(' | '),
@@ -128,6 +131,7 @@ export function IngestionPanel() {
     const finalized = rowStore.items.filter((row) => row.status === 'promoted' || row.status === 'reconciledExisting')
     return [...finalized].sort((left, right) => Number(right.hasPendingChange) - Number(left.hasPendingChange))
   }, [rowStore.items])
+  const catalogue = useMemo(() => buildLabelCatalogue((key) => String(t(key as never))), [t])
   const tableName = (table?: { name: string; nameKey?: string }) => (table ? tableDisplayName(table, (key) => String(t(key as never))) : '')
   const showingConfirmed = selected === CONFIRMED_DATASET
   const datasetRows = showingConfirmed ? confirmedRows : showDiscarded ? discardedRows : rows
@@ -136,8 +140,8 @@ export function IngestionPanel() {
   const visibleRows = useMemo(() => {
     const scoped = showingConfirmed && confirmedTableId !== null ? datasetRows.filter((row) => row.destinationTableId === confirmedTableId) : datasetRows
     if (!sort && filters.length === 0) return scoped
-    return queryRows(scoped, (row, field) => rowCellValue(row, field, categories, tableDefs), { sort: sort ?? undefined, filters }).rows
-  }, [datasetRows, sort, filters, categories, tableDefs, showingConfirmed, confirmedTableId])
+    return queryRows(scoped, (row, field) => rowCellValue(row, field, categories, tableDefs, catalogue), { sort: sort ?? undefined, filters }).rows
+  }, [datasetRows, sort, filters, categories, tableDefs, catalogue, showingConfirmed, confirmedTableId])
   const { visible: windowedRows, onScroll: onRowsScroll, shown, total } = useProgressiveRows(visibleRows, `${selected}:${showDiscarded}:${confirmedTableId}:${sort?.field}:${sort?.direction}:${sort?.type}:${filters.length}`)
   const reallocatable = confirmedRows.filter((row) => row.hasPendingChange && row.validationErrors.length === 0)
   // A source file is finished when nothing of it is still waiting: every row either
@@ -469,7 +473,7 @@ export function IngestionPanel() {
             ? 'These rows are already in a Finance table. Editing a label or a data field marks the row for reallocation — its entry is rewritten, and every Finance screen follows, only when you confirm below.'
             : 'Source data is shown in its own columns. Canonical fields can be edited here; label cells accept text and turn red when the value is not one of the accepted options. Typing a category name that does not exist yet creates it.'}</p>
           <div className="min-h-0 flex-1 overflow-auto rounded border" onScroll={onRowsScroll}>
-            <table className="min-w-max text-left text-xs"><thead className="bg-muted"><tr><th className="bg-muted sticky left-0 z-30 w-40 min-w-40 p-2"><ColumnSortMenu field="source" label="Source" sort={sort} onSort={setSort} /></th><th className="bg-muted sticky left-40 z-30 w-22 min-w-22 border-r p-2"><ColumnSortMenu field="status" label="Status" sort={sort} onSort={setSort} /></th>{rawColumns(visibleRows).map((column) => <th key={`raw-${column}`} className="min-w-36 p-2"><span className="flex items-center gap-0.5"><ColumnSortMenu field={`raw.${column}`} label={column} sort={sort} onSort={setSort} /><ColumnFilterMenu field={`raw.${column}`} label={column} filters={filters} onChange={setFilters} /></span></th>)}{DATA_FIELDS.map((field) => <th key={field} className="min-w-32 p-2"><span className="flex items-center gap-0.5"><ColumnSortMenu field={`mapped.${field}`} label={field} sort={sort} onSort={setSort} /><ColumnFilterMenu field={`mapped.${field}`} label={field} filters={filters} onChange={setFilters} /></span></th>)}{LABEL_FIELDS.map((field) => <th key={field} className="min-w-40 p-2 align-top"><span className="flex items-center gap-0.5"><ColumnSortMenu field={field} label={field} sort={sort} onSort={setSort} /><ColumnFilterMenu field={field} label={field} filters={filters} onChange={setFilters} /></span><p className="text-muted-foreground font-normal">{LABEL_OPTIONS[field]}</p></th>)}</tr></thead><tbody>{windowedRows.map((row) => <WorklistRow key={row.id} row={row} sourceName={sourceStore.items.find((source) => source.id === row.sourceId)?.originalFilename ?? row.sourceFilename ?? 'Existing data'} categories={categories} tableDefs={tableDefs} rawColumns={rawColumns(visibleRows)} onChange={updateWorklist} ensureCategory={ensureCategory} onRestore={restoreRow} onEliminate={eliminateRow} />)}{windowedRows.length === 0 && <tr><td colSpan={2 + DATA_FIELDS.length + LABEL_FIELDS.length} className="text-muted-foreground p-4 text-center">{showingConfirmed ? 'Nothing has been confirmed yet.' : 'No staged data yet.'}</td></tr>}</tbody></table>
+            <table className="min-w-max text-left text-xs"><thead className="bg-muted"><tr><th className="bg-muted sticky left-0 z-30 w-40 min-w-40 p-2"><ColumnSortMenu field="source" label="Source" sort={sort} onSort={setSort} /></th><th className="bg-muted sticky left-40 z-30 w-22 min-w-22 border-r p-2"><ColumnSortMenu field="status" label="Status" sort={sort} onSort={setSort} /></th>{rawColumns(visibleRows).map((column) => <th key={`raw-${column}`} className="min-w-36 p-2"><span className="flex items-center gap-0.5"><ColumnSortMenu field={`raw.${column}`} label={column} sort={sort} onSort={setSort} /><ColumnFilterMenu field={`raw.${column}`} label={column} filters={filters} onChange={setFilters} /></span></th>)}{DATA_FIELDS.map((field) => <th key={field} className="min-w-32 p-2"><span className="flex items-center gap-0.5"><ColumnSortMenu field={`mapped.${field}`} label={field} sort={sort} onSort={setSort} /><ColumnFilterMenu field={`mapped.${field}`} label={field} filters={filters} onChange={setFilters} /></span></th>)}{LABEL_FIELDS.map((field) => <th key={field} className="min-w-40 p-2 align-top"><span className="flex items-center gap-0.5"><ColumnSortMenu field={field} label={field} sort={sort} onSort={setSort} /><ColumnFilterMenu field={field} label={field} filters={filters} onChange={setFilters} /></span><p className="text-muted-foreground font-normal">{LABEL_OPTIONS[field]}</p></th>)}</tr></thead><tbody>{windowedRows.map((row) => <WorklistRow key={row.id} row={row} sourceName={sourceStore.items.find((source) => source.id === row.sourceId)?.originalFilename ?? row.sourceFilename ?? 'Existing data'} categories={categories} tableDefs={tableDefs} rawColumns={rawColumns(visibleRows)} catalogue={catalogue} onChange={updateWorklist} ensureCategory={ensureCategory} onRestore={restoreRow} onEliminate={eliminateRow} />)}{windowedRows.length === 0 && <tr><td colSpan={2 + DATA_FIELDS.length + LABEL_FIELDS.length} className="text-muted-foreground p-4 text-center">{showingConfirmed ? 'Nothing has been confirmed yet.' : 'No staged data yet.'}</td></tr>}</tbody></table>
           </div>
           <div className="flex items-center justify-between gap-2 text-xs">
             <div className="flex items-center gap-2">
@@ -541,12 +545,12 @@ function displayDataValue(field: IngestionTargetField, value: unknown): string {
 }
 
 /** What a column shows, for sorting — the same value the cell renders. */
-function rowCellValue(row: StoredRow<IngestionRow>, field: string, categories: { id: number; name: string }[], tableDefs: { id: number; name: string }[]): unknown {
+function rowCellValue(row: StoredRow<IngestionRow>, field: string, categories: { id: number; name: string }[], tableDefs: { id: number; name: string }[], catalogue: LabelCatalogue): unknown {
   if (field === 'source') return row.sourceFilename ?? ''
   if (field === 'status') return row.hasPendingChange ? 'pending reallocation' : row.status
   if (field.startsWith('raw.')) return row.rawValues[field.slice(4)]
   if (field.startsWith('mapped.')) return row.mappedValues[field.slice(7) as IngestionTargetField]
-  return allLabelValues(row, categories, tableDefs)[field as typeof LABEL_FIELDS[number]]
+  return allLabelValues(row, categories, tableDefs, catalogue)[field as typeof LABEL_FIELDS[number]]
 }
 
 /**
@@ -585,17 +589,17 @@ function rawColumns(rows: StoredRow<IngestionRow>[]) {
   return [...new Set(rows.flatMap((row) => Object.keys(row.rawValues)))].sort((a, b) => a.localeCompare(b))
 }
 
-function WorklistRow({ row, sourceName, categories, tableDefs, rawColumns: columns, onChange, ensureCategory, onRestore, onEliminate }: { row: StoredRow<IngestionRow>; sourceName: string; categories: { id: number; name: string }[]; tableDefs: { id: number; name: string }[]; rawColumns: string[]; onChange: (id: number, patch: { mappedValues?: Partial<IngestionRow['mappedValues']>; labels?: IngestionRowLabels; labelValues?: IngestionRowLabelValues; destinationTableId?: number | null }) => Promise<void>; ensureCategory: (name: string) => Promise<number | undefined>; onRestore: (id: number) => Promise<void>; onEliminate: (id: number) => Promise<void> }) {
+function WorklistRow({ row, sourceName, categories, tableDefs, rawColumns: columns, catalogue, onChange, ensureCategory, onRestore, onEliminate }: { row: StoredRow<IngestionRow>; sourceName: string; categories: { id: number; name: string }[]; tableDefs: { id: number; name: string }[]; rawColumns: string[]; catalogue: LabelCatalogue; onChange: (id: number, patch: { mappedValues?: Partial<IngestionRow['mappedValues']>; labels?: IngestionRowLabels; labelValues?: IngestionRowLabelValues; destinationTableId?: number | null }) => Promise<void>; ensureCategory: (name: string) => Promise<number | undefined>; onRestore: (id: number) => Promise<void>; onEliminate: (id: number) => Promise<void> }) {
   function saveData(field: IngestionTargetField, value: string) { void onChange(row.id, { mappedValues: { [field]: value } }) }
   async function saveLabel(field: typeof LABEL_FIELDS[number], value: string) {
-    const draft = { ...allLabelValues(row, categories, tableDefs), [field]: value }
-    const parsed = parseLabelValues(draft, categories, tableDefs)
+    const draft = { ...allLabelValues(row, categories, tableDefs, catalogue), [field]: value }
+    const parsed = parseLabelValues(draft, categories, tableDefs, catalogue)
     const categoryId = field === 'category' && !parsed.labels.categoryId ? await ensureCategory(value) : parsed.labels.categoryId
     await onChange(row.id, { labels: { ...parsed.labels, ...(categoryId ? { categoryId } : {}) }, labelValues: draft, destinationTableId: parsed.destinationTableId ?? null })
   }
   return <tr className="border-t align-top"><td className="bg-background sticky left-0 z-10 w-40 min-w-40 max-w-40 truncate p-2 font-medium" title={sourceName}>{sourceName}</td><td className="bg-background sticky left-40 z-10 w-22 min-w-22 border-r p-2">{row.status === 'discarded'
     ? <><span className="text-muted-foreground">discarded</span><Button type="button" size="xs" variant="ghost" className="mt-1 h-5 px-1" onClick={() => void onRestore(row.id)}>Restore</Button></>
-    : <>{statusCell(row)}<button type="button" className="text-destructive mt-1 block text-left underline-offset-2 hover:underline" onClick={() => void onEliminate(row.id)}>eliminate</button></>}</td>{columns.map((column) => <td key={column} className="max-w-52 truncate p-2" title={row.rawValues[column] ?? ''}>{row.rawValues[column] ?? ''}</td>)}{DATA_FIELDS.map((field) => <td key={field} className="p-1"><EditableCell value={displayDataValue(field, row.mappedValues[field])} onCommit={(value) => saveData(field, value)} /></td>)}{LABEL_FIELDS.map((field) => <td key={field} className="p-1"><EditableCell value={labelValue(row, field, categories, tableDefs)} invalid={labelFieldInvalid(row, field, categories, tableDefs)} onCommit={(value) => void saveLabel(field, value)} /></td>)}</tr>
+    : <>{statusCell(row)}<button type="button" className="text-destructive mt-1 block text-left underline-offset-2 hover:underline" onClick={() => void onEliminate(row.id)}>eliminate</button></>}</td>{columns.map((column) => <td key={column} className="max-w-52 truncate p-2" title={row.rawValues[column] ?? ''}>{row.rawValues[column] ?? ''}</td>)}{DATA_FIELDS.map((field) => <td key={field} className="p-1"><EditableCell value={displayDataValue(field, row.mappedValues[field])} onCommit={(value) => saveData(field, value)} /></td>)}{LABEL_FIELDS.map((field) => <td key={field} className="p-1"><EditableCell value={labelValue(row, field, categories, tableDefs, catalogue)} invalid={labelFieldInvalid(row, field, categories, tableDefs, catalogue)} onCommit={(value) => void saveLabel(field, value)} /></td>)}</tr>
 }
 
 /** Kept beside the source name and pinned with it: the state is why a row is on screen. */
@@ -618,13 +622,14 @@ function EditableCell({ value, invalid = false, onCommit }: { value: string; inv
   return <Input key={value} defaultValue={value} onBlur={(event) => { if (event.target.value !== value) onCommit(event.target.value) }} className={cn('h-7 min-w-28 text-xs', invalid && 'border-red-500 bg-red-500/10 focus-visible:ring-red-500')} />
 }
 
-function labelValue(row: StoredRow<IngestionRow>, field: typeof LABEL_FIELDS[number], categories: { id: number; name: string }[], tableDefs: { id: number; name: string }[]) {
-  return allLabelValues(row, categories, tableDefs)[field] ?? ''
+function labelValue(row: StoredRow<IngestionRow>, field: typeof LABEL_FIELDS[number], categories: { id: number; name: string }[], tableDefs: { id: number; name: string }[], catalogue: LabelCatalogue) {
+  return allLabelValues(row, categories, tableDefs, catalogue)[field] ?? ''
 }
 
-function allLabelValues(row: StoredRow<IngestionRow>, categories: { id: number; name: string }[], tableDefs: { id: number; name: string }[]): IngestionRowLabelValues {
+function allLabelValues(row: StoredRow<IngestionRow>, categories: { id: number; name: string }[], tableDefs: { id: number; name: string }[], catalogue: LabelCatalogue): IngestionRowLabelValues {
   return {
-    financeDestination: row.labels.financeDestination ?? '',
+    sections: (row.labels.sections ?? []).map((id) => sectionLabelFor(catalogue, id)).join(', '),
+    subsections: (row.labels.subsections ?? []).map((id) => subsectionLabelFor(catalogue, id)).join(', '),
     flowRole: row.labels.flowRole ?? '',
     settlementChannel: row.labels.settlementChannel ?? '',
     spendingTreatment: row.labels.spendingTreatment ?? '',
@@ -635,18 +640,20 @@ function allLabelValues(row: StoredRow<IngestionRow>, categories: { id: number; 
   }
 }
 
-function parseLabelValues(values: IngestionRowLabelValues, categories: { id: number; name: string }[], tableDefs: { id: number; name: string }[]) {
+function parseLabelValues(values: IngestionRowLabelValues, categories: { id: number; name: string }[], tableDefs: { id: number; name: string }[], catalogue: LabelCatalogue) {
   const category = categories.find((candidate) => candidate.name.trim().toLowerCase() === values.category?.trim().toLowerCase())
   const wanted = values.destinationTable?.trim().toLowerCase()
   const table = tableDefs.find((candidate) => candidate.name.trim().toLowerCase() === wanted)
-  const destination = matchLabelValue(FINANCE_DESTINATIONS, values.financeDestination)
+  const sections = parsePlacementLabels(values.sections ?? '', (value) => resolveSectionLabel(catalogue, value))
+  const subsections = parsePlacementLabels(values.subsections ?? '', (value) => resolveSubsectionLabel(catalogue, value))
   const flowRole = matchLabelValue(FLOW_ROLES, values.flowRole)
   const settlementChannel = matchLabelValue(SETTLEMENT_CHANNELS, values.settlementChannel)
   const spendingTreatment = matchLabelValue(SPENDING_TREATMENTS, values.spendingTreatment)
   const recurrence = matchLabelValue(RECURRENCES, values.recurrence)
   return {
     labels: {
-      ...(destination ? { financeDestination: destination } : {}),
+      ...(sections.values.length ? { sections: sections.values } : {}),
+      ...(subsections.values.length ? { subsections: subsections.values } : {}),
       ...(flowRole ? { flowRole } : {}),
       ...(settlementChannel ? { settlementChannel } : {}),
       ...(spendingTreatment ? { spendingTreatment } : {}),
@@ -654,14 +661,19 @@ function parseLabelValues(values: IngestionRowLabelValues, categories: { id: num
       ...(recurrence ? { recurrence } : {}),
     } satisfies IngestionRowLabels,
     destinationTableId: table?.id,
+    unknownPlacements: [...sections.unknown, ...subsections.unknown],
   }
 }
 
-function labelFieldInvalid(row: StoredRow<IngestionRow>, field: typeof LABEL_FIELDS[number], categories: { id: number; name: string }[], tableDefs: { id: number; name: string }[]) {
-  const value = labelValue(row, field, categories, tableDefs).trim()
+function labelFieldInvalid(row: StoredRow<IngestionRow>, field: typeof LABEL_FIELDS[number], categories: { id: number; name: string }[], tableDefs: { id: number; name: string }[], catalogue: LabelCatalogue) {
+  const value = labelValue(row, field, categories, tableDefs, catalogue).trim()
   if (!value) return false
-  const { labels, destinationTableId } = parseLabelValues({ ...row.labelValues, [field]: value }, categories, tableDefs)
-  if (field === 'financeDestination') return !labels.financeDestination
+  const { labels, destinationTableId } = parseLabelValues({ ...row.labelValues, [field]: value }, categories, tableDefs, catalogue)
+  if (field === 'sections' || field === 'subsections') {
+    // Red means "no section or screen is called that", which is the only way these can
+    // be wrong: they are free text checked against what the app currently has.
+    return parseLabelValues({ ...row.labelValues, [field]: value }, categories, tableDefs, catalogue).unknownPlacements.length > 0
+  }
   if (field === 'category') return false
   if (field === 'destinationTable') return !destinationTableId
   return !labels[field as keyof IngestionRowLabels]

@@ -1,4 +1,5 @@
 import { DEFAULT_INGESTION_GUIDE, INGESTION_GUIDE_KEY } from '@/lib/ingestion-guide'
+import { renderPrompt } from '@/lib/prompt-placeholders'
 import { ingestionLabelErrors } from '@/lib/model/ingestion'
 import { ensureCategoryByName } from '@/lib/model/category-vocabulary'
 import { createSupplementalColumn, fillSupplementalColumn, markSourceRows, parseIngestionCsv, planIngestionStaging, saveIngestionMappings, stageIngestionSource, supplementalValueFor } from '@/lib/model/ingestion-source'
@@ -6,7 +7,9 @@ import { discardIngestionRows, updateIngestionRowLabels, updateIngestionRowWorkl
 import { ingestionFieldContext, INGESTION_QUERY_FIELDS, resolveIngestionField } from '@/lib/model/ingestion-fields'
 import { groupRows, queryRows, type RowFilter, type RowQuery } from '@/lib/model/row-query'
 import { findDuplicateMatches, findDuplicateMatchesWithin, normalizeAmount, normalizeDate, normalizeText, type ComparableRow } from '@/lib/model/ingestion-duplicates'
-import { FINANCE_DESTINATIONS, FLOW_ROLES, labelValues, matchLabelValue, RECURRENCES, SETTLEMENT_CHANNELS, SPENDING_TREATMENTS } from '@/lib/model/label-vocabulary'
+import { FLOW_ROLES, labelValues, matchLabelValue, RECURRENCES, SETTLEMENT_CHANNELS, SPENDING_TREATMENTS } from '@/lib/model/label-vocabulary'
+import { parsePlacementLabels, resolveSectionLabel, resolveSubsectionLabel } from '@/lib/model/label-catalogue'
+import { buildLabelCatalogue } from '@/lib/label-catalogue-source'
 import { assistantPromptsTable } from '@/lib/assistant-prompts-db'
 import { categoriesTable, entriesTable, ingestionAuditEventsTable, ingestionColumnMappingsTable, ingestionRowsTable, ingestionSourcesTable, tableDefsTable } from '@/lib/model/model-db'
 import type { AssistantPrompt } from '@/lib/assistant-prompts'
@@ -45,7 +48,7 @@ function summariseSource(stored: { id: number; data: unknown }, rows: IngestionR
     },
   }
 }
-const TARGET_FIELDS: IngestionTargetField[] = ['date', 'amount', 'description', 'rawCategory', 'direction', 'asset', 'investmentType', 'quantity', 'price', 'note', 'destination', 'financeDestination', 'flowRole', 'settlementChannel', 'spendingTreatment', 'categoryId', 'recurrence', 'destinationTableId']
+const TARGET_FIELDS: IngestionTargetField[] = ['date', 'amount', 'description', 'rawCategory', 'direction', 'asset', 'investmentType', 'quantity', 'price', 'note', 'destination', 'sections', 'subsections', 'flowRole', 'settlementChannel', 'spendingTreatment', 'categoryId', 'recurrence', 'destinationTableId']
 
 /** Mapping tools act on an uploaded file; the migration's synthetic source has none. */
 async function rejectIfLegacy(sourceId: number): Promise<string | null> {
@@ -286,7 +289,7 @@ export const stageIngestionSourceTool: ToolDefinition = {
 
 export const updateIngestionLabelsTool: ToolDefinition = {
   name: 'update_ingestion_labels',
-  description: `Sets or clears labels and the destination table for explicit imported rows. Read the rows first with read_ingestion_table, and read_ingestion_guide if you have not already, since every value below is closed except the category. financeDestination: ${labelValues(FINANCE_DESTINATIONS).join(' | ')}. flowRole: ${labelValues(FLOW_ROLES).join(' | ')}. settlementChannel: ${labelValues(SETTLEMENT_CHANNELS).join(' | ')}. spendingTreatment: ${labelValues(SPENDING_TREATMENTS).join(' | ')}. recurrence: ${labelValues(RECURRENCES).join(' | ')}. category is free text and a new name creates that category. It also relabels a row that is already confirmed: the change is held as a pending reallocation and the live entry keeps its current meaning until the user confirms it. Reports each row's readiness; this tool can never confirm, promote or reallocate — only the user can.`,
+  description: `Sets or clears labels and the destination table for explicit imported rows. Read the rows first with read_ingestion_table, and read_ingestion_guide if you have not already, since every value below is closed except the category. sections and subsections are free text naming the app's own sections and screens — call list_label_options for what exists now, and pass several separated by commas when a row belongs to more than one. flowRole: ${labelValues(FLOW_ROLES).join(' | ')}. settlementChannel: ${labelValues(SETTLEMENT_CHANNELS).join(' | ')}. spendingTreatment: ${labelValues(SPENDING_TREATMENTS).join(' | ')}. recurrence: ${labelValues(RECURRENCES).join(' | ')}. category is free text and a new name creates that category. It also relabels a row that is already confirmed: the change is held as a pending reallocation and the live entry keeps its current meaning until the user confirms it. Reports each row's readiness; this tool can never confirm, promote or reallocate — only the user can.`,
   parameters: {
     type: 'object',
     properties: {
@@ -296,7 +299,8 @@ export const updateIngestionLabelsTool: ToolDefinition = {
           type: 'object',
           properties: {
             rowId: { type: 'number' },
-            financeDestination: { type: 'string', enum: labelValues(FINANCE_DESTINATIONS) },
+            sections: { type: 'string', description: 'Section names or ids, comma-separated. See list_label_options.' },
+            subsections: { type: 'string', description: 'Screen names or ids, comma-separated. See list_label_options.' },
             flowRole: { type: 'string', enum: labelValues(FLOW_ROLES) },
             settlementChannel: { type: 'string', enum: labelValues(SETTLEMENT_CHANNELS) },
             spendingTreatment: { type: 'string', enum: labelValues(SPENDING_TREATMENTS) },
@@ -311,8 +315,9 @@ export const updateIngestionLabelsTool: ToolDefinition = {
     required: ['updates'],
     additionalProperties: false,
   },
-  execute: async (args) => {
+  execute: async (args, context) => {
     if (!Array.isArray(args.updates)) return 'Error: updates are required.'
+    const catalogue = buildLabelCatalogue(context.translate)
     const result: unknown[] = []
     for (const update of args.updates as Record<string, unknown>[]) {
       if (typeof update.rowId !== 'number') { result.push({ error: 'rowId is required.' }); continue }
@@ -323,7 +328,8 @@ export const updateIngestionLabelsTool: ToolDefinition = {
       const categoryId = text('category') === undefined ? current.labels.categoryId : await ensureCategoryByName(text('category')!)
       const labels: IngestionRowLabels = {
         ...current.labels,
-        ...(text('financeDestination') !== undefined ? { financeDestination: matchLabelValue(FINANCE_DESTINATIONS, text('financeDestination')) } : {}),
+        ...(text('sections') !== undefined ? { sections: parsePlacementLabels(text('sections')!, (value) => resolveSectionLabel(catalogue, value)).values } : {}),
+        ...(text('subsections') !== undefined ? { subsections: parsePlacementLabels(text('subsections')!, (value) => resolveSubsectionLabel(catalogue, value)).values } : {}),
         ...(text('flowRole') !== undefined ? { flowRole: matchLabelValue(FLOW_ROLES, text('flowRole')) } : {}),
         ...(text('settlementChannel') !== undefined ? { settlementChannel: matchLabelValue(SETTLEMENT_CHANNELS, text('settlementChannel')) } : {}),
         ...(text('spendingTreatment') !== undefined ? { spendingTreatment: matchLabelValue(SPENDING_TREATMENTS, text('spendingTreatment')) } : {}),
@@ -341,7 +347,8 @@ export const updateIngestionLabelsTool: ToolDefinition = {
 }
 
 const LABEL_PROPERTIES = {
-  financeDestination: { type: 'string', enum: labelValues(FINANCE_DESTINATIONS) },
+  sections: { type: 'string', description: "Section names or ids, comma-separated." },
+  subsections: { type: 'string', description: "Screen names or ids, comma-separated." },
   flowRole: { type: 'string', enum: labelValues(FLOW_ROLES) },
   settlementChannel: { type: 'string', enum: labelValues(SETTLEMENT_CHANNELS) },
   spendingTreatment: { type: 'string', enum: labelValues(SPENDING_TREATMENTS) },
@@ -374,7 +381,7 @@ export const labelIngestionRowsByMatchTool: ToolDefinition = {
     required: ['contains', 'labels'],
     additionalProperties: false,
   },
-  execute: async (args) => {
+  execute: async (args, context) => {
     const contains = typeof args.contains === 'string' ? args.contains.trim() : ''
     if (!contains) return 'Error: contains is required and cannot be empty.'
     const update = (args.labels ?? {}) as Record<string, unknown>
@@ -397,13 +404,15 @@ export const labelIngestionRowsByMatchTool: ToolDefinition = {
       return JSON.stringify({ applied: false, matched: matches.length, examples, next: 'Show the user the count and these examples, confirm the rule really covers them, then call again with apply=true.' })
     }
 
+    const catalogue = buildLabelCatalogue(context.translate)
     const categoryId = typeof update.category === 'string' ? await ensureCategoryByName(update.category) : undefined
     const result = { applied: true, matched: matches.length, ready: 0, invalid: 0, pendingReallocation: 0, unchanged: 0, errors: [] as string[] }
     for (const row of matches) {
       const current = row.data as IngestionRow
       const labels: IngestionRowLabels = {
         ...current.labels,
-        ...(typeof update.financeDestination === 'string' ? { financeDestination: matchLabelValue(FINANCE_DESTINATIONS, update.financeDestination) } : {}),
+        ...(typeof update.sections === 'string' ? { sections: parsePlacementLabels(update.sections, (value) => resolveSectionLabel(catalogue, value)).values } : {}),
+        ...(typeof update.subsections === 'string' ? { subsections: parsePlacementLabels(update.subsections, (value) => resolveSubsectionLabel(catalogue, value)).values } : {}),
         ...(typeof update.flowRole === 'string' ? { flowRole: matchLabelValue(FLOW_ROLES, update.flowRole) } : {}),
         ...(typeof update.settlementChannel === 'string' ? { settlementChannel: matchLabelValue(SETTLEMENT_CHANNELS, update.settlementChannel) } : {}),
         ...(typeof update.spendingTreatment === 'string' ? { spendingTreatment: matchLabelValue(SPENDING_TREATMENTS, update.spendingTreatment) } : {}),
@@ -738,7 +747,7 @@ export const suggestIngestionLabelsTool: ToolDefinition = {
   execute: async (args) => {
     if (!Array.isArray(args.rowIds)) return 'Error: rowIds are required.'
     const [categories, allRows] = await Promise.all([categoriesTable.toArray(), ingestionRowsTable.toArray()])
-    const labelledRows = allRows.map((row) => row.data as IngestionRow).filter((row) => row.labels.financeDestination)
+    const labelledRows = allRows.map((row) => row.data as IngestionRow).filter((row) => row.labels.subsections?.length)
     const result = []
     for (const id of args.rowIds) {
       if (typeof id !== 'number') continue
@@ -785,12 +794,29 @@ export const readIngestionProvenanceTool: ToolDefinition = {
   },
 }
 
+export const listLabelOptionsTool: ToolDefinition = {
+  name: 'list_label_options',
+  description: "Lists what the placement labels may be set to right now: the app's sections and the screens inside them, each with the id to store and the name currently shown. Those two labels are the only ones that are not a fixed list — they follow the app, so read them here rather than remembering them, and never invent a section or screen that is not in this answer. The other dimensions (flow role, settlement channel, spending treatment, recurrence) are fixed and stated in the tools that set them; category is free text. Read-only.",
+  parameters: { type: 'object', properties: {}, additionalProperties: false },
+  execute: async (_args, context) => {
+    const catalogue = buildLabelCatalogue(context.translate)
+    return JSON.stringify({
+      sections: catalogue.sections,
+      screens: catalogue.subsections,
+      note: 'Store the id. A row may carry more than one of each when it genuinely belongs to more than one.',
+    })
+  },
+}
+
 export const readIngestionGuideTool: ToolDefinition = {
   name: 'read_ingestion_guide',
   description: 'Returns the complete step-by-step guide to the data ingestion and labelling workflow: the two steps, the canonical fields a source must supply, every label dimension with the meaning of each of its values, the judgment rules, and which actions belong to the user alone. Call it BEFORE doing or explaining anything about importing, mapping columns, labelling rows, categories, or confirming rows — including when the user simply asks for help with any of that. Read-only.',
   parameters: { type: 'object', properties: {}, additionalProperties: false },
-  execute: async () => {
+  execute: async (_args, context) => {
     const stored = (await assistantPromptsTable.toArray()).find((row) => (row.data as AssistantPrompt).key === INGESTION_GUIDE_KEY)
-    return stored ? (stored.data as AssistantPrompt).content : DEFAULT_INGESTION_GUIDE
+    // Rendered, never raw: the guide names the sections and screens that exist at this
+    // moment, and a saved copy that has lost that placeholder is refused with an
+    // explanation rather than sent as if it were still true.
+    return renderPrompt(INGESTION_GUIDE_KEY, stored ? (stored.data as AssistantPrompt).content : DEFAULT_INGESTION_GUIDE, context.translate)
   },
 }

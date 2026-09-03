@@ -11,7 +11,7 @@ import type { IngestionRow, TableDef } from './types'
 export const INGESTION_QUERY_FIELDS = [
   'date', 'amount', 'description', 'rawCategory', 'note', 'asset', 'quantity', 'price', 'investmentType', 'direction', 'destination',
   'status', 'source', 'destinationTable', 'discardReason',
-  'financeDestination', 'flowRole', 'settlementChannel', 'spendingTreatment', 'recurrence', 'category',
+  'sections', 'subsections', 'flowRole', 'settlementChannel', 'spendingTreatment', 'recurrence', 'category',
 ] as const
 
 export interface IngestionFieldContext {
@@ -31,7 +31,8 @@ export function resolveIngestionField(row: IngestionRow, field: string, context:
     case 'source': return context.sourceNameById.get(row.sourceId) ?? row.sourceFilename ?? ''
     case 'destinationTable': return row.destinationTableId ? (context.tableNameById.get(row.destinationTableId) ?? '') : ''
     case 'category': return row.labels.categoryId ? (context.categoryNameById.get(row.labels.categoryId) ?? '') : ''
-    case 'financeDestination': return row.labels.financeDestination
+    case 'sections': return (row.labels.sections ?? []).join(', ')
+    case 'subsections': return (row.labels.subsections ?? []).join(', ')
     case 'flowRole': return row.labels.flowRole
     case 'settlementChannel': return row.labels.settlementChannel
     case 'spendingTreatment': return row.labels.spendingTreatment

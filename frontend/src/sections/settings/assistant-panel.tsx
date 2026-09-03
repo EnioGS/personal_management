@@ -20,6 +20,7 @@ import { DEV_API_KEY, useAssistantConfigStore, type AssistantConfig } from '@/li
 import { detectApiProvider, providerLabel, type ApiProvider } from '@/lib/ai-providers'
 import { DEFAULT_SYSTEM_PROMPT, SYSTEM_PROMPT_KEY, useAssistantPromptsStore } from '@/lib/assistant-prompts'
 import { DEFAULT_INGESTION_GUIDE, INGESTION_GUIDE_KEY } from '@/lib/ingestion-guide'
+import { missingPlaceholders, PROMPT_PLACEHOLDERS } from '@/lib/prompt-placeholders'
 import type { StoredRow } from '@/lib/local-store/create-local-table'
 import { cn } from '@/lib/utils'
 
@@ -219,6 +220,7 @@ function ConnectionsSection() {
  * sent to the model, so both are the user's to rewrite and to reset.
  */
 function PromptSection({ promptKey, defaultContent, label, description, resetLabel }: { promptKey: string; defaultContent: string; label: string; description: string; resetLabel: string }) {
+  const { t } = useTranslation('settings')
   const { items, isLoading, addItem, updateItem } = useAssistantPromptsStore()
   const [draft, setDraft] = useState<string | null>(null)
   const [isFocused, setIsFocused] = useState(false)
@@ -252,6 +254,10 @@ function PromptSection({ promptKey, defaultContent, label, description, resetLab
     }
   }, [isFocused, draft])
 
+  // A prompt that has lost a placeholder is not sent to the model at all, so the editor
+  // has to say so plainly rather than letting it look saved and working.
+  const missing = draft === null ? [] : missingPlaceholders(promptKey, draft)
+
   async function persist(content: string) {
     if (promptRow) await updateItem(promptRow.id, { key: promptKey, content })
     else await addItem({ key: promptKey, content })
@@ -283,9 +289,21 @@ function PromptSection({ promptKey, defaultContent, label, description, resetLab
           setIsFocused(false)
           void persist(e.target.value)
         }}
-        className={cn('max-h-[70vh] resize-none overflow-auto font-mono text-sm', !isFocused && 'h-72 min-h-0')}
+        className={cn(
+          'max-h-[70vh] resize-none overflow-auto font-mono text-sm',
+          !isFocused && 'h-72 min-h-0',
+          missing.length > 0 && 'border-destructive focus-visible:ring-destructive',
+        )}
         disabled={draft === null}
       />
+      {missing.length > 0 && (
+        <p className="text-destructive text-xs">
+          {t('assistant.placeholderMissing', {
+            placeholders: missing.map((name) => PROMPT_PLACEHOLDERS[name]).join(' '),
+            defaultValue: `This instruction needs ${missing.map((name) => PROMPT_PLACEHOLDERS[name]).join(' and ')}, which is where the app fills in the sections and screens that exist right now. Without it the assistant is told to use labels without being told which ones there are, so it will refuse to use this instruction until you put it back — or reset it to the default.`,
+        })}
+        </p>
+      )}
     </div>
   )
 }

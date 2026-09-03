@@ -1,18 +1,21 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Plus, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { applyLabelRulesToRows, deleteLabelRule, labelRulesWithStats, saveLabelRule, updateLabelRule } from '@/lib/model/label-rules-repository'
-import { FINANCE_DESTINATIONS, FLOW_ROLES, labelValues, matchLabelValue, RECURRENCES, SETTLEMENT_CHANNELS, SPENDING_TREATMENTS } from '@/lib/model/label-vocabulary'
+import { FLOW_ROLES, labelValues, matchLabelValue, RECURRENCES, SETTLEMENT_CHANNELS, SPENDING_TREATMENTS } from '@/lib/model/label-vocabulary'
+import { parsePlacementLabels, resolveSectionLabel, resolveSubsectionLabel, subsectionLabelFor } from '@/lib/model/label-catalogue'
+import { buildLabelCatalogue } from '@/lib/label-catalogue-source'
 import type { RuleStats, StoredRule } from '@/lib/model/label-rules'
 import { useCategoriesStore, useIngestionRowsStore, useTableDefsStore } from '@/lib/model/model-stores'
 import type { IngestionRowLabels, LabelRule } from '@/lib/model/types'
 
 interface RuleWithStats { rule: StoredRule; stats: RuleStats }
 
-const BLANK_DRAFT = { name: '', contains: '', rationale: '', financeDestination: '', flowRole: '', settlementChannel: '', spendingTreatment: '', recurrence: '', category: '', destinationTable: '' }
+const BLANK_DRAFT = { name: '', contains: '', rationale: '', sections: '', subsections: '', flowRole: '', settlementChannel: '', spendingTreatment: '', recurrence: '', category: '', destinationTable: '' }
 
 /**
  * Standing rules, listed one line each. A rule is a decision that outlives the batch
@@ -22,6 +25,7 @@ const BLANK_DRAFT = { name: '', contains: '', rationale: '', financeDestination:
  * number that says a rule is wrong.
  */
 export function LabellingRules({ onChanged }: { onChanged: () => Promise<void> | void }) {
+  const { t } = useTranslation()
   const rowStore = useIngestionRowsStore((store) => store.items)
   const categories = useCategoriesStore((store) => store.items)
   const addCategory = useCategoriesStore((store) => store.addItem)
@@ -50,8 +54,16 @@ export function LabellingRules({ onChanged }: { onChanged: () => Promise<void> |
     const categoryName = draft.category.trim()
     const existing = categories.find((category) => category.name.trim().toLowerCase() === categoryName.toLowerCase())
     const categoryId = categoryName ? (existing?.id ?? (await addCategory({ name: categoryName }))) : undefined
+    const catalogue = buildLabelCatalogue((key) => String(t(key as never)))
+    const sections = parsePlacementLabels(draft.sections, (value) => resolveSectionLabel(catalogue, value))
+    const subsections = parsePlacementLabels(draft.subsections, (value) => resolveSubsectionLabel(catalogue, value))
+    if (sections.unknown.length > 0 || subsections.unknown.length > 0) {
+      setMessage(`No section or screen is called ${[...sections.unknown, ...subsections.unknown].join(', ')}.`)
+      return
+    }
     const labels: IngestionRowLabels = {
-      ...(matchLabelValue(FINANCE_DESTINATIONS, draft.financeDestination) ? { financeDestination: matchLabelValue(FINANCE_DESTINATIONS, draft.financeDestination) } : {}),
+      ...(sections.values.length ? { sections: sections.values } : {}),
+      ...(subsections.values.length ? { subsections: subsections.values } : {}),
       ...(matchLabelValue(FLOW_ROLES, draft.flowRole) ? { flowRole: matchLabelValue(FLOW_ROLES, draft.flowRole) } : {}),
       ...(matchLabelValue(SETTLEMENT_CHANNELS, draft.settlementChannel) ? { settlementChannel: matchLabelValue(SETTLEMENT_CHANNELS, draft.settlementChannel) } : {}),
       ...(matchLabelValue(SPENDING_TREATMENTS, draft.spendingTreatment) ? { spendingTreatment: matchLabelValue(SPENDING_TREATMENTS, draft.spendingTreatment) } : {}),
@@ -85,7 +97,7 @@ export function LabellingRules({ onChanged }: { onChanged: () => Promise<void> |
   }
 
   function summarise(rule: StoredRule): string {
-    const labels = [rule.labels.financeDestination, rule.labels.flowRole, rule.labels.settlementChannel, rule.labels.spendingTreatment, rule.labels.recurrence].filter(Boolean)
+    const labels = [...(rule.labels.subsections ?? []).map((id) => subsectionLabelFor(buildLabelCatalogue((key) => String(t(key as never))), id)), rule.labels.flowRole, rule.labels.settlementChannel, rule.labels.spendingTreatment, rule.labels.recurrence].filter(Boolean)
     const table = rule.destinationTableId ? tableDefs.find((candidate) => candidate.id === rule.destinationTableId)?.name : undefined
     return [...labels, ...(table ? [table] : [])].join(' · ') || 'no labels'
   }
@@ -121,7 +133,8 @@ export function LabellingRules({ onChanged }: { onChanged: () => Promise<void> |
           <div className="grid grid-cols-2 gap-2">
             <Input value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} placeholder="Name (optional)" className="h-7 text-xs" />
             <Input value={draft.contains} onChange={(event) => setDraft({ ...draft, contains: event.target.value })} placeholder="Description contains…" className="h-7 text-xs" />
-            <Input value={draft.financeDestination} onChange={(event) => setDraft({ ...draft, financeDestination: event.target.value })} placeholder={`destination: ${labelValues(FINANCE_DESTINATIONS).join(' | ')}`} className="h-7 text-xs" />
+            <Input value={draft.sections} onChange={(event) => setDraft({ ...draft, sections: event.target.value })} placeholder="sections (comma-separated)" className="h-7 text-xs" />
+            <Input value={draft.subsections} onChange={(event) => setDraft({ ...draft, subsections: event.target.value })} placeholder="screens (comma-separated)" className="h-7 text-xs" />
             <Input value={draft.flowRole} onChange={(event) => setDraft({ ...draft, flowRole: event.target.value })} placeholder={`flow role: ${labelValues(FLOW_ROLES).join(' | ')}`} className="h-7 text-xs" />
             <Input value={draft.settlementChannel} onChange={(event) => setDraft({ ...draft, settlementChannel: event.target.value })} placeholder="settlement channel" className="h-7 text-xs" />
             <Input value={draft.spendingTreatment} onChange={(event) => setDraft({ ...draft, spendingTreatment: event.target.value })} placeholder="spending treatment" className="h-7 text-xs" />

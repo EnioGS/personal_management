@@ -9,7 +9,7 @@ function csvAttachment(content = CSV_CONTENT): ChatAttachment {
 }
 
 function makeContext(attachments: ChatAttachment[] = [csvAttachment()]) {
-  return { attachments }
+  return { attachments, translate: (key: string) => key }
 }
 
 describe('readCsvTool', () => {

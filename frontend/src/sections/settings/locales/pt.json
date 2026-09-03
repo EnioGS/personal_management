@@ -38,7 +38,8 @@
     "systemPromptDescription": "Enviado ao modelo no início de cada conversa. Não é traduzido — sempre salvo e usado no idioma em que você escrevê-lo.",
     "resetPrompt": "Restaurar padrão",
     "ingestionGuideLabel": "Guia de importação",
-    "ingestionGuideDescription": "O guia passo a passo que o assistente lê antes de ajudar com importação, mapeamento e rótulos. Edite para mudar como ele age, ou restaure o padrão."
+    "ingestionGuideDescription": "O guia passo a passo que o assistente lê antes de ajudar com importação, mapeamento e rótulos. Edite para mudar como ele age, ou restaure o padrão.",
+    "placeholderMissing": "Esta instrução precisa de {{placeholders}} — é ali que o app preenche as seções e telas que existem agora. Sem isso o assistente seria instruído a usar rótulos sem saber quais existem, então ele recusará esta instrução até que você a devolva, ou restaure o padrão."
   },
   "accountsCards": {
     "accountsHeading": "Contas bancárias",
