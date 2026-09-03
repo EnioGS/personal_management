@@ -124,13 +124,46 @@ is one line: what it matches, what it sets, and how many rows it has been credit
 with. Clicking opens a dialog with the full labels, the distinct strings it matched,
 the confirmed/overridden split, and a delete action.
 
-### 4.5 Tools
+### 4.5 Authorship and rationale
 
-- `save_label_rule` — persist a rule, optionally applying it to the current worklist.
-- `list_label_rules` — rules with their stats.
+Every rule carries a **rationale**: why it is safe to apply this label set to
+everything matching this string. The assistant writes it when it proposes a rule
+(aim for a short paragraph, no hard limit), the user can edit it freely, and a rule
+created by hand in the UI starts with whatever the user writes. It is stored with the
+rule and shown in both the collapsed line and the detail dialog, because a rule that
+nobody can justify later is a rule nobody can safely keep.
+
+The user can also **create a rule directly**: a small form in the Labelling rules
+section — field, matching text, the label set, and the rationale — with no assistant
+involved.
+
+### 4.6 Tools
+
+- `save_label_rule` — persist a rule *with its rationale*, optionally applying it to
+  the current worklist immediately.
+- `list_label_rules` — every rule with its labels, rationale and stats, so the
+  assistant can read the standing rules, judge whether one already covers a batch,
+  and apply or skip it rather than inventing an overlapping one.
+- `apply_label_rules` — run the saved rules over rows that are still unlabelled,
+  reporting what each one filled.
 - `delete_label_rule` — remove one; rows it labelled keep their labels.
 - `label_ingestion_rows_by_match` gains an instruction: after a rule is applied,
   **ask the user whether to save it**, so the next import starts where this one ended.
+
+## Phase 5 — the secondary bar behaves like a flyout
+
+The bar rests on its icon strip (adr/0020). Expanding it should feel like peeking,
+not like committing:
+
+- **A control inside the bar** toggles the width as well as the activity-bar icon, so
+  the bar can be collapsed without travelling back to the icon that opened it.
+- **Width transitions** are animated (~150ms), matching the chat panel's own
+  transition so the two do not feel like different applications.
+- **It collapses itself**: immediately when a click lands outside it, and about three
+  seconds after it opened. The timer is cancelled while the pointer or keyboard focus
+  is inside the bar — a countdown that fires while someone is reading the labels
+  would be worse than no countdown at all — and restarts when they leave.
+- Choosing an item still collapses it, as it does today.
 
 ## Verification
 

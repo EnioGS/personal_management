@@ -3,6 +3,9 @@ import { Check, FilePlus2, Plus, Trash2, Upload } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { ColumnSortMenu, type ColumnSort } from '@/components/data-table/column-sort-menu'
+import { useProgressiveRows } from '@/components/data-table/use-progressive-rows'
+import { queryRows } from '@/lib/model/row-query'
 import { cn } from '@/lib/utils'
 import {
   createIngestionSource,
@@ -67,6 +70,7 @@ export function IngestionPanel() {
   const [worklistFieldName, setWorklistFieldName] = useState('')
   const [showDiscarded, setShowDiscarded] = useState(false)
   const [isDropTarget, setIsDropTarget] = useState(false)
+  const [sort, setSort] = useState<ColumnSort | null>(null)
   const fileInput = useRef<HTMLInputElement>(null)
 
   const selectedSource = sourceStore.items.find((source) => String(source.id) === selected)
@@ -103,7 +107,14 @@ export function IngestionPanel() {
     return [...finalized].sort((left, right) => Number(right.hasPendingChange) - Number(left.hasPendingChange))
   }, [rowStore.items])
   const showingConfirmed = selected === CONFIRMED_DATASET
-  const visibleRows = showingConfirmed ? confirmedRows : showDiscarded ? discardedRows : rows
+  const datasetRows = showingConfirmed ? confirmedRows : showDiscarded ? discardedRows : rows
+  // Sorting is applied to the whole dataset before the window is taken, so ordering a
+  // column never means "ordering the hundred rows that happen to be rendered".
+  const visibleRows = useMemo(() => {
+    if (!sort) return datasetRows
+    return queryRows(datasetRows, (row, field) => rowCellValue(row, field, categories, tableDefs), { sort }).rows
+  }, [datasetRows, sort, categories, tableDefs])
+  const { visible: windowedRows, onScroll: onRowsScroll, shown, total } = useProgressiveRows(visibleRows, `${selected}:${showDiscarded}:${sort?.field}:${sort?.direction}:${sort?.type}`)
   const reallocatable = confirmedRows.filter((row) => row.hasPendingChange && row.validationErrors.length === 0)
   // A source file is finished when nothing of it is still waiting: every row either
   // reached a Finance table or was set aside as a duplicate. Duplicates count as dealt
@@ -370,8 +381,8 @@ export function IngestionPanel() {
           <p className="text-muted-foreground text-xs">{showingConfirmed
             ? 'These rows are already in a Finance table. Editing a label or a data field marks the row for reallocation — its entry is rewritten, and every Finance screen follows, only when you confirm below.'
             : 'Source data is shown in its own columns. Canonical fields can be edited here; label cells accept text and turn red when the value is not one of the accepted options. Typing a category name that does not exist yet creates it.'}</p>
-          <div className="min-h-0 flex-1 overflow-auto rounded border">
-            <table className="min-w-max text-left text-xs"><thead className="bg-muted"><tr><th className="bg-muted sticky left-0 z-30 w-40 min-w-40 p-2">Source</th><th className="bg-muted sticky left-40 z-30 w-22 min-w-22 border-r p-2">Status</th>{rawColumns(visibleRows).map((column) => <th key={`raw-${column}`} className="min-w-36 p-2">{column}</th>)}{DATA_FIELDS.map((field) => <th key={field} className="min-w-32 p-2">{field}</th>)}{LABEL_FIELDS.map((field) => <th key={field} className="min-w-40 p-2 align-top">{field}<p className="text-muted-foreground font-normal">{LABEL_OPTIONS[field]}</p></th>)}</tr></thead><tbody>{visibleRows.map((row) => <WorklistRow key={row.id} row={row} sourceName={sourceStore.items.find((source) => source.id === row.sourceId)?.originalFilename ?? row.sourceFilename ?? 'Existing data'} categories={categories} tableDefs={tableDefs} rawColumns={rawColumns(visibleRows)} onChange={updateWorklist} ensureCategory={ensureCategory} onRestore={restoreRow} />)}{visibleRows.length === 0 && <tr><td colSpan={2 + DATA_FIELDS.length + LABEL_FIELDS.length} className="text-muted-foreground p-4 text-center">{showingConfirmed ? 'Nothing has been confirmed yet.' : 'No staged data yet.'}</td></tr>}</tbody></table>
+          <div className="min-h-0 flex-1 overflow-auto rounded border" onScroll={onRowsScroll}>
+            <table className="min-w-max text-left text-xs"><thead className="bg-muted"><tr><th className="bg-muted sticky left-0 z-30 w-40 min-w-40 p-2"><ColumnSortMenu field="source" label="Source" sort={sort} onSort={setSort} /></th><th className="bg-muted sticky left-40 z-30 w-22 min-w-22 border-r p-2"><ColumnSortMenu field="status" label="Status" sort={sort} onSort={setSort} /></th>{rawColumns(visibleRows).map((column) => <th key={`raw-${column}`} className="min-w-36 p-2"><ColumnSortMenu field={`raw.${column}`} label={column} sort={sort} onSort={setSort} /></th>)}{DATA_FIELDS.map((field) => <th key={field} className="min-w-32 p-2"><ColumnSortMenu field={`mapped.${field}`} label={field} sort={sort} onSort={setSort} /></th>)}{LABEL_FIELDS.map((field) => <th key={field} className="min-w-40 p-2 align-top"><ColumnSortMenu field={field} label={field} sort={sort} onSort={setSort} /><p className="text-muted-foreground font-normal">{LABEL_OPTIONS[field]}</p></th>)}</tr></thead><tbody>{windowedRows.map((row) => <WorklistRow key={row.id} row={row} sourceName={sourceStore.items.find((source) => source.id === row.sourceId)?.originalFilename ?? row.sourceFilename ?? 'Existing data'} categories={categories} tableDefs={tableDefs} rawColumns={rawColumns(visibleRows)} onChange={updateWorklist} ensureCategory={ensureCategory} onRestore={restoreRow} />)}{windowedRows.length === 0 && <tr><td colSpan={2 + DATA_FIELDS.length + LABEL_FIELDS.length} className="text-muted-foreground p-4 text-center">{showingConfirmed ? 'Nothing has been confirmed yet.' : 'No staged data yet.'}</td></tr>}</tbody></table>
           </div>
           <div className="flex items-center justify-between gap-2 text-xs">
             <div className="flex items-center gap-2">
@@ -384,7 +395,7 @@ export function IngestionPanel() {
                   {showDiscarded ? 'Back to the worklist' : `Show discarded (${discardedRows.length})`}
                 </Button>
               )}
-              <p className="text-muted-foreground">{showingConfirmed
+              <p className="text-muted-foreground">{shown < total ? `showing ${shown} of ${total} · scroll for more — ` : ''}{showingConfirmed
                 ? `${confirmedRows.length} confirmed row(s) · ${reallocatable.length} to reallocate`
                 : showDiscarded
                   ? `${discardedRows.length} discarded row(s) · kept as provenance, never promoted`
@@ -414,6 +425,15 @@ export function IngestionPanel() {
 function displayDataValue(field: IngestionTargetField, value: unknown): string {
   if (field === 'date' && typeof value === 'number' && Number.isFinite(value)) return new Date(value).toISOString().slice(0, 10)
   return String(value ?? '')
+}
+
+/** What a column shows, for sorting — the same value the cell renders. */
+function rowCellValue(row: StoredRow<IngestionRow>, field: string, categories: { id: number; name: string }[], tableDefs: { id: number; name: string }[]): unknown {
+  if (field === 'source') return row.sourceFilename ?? ''
+  if (field === 'status') return row.hasPendingChange ? 'pending reallocation' : row.status
+  if (field.startsWith('raw.')) return row.rawValues[field.slice(4)]
+  if (field.startsWith('mapped.')) return row.mappedValues[field.slice(7) as IngestionTargetField]
+  return allLabelValues(row, categories, tableDefs)[field as typeof LABEL_FIELDS[number]]
 }
 
 function rawColumns(rows: StoredRow<IngestionRow>[]) {
