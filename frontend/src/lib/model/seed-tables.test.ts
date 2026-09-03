@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { wipeAllData } from '@/lib/data-file'
-import { accountsTable, entriesTable, tableDefsTable } from './model-db'
+import { accountsTable, cardsTable, entriesTable, tableDefsTable } from './model-db'
 import { alignDefaultTables, seedDefaultTables } from './seed-tables'
 import type { TableDef } from './types'
 
@@ -84,5 +84,27 @@ describe('the six tables an earlier version seeded', () => {
       'investments:section.label',
     ])
     expect(result.retired.sort()).toEqual(['Aportes', 'Outros lançamentos', 'Proventos'])
+  })
+})
+
+describe('the card behind the card ledger', () => {
+  beforeEach(async () => { await wipeAllData() })
+
+  it('is created with it, since card spend and invoices read the card, not the table', async () => {
+    await seedDefaultTables()
+
+    const cards = await cardsTable.toArray()
+    const cardLedger = (await tableDefsTable.toArray()).map((row) => row.data as TableDef).find((table) => table.kind === 'cardLedger')
+    expect(cards).toHaveLength(1)
+    expect(cardLedger?.cardId).toBe(cards[0].id)
+  })
+
+  it('is linked to a ledger that never had one', async () => {
+    await tableDefsTable.add({ createdAt: 1, data: { name: 'Fatura Nubank', kind: 'cardLedger' } })
+
+    await alignDefaultTables()
+
+    const cardLedger = (await tableDefsTable.toArray()).map((row) => row.data as TableDef).find((table) => table.kind === 'cardLedger')
+    expect(cardLedger?.cardId).toBeDefined()
   })
 })

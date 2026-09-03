@@ -1,5 +1,5 @@
-import { accountsTable, entriesTable, tableDefsTable } from './model-db'
-import type { Account, Entry, TableDef, TableKind } from './types'
+import { accountsTable, cardsTable, entriesTable, tableDefsTable } from './model-db'
+import type { Account, Card, Entry, TableDef, TableKind } from './types'
 
 /**
  * The tables every screen needs, created once on a fresh vault.
@@ -12,6 +12,12 @@ import type { Account, Entry, TableDef, TableKind } from './types'
  * income — carried by the rows instead.
  */
 const DEFAULT_ACCOUNT: Account = { name: 'Conta principal', kind: 'checking' }
+/**
+ * A card as well as an account, because the card ledger is useless without one: card
+ * spend, the invoice cycle and open instalments all read the card behind the table,
+ * and a table with no card silently reports zero rather than saying it cannot tell.
+ */
+const DEFAULT_CARD: Card = { name: 'Cartão principal', accountId: 0, closingDay: 25, dueDay: 2 }
 
 /**
  * One table per screen, carrying that screen's own name.
@@ -49,9 +55,11 @@ async function runSeed(): Promise<{ created: string[] }> {
     if ((await tableDefsTable.count()) > 0) return { created: [] }
 
     const accountId = await accountsTable.add({ createdAt: Date.now(), data: DEFAULT_ACCOUNT })
+    const cardId = await cardsTable.add({ createdAt: Date.now(), data: { ...DEFAULT_CARD, accountId } })
     const created: string[] = []
     for (const table of DEFAULT_TABLES) {
-      await tableDefsTable.add({ createdAt: Date.now(), data: table.kind === 'bankLedger' ? { ...table, accountId } : table })
+      const link = table.kind === 'bankLedger' ? { accountId } : table.kind === 'cardLedger' ? { cardId } : {}
+      await tableDefsTable.add({ createdAt: Date.now(), data: { ...table, ...link } })
       created.push(table.name)
     }
     return { created }
@@ -87,18 +95,27 @@ export async function alignDefaultTables(): Promise<AlignmentResult> {
   const rowsByTable = new Map<number, number>()
   for (const entry of entries) rowsByTable.set(entry.tableId, (rowsByTable.get(entry.tableId) ?? 0) + 1)
 
+  // A card ledger with no card behind it reports zero for everything a card decides,
+  // so an older vault gets the same link a fresh one is created with.
+  const accounts = await accountsTable.toArray()
+  const cards = await cardsTable.toArray()
+  const accountId = accounts[0]?.id ?? (accounts.length === 0 ? await accountsTable.add({ createdAt: Date.now(), data: DEFAULT_ACCOUNT }) : undefined)
+  const cardId = cards[0]?.id ?? (cards.length === 0 && accountId ? await cardsTable.add({ createdAt: Date.now(), data: { ...DEFAULT_CARD, accountId } }) : undefined)
+
   for (const wanted of DEFAULT_TABLES) {
     const matches = stored.filter((row) => (row.data as TableDef).kind === wanted.kind)
+    const link = wanted.kind === 'bankLedger' && accountId ? { accountId } : wanted.kind === 'cardLedger' && cardId ? { cardId } : {}
     if (matches.length === 0) {
-      await tableDefsTable.add({ createdAt: Date.now(), data: wanted })
+      await tableDefsTable.add({ createdAt: Date.now(), data: { ...wanted, ...link } })
       result.created.push(wanted.name)
       continue
     }
     // The oldest table of a kind is the one that screen has been reading all along.
     const owner = matches[0]
     const table = owner.data as TableDef
-    if (table.nameKey !== wanted.nameKey) {
-      await tableDefsTable.update(owner.id, { data: { ...table, nameKey: wanted.nameKey } })
+    const needsLink = (wanted.kind === 'bankLedger' && !table.accountId) || (wanted.kind === 'cardLedger' && !table.cardId)
+    if (table.nameKey !== wanted.nameKey || needsLink) {
+      await tableDefsTable.update(owner.id, { data: { ...table, nameKey: wanted.nameKey, ...(needsLink ? link : {}) } })
       result.named.push(table.name)
     }
   }
