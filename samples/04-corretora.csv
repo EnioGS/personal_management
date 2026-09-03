@@ -1,0 +1,8 @@
+data,operacao,ativo,quantidade,preco,valor,observacao
+2026-08-05,compra,PETR4,100,38.42,3842.00,ordem executada
+2026-08-12,compra,ITSA4,300,10.85,3255.00,ordem executada
+2026-08-19,compra,CDB LIQ DIARIA,1,5000.00,5000.00,aplicacao
+2026-08-19,compra,CDB LIQ DIARIA,1,5000.00,5000.00,aplicacao
+2026-08-26,venda,PETR4,40,41.10,1644.00,realizacao parcial
+2026-09-02,provento,PETR4,100,0.87,87.00,Dividendos PETR4
+2026-09-15,compra,HGLG11,20,158.30,3166.00,ordem executada
