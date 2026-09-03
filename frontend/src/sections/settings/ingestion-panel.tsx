@@ -11,7 +11,9 @@ import { LabellingRules } from './labelling-rules'
 import {
   createIngestionSource,
   createSupplementalColumn,
+  markSourceRows,
   parseIngestionCsv,
+  planIngestionStaging,
   removeFinishedIngestionSource,
   saveIngestionMappings,
   stageIngestionSource,
@@ -72,6 +74,7 @@ export function IngestionPanel() {
   const [showDiscarded, setShowDiscarded] = useState(false)
   const [isDropTarget, setIsDropTarget] = useState(false)
   const [sort, setSort] = useState<ColumnSort | null>(null)
+  const [pendingStage, setPendingStage] = useState<{ duplicates: number } | null>(null)
   const fileInput = useRef<HTMLInputElement>(null)
 
   const selectedSource = sourceStore.items.find((source) => String(source.id) === selected)
@@ -91,6 +94,17 @@ export function IngestionPanel() {
       return []
     }
   }, [selectedSource])
+  // A row that has been staged has left the file's business: it lives in the worklist
+  // now, so the file table shows what is still to be decided and empties as it is dealt
+  // with, rather than repeating rows that already moved on.
+  const stagedRowIndexes = useMemo(
+    () => new Set(rowStore.items.filter((row) => selectedSource && row.sourceId === selectedSource.id).map((row) => row.sourceRowIndex)),
+    [rowStore.items, selectedSource],
+  )
+  const sourceRows = useMemo(
+    () => sourcePreview.map((values, index) => ({ index, values })).filter((row) => !stagedRowIndexes.has(row.index)),
+    [sourcePreview, stagedRowIndexes],
+  )
   // Ready rows first. They are the only rows the confirmation button acts on, and a
   // backlog of hundreds otherwise buries them; the sort is stable, so everything else
   // keeps the order it was queued in.
@@ -270,7 +284,12 @@ export function IngestionPanel() {
     setDraftMappings(existing)
   }
 
-  async function saveAndStage() {
+  /**
+   * Staging everything asks first when the file still carries unresolved duplicate
+   * marks — those rows are the whole reason to look before moving. Staging only the
+   * ready rows needs no such question: it leaves the questionable ones where they are.
+   */
+  async function saveAndStage(readyOnly: boolean) {
     if (!selectedSource) return
     try {
       const result = await saveIngestionMappings(selectedSource.id, mappings)
@@ -278,14 +297,29 @@ export function IngestionPanel() {
         setMessage(result.errors.join(' '))
         return
       }
-      const staged = await stageIngestionSource(selectedSource.id)
+      if (!readyOnly) {
+        const plan = await planIngestionStaging(selectedSource.id)
+        if (plan.duplicate.length > 0 && !pendingStage) {
+          setPendingStage({ duplicates: plan.duplicate.length })
+          return
+        }
+      }
+      const staged = await stageIngestionSource(selectedSource.id, { readyOnly })
+      setPendingStage(null)
       setDraftMappings(null)
       await refresh()
-      setMessage(`Added ${staged.staged} row(s) to imported unlabelled data; ${staged.duplicates} duplicate row(s) skipped.`)
-      setSelected(UNLABELLED_DATASET)
+      setMessage(`Added ${staged.staged} row(s) to imported unlabelled data.${staged.skippedDuplicateMarks ? ` ${staged.skippedDuplicateMarks} row(s) marked as possible duplicates were left in the file.` : ''}${staged.eliminated ? ` ${staged.eliminated} row(s) marked for elimination were dropped.` : ''}${staged.duplicates ? ` ${staged.duplicates} identical row(s) were already staged.` : ''}`)
+      if (!readyOnly) setSelected(UNLABELLED_DATASET)
     } catch (error) {
+      setPendingStage(null)
       setMessage(error instanceof Error ? error.message : 'Could not stage this source.')
     }
+  }
+
+  async function markRow(index: number, mark: 'duplicate' | 'eliminate' | null) {
+    if (!selectedSource) return
+    await markSourceRows(selectedSource.id, [index], mark)
+    await refresh()
   }
 
   async function addBlankColumn() {
@@ -354,7 +388,7 @@ export function IngestionPanel() {
             <p className="text-muted-foreground">This dataset has no source file: its rows were moved out of the Finance tables when the label workflow was introduced, so they are already mapped. There are no columns to assign — pick <span className="font-medium">Imported, unlabelled data</span> to label them.</p>
           </section>
         ) : (
-        <section className="flex min-h-0 flex-1 flex-col gap-2 rounded-md border p-2">
+        <section className="flex min-h-[60vh] flex-1 shrink-0 flex-col gap-2 rounded-md border p-2">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="text-xs"><span className="font-medium">{selectedSource.originalFilename}</span><span className="text-muted-foreground"> · original columns stay unchanged; supplemental columns are blank by design.</span></div>
             <div className="flex items-center gap-1">
@@ -365,20 +399,33 @@ export function IngestionPanel() {
           <div className="min-h-0 flex-1 overflow-auto rounded border">
             <table className="min-w-max text-left text-xs">
               <thead className="bg-muted/30">
-                <tr>{[...selectedSource.originalColumns, ...selectedSource.supplementalColumns].map((column) => {
+                <tr><th className="bg-muted sticky left-0 z-30 w-28 min-w-28 border-b p-1">Row</th>{[...selectedSource.originalColumns, ...selectedSource.supplementalColumns].map((column) => {
                   const current = mappings.find((mapping) => mapping.sourceColumn === column)?.targetField ?? ''
                   return <th key={column} className="min-w-44 border-b p-1 align-top"><Select value={current} onValueChange={(value) => setMapping(column, value)}><SelectTrigger className="h-7 text-xs"><SelectValue placeholder="Assign column" /></SelectTrigger><SelectContent><SelectItem value="__clear__">No assignment</SelectItem>{TARGET_FIELDS.map((field) => <SelectItem key={field} value={field}>{field}</SelectItem>)}</SelectContent></Select></th>
                 })}</tr>
-                <tr>{[...selectedSource.originalColumns, ...selectedSource.supplementalColumns].map((column) => <th key={column} className="border-b p-2 font-medium">{column}{selectedSource.supplementalColumns.includes(column) && <span className="text-muted-foreground"> · blank</span>}</th>)}</tr>
+                <tr><th className="bg-muted sticky left-0 z-30 w-28 min-w-28 border-b border-r p-2 font-medium">Status</th>{[...selectedSource.originalColumns, ...selectedSource.supplementalColumns].map((column) => <th key={column} className="border-b p-2 font-medium">{column}{selectedSource.supplementalColumns.includes(column) && <span className="text-muted-foreground"> · blank</span>}</th>)}</tr>
               </thead>
-              <tbody>{sourcePreview.map((rawValues, rowIndex) => <tr key={rowIndex} className="border-b">{[...selectedSource.originalColumns, ...selectedSource.supplementalColumns].map((column) => <td key={column} className="max-w-64 truncate p-2" title={rawValues[column] ?? ''}>{rawValues[column] ?? ''}</td>)}</tr>)}</tbody>
+              <tbody>{sourceRows.map(({ index, values }) => {
+                const mark = selectedSource.rowMarks?.[String(index)]
+                return (
+                  <tr key={index} className="border-b">
+                    <td className="bg-background sticky left-0 z-10 w-28 min-w-28 border-r p-2 align-top">
+                      <SourceRowVerdict mark={mark} onMark={(next) => void markRow(index, next)} />
+                    </td>
+                    {[...selectedSource.originalColumns, ...selectedSource.supplementalColumns].map((column) => (
+                      <td key={column} className="max-w-64 truncate p-2" title={values[column] ?? ''}>{values[column] ?? ''}</td>
+                    ))}
+                  </tr>
+                )
+              })}
+              {sourceRows.length === 0 && <tr><td colSpan={1 + selectedSource.originalColumns.length + selectedSource.supplementalColumns.length} className="text-muted-foreground p-4 text-center">Every row of this file has been dealt with.</td></tr>}</tbody>
             </table>
           </div>
           {validation && <p className={cn('text-xs', validation.errors.length ? 'text-amber-600 dark:text-amber-300' : 'text-emerald-600 dark:text-emerald-300')}>{validation.errors.length ? validation.errors.join(' ') : 'Mapping covers every possible destination table. Individual blank values are checked later.'}</p>}
         </section>
         )
       ) : (
-        <section className="flex min-h-0 flex-1 flex-col gap-2 rounded-md border p-2">
+        <section className="flex min-h-[60vh] flex-1 shrink-0 flex-col gap-2 rounded-md border p-2">
           <p className="text-muted-foreground text-xs">{showingConfirmed
             ? 'These rows are already in a Finance table. Editing a label or a data field marks the row for reallocation — its entry is rewritten, and every Finance screen follows, only when you confirm below.'
             : 'Source data is shown in its own columns. Canonical fields can be edited here; label cells accept text and turn red when the value is not one of the accepted options. Typing a category name that does not exist yet creates it.'}</p>
@@ -406,16 +453,37 @@ export function IngestionPanel() {
         </section>
       )}
 
-      <LabellingRules onChanged={refresh} />
+      {pendingStage && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-amber-500/60 p-2 text-xs">
+          <span>{pendingStage.duplicates} row(s) in this file look like duplicates of data you already have. Adding everything will import them too.</span>
+          <span className="flex gap-2">
+            <Button type="button" size="xs" onClick={() => void saveAndStage(false)}>Add them anyway</Button>
+            <Button type="button" size="xs" variant="outline" onClick={() => { setPendingStage(null); void saveAndStage(true) }}>Add only the ready rows</Button>
+            <Button type="button" size="xs" variant="ghost" onClick={() => setPendingStage(null)}>Cancel</Button>
+          </span>
+        </div>
+      )}
 
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-dashed p-3">
+
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 rounded-md border border-dashed p-3">
         <div className="text-xs"><p className="font-medium">Import data</p><p className="text-muted-foreground">Drop files anywhere on this screen, or choose them. An exported .db is split into one dataset per table it contains.</p></div>
-        <div className="flex gap-2"><input ref={fileInput} type="file" accept=".csv,text/csv,.db,.pmdata,application/vnd.sqlite3" multiple className="hidden" onChange={(event: ChangeEvent<HTMLInputElement>) => void handleFiles(event.target.files)} /><Button type="button" variant="outline" size="sm" onClick={() => fileInput.current?.click()}><FilePlus2 className="size-3.5" />Import data</Button>{selectedSource
-            ? <Button type="button" size="sm" disabled={!!validation?.errors.length || selectedSource.legacy || selectedSource.originalColumns.length === 0} onClick={() => void saveAndStage()}><Upload className="size-3.5" />Add to imported unlabelled data</Button>
+        <div className="flex flex-wrap gap-2"><input ref={fileInput} type="file" accept=".csv,text/csv,.db,.pmdata,application/vnd.sqlite3" multiple className="hidden" onChange={(event: ChangeEvent<HTMLInputElement>) => void handleFiles(event.target.files)} /><Button type="button" variant="outline" size="sm" onClick={() => fileInput.current?.click()}><FilePlus2 className="size-3.5" />Import data</Button>{selectedSource
+            ? <>
+                <Button type="button" size="sm" variant="outline" disabled={!!validation?.errors.length || selectedSource.legacy || selectedSource.originalColumns.length === 0} onClick={() => void saveAndStage(true)}>
+                  <Upload className="size-3.5" />Add to imported known new values
+                </Button>
+                <Button type="button" size="sm" disabled={!!validation?.errors.length || selectedSource.legacy || selectedSource.originalColumns.length === 0} onClick={() => void saveAndStage(false)}>
+                  <Upload className="size-3.5" />Add to imported unlabelled data
+                </Button>
+              </>
             : showingConfirmed
               ? <Button type="button" size="sm" disabled={reallocatable.length === 0} onClick={() => void confirmReallocation()}><Check className="size-3.5" />Confirm and reallocate rows</Button>
               : <Button type="button" size="sm" disabled={!rows.some((row) => row.status === 'ready')} onClick={() => void confirmPromotion()}><Check className="size-3.5" />Confirm and move ready rows</Button>}</div>
       </div>
+
+      {/* Below the import zone, and reached by scrolling: rules are reference material,
+          not something the worklist should give up its height for. */}
+      <LabellingRules onChanged={refresh} />
     </div>
   )
 }
@@ -437,6 +505,38 @@ function rowCellValue(row: StoredRow<IngestionRow>, field: string, categories: {
   if (field.startsWith('raw.')) return row.rawValues[field.slice(4)]
   if (field.startsWith('mapped.')) return row.mappedValues[field.slice(7) as IngestionTargetField]
   return allLabelValues(row, categories, tableDefs)[field as typeof LABEL_FIELDS[number]]
+}
+
+/**
+ * A file row's verdict, pinned beside it: what the duplicate scan found, and what
+ * anyone decided. One click moves between the three, so ruling on a flagged row costs
+ * as little as reading it.
+ */
+function SourceRowVerdict({ mark, onMark }: { mark?: 'duplicate' | 'eliminate'; onMark: (mark: 'duplicate' | 'eliminate' | null) => void }) {
+  if (mark === 'eliminate') {
+    return (
+      <button type="button" onClick={() => onMark(null)} className="text-destructive text-left" title="Click to keep this row">
+        eliminate
+      </button>
+    )
+  }
+  if (mark === 'duplicate') {
+    return (
+      <span className="flex flex-col items-start gap-0.5">
+        <span className="text-amber-600 dark:text-amber-300">duplicate?</span>
+        <span className="flex gap-1">
+          <button type="button" className="text-destructive underline-offset-2 hover:underline" onClick={() => onMark('eliminate')}>drop</button>
+          <button type="button" className="text-muted-foreground underline-offset-2 hover:underline" onClick={() => onMark(null)}>keep</button>
+        </span>
+      </span>
+    )
+  }
+  return (
+    <span className="flex flex-col items-start gap-0.5">
+      <span className="text-emerald-600 dark:text-emerald-300">ready</span>
+      <button type="button" className="text-muted-foreground underline-offset-2 hover:underline" onClick={() => onMark('eliminate')}>drop</button>
+    </span>
+  )
 }
 
 function rawColumns(rows: StoredRow<IngestionRow>[]) {

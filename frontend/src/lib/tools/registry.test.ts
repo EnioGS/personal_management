@@ -24,6 +24,8 @@ describe('findTool', () => {
       'group_ingestion_rows',
       'assign_ingestion_columns',
       'add_ingestion_blank_column',
+      'mark_source_rows',
+      'stage_ingestion_source',
       'find_ingestion_duplicates',
       'discard_ingestion_rows',
       'suggest_ingestion_labels',
@@ -39,9 +41,9 @@ describe('findTool', () => {
     ])
   })
 
-  it('leaves both data-moving steps to the user and keeps no category-rule tools', () => {
-    expect(findTool('stage_ingestion_source')).toBeUndefined()
+  it('keeps promotion to the user and has no category-rule tools', () => {
     expect(findTool('promote_ingestion_rows')).toBeUndefined()
+    expect(findTool('reallocate_ingestion_rows')).toBeUndefined()
     expect(findTool('add_category')).toBeUndefined()
     expect(findTool('update_category_rule')).toBeUndefined()
     expect(findTool('delete_category_rule')).toBeUndefined()

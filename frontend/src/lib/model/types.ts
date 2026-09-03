@@ -166,6 +166,12 @@ export interface IngestionSource {
   /** True only for the synthetic source that links pre-existing app entries. */
   legacy?: boolean
   /**
+   * Per-row verdicts on the file's own rows, keyed by row index: what the duplicate
+   * scan found, and what anyone decided about it. Kept on the source because a file's
+   * rows have no identity of their own until they are staged.
+   */
+  rowMarks?: Record<string, 'duplicate' | 'eliminate'>
+  /**
    * Marks which one-off repair of the legacy queue has already run for this
    * source, so a repair corrects historical data exactly once instead of
    * discarding labels the user has assigned since.

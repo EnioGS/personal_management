@@ -1,7 +1,7 @@
 import { DEFAULT_INGESTION_GUIDE, INGESTION_GUIDE_KEY } from '@/lib/ingestion-guide'
 import { ingestionLabelErrors } from '@/lib/model/ingestion'
 import { ensureCategoryByName } from '@/lib/model/category-vocabulary'
-import { createSupplementalColumn, parseIngestionCsv, saveIngestionMappings } from '@/lib/model/ingestion-source'
+import { createSupplementalColumn, markSourceRows, parseIngestionCsv, planIngestionStaging, saveIngestionMappings, stageIngestionSource } from '@/lib/model/ingestion-source'
 import { discardIngestionRows, updateIngestionRowLabels, updateIngestionRowWorklist } from '@/lib/model/ingestion-promotion'
 import { ingestionFieldContext, INGESTION_QUERY_FIELDS, resolveIngestionField } from '@/lib/model/ingestion-fields'
 import { groupRows, queryRows, type RowFilter, type RowQuery } from '@/lib/model/row-query'
@@ -119,7 +119,11 @@ export const readIngestionTableTool: ToolDefinition = {
     const file = source ? readSourceFile(source) : null
     return JSON.stringify({
       source: source ? summariseSource(source, rows) : sourceId === undefined ? 'Imported, unlabelled data' : null,
-      ...(file ? { sourceColumns: file.columns, sourceRowCount: file.rows.length, sourceRows: file.rows.slice(offset, offset + limit) } : {}),
+      ...(file ? {
+        sourceColumns: file.columns,
+        sourceRowCount: file.rows.length,
+        sourceRows: file.rows.slice(offset, offset + limit).map((values, index) => ({ rowIndex: offset + index, mark: (source!.data as IngestionSource).rowMarks?.[String(offset + index)] ?? null, values })),
+      } : {}),
       total: selected.length,
       offset,
       returned: page.length,
@@ -184,6 +188,62 @@ export const addIngestionBlankColumnTool: ToolDefinition = {
       const merged = await mergedMappings(sourceId, [{ sourceId, sourceColumn: name, targetField: target, isSupplemental: true }], false)
       return JSON.stringify({ source, assignedTo: target, validation: await saveIngestionMappings(sourceId, merged) })
     } catch (error) { return `Error: ${error instanceof Error ? error.message : 'could not add blank column.'}` }
+  },
+}
+
+export const markSourceRowsTool: ToolDefinition = {
+  name: 'mark_source_rows',
+  description: 'Marks rows of an uploaded file, by their row index, before it is staged. "duplicate" says this row looks like data already held; "eliminate" says it should not enter the worklist at all; null clears a mark. Every file is scanned for duplicates on upload — a row counts as one only when everything it actually carries matches a stored row, ignoring blank columns the ingestion centre added — so use this to rule on what the scan flagged, and to drop rows for any other reason. Read the file with read_ingestion_table first and say what you are marking and why. Marked rows are handled when the user stages the file: eliminated rows are dropped, and unresolved duplicates are what the confirmation asks about.',
+  parameters: {
+    type: 'object',
+    properties: {
+      sourceId: { type: 'number' },
+      rowIndexes: { type: 'array', items: { type: 'number' }, description: 'Row positions in the file, starting at 0 — as returned in sourceRows.' },
+      mark: { type: 'string', enum: ['duplicate', 'eliminate', 'clear'] },
+      reason: { type: 'string', description: 'Why. Reported back to the user; say which stored row a duplicate repeats.' },
+    },
+    required: ['sourceId', 'rowIndexes', 'mark'],
+    additionalProperties: false,
+  },
+  execute: async (args) => {
+    if (typeof args.sourceId !== 'number' || !Array.isArray(args.rowIndexes)) return 'Error: sourceId and rowIndexes are required.'
+    const rejection = await rejectIfLegacy(args.sourceId)
+    if (rejection) return rejection
+    const indexes = args.rowIndexes.filter((index): index is number => typeof index === 'number')
+    const mark = args.mark === 'clear' ? null : (args.mark as 'duplicate' | 'eliminate')
+    try {
+      const source = await markSourceRows(args.sourceId, indexes, mark)
+      const plan = await planIngestionStaging(args.sourceId)
+      return JSON.stringify({ marked: indexes.length, mark: args.mark, reason: args.reason ?? null, file: source.originalFilename, plan: { ready: plan.ready.length, duplicate: plan.duplicate.length, eliminate: plan.eliminate.length, alreadyStaged: plan.alreadyStaged.length } })
+    } catch (error) { return `Error: ${error instanceof Error ? error.message : 'could not mark those rows.'}` }
+  },
+}
+
+export const stageIngestionSourceTool: ToolDefinition = {
+  name: 'stage_ingestion_source',
+  description: 'Moves a mapped file\'s rows into the imported-unlabelled worklist. This changes where data lives, so it runs ONLY on the user\'s explicit say-so: describe what would move — call it with confirmed omitted to see the plan without doing anything — get their agreement, then call again with confirmed: true. One agreement can cover several files; it cannot cover files the user has not been told about. readyOnly leaves rows marked as possible duplicates in the file instead of importing them, which is the safer choice whenever the scan flagged anything. Rows marked for elimination are never staged either way.',
+  parameters: {
+    type: 'object',
+    properties: {
+      sourceId: { type: 'number' },
+      readyOnly: { type: 'boolean', description: 'Stage only rows nobody flagged. Default false.' },
+      confirmed: { type: 'boolean', description: 'True only after the user has agreed to this move.' },
+    },
+    required: ['sourceId'],
+    additionalProperties: false,
+  },
+  execute: async (args) => {
+    if (typeof args.sourceId !== 'number') return 'Error: sourceId is required.'
+    const rejection = await rejectIfLegacy(args.sourceId)
+    if (rejection) return rejection
+    try {
+      const plan = await planIngestionStaging(args.sourceId)
+      if (args.confirmed !== true) {
+        return JSON.stringify({ staged: false, plan: { ready: plan.ready.length, duplicate: plan.duplicate.length, eliminate: plan.eliminate.length, alreadyStaged: plan.alreadyStaged.length }, next: 'Tell the user exactly what this would move — including any rows flagged as duplicates — and call again with confirmed: true only once they agree.' })
+      }
+      const result = await stageIngestionSource(args.sourceId, { readyOnly: args.readyOnly === true })
+      return JSON.stringify({ ...result, movedToWorklist: true })
+    } catch (error) { return `Error: ${error instanceof Error ? error.message : 'could not stage this source.'}` }
   },
 }
 

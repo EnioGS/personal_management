@@ -8,10 +8,12 @@ import {
   groupIngestionRowsTool,
   labelIngestionRowsByMatchTool,
   listIngestionDatasetsTool,
+  markSourceRowsTool,
   readIngestionGuideTool,
   readIngestionProvenanceTool,
   readIngestionTableTool,
   queryIngestionRowsTool,
+  stageIngestionSourceTool,
   suggestIngestionLabelsTool,
   updateIngestionLabelsTool,
   updateIngestionDataFieldsTool,
@@ -23,8 +25,9 @@ import { readTableTool } from './read-table'
 import { readTextFileTool } from './read-text-file'
 import type { ToolDefinition } from './types'
 import { writeToTableTool } from './write-to-table'
-// Staging a mapped source and promoting labelled rows are user-only actions: both
-// are the moments data changes shape, so no tool implements them at all.
+// Promoting labelled rows and reallocating confirmed ones stay user-only. Staging is
+// reachable, but only behind an explicit confirmation the user has given (see the
+// tool's own description).
 // Row correction/deletion tools stay disabled: the assistant may append new rows,
 // but cannot alter existing history. Their implementations remain available here for
 // a future, separately-authorized capability.
@@ -46,6 +49,8 @@ export const toolRegistry: ToolDefinition[] = [
   groupIngestionRowsTool,
   assignIngestionColumnsTool,
   addIngestionBlankColumnTool,
+  markSourceRowsTool,
+  stageIngestionSourceTool,
   findIngestionDuplicatesTool,
   discardIngestionRowsTool,
   suggestIngestionLabelsTool,

@@ -252,7 +252,7 @@ describe('reading an uploaded source before it is staged', () => {
 
     expect(read.sourceColumns).toEqual(['Data', 'Valor', 'Descrição'])
     expect(read.sourceRowCount).toBe(2)
-    expect(read.sourceRows[0]).toEqual({ Data: '2026-01-02', Valor: '-12.50', 'Descrição': 'Coffee' })
+    expect(read.sourceRows[0]).toEqual({ rowIndex: 0, mark: null, values: { Data: '2026-01-02', Valor: '-12.50', 'Descrição': 'Coffee' } })
     expect(read.rows).toEqual([])
   })
 

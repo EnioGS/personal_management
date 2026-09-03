@@ -171,6 +171,14 @@ Two things it optimizes for:
   *Confirm and reallocate rows* rewrites that entry in place — same entry id, new
   destination and labels, every Finance screen following immediately. An edit
   whose new destination cannot hold the row keeps its error and stays put.
+- An uploaded file is triaged before it is staged: every row is scanned on arrival
+  and shows as ready, duplicate? or eliminate beside itself. A row counts as a
+  duplicate only when everything it actually carries matches a stored row —
+  columns the ingestion centre added are not evidence, blank or not. *Add to
+  imported known new values* takes only the unflagged rows; *Add to imported
+  unlabelled data* takes everything except eliminations, and asks first when
+  duplicates are unresolved. Staged rows leave the file's table, so it empties as
+  it is dealt with.
 - The same transaction arrives twice more often than expected, so duplicates are
   detected by comparing only the fields two rows *both* have: a file missing a
   column is still checked on the columns it does have, and a missing column is

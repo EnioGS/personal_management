@@ -2,7 +2,9 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import {
   createIngestionSource,
   createSupplementalColumn,
+  markSourceRows,
   parseIngestionCsv,
+  planIngestionStaging,
   removeFinishedIngestionSource,
   saveIngestionMappings,
   stageIngestionSource,
@@ -52,7 +54,7 @@ describe('ingestion source staging', () => {
       })),
     ])
 
-    await expect(stageIngestionSource(sourceId)).resolves.toEqual({ staged: 2, duplicates: 0 })
+    await expect(stageIngestionSource(sourceId)).resolves.toMatchObject({ staged: 2, duplicates: 0 })
     const source = (await ingestionSourcesTable.get(sourceId))!.data as { originalColumns: string[]; supplementalColumns: string[]; rawCsv: string }
     expect(source.originalColumns).toEqual(['Date', 'Description', 'Amount'])
     expect(source.supplementalColumns).toContain('asset')
@@ -71,7 +73,7 @@ describe('ingestion source staging', () => {
     )
 
     await stageIngestionSource(sourceId)
-    await expect(stageIngestionSource(sourceId)).resolves.toEqual({ staged: 0, duplicates: 2 })
+    await expect(stageIngestionSource(sourceId)).resolves.toMatchObject({ staged: 0, duplicates: 2 })
     expect(await ingestionRowsTable.count()).toBe(2)
   })
 })
@@ -104,5 +106,50 @@ describe('removing a source file once everything in it is dealt with', () => {
 
     await expect(removeFinishedIngestionSource(sourceId)).rejects.toThrow(/still has 2 row\(s\) waiting/)
     expect(await ingestionSourcesTable.get(sourceId)).toBeDefined()
+  })
+})
+
+describe('staging with the file marked up', () => {
+  beforeEach(async () => { await wipeAllData() })
+
+  async function markedSource() {
+    const sourceId = await createIngestionSource('nubank.csv', RAW_CSV)
+    const source = (await ingestionSourcesTable.get(sourceId))!.data as { originalColumns: string[]; supplementalColumns: string[] }
+    for (const field of SUPPLEMENTAL_FIELDS) await createSupplementalColumn(sourceId, field)
+    await saveIngestionMappings(sourceId, [
+      { sourceId, sourceColumn: 'Date', targetField: 'date' },
+      { sourceId, sourceColumn: 'Description', targetField: 'description' },
+      { sourceId, sourceColumn: 'Amount', targetField: 'amount' },
+      ...SUPPLEMENTAL_FIELDS.map((field) => ({ sourceId, sourceColumn: field, targetField: field })),
+    ])
+    void source
+    return sourceId
+  }
+
+  it('reports what staging would do before anyone stages anything', async () => {
+    const sourceId = await markedSource()
+    await markSourceRows(sourceId, [0], 'duplicate')
+
+    expect(await planIngestionStaging(sourceId)).toEqual({ ready: [1], duplicate: [0], eliminate: [], alreadyStaged: [] })
+  })
+
+  it('never stages a row marked for elimination', async () => {
+    const sourceId = await markedSource()
+    await markSourceRows(sourceId, [0], 'eliminate')
+
+    const result = await stageIngestionSource(sourceId)
+
+    expect(result).toMatchObject({ staged: 1, eliminated: 1 })
+    expect((await ingestionRowsTable.toArray()).map((row) => (row.data as { sourceRowIndex: number }).sourceRowIndex)).toEqual([1])
+  })
+
+  it('leaves questionable rows in the file when only the ready ones are wanted', async () => {
+    const sourceId = await markedSource()
+    await markSourceRows(sourceId, [1], 'duplicate')
+
+    const result = await stageIngestionSource(sourceId, { readyOnly: true })
+
+    expect(result).toMatchObject({ staged: 1, skippedDuplicateMarks: 1 })
+    expect((await planIngestionStaging(sourceId))).toMatchObject({ ready: [], duplicate: [1], alreadyStaged: [0] })
   })
 })

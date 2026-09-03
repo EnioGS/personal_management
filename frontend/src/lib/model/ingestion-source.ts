@@ -1,6 +1,7 @@
 import Papa from 'papaparse'
 import type { LocalRow } from '@/lib/local-store/create-local-table'
 import {
+  entriesTable,
   ingestionAuditEventsTable,
   ingestionColumnMappingsTable,
   ingestionRowsTable,
@@ -8,8 +9,9 @@ import {
 } from './model-db'
 import { allPotentialIngestionFields } from './ingestion'
 import { applyLabelRulesToRows } from './label-rules-repository'
+import { markDuplicateSourceRows, type SourceRowMark } from './source-row-marks'
 import { FINANCE_DESTINATIONS, FLOW_ROLES, matchLabelValue, RECURRENCES, SETTLEMENT_CHANNELS, SPENDING_TREATMENTS } from './label-vocabulary'
-import type { IngestionColumnMapping, IngestionRow, IngestionSource, IngestionTargetField } from './types'
+import type { Entry, IngestionColumnMapping, IngestionRow, IngestionSource, IngestionTargetField } from './types'
 
 export interface ParsedIngestionCsv {
   columns: string[]
@@ -110,6 +112,8 @@ export async function createIngestionSource(originalFilename: string, rawCsv: st
     createdAt: importedAt,
     data: { event: 'sourceUploaded', actor: 'user', sourceId, details: { originalFilename, rowCount: parsed.rows.length } },
   })
+  // Duplicates are found when the file arrives, not when someone thinks to ask.
+  await rescanSourceRowDuplicates(sourceId)
   return sourceId
 }
 
@@ -175,7 +179,49 @@ function labelsFromMappedValues(values: IngestionRow['mappedValues']): Ingestion
  * Sends a fully mapped source into the unlabelled worklist. Staging is idempotent:
  * existing source-row fingerprints are retained and reported instead of duplicated.
  */
-export async function stageIngestionSource(sourceId: number): Promise<{ staged: number; duplicates: number }> {
+export interface StagingPlan {
+  /** Rows that would be staged: no mark, and not staged already. */
+  ready: number[]
+  /** Rows the scan flagged and nobody has ruled on. */
+  duplicate: number[]
+  /** Rows someone decided against; they are dropped rather than staged. */
+  eliminate: number[]
+  /** Rows already staged from an earlier pass. */
+  alreadyStaged: number[]
+}
+
+/** What staging this source would do, so the screen and the assistant can say so first. */
+export async function planIngestionStaging(sourceId: number): Promise<StagingPlan> {
+  const sourceRow = await ingestionSourcesTable.get(sourceId)
+  if (!sourceRow) throw new Error(`Ingestion source ${sourceId} was not found.`)
+  const source = sourceData(sourceRow)
+  const parsed = source.rawCsv ? parseIngestionCsv(source.rawCsv) : { columns: [], rows: [] }
+  const staged = new Set(
+    (await ingestionRowsTable.toArray())
+      .map((row) => row.data as IngestionRow)
+      .filter((row) => row.sourceId === sourceId)
+      .map((row) => row.sourceRowIndex),
+  )
+  const plan: StagingPlan = { ready: [], duplicate: [], eliminate: [], alreadyStaged: [] }
+  parsed.rows.forEach((_row, index) => {
+    if (staged.has(index)) { plan.alreadyStaged.push(index); return }
+    const mark = source.rowMarks?.[String(index)]
+    if (mark === 'eliminate') plan.eliminate.push(index)
+    else if (mark === 'duplicate') plan.duplicate.push(index)
+    else plan.ready.push(index)
+  })
+  return plan
+}
+
+/**
+ * Sends a source's rows into the worklist.
+ *
+ * `readyOnly` stages what nobody has flagged and leaves the questionable rows in the
+ * file for another look; the default stages those too, which is why the screen asks
+ * before doing it. Rows marked for elimination are never staged either way, and rows
+ * staged by an earlier pass are not staged twice.
+ */
+export async function stageIngestionSource(sourceId: number, options: { readyOnly?: boolean } = {}): Promise<{ staged: number; duplicates: number; skippedDuplicateMarks: number; eliminated: number }> {
   const sourceRow = await ingestionSourcesTable.get(sourceId)
   if (!sourceRow) throw new Error(`Ingestion source ${sourceId} was not found.`)
   const source = sourceData(sourceRow)
@@ -189,8 +235,14 @@ export async function stageIngestionSource(sourceId: number): Promise<{ staged: 
   )
   const staged: IngestionRow[] = []
   let duplicates = 0
+  let skippedDuplicateMarks = 0
+  let eliminated = 0
 
   for (const [sourceRowIndex, rawOriginalValues] of parsed.rows.entries()) {
+    const mark = source.rowMarks?.[String(sourceRowIndex)]
+    // A row someone ruled against never enters the worklist, however it was mapped.
+    if (mark === 'eliminate') { eliminated += 1; continue }
+    if (mark === 'duplicate' && options.readyOnly) { skippedDuplicateMarks += 1; continue }
     const rawValues = Object.fromEntries([
       ...Object.entries(rawOriginalValues),
       ...source.supplementalColumns.map((column) => [column, '']),
@@ -226,7 +278,7 @@ export async function stageIngestionSource(sourceId: number): Promise<{ staged: 
     createdAt: Date.now(),
     data: { event: 'rowsStaged', actor: 'user', sourceId, details: { staged: staged.length, duplicates } },
   })
-  return { staged: staged.length, duplicates }
+  return { staged: staged.length, duplicates, skippedDuplicateMarks, eliminated }
 }
 
 /**
@@ -267,4 +319,34 @@ export async function removeFinishedIngestionSource(sourceId: number): Promise<{
     data: { event: 'rowsDiscarded', actor: 'user', sourceId, details: { removedSource: source.originalFilename, keptRows: kept.length, deletedRows: discarded.length } },
   })
   return { keptRows: kept.length, deletedRows: discarded.length, originalFilename: source.originalFilename }
+}
+
+/** Re-runs the duplicate scan over a file's own rows and stores what it found. */
+export async function rescanSourceRowDuplicates(sourceId: number): Promise<IngestionSource> {
+  const sourceRow = await ingestionSourcesTable.get(sourceId)
+  if (!sourceRow) throw new Error(`Ingestion source ${sourceId} was not found.`)
+  const source = sourceData(sourceRow)
+  if (!source.rawCsv) return source
+  const parsed = parseIngestionCsv(source.rawCsv)
+  const storedRows = (await ingestionRowsTable.toArray()).map((row) => row.data as IngestionRow)
+  const entries = (await entriesTable.toArray()).map((row) => row.data as Entry).filter((entry) => !entry.deleted)
+  const rowMarks = markDuplicateSourceRows(source, parsed.rows, storedRows, entries, source.rowMarks ?? {})
+  const next = { ...source, rowMarks }
+  await ingestionSourcesTable.update(sourceId, { data: next })
+  return next
+}
+
+/** Records a verdict on file rows: what to eliminate, what is a duplicate, or neither. */
+export async function markSourceRows(sourceId: number, rowIndexes: number[], mark: SourceRowMark | null): Promise<IngestionSource> {
+  const sourceRow = await ingestionSourcesTable.get(sourceId)
+  if (!sourceRow) throw new Error(`Ingestion source ${sourceId} was not found.`)
+  const source = sourceData(sourceRow)
+  const rowMarks = { ...(source.rowMarks ?? {}) }
+  for (const index of rowIndexes) {
+    if (mark) rowMarks[String(index)] = mark
+    else delete rowMarks[String(index)]
+  }
+  const next = { ...source, rowMarks }
+  await ingestionSourcesTable.update(sourceId, { data: next })
+  return next
 }
