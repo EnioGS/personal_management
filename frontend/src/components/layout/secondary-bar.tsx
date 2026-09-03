@@ -38,7 +38,12 @@ export function SecondaryBar() {
     const collapse = () => setMode('icons')
 
     const onPointerDown = (event: PointerEvent) => {
-      if (!barRef.current?.contains(event.target as Node)) collapse()
+      const target = event.target as HTMLElement | null
+      if (barRef.current?.contains(target as Node)) return
+      // A control whose job is to toggle this bar handles the change itself; collapsing
+      // here first would undo it, or double it back to where it started.
+      if (target?.closest('[data-secondary-bar-toggle]')) return
+      collapse()
     }
     let timer = window.setTimeout(collapse, AUTO_COLLAPSE_MS)
     const restart = () => {

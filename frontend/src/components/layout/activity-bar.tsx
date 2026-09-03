@@ -51,7 +51,10 @@ export function ActivityBar() {
   }
 
   return (
-    <div className="flex h-full w-18 shrink-0 flex-col items-center border-r bg-sidebar py-2">
+    // Marked so the secondary bar's click-away does not fight this bar's own toggle:
+    // without it, clicking the active icon collapsed the bar and then re-expanded it in
+    // the same gesture, and it could never be closed from here.
+    <div data-secondary-bar-toggle className="flex h-full w-18 shrink-0 flex-col items-center border-r bg-sidebar py-2">
       <nav className="flex flex-col items-center gap-1">
         {sections.filter((s) => !s.pinned).map(renderSectionButton)}
       </nav>
