@@ -10,10 +10,12 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 /** How long the labels stay up on their own before the bar gives the width back. */
 const AUTO_COLLAPSE_MS = 3000
 /**
- * The slip's bottom-right corner, in pixels: a rounded corner rather than a sweep,
- * and constant whatever width the bar has.
+ * The slip's bottom edge, in pixels: how far it drops, and how much of the width the
+ * diagonal takes to get there. Both constant, so widening the bar only lengthens the
+ * flat run that follows — the corner itself never stretches.
  */
-const CORNER = 18
+const EDGE_HEIGHT = 34
+const DIAGONAL = 64
 
 /**
  * Items of the active section, as an icon strip or with labels (see store/ui-store.ts).
@@ -42,7 +44,7 @@ export function SecondaryBar() {
   // The corner is a fixed size, so widening the bar lengthens the flat part and leaves
   // the curve alone — stretching one shape across four times the width is what made
   // the expanded bar look wrong.
-  const edgeHeight = CORNER
+  const edgeHeight = EDGE_HEIGHT
 
   useLayoutEffect(() => {
     const sheet = sheetRef.current
@@ -152,11 +154,14 @@ export function SecondaryBar() {
  */
 function SlipEdge({ width, height }: { width: number; height: number }) {
   if (width === 0) return null
-  // The right border turns through a quarter round of a fixed size and then runs flat
-  // to the left, meeting the activity bar square. Only that flat run changes with the
-  // bar's width, so the corner keeps its shape at 48px and at 224px alike.
-  const corner = Math.min(height, width)
-  const turn = `C${width} ${corner * 0.55}, ${width - corner * 0.45} ${corner}, ${width - corner} ${corner}`
+  // The right border leaves vertical, eases into a diagonal, and eases out of it into
+  // the flat run that meets the activity bar. Two roundings and a straight between
+  // them, all of fixed size: at 224px the flat run is simply longer.
+  const span = Math.min(DIAGONAL, width)
+  const turn = [
+    `C${width} ${height * 0.42}, ${width - span * 0.2} ${height * 0.3}, ${width - span * 0.55} ${height * 0.7}`,
+    `C${width - span * 0.78} ${height * 0.93}, ${width - span * 0.9} ${height}, ${width - span} ${height}`,
+  ].join(' ')
   return (
     <svg aria-hidden className="pointer-events-none shrink-0" width={width} height={height} viewBox={`0 0 ${width} ${height}`} fill="none">
       <path d={`M0 0 H${width} ${turn} H0 Z`} className="fill-sidebar" />
