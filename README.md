@@ -209,8 +209,12 @@ Two things it optimizes for:
   it returns the match count and examples, changes nothing, and only labels once
   the user has confirmed the rule really describes those rows. Ready rows sort to
   the top of the worklist, since they are what the confirmation button acts on.
+- Finance tables are read-only to the assistant: no tool writes to one. Every
+  change — adding data, correcting it, taking it out — happens in the ingestion
+  centre, so a row on a dashboard always has raw values and explicit labels behind
+  it. Discarding a confirmed row flags its entry, which restoring undoes.
 - The assistant can map columns, edit staged values, label rows and validate
-  them, but has no tool for the two steps that move data (staging a mapped
+  them, but has no tool for the steps that move data (staging a mapped
   source, promoting labelled rows); those are the user's clicks. Its whole
   workflow knowledge is one retrievable document (`read_ingestion_guide`),
   editable and resettable under Settings → Assistant.

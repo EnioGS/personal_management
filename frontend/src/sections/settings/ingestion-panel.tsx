@@ -199,6 +199,13 @@ export function IngestionPanel() {
     await refresh()
   }
 
+  /** Taking a row out, at any stage: a confirmed one leaves the dashboards with it. */
+  async function eliminateRow(rowId: number) {
+    const result = await discardIngestionRows([rowId], 'eliminated from the ingestion centre', 'user')
+    await refresh()
+    if (result.errors.length > 0) setMessage(result.errors.join(' '))
+  }
+
   async function confirmReallocation() {
     if (reallocatable.length === 0) return
     const result = await reallocateConfirmedIngestionRows(reallocatable.map((row) => row.id))
@@ -307,8 +314,11 @@ export function IngestionPanel() {
       const staged = await stageIngestionSource(selectedSource.id, { readyOnly })
       setPendingStage(null)
       setDraftMappings(null)
+      // "Import and discard" finishes the file: everything worth keeping has moved, so
+      // the file itself and whatever was marked for elimination go with it.
+      const removed = readyOnly ? null : await removeFinishedIngestionSource(selectedSource.id).catch(() => null)
       await refresh()
-      setMessage(`Added ${staged.staged} row(s) to imported unlabelled data.${staged.skippedDuplicateMarks ? ` ${staged.skippedDuplicateMarks} row(s) marked as possible duplicates were left in the file.` : ''}${staged.eliminated ? ` ${staged.eliminated} row(s) marked for elimination were dropped.` : ''}${staged.duplicates ? ` ${staged.duplicates} identical row(s) were already staged.` : ''}`)
+      setMessage(`Imported ${staged.staged} row(s).${staged.skippedDuplicateMarks ? ` ${staged.skippedDuplicateMarks} possible duplicate(s) were left in the file.` : ''}${staged.eliminated ? ` ${staged.eliminated} row(s) marked for elimination were discarded.` : ''}${staged.duplicates ? ` ${staged.duplicates} identical row(s) were already staged.` : ''}${removed ? ` "${removed.originalFilename}" was removed from the source list.` : ''}`)
       if (!readyOnly) setSelected(UNLABELLED_DATASET)
     } catch (error) {
       setPendingStage(null)
@@ -430,7 +440,7 @@ export function IngestionPanel() {
             ? 'These rows are already in a Finance table. Editing a label or a data field marks the row for reallocation — its entry is rewritten, and every Finance screen follows, only when you confirm below.'
             : 'Source data is shown in its own columns. Canonical fields can be edited here; label cells accept text and turn red when the value is not one of the accepted options. Typing a category name that does not exist yet creates it.'}</p>
           <div className="min-h-0 flex-1 overflow-auto rounded border" onScroll={onRowsScroll}>
-            <table className="min-w-max text-left text-xs"><thead className="bg-muted"><tr><th className="bg-muted sticky left-0 z-30 w-40 min-w-40 p-2"><ColumnSortMenu field="source" label="Source" sort={sort} onSort={setSort} /></th><th className="bg-muted sticky left-40 z-30 w-22 min-w-22 border-r p-2"><ColumnSortMenu field="status" label="Status" sort={sort} onSort={setSort} /></th>{rawColumns(visibleRows).map((column) => <th key={`raw-${column}`} className="min-w-36 p-2"><ColumnSortMenu field={`raw.${column}`} label={column} sort={sort} onSort={setSort} /></th>)}{DATA_FIELDS.map((field) => <th key={field} className="min-w-32 p-2"><ColumnSortMenu field={`mapped.${field}`} label={field} sort={sort} onSort={setSort} /></th>)}{LABEL_FIELDS.map((field) => <th key={field} className="min-w-40 p-2 align-top"><ColumnSortMenu field={field} label={field} sort={sort} onSort={setSort} /><p className="text-muted-foreground font-normal">{LABEL_OPTIONS[field]}</p></th>)}</tr></thead><tbody>{windowedRows.map((row) => <WorklistRow key={row.id} row={row} sourceName={sourceStore.items.find((source) => source.id === row.sourceId)?.originalFilename ?? row.sourceFilename ?? 'Existing data'} categories={categories} tableDefs={tableDefs} rawColumns={rawColumns(visibleRows)} onChange={updateWorklist} ensureCategory={ensureCategory} onRestore={restoreRow} />)}{windowedRows.length === 0 && <tr><td colSpan={2 + DATA_FIELDS.length + LABEL_FIELDS.length} className="text-muted-foreground p-4 text-center">{showingConfirmed ? 'Nothing has been confirmed yet.' : 'No staged data yet.'}</td></tr>}</tbody></table>
+            <table className="min-w-max text-left text-xs"><thead className="bg-muted"><tr><th className="bg-muted sticky left-0 z-30 w-40 min-w-40 p-2"><ColumnSortMenu field="source" label="Source" sort={sort} onSort={setSort} /></th><th className="bg-muted sticky left-40 z-30 w-22 min-w-22 border-r p-2"><ColumnSortMenu field="status" label="Status" sort={sort} onSort={setSort} /></th>{rawColumns(visibleRows).map((column) => <th key={`raw-${column}`} className="min-w-36 p-2"><ColumnSortMenu field={`raw.${column}`} label={column} sort={sort} onSort={setSort} /></th>)}{DATA_FIELDS.map((field) => <th key={field} className="min-w-32 p-2"><ColumnSortMenu field={`mapped.${field}`} label={field} sort={sort} onSort={setSort} /></th>)}{LABEL_FIELDS.map((field) => <th key={field} className="min-w-40 p-2 align-top"><ColumnSortMenu field={field} label={field} sort={sort} onSort={setSort} /><p className="text-muted-foreground font-normal">{LABEL_OPTIONS[field]}</p></th>)}</tr></thead><tbody>{windowedRows.map((row) => <WorklistRow key={row.id} row={row} sourceName={sourceStore.items.find((source) => source.id === row.sourceId)?.originalFilename ?? row.sourceFilename ?? 'Existing data'} categories={categories} tableDefs={tableDefs} rawColumns={rawColumns(visibleRows)} onChange={updateWorklist} ensureCategory={ensureCategory} onRestore={restoreRow} onEliminate={eliminateRow} />)}{windowedRows.length === 0 && <tr><td colSpan={2 + DATA_FIELDS.length + LABEL_FIELDS.length} className="text-muted-foreground p-4 text-center">{showingConfirmed ? 'Nothing has been confirmed yet.' : 'No staged data yet.'}</td></tr>}</tbody></table>
           </div>
           <div className="flex items-center justify-between gap-2 text-xs">
             <div className="flex items-center gap-2">
@@ -455,10 +465,10 @@ export function IngestionPanel() {
 
       {pendingStage && (
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-amber-500/60 p-2 text-xs">
-          <span>{pendingStage.duplicates} row(s) in this file look like duplicates of data you already have. Adding everything will import them too.</span>
+          <span>{pendingStage.duplicates} row(s) in this file look like duplicates of data you already have. Importing everything brings them in too, and then removes this file.</span>
           <span className="flex gap-2">
-            <Button type="button" size="xs" onClick={() => void saveAndStage(false)}>Add them anyway</Button>
-            <Button type="button" size="xs" variant="outline" onClick={() => { setPendingStage(null); void saveAndStage(true) }}>Add only the ready rows</Button>
+            <Button type="button" size="xs" onClick={() => void saveAndStage(false)}>Import them anyway</Button>
+            <Button type="button" size="xs" variant="outline" onClick={() => { setPendingStage(null); void saveAndStage(true) }}>Import only the new values</Button>
             <Button type="button" size="xs" variant="ghost" onClick={() => setPendingStage(null)}>Cancel</Button>
           </span>
         </div>
@@ -470,10 +480,10 @@ export function IngestionPanel() {
         <div className="flex flex-wrap gap-2"><input ref={fileInput} type="file" accept=".csv,text/csv,.db,.pmdata,application/vnd.sqlite3" multiple className="hidden" onChange={(event: ChangeEvent<HTMLInputElement>) => void handleFiles(event.target.files)} /><Button type="button" variant="outline" size="sm" onClick={() => fileInput.current?.click()}><FilePlus2 className="size-3.5" />Import data</Button>{selectedSource
             ? <>
                 <Button type="button" size="sm" variant="outline" disabled={!!validation?.errors.length || selectedSource.legacy || selectedSource.originalColumns.length === 0} onClick={() => void saveAndStage(true)}>
-                  <Upload className="size-3.5" />Add to imported known new values
+                  <Upload className="size-3.5" />Import new values
                 </Button>
                 <Button type="button" size="sm" disabled={!!validation?.errors.length || selectedSource.legacy || selectedSource.originalColumns.length === 0} onClick={() => void saveAndStage(false)}>
-                  <Upload className="size-3.5" />Add to imported unlabelled data
+                  <Upload className="size-3.5" />Import and discard
                 </Button>
               </>
             : showingConfirmed
@@ -543,7 +553,7 @@ function rawColumns(rows: StoredRow<IngestionRow>[]) {
   return [...new Set(rows.flatMap((row) => Object.keys(row.rawValues)))].sort((a, b) => a.localeCompare(b))
 }
 
-function WorklistRow({ row, sourceName, categories, tableDefs, rawColumns: columns, onChange, ensureCategory, onRestore }: { row: StoredRow<IngestionRow>; sourceName: string; categories: { id: number; name: string }[]; tableDefs: { id: number; name: string }[]; rawColumns: string[]; onChange: (id: number, patch: { mappedValues?: Partial<IngestionRow['mappedValues']>; labels?: IngestionRowLabels; labelValues?: IngestionRowLabelValues; destinationTableId?: number | null }) => Promise<void>; ensureCategory: (name: string) => Promise<number | undefined>; onRestore: (id: number) => Promise<void> }) {
+function WorklistRow({ row, sourceName, categories, tableDefs, rawColumns: columns, onChange, ensureCategory, onRestore, onEliminate }: { row: StoredRow<IngestionRow>; sourceName: string; categories: { id: number; name: string }[]; tableDefs: { id: number; name: string }[]; rawColumns: string[]; onChange: (id: number, patch: { mappedValues?: Partial<IngestionRow['mappedValues']>; labels?: IngestionRowLabels; labelValues?: IngestionRowLabelValues; destinationTableId?: number | null }) => Promise<void>; ensureCategory: (name: string) => Promise<number | undefined>; onRestore: (id: number) => Promise<void>; onEliminate: (id: number) => Promise<void> }) {
   function saveData(field: IngestionTargetField, value: string) { void onChange(row.id, { mappedValues: { [field]: value } }) }
   async function saveLabel(field: typeof LABEL_FIELDS[number], value: string) {
     const draft = { ...allLabelValues(row, categories, tableDefs), [field]: value }
@@ -553,7 +563,7 @@ function WorklistRow({ row, sourceName, categories, tableDefs, rawColumns: colum
   }
   return <tr className="border-t align-top"><td className="bg-background sticky left-0 z-10 w-40 min-w-40 max-w-40 truncate p-2 font-medium" title={sourceName}>{sourceName}</td><td className="bg-background sticky left-40 z-10 w-22 min-w-22 border-r p-2">{row.status === 'discarded'
     ? <><span className="text-muted-foreground">discarded</span><Button type="button" size="xs" variant="ghost" className="mt-1 h-5 px-1" onClick={() => void onRestore(row.id)}>Restore</Button></>
-    : statusCell(row)}</td>{columns.map((column) => <td key={column} className="max-w-52 truncate p-2" title={row.rawValues[column] ?? ''}>{row.rawValues[column] ?? ''}</td>)}{DATA_FIELDS.map((field) => <td key={field} className="p-1"><EditableCell value={displayDataValue(field, row.mappedValues[field])} onCommit={(value) => saveData(field, value)} /></td>)}{LABEL_FIELDS.map((field) => <td key={field} className="p-1"><EditableCell value={labelValue(row, field, categories, tableDefs)} invalid={labelFieldInvalid(row, field, categories, tableDefs)} onCommit={(value) => void saveLabel(field, value)} /></td>)}</tr>
+    : <>{statusCell(row)}<button type="button" className="text-destructive mt-1 block text-left underline-offset-2 hover:underline" onClick={() => void onEliminate(row.id)}>eliminate</button></>}</td>{columns.map((column) => <td key={column} className="max-w-52 truncate p-2" title={row.rawValues[column] ?? ''}>{row.rawValues[column] ?? ''}</td>)}{DATA_FIELDS.map((field) => <td key={field} className="p-1"><EditableCell value={displayDataValue(field, row.mappedValues[field])} onCommit={(value) => saveData(field, value)} /></td>)}{LABEL_FIELDS.map((field) => <td key={field} className="p-1"><EditableCell value={labelValue(row, field, categories, tableDefs)} invalid={labelFieldInvalid(row, field, categories, tableDefs)} onCommit={(value) => void saveLabel(field, value)} /></td>)}</tr>
 }
 
 /** Kept beside the source name and pinned with it: the state is why a row is on screen. */

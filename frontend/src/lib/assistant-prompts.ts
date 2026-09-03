@@ -8,7 +8,7 @@ export interface AssistantPrompt {
 
 export const SYSTEM_PROMPT_KEY = 'system'
 
-const ROW_ACCESS_PROMPT = 'You can append new, validated table rows with write_to_table after first identifying the correct table. You cannot edit, correct, delete, or restore existing table rows, and you cannot change accounts, cards, or other settings.'
+const ROW_ACCESS_PROMPT = 'Finance tables are read-only to you. Every change to the data — adding a row, correcting one, taking one out — is made in the Data ingestion centre, where a row keeps its raw values and its labels are explicit; you cannot write to a table directly, and you cannot change accounts, cards, or other settings.'
 const LEGACY_ROW_ACCESS_PROMPT = 'You cannot add, edit, correct, delete, or restore table rows, and you cannot change accounts, cards, or other settings.'
 
 /**

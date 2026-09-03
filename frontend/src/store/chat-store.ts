@@ -8,7 +8,7 @@ import { formatAttachmentsForPrompt, type ChatAttachment } from '@/lib/chat-atta
 import type { OpenRouterMessage } from '@/lib/openrouter'
 import { toolsForRequest } from '@/lib/tools/registry'
 import { runConversation, type ConversationStatus } from '@/lib/tools/run-conversation'
-import { contextWindowFor } from '@/lib/model-context-window'
+import { modelFactsFor } from '@/lib/model-context-window'
 import { useChatPanelStore } from './chat-panel-store'
 
 export interface ChatMessage {
@@ -33,6 +33,10 @@ export interface ChatUsage {
   contextTokens: number
   /** The model's window, when it could be looked up. */
   contextWindow: number | null
+  /** What the session has cost in US dollars, when the model's prices are known. */
+  sessionCost: number | null
+  /** What the last message cost, on the same terms. */
+  lastMessageCost: number | null
   model?: string
 }
 
@@ -66,7 +70,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   attachments: [],
   isSending: false,
   status: { type: 'idle' },
-  usage: { lastMessageTokens: 0, lastMessageRounds: 0, sessionTokens: 0, contextTokens: 0, contextWindow: null },
+  usage: { lastMessageTokens: 0, lastMessageRounds: 0, sessionTokens: 0, contextTokens: 0, contextWindow: null, sessionCost: null, lastMessageCost: null },
 
   sendMessage: async (text) => {
     const userMessage: ChatMessage = { id: crypto.randomUUID(), role: 'user', content: text }
@@ -96,8 +100,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
       const requestFn = connection.provider === 'openai' ? requestOpenAiChatMessage : requestChatMessage
       const sessionTokensBefore = get().usage.sessionTokens
-      // The window is looked up once per model and never blocks the request itself.
-      void contextWindowFor(connection.model).then((contextWindow) => set({ usage: { ...get().usage, contextWindow, model: connection.model } }))
+      const sessionCostBefore = get().usage.sessionCost ?? 0
+      // The window and the prices are looked up once per model, and never block the
+      // request itself; the line simply says less until they arrive.
+      const facts = await modelFactsFor(connection.model).catch(() => null)
+      set({ usage: { ...get().usage, contextWindow: facts?.contextWindow ?? null, model: connection.model } })
       const replyText = await runConversation({
         apiKey: connection.apiKey,
         model: connection.model,
@@ -108,11 +115,18 @@ export const useChatStore = create<ChatState>((set, get) => ({
         onStatus: (status) => set({ status }),
         onUsage: (usage) => {
           const previous = get().usage
+          // Prompt and completion tokens are priced differently, so the cost is built
+          // from the two rather than from the total.
+          const cost = facts?.promptCostPerToken !== null && facts?.completionCostPerToken !== null && facts
+            ? usage.promptTokens * facts.promptCostPerToken + usage.completionTokens * facts.completionCostPerToken
+            : null
           set({
             usage: {
               ...previous,
               lastMessageTokens: usage.totalTokens,
               lastMessageRounds: usage.rounds,
+              lastMessageCost: cost,
+              sessionCost: cost === null ? previous.sessionCost : sessionCostBefore + cost,
               // The session total counts each round once, however many rounds a
               // message took, so it keeps rising while a message is still working.
               sessionTokens: sessionTokensBefore + usage.totalTokens,
@@ -142,7 +156,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     messages: [],
     attachments: [],
     // The window survives a cleared conversation; what it cost does not.
-    usage: { ...get().usage, lastMessageTokens: 0, lastMessageRounds: 0, sessionTokens: 0, contextTokens: 0 },
+    usage: { ...get().usage, lastMessageTokens: 0, lastMessageRounds: 0, sessionTokens: 0, contextTokens: 0, sessionCost: null, lastMessageCost: null },
   }),
   addAttachment: (attachment) => set({ attachments: [...get().attachments, attachment] }),
   removeAttachment: (id) => set({ attachments: get().attachments.filter((a) => a.id !== id) }),

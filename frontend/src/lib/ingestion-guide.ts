@@ -116,6 +116,14 @@ you checked, and what you deliberately left out. Rules fill only labels a row do
 already have, so they never overwrite a judgement, and they run by themselves when new
 rows are staged: an import a rule fully covers arrives ready for the user to confirm.
 
+## Removing data
+
+Finance tables are read-only to you: there is no tool that writes to one. Everything —
+adding data, correcting it, taking it out — happens here. A row that should not count
+is discarded with discard_ingestion_rows and a reason, at any stage: before staging it
+simply never arrives, and after confirmation discarding it flags its entry so it leaves
+every dashboard, which restoring undoes. Nothing is erased, so a mistake costs a click.
+
 ## Judgment rules
 
 - Never apply a blanket rule to IOF, Pix, or any merchant word. An IOF line can be a

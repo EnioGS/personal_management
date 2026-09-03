@@ -1,5 +1,4 @@
 import { useEffect, useRef } from 'react'
-import { PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
 import { sections } from '@/sections'
@@ -27,7 +26,6 @@ export function SecondaryBar() {
   const activeSectionId = useUiStore((s) => s.activeSectionId)
   const activeItemBySection = useUiStore((s) => s.activeItemBySection)
   const selectItem = useUiStore((s) => s.selectItem)
-  const toggleBar = useUiStore((s) => s.toggleSecondaryBar)
   const setMode = useUiStore((s) => s.setSecondaryBarMode)
   const iconsOnly = useUiStore((s) => s.secondaryBarMode) === 'icons'
   const barRef = useRef<HTMLDivElement>(null)
@@ -69,32 +67,11 @@ export function SecondaryBar() {
     }
   }, [iconsOnly, setMode])
 
-  // Typed keys are generated from the app's own namespaces; these two live in the
-  // shared common bundle, which the generated union does not cover (see activity-bar).
-  const toggleLabel = String(t((iconsOnly ? 'common:nav.showLabels' : 'common:nav.hideLabels') as never))
   const section = sections.find((s) => s.id === activeSectionId) ?? sections[0]
   const activeItemId = activeItemBySection[section.id] ?? section.items[0].id
 
   return (
     <div ref={barRef} className="bg-sidebar flex h-full flex-col pt-2">
-      <div className={cn('flex pb-1', iconsOnly ? 'justify-center px-1.5' : 'justify-end px-2')}>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-xs"
-              aria-label={toggleLabel}
-              aria-expanded={!iconsOnly}
-              onClick={toggleBar}
-              className="text-sidebar-foreground/60 hover:text-sidebar-foreground"
-            >
-              {iconsOnly ? <PanelLeftOpen className="size-3.5" /> : <PanelLeftClose className="size-3.5" />}
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent side="right">{toggleLabel}</TooltipContent>
-        </Tooltip>
-      </div>
       <ScrollArea className="flex-1">
         <nav className={cn('flex flex-col gap-0.5 pb-2', iconsOnly ? 'px-1.5' : 'px-2')}>
           {section.items.map((item) => {
@@ -108,6 +85,7 @@ export function SecondaryBar() {
                 aria-pressed={isActive}
                 aria-label={iconsOnly ? label : undefined}
                 onClick={() => selectItem(section.id, item.id)}
+                data-secondary-bar-toggle
                 className={cn(
                   'text-sidebar-foreground/80 hover:text-sidebar-foreground relative h-8 gap-2 text-sm font-normal',
                   iconsOnly ? 'w-9 justify-center px-0' : 'w-full justify-start px-2',

@@ -40,10 +40,20 @@ export const useUiStore = create<UiState>((set, get) => ({
     }
   },
 
-  // Choosing an item is what the labels were opened for, so the bar gives the width
-  // back as soon as that choice is made.
+  /**
+   * Choosing an item is what the labels were opened for, so the bar gives the width
+   * back as soon as that choice is made. Clicking the item that is *already* active
+   * asks for the labels instead — the same gesture as re-clicking the section's icon,
+   * so nothing needs a button of its own to say "show me the names".
+   */
   selectItem: (sectionId, itemId) =>
-    set((s) => ({ activeItemBySection: { ...s.activeItemBySection, [sectionId]: itemId }, secondaryBarMode: 'icons' })),
+    set((s) => {
+      const reselecting = s.activeItemBySection[sectionId] === itemId
+      return {
+        activeItemBySection: { ...s.activeItemBySection, [sectionId]: itemId },
+        secondaryBarMode: reselecting ? (s.secondaryBarMode === 'icons' ? 'expanded' : 'icons') : 'icons',
+      }
+    }),
 
   selectTable: (workspaceId, tableId) =>
     set((s) => ({ activeTableByWorkspace: { ...s.activeTableByWorkspace, [workspaceId]: tableId } })),

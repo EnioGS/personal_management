@@ -319,16 +319,24 @@ describe('duplicates and discarding', () => {
     expect(((await ingestionRowsTable.get(rowId))!.data as IngestionRow).status).toBe('unlabelled')
   })
 
-  it('refuses to discard a row that is already in a Finance table', async () => {
+  it('takes a confirmed row off the dashboards by flagging its entry, and puts it back on restore', async () => {
+    const { entriesTable } = await import('@/lib/model/model-db')
     const tableId = await tableDefsTable.add({ createdAt: 1, data: { name: 'Fatura Nubank', kind: 'cardLedger' } })
     const rowId = await stageRow({ rawCategory: 'Assinatura' }, 'a')
     await updateIngestionLabelsTool.execute({ updates: [{ rowId, financeDestination: 'spending', flowRole: 'outflow', settlementChannel: 'creditCard', spendingTreatment: 'expense', recurrence: 'recurring', category: 'Assinaturas', destinationTableId: tableId }] }, context)
     await promoteReadyIngestionRows([rowId])
+    const entryId = ((await ingestionRowsTable.get(rowId))!.data as IngestionRow).promotedEntryId!
 
-    const result = JSON.parse(await discardIngestionRowsTool.execute({ rowIds: [rowId], reason: 'duplicate' }, context))
+    const result = JSON.parse(await discardIngestionRowsTool.execute({ rowIds: [rowId], reason: 'charged twice by the shop' }, context))
 
-    expect(result.changed).toBe(0)
-    expect(result.errors[0]).toContain('already in a Finance table')
+    expect(result).toEqual({ changed: 1, errors: [] })
+    expect(((await entriesTable.get(entryId))!.data as { deleted?: boolean }).deleted).toBe(true)
+    expect(((await ingestionRowsTable.get(rowId))!.data as IngestionRow).status).toBe('discarded')
+
+    await discardIngestionRowsTool.execute({ rowIds: [rowId], reason: 'my mistake', restore: true }, context)
+
+    expect(((await entriesTable.get(entryId))!.data as { deleted?: boolean }).deleted).toBe(false)
+    expect(((await ingestionRowsTable.get(rowId))!.data as IngestionRow).status).toBe('promoted')
   })
 })
 

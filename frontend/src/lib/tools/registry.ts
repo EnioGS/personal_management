@@ -24,16 +24,15 @@ import { readCsvTool } from './read-csv'
 import { readTableTool } from './read-table'
 import { readTextFileTool } from './read-text-file'
 import type { ToolDefinition } from './types'
-import { writeToTableTool } from './write-to-table'
+// Finance tables are read-only to the assistant. Every write — adding a row,
+// correcting one, taking one out — happens in the ingestion centre, where the row
+// keeps its raw values, its labels are explicit, and the moves that matter are the
+// user's own clicks. Writing straight to a table would be a second door into the
+// dashboards with none of that.
+//
 // Promoting labelled rows and reallocating confirmed ones stay user-only. Staging is
 // reachable, but only behind an explicit confirmation the user has given (see the
 // tool's own description).
-// Row correction/deletion tools stay disabled: the assistant may append new rows,
-// but cannot alter existing history. Their implementations remain available here for
-// a future, separately-authorized capability.
-// import { deleteTableRowsTool } from './delete-table-rows'
-// import { restoreTableRowsTool } from './restore-table-rows'
-// import { updateTableRowsTool } from './update-table-rows'
 
 /** Adding a tool = write one ToolDefinition file + add it here. Nothing else changes. */
 export const toolRegistry: ToolDefinition[] = [
@@ -62,7 +61,6 @@ export const toolRegistry: ToolDefinition[] = [
   saveLabelRuleTool,
   applyLabelRulesTool,
   deleteLabelRuleTool,
-  writeToTableTool,
 ]
 
 export function findTool(name: string): ToolDefinition | undefined {

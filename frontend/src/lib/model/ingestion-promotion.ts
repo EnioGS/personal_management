@@ -315,11 +315,24 @@ export async function discardIngestionRows(
     const stored = await ingestionRowsTable.get(rowId)
     if (!stored) { result.errors.push(`Row ${rowId} no longer exists.`); continue }
     const row = asIngestionRow(stored.data)
-    if (isFinalized(row)) { result.errors.push(`Row ${rowId} is already in a Finance table; relabel or reallocate it instead of discarding it.`); continue }
+    // A confirmed row's entry is real data on a dashboard, so discarding one has to
+    // take that entry out of the picture too. It is flagged rather than erased (adr/0018),
+    // which is what makes restoring the row put the entry back.
+    // Restoring works from the discarded status, not the finalized one, so the entry
+    // has to be found by the link the row still carries either way.
+    const entryId = row.promotedEntryId ?? row.existingEntryId
+    const touchesEntry = entryId !== undefined && (restore ? row.status === 'discarded' : isFinalized(row))
+    if (touchesEntry) {
+      const entry = await entriesTable.get(entryId!)
+      if (entry) await entriesTable.update(entryId!, { data: { ...(entry.data as Entry), deleted: !restore } })
+    }
     if (restore) {
       if (row.status !== 'discarded') continue
       const { discardReason: _reason, ...rest } = row
-      await ingestionRowsTable.update(rowId, { data: { ...rest, status: 'unlabelled', validationErrors: ['Assign the required labels before confirmation.'] } })
+      // A row that had reached a table goes back to being confirmed; one that never did
+      // goes back to the worklist.
+      const restoredStatus = rest.promotedEntryId ? 'promoted' : rest.existingEntryId ? 'reconciledExisting' : 'unlabelled'
+      await ingestionRowsTable.update(rowId, { data: { ...rest, status: restoredStatus, validationErrors: restoredStatus === 'unlabelled' ? ['Assign the required labels before confirmation.'] : [] } })
     } else {
       if (row.status === 'discarded') continue
       await ingestionRowsTable.update(rowId, { data: { ...row, status: 'discarded', discardReason: reason, validationErrors: [] } })

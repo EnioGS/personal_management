@@ -37,7 +37,6 @@ describe('findTool', () => {
       'save_label_rule',
       'apply_label_rules',
       'delete_label_rule',
-      'write_to_table',
     ])
   })
 
@@ -50,11 +49,12 @@ describe('findTool', () => {
     expect(findTool('read_category_raw_values')).toBeUndefined()
   })
 
-  it('exposes append-only writing but not row correction or removal', () => {
-    expect(findTool('write_to_table')).toBeDefined()
+  it('cannot write to a finance table at all — every write goes through the ingestion centre', () => {
+    expect(findTool('write_to_table')).toBeUndefined()
     expect(findTool('update_table_rows')).toBeUndefined()
     expect(findTool('delete_table_rows')).toBeUndefined()
     expect(findTool('restore_table_rows')).toBeUndefined()
+    expect(findTool('read_table')).toBeDefined()
   })
 })
 

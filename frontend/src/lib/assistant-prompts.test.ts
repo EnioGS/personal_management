@@ -6,7 +6,7 @@ describe('enableAppendOnlyTableWrites', () => {
     const legacy = 'Keep answers short. You cannot add, edit, correct, delete, or restore table rows, and you cannot change accounts, cards, or other settings. Always mention dates.'
     const upgraded = enableAppendOnlyTableWrites(legacy)
 
-    expect(upgraded).toContain('You can append new, validated table rows with write_to_table')
+    expect(upgraded).toContain('Finance tables are read-only to you')
     expect(upgraded).toContain('Keep answers short.')
     expect(upgraded).toContain('Always mention dates.')
     expect(upgraded).not.toContain('You cannot add, edit, correct, delete, or restore table rows')

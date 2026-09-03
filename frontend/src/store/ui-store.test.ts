@@ -42,14 +42,26 @@ describe('ui-store', () => {
     expect(useUiStore.getState().secondaryBarMode).toBe('icons')
   })
 
-  it('collapses the labels again once an item has been chosen with them', () => {
+  it('collapses the labels again once a different item has been chosen with them', () => {
     const [section] = sections
+    useUiStore.getState().selectItem(section.id, 'item-a')
     useUiStore.getState().setSecondaryBarMode('expanded')
 
-    useUiStore.getState().selectItem(section.id, 'item-a')
+    useUiStore.getState().selectItem(section.id, 'item-b')
 
     expect(useUiStore.getState().secondaryBarMode).toBe('icons')
-    expect(useUiStore.getState().activeItemBySection).toEqual({ [section.id]: 'item-a' })
+    expect(useUiStore.getState().activeItemBySection).toEqual({ [section.id]: 'item-b' })
+  })
+
+  it('shows the labels when the item already open is clicked again, and hides them on the next click', () => {
+    const [section] = sections
+    useUiStore.getState().selectItem(section.id, 'item-a')
+
+    useUiStore.getState().selectItem(section.id, 'item-a')
+    expect(useUiStore.getState().secondaryBarMode).toBe('expanded')
+
+    useUiStore.getState().selectItem(section.id, 'item-a')
+    expect(useUiStore.getState().secondaryBarMode).toBe('icons')
   })
 
   it('remembers the last-selected item per section without clobbering other sections', () => {

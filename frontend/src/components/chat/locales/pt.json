@@ -13,6 +13,8 @@
     "usageLast": "{{tokens}} tokens na última mensagem ({{rounds}} requisições)",
     "usageSession": "{{tokens}} nesta sessão",
     "usageContext": "contexto {{tokens}} / {{window}} ({{percent}}%)",
-    "usageContextUnknown": "contexto {{tokens}} tokens — janela desconhecida para este modelo"
+    "usageContextUnknown": "contexto {{tokens}} tokens — janela desconhecida para este modelo",
+    "usageCost": "{{cost}} gastos",
+    "usageCostLast": "última mensagem: {{cost}}"
   }
 }

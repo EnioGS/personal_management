@@ -530,7 +530,7 @@ export const findIngestionDuplicatesTool: ToolDefinition = {
 
 export const discardIngestionRowsTool: ToolDefinition = {
   name: 'discard_ingestion_rows',
-  description: 'Sets staged rows aside as duplicates or noise, with a reason. A discarded row keeps every raw value and stays readable, but leaves the worklist and can never be promoted, so nothing is lost. Use it on what find_ingestion_duplicates reports, name the row it duplicates in the reason, and tell the user what you discarded and why. Pass restore=true to put rows back. A row already in a Finance table is refused: relabel and let the user reallocate it instead.',
+  description: 'Sets rows aside, with a reason: duplicates, noise, or anything that should not count. A discarded row keeps every raw value and stays readable, but leaves the worklist and can never be promoted, so nothing is lost. This works on confirmed rows too — discarding one flags its entry as deleted, which is how a row already on a dashboard is taken out; restore=true puts both back. This is the only way to remove data: finance tables are read-only to you. Say what you discarded and why, and name the row a duplicate repeats.',
   parameters: {
     type: 'object',
     properties: {

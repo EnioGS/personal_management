@@ -13,6 +13,8 @@
     "usageLast": "{{tokens}} tokens last message ({{rounds}} requests)",
     "usageSession": "{{tokens}} this session",
     "usageContext": "context {{tokens}} / {{window}} ({{percent}}%)",
-    "usageContextUnknown": "context {{tokens}} tokens — window unknown for this model"
+    "usageContextUnknown": "context {{tokens}} tokens — window unknown for this model",
+    "usageCost": "{{cost}} spent",
+    "usageCostLast": "last message: {{cost}}"
   }
 }

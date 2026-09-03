@@ -290,6 +290,11 @@ export function ChatPanel() {
           <div className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-0.5 border-t px-3 pt-1.5 text-[11px]">
             <span>{t('panel.usageLast', { tokens: usage.lastMessageTokens.toLocaleString(), rounds: usage.lastMessageRounds })}</span>
             <span>{t('panel.usageSession', { tokens: usage.sessionTokens.toLocaleString() })}</span>
+            {usage.sessionCost !== null && (
+              <span title={usage.lastMessageCost !== null ? t('panel.usageCostLast', { cost: formatCost(usage.lastMessageCost) }) : undefined}>
+                {t('panel.usageCost', { cost: formatCost(usage.sessionCost) })}
+              </span>
+            )}
             <span className={cn(usage.contextWindow && usage.contextTokens / usage.contextWindow > 0.8 && 'text-amber-600 dark:text-amber-300')}>
               {usage.contextWindow
                 ? t('panel.usageContext', { tokens: usage.contextTokens.toLocaleString(), window: usage.contextWindow.toLocaleString(), percent: Math.round((usage.contextTokens / usage.contextWindow) * 100) })
@@ -373,4 +378,13 @@ export function ChatPanel() {
       </div>
     </div>
   )
+}
+
+/**
+ * Model prices run to millionths of a dollar a token, so a session can genuinely cost
+ * a fraction of a cent — shown to four decimals until it is worth rounding, since
+ * "$0.00" would say the wrong thing about a number that is not zero.
+ */
+function formatCost(cost: number): string {
+  return cost >= 0.01 ? `$${cost.toFixed(2)}` : `$${cost.toFixed(4)}`
 }
