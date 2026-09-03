@@ -294,3 +294,43 @@ export async function reallocateConfirmedIngestionRows(rowIds: number[]): Promis
   })
   return result
 }
+
+/**
+ * Sets rows aside without deleting them. A discarded row keeps every raw value and
+ * stays readable as provenance — it simply leaves the worklist and can never be
+ * promoted, which is what "this is a duplicate" should mean for data nobody wants to
+ * lose. Restoring puts it back where it was.
+ *
+ * A row already in a Finance table is refused: discarding it would silently remove a
+ * real entry, which is a different act than tidying a queue.
+ */
+export async function discardIngestionRows(
+  rowIds: number[],
+  reason: string,
+  actor: 'user' | 'assistant' = 'user',
+  restore = false,
+): Promise<{ changed: number; errors: string[] }> {
+  const result = { changed: 0, errors: [] as string[] }
+  for (const rowId of [...new Set(rowIds)]) {
+    const stored = await ingestionRowsTable.get(rowId)
+    if (!stored) { result.errors.push(`Row ${rowId} no longer exists.`); continue }
+    const row = asIngestionRow(stored.data)
+    if (isFinalized(row)) { result.errors.push(`Row ${rowId} is already in a Finance table; relabel or reallocate it instead of discarding it.`); continue }
+    if (restore) {
+      if (row.status !== 'discarded') continue
+      const { discardReason: _reason, ...rest } = row
+      await ingestionRowsTable.update(rowId, { data: { ...rest, status: 'unlabelled', validationErrors: ['Assign the required labels before confirmation.'] } })
+    } else {
+      if (row.status === 'discarded') continue
+      await ingestionRowsTable.update(rowId, { data: { ...row, status: 'discarded', discardReason: reason, validationErrors: [] } })
+    }
+    result.changed += 1
+  }
+  if (result.changed > 0) {
+    await ingestionAuditEventsTable.add({
+      createdAt: Date.now(),
+      data: { event: 'rowsDiscarded', actor, ingestionRowIds: rowIds, details: { restored: restore, reason, changed: result.changed } },
+    })
+  }
+  return result
+}

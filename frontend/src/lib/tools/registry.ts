@@ -2,6 +2,8 @@ import type { OpenRouterTool } from '@/lib/openrouter'
 import {
   assignIngestionColumnsTool,
   addIngestionBlankColumnTool,
+  discardIngestionRowsTool,
+  findIngestionDuplicatesTool,
   labelIngestionRowsByMatchTool,
   listIngestionDatasetsTool,
   readIngestionGuideTool,
@@ -37,6 +39,8 @@ export const toolRegistry: ToolDefinition[] = [
   readIngestionProvenanceTool,
   assignIngestionColumnsTool,
   addIngestionBlankColumnTool,
+  findIngestionDuplicatesTool,
+  discardIngestionRowsTool,
   suggestIngestionLabelsTool,
   updateIngestionLabelsTool,
   labelIngestionRowsByMatchTool,

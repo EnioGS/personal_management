@@ -125,6 +125,8 @@ export type IngestionRowStatus =
   | 'reconciledExisting'
   | 'invalid'
   | 'promotionError'
+  /** Set aside as a duplicate or as noise: kept as provenance, never promoted. */
+  | 'discarded'
 
 /** Canonical values available above a raw source file's original column headers. */
 export type IngestionTargetField =
@@ -233,6 +235,8 @@ export interface IngestionRow {
   existingEntryId?: number
   /** Present after a newly staged row is promoted to an app entry. */
   promotedEntryId?: number
+  /** Why the row was discarded, and by whom, so the decision can be reviewed. */
+  discardReason?: string
   /**
    * True when a confirmed row's labels or data have been edited but its promoted
    * entry has not been rewritten yet. Reallocation — a user click, like promotion —
@@ -243,7 +247,7 @@ export interface IngestionRow {
 
 /** Append-only trace of user/assistant classification actions. */
 export interface IngestionAuditEvent {
-  event: 'sourceUploaded' | 'mappingChanged' | 'rowsStaged' | 'labelsChanged' | 'rowsPromoted' | 'rowsReconciled' | 'rowsReallocated' | 'promotionFailed'
+  event: 'sourceUploaded' | 'mappingChanged' | 'rowsStaged' | 'labelsChanged' | 'rowsPromoted' | 'rowsReconciled' | 'rowsReallocated' | 'rowsDiscarded' | 'promotionFailed'
   actor: 'user' | 'assistant' | 'migration'
   sourceId?: number
   ingestionRowIds?: number[]

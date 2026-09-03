@@ -2,10 +2,11 @@ import { DEFAULT_INGESTION_GUIDE, INGESTION_GUIDE_KEY } from '@/lib/ingestion-gu
 import { ingestionLabelErrors } from '@/lib/model/ingestion'
 import { ensureCategoryByName } from '@/lib/model/category-vocabulary'
 import { createSupplementalColumn, parseIngestionCsv, saveIngestionMappings } from '@/lib/model/ingestion-source'
-import { updateIngestionRowLabels, updateIngestionRowWorklist } from '@/lib/model/ingestion-promotion'
+import { discardIngestionRows, updateIngestionRowLabels, updateIngestionRowWorklist } from '@/lib/model/ingestion-promotion'
+import { findDuplicateMatches, normalizeAmount, normalizeDate, normalizeText, type ComparableRow } from '@/lib/model/ingestion-duplicates'
 import { FINANCE_DESTINATIONS, FLOW_ROLES, labelValues, matchLabelValue, RECURRENCES, SETTLEMENT_CHANNELS, SPENDING_TREATMENTS } from '@/lib/model/label-vocabulary'
 import { assistantPromptsTable } from '@/lib/assistant-prompts-db'
-import { categoriesTable, ingestionAuditEventsTable, ingestionColumnMappingsTable, ingestionRowsTable, ingestionSourcesTable, tableDefsTable } from '@/lib/model/model-db'
+import { categoriesTable, entriesTable, ingestionAuditEventsTable, ingestionColumnMappingsTable, ingestionRowsTable, ingestionSourcesTable, tableDefsTable } from '@/lib/model/model-db'
 import type { AssistantPrompt } from '@/lib/assistant-prompts'
 import type { Category, IngestionAuditEvent, IngestionColumnMapping, IngestionRow, IngestionRowLabels, IngestionSource, IngestionTargetField, TableDef } from '@/lib/model/types'
 import type { ToolDefinition } from './types'
@@ -91,18 +92,21 @@ function readSourceFile(stored: { data: unknown }) {
 export const readIngestionTableTool: ToolDefinition = {
   name: 'read_ingestion_table',
   description: 'Reads a paged slice of one of the three datasets: the imported-unlabelled worklist, the confirmed rows already in a Finance table, or one uploaded source file. For a source file it returns that file\'s own columns and rows exactly as uploaded (sourceColumns/sourceRows), which is what a column mapping must be judged from, plus any rows already staged from it. Read-only. The result reports the total, so read ONE page (25-100 rows), act on it, and answer the user — never loop through an entire backlog before replying.',
-  parameters: { type: 'object', properties: { dataset: { type: 'string', enum: ['worklist', 'confirmed'], description: 'worklist (default) = rows waiting to be labelled; confirmed = rows already in a Finance table, which can still be relabelled for reallocation.' }, sourceId: { type: 'number', description: 'Uploaded source ID. Omit to read the chosen dataset across all sources.' }, offset: { type: 'number' }, limit: { type: 'number' } }, additionalProperties: false },
+  parameters: { type: 'object', properties: { dataset: { type: 'string', enum: ['worklist', 'confirmed', 'discarded'], description: 'worklist (default) = rows waiting to be labelled; confirmed = rows already in a Finance table, which can still be relabelled for reallocation; discarded = rows set aside as duplicates or noise, readable and restorable but never promoted.' }, sourceId: { type: 'number', description: 'Uploaded source ID. Omit to read the chosen dataset across all sources.' }, offset: { type: 'number' }, limit: { type: 'number' } }, additionalProperties: false },
   execute: async (args) => {
     const offset = typeof args.offset === 'number' && args.offset >= 0 ? Math.floor(args.offset) : 0
     const limit = typeof args.limit === 'number' && args.limit > 0 ? Math.min(MAX_ROWS, Math.floor(args.limit)) : 25
     const sourceId = typeof args.sourceId === 'number' ? args.sourceId : undefined
     const stored = await ingestionRowsTable.toArray()
     const rows = stored.map((row) => row.data as IngestionRow)
-    const confirmedOnly = args.dataset === 'confirmed'
+    const dataset = args.dataset === 'confirmed' || args.dataset === 'discarded' ? args.dataset : 'worklist'
     const isConfirmed = (row: IngestionRow) => row.status === 'promoted' || row.status === 'reconciledExisting'
     const selected = stored.map((row) => ({ id: row.id, ...(row.data as IngestionRow) })).filter((row) => {
       if (sourceId !== undefined && row.sourceId !== sourceId) return false
-      return confirmedOnly ? isConfirmed(row) : !isConfirmed(row)
+      if (dataset === 'confirmed') return isConfirmed(row)
+      if (dataset === 'discarded') return row.status === 'discarded'
+      // The worklist is what still needs work: neither finalized nor set aside.
+      return !isConfirmed(row) && row.status !== 'discarded'
     })
     const source = sourceId === undefined ? undefined : await ingestionSourcesTable.get(sourceId)
     const mappings = sourceId === undefined ? [] : (await ingestionColumnMappingsTable.toArray()).filter((row) => (row.data as IngestionColumnMapping).sourceId === sourceId).map((row) => row.data)
@@ -306,6 +310,149 @@ export const updateIngestionDataFieldsTool: ToolDefinition = {
       try { result.push(await updateIngestionRowWorklist(update.rowId, { mappedValues: values }, 'assistant')) } catch (error) { result.push({ rowId: update.rowId, error: error instanceof Error ? error.message : 'could not update data fields.' }) }
     }
     return JSON.stringify(result)
+  },
+}
+
+/** Every row and entry a candidate could already be a copy of. */
+async function duplicateCorpus(excludeRowIds: Set<number>): Promise<ComparableRow[]> {
+  const [storedRows, entries, tables] = await Promise.all([ingestionRowsTable.toArray(), entriesTable.toArray(), tableDefsTable.toArray()])
+  const tableName = new Map(tables.map((table) => [table.id, (table.data as TableDef).name]))
+  const linkedEntryIds = new Set(storedRows.flatMap((row) => {
+    const data = row.data as IngestionRow
+    return [data.promotedEntryId, data.existingEntryId].filter((id): id is number => typeof id === 'number')
+  }))
+
+  const corpus: ComparableRow[] = []
+  for (const stored of storedRows) {
+    if (excludeRowIds.has(stored.id)) continue
+    const row = stored.data as IngestionRow
+    corpus.push({
+      key: `row:${stored.id}`,
+      date: normalizeDate(row.mappedValues.date ?? row.rawValues.date),
+      amount: normalizeAmount(row.mappedValues.amount ?? row.rawValues.amount),
+      description: normalizeText(row.mappedValues.description ?? row.rawValues.description ?? ''),
+      fingerprint: row.sourceRowFingerprint,
+      context: { rowId: stored.id, status: row.status, destinationTable: tableName.get(row.destinationTableId ?? -1) },
+    })
+  }
+  // An entry written by hand has no ingestion row behind it, and is still something a
+  // new file can duplicate.
+  for (const stored of entries) {
+    if (linkedEntryIds.has(stored.id)) continue
+    const entry = stored.data as Record<string, unknown>
+    corpus.push({
+      key: `entry:${stored.id}`,
+      date: normalizeDate(entry.date),
+      amount: normalizeAmount(entry.amount),
+      description: normalizeText(entry.description ?? entry.note ?? ''),
+      fingerprint: typeof entry.importKey === 'string' ? entry.importKey : undefined,
+      context: { entryId: stored.id, status: 'inFinanceTable', destinationTable: tableName.get(Number(entry.tableId)) },
+    })
+  }
+  return corpus
+}
+
+export const findIngestionDuplicatesTool: ToolDefinition = {
+  name: 'find_ingestion_duplicates',
+  description: 'Checks rows against everything already stored — the unlabelled worklist, the confirmed rows, and entries written by hand — and returns the ones that look like copies. ALWAYS run this on new data: on an uploaded source before its mapping is finished, and again on staged rows before labelling them, because the same transaction arrives twice from a bank as easily as from two overlapping files. It compares only the fields both rows actually have, so a file missing a column is still checked on the columns it does have: a match on date+amount+description is high confidence, an identical fingerprint is proof, and two fields agreeing with the third missing is medium — real, but worth a human eye. Read-only; discard_ingestion_rows is what acts on the answer.',
+  parameters: {
+    type: 'object',
+    properties: {
+      sourceId: { type: 'number', description: 'Check an uploaded file\'s own rows, before or after staging.' },
+      rowIds: { type: 'array', items: { type: 'number' }, description: 'Check these staged rows instead.' },
+      offset: { type: 'number' },
+      limit: { type: 'number' },
+    },
+    additionalProperties: false,
+  },
+  execute: async (args) => {
+    const offset = typeof args.offset === 'number' && args.offset >= 0 ? Math.floor(args.offset) : 0
+    const limit = typeof args.limit === 'number' && args.limit > 0 ? Math.min(MAX_ROWS, Math.floor(args.limit)) : 50
+    const sourceId = typeof args.sourceId === 'number' ? args.sourceId : undefined
+    const rowIds = Array.isArray(args.rowIds) ? args.rowIds.filter((id): id is number => typeof id === 'number') : undefined
+    if (sourceId === undefined && !rowIds?.length) return 'Error: pass either sourceId or rowIds.'
+
+    const storedRows = await ingestionRowsTable.toArray()
+    const candidates: ComparableRow[] = []
+    const excluded = new Set<number>()
+
+    if (rowIds?.length) {
+      for (const rowId of rowIds) {
+        const stored = storedRows.find((row) => row.id === rowId)
+        if (!stored) continue
+        const row = stored.data as IngestionRow
+        excluded.add(rowId)
+        candidates.push({
+          key: `row:${rowId}`,
+          date: normalizeDate(row.mappedValues.date ?? row.rawValues.date),
+          amount: normalizeAmount(row.mappedValues.amount ?? row.rawValues.amount),
+          description: normalizeText(row.mappedValues.description ?? row.rawValues.description ?? ''),
+          fingerprint: row.sourceRowFingerprint,
+        })
+      }
+    } else {
+      const source = await ingestionSourcesTable.get(sourceId!)
+      if (!source) return `Error: ingestion source ${sourceId} was not found.`
+      const staged = storedRows.filter((row) => (row.data as IngestionRow).sourceId === sourceId)
+      for (const stored of staged) excluded.add(stored.id)
+      const file = readSourceFile(source)
+      if (file) {
+        // Before staging there are no row ids, so a file row is named by its position.
+        const columnFor = (names: string[]) => file.columns.find((column) => names.some((name) => normalizeText(column).includes(name)))
+        const dateColumn = columnFor(['date', 'data'])
+        const amountColumn = columnFor(['amount', 'valor', 'value'])
+        const descriptionColumn = columnFor(['description', 'descricao', 'historico', 'estabelecimento', 'title'])
+        file.rows.slice(offset, offset + limit).forEach((row, index) => {
+          candidates.push({
+            key: `file-row:${offset + index}`,
+            date: normalizeDate(dateColumn ? row[dateColumn] : undefined),
+            amount: normalizeAmount(amountColumn ? row[amountColumn] : undefined),
+            description: normalizeText(descriptionColumn ? row[descriptionColumn] : ''),
+          })
+        })
+      } else {
+        for (const stored of staged.slice(offset, offset + limit)) {
+          const row = stored.data as IngestionRow
+          candidates.push({
+            key: `row:${stored.id}`,
+            date: normalizeDate(row.mappedValues.date ?? row.rawValues.date),
+            amount: normalizeAmount(row.mappedValues.amount ?? row.rawValues.amount),
+            description: normalizeText(row.mappedValues.description ?? row.rawValues.description ?? ''),
+            fingerprint: row.sourceRowFingerprint,
+          })
+        }
+      }
+    }
+
+    const matches = findDuplicateMatches(candidates, await duplicateCorpus(excluded))
+    return JSON.stringify({
+      checked: candidates.length,
+      offset,
+      candidatesWithMatches: new Set(matches.map((match) => match.candidateKey)).size,
+      matches,
+      note: 'Medium confidence means two fields agreed and a third was missing on one side — judge it, do not assume it. Nothing was changed.',
+    })
+  },
+}
+
+export const discardIngestionRowsTool: ToolDefinition = {
+  name: 'discard_ingestion_rows',
+  description: 'Sets staged rows aside as duplicates or noise, with a reason. A discarded row keeps every raw value and stays readable, but leaves the worklist and can never be promoted, so nothing is lost. Use it on what find_ingestion_duplicates reports, name the row it duplicates in the reason, and tell the user what you discarded and why. Pass restore=true to put rows back. A row already in a Finance table is refused: relabel and let the user reallocate it instead.',
+  parameters: {
+    type: 'object',
+    properties: {
+      rowIds: { type: 'array', items: { type: 'number' } },
+      reason: { type: 'string', description: 'Why — e.g. "duplicate of row 412 (same date, amount and description)".' },
+      restore: { type: 'boolean' },
+    },
+    required: ['rowIds', 'reason'],
+    additionalProperties: false,
+  },
+  execute: async (args) => {
+    const rowIds = Array.isArray(args.rowIds) ? args.rowIds.filter((id): id is number => typeof id === 'number') : []
+    if (rowIds.length === 0) return 'Error: rowIds are required.'
+    if (typeof args.reason !== 'string' || !args.reason.trim()) return 'Error: a reason is required.'
+    return JSON.stringify(await discardIngestionRows(rowIds, args.reason.trim(), 'assistant', args.restore === true))
   },
 }
 

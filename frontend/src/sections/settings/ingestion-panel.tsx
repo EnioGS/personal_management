@@ -13,7 +13,7 @@ import {
   validateIngestionMappings,
 } from '@/lib/model/ingestion-source'
 import { createIngestionSourcesFromDatabaseFile } from '@/lib/model/ingestion-database-file'
-import { promoteReadyIngestionRows, reallocateConfirmedIngestionRows, updateIngestionRowWorklist } from '@/lib/model/ingestion-promotion'
+import { discardIngestionRows, promoteReadyIngestionRows, reallocateConfirmedIngestionRows, updateIngestionRowWorklist } from '@/lib/model/ingestion-promotion'
 import {
   useCategoriesStore,
   useIngestionColumnMappingsStore,
@@ -64,6 +64,7 @@ export function IngestionPanel() {
   const [supplementalName, setSupplementalName] = useState('')
   const [message, setMessage] = useState<string | null>(null)
   const [worklistFieldName, setWorklistFieldName] = useState('')
+  const [showDiscarded, setShowDiscarded] = useState(false)
   const fileInput = useRef<HTMLInputElement>(null)
 
   const selectedSource = sourceStore.items.find((source) => String(source.id) === selected)
@@ -87,9 +88,12 @@ export function IngestionPanel() {
   // backlog of hundreds otherwise buries them; the sort is stable, so everything else
   // keeps the order it was queued in.
   const rows = useMemo(() => {
-    const active = rowStore.items.filter((row) => row.status !== 'promoted' && row.status !== 'reconciledExisting')
+    const active = rowStore.items.filter((row) => row.status !== 'promoted' && row.status !== 'reconciledExisting' && row.status !== 'discarded')
     return [...active].sort((left, right) => Number(right.status === 'ready') - Number(left.status === 'ready'))
   }, [rowStore.items])
+  // Discarded rows are set aside, not deleted: they stay one click away so a wrong
+  // duplicate call can be undone.
+  const discardedRows = useMemo(() => rowStore.items.filter((row) => row.status === 'discarded'), [rowStore.items])
   // Rows whose entry already exists. Edits here wait for reallocation the same way a
   // staged row waits for promotion, so a pending change sorts to the top.
   const confirmedRows = useMemo(() => {
@@ -97,7 +101,7 @@ export function IngestionPanel() {
     return [...finalized].sort((left, right) => Number(right.hasPendingChange) - Number(left.hasPendingChange))
   }, [rowStore.items])
   const showingConfirmed = selected === CONFIRMED_DATASET
-  const visibleRows = showingConfirmed ? confirmedRows : rows
+  const visibleRows = showingConfirmed ? confirmedRows : showDiscarded ? discardedRows : rows
   const reallocatable = confirmedRows.filter((row) => row.hasPendingChange && row.validationErrors.length === 0)
 
   function selectDataset(value: string) {
@@ -142,6 +146,11 @@ export function IngestionPanel() {
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Could not add the blank data field.')
     }
+  }
+
+  async function restoreRow(rowId: number) {
+    await discardIngestionRows([rowId], 'restored from the discarded list', 'user', true)
+    await refresh()
   }
 
   async function confirmReallocation() {
@@ -298,16 +307,25 @@ export function IngestionPanel() {
             ? 'These rows are already in a Finance table. Editing a label or a data field marks the row for reallocation — its entry is rewritten, and every Finance screen follows, only when you confirm below.'
             : 'Source data is shown in its own columns. Canonical fields can be edited here; label cells accept text and turn red when the value is not one of the accepted options. Typing a category name that does not exist yet creates it.'}</p>
           <div className="min-h-0 flex-1 overflow-auto rounded border">
-            <table className="min-w-max text-left text-xs"><thead className="bg-muted"><tr><th className="bg-muted sticky left-0 z-30 w-40 min-w-40 p-2">Source</th><th className="bg-muted sticky left-40 z-30 w-22 min-w-22 border-r p-2">Status</th>{rawColumns(visibleRows).map((column) => <th key={`raw-${column}`} className="min-w-36 p-2">{column}</th>)}{DATA_FIELDS.map((field) => <th key={field} className="min-w-32 p-2">{field}</th>)}{LABEL_FIELDS.map((field) => <th key={field} className="min-w-40 p-2 align-top">{field}<p className="text-muted-foreground font-normal">{LABEL_OPTIONS[field]}</p></th>)}</tr></thead><tbody>{visibleRows.map((row) => <WorklistRow key={row.id} row={row} sourceName={sourceStore.items.find((source) => source.id === row.sourceId)?.originalFilename ?? 'Existing data'} categories={categories} tableDefs={tableDefs} rawColumns={rawColumns(visibleRows)} onChange={updateWorklist} ensureCategory={ensureCategory} />)}{visibleRows.length === 0 && <tr><td colSpan={2 + DATA_FIELDS.length + LABEL_FIELDS.length} className="text-muted-foreground p-4 text-center">{showingConfirmed ? 'Nothing has been confirmed yet.' : 'No staged data yet.'}</td></tr>}</tbody></table>
+            <table className="min-w-max text-left text-xs"><thead className="bg-muted"><tr><th className="bg-muted sticky left-0 z-30 w-40 min-w-40 p-2">Source</th><th className="bg-muted sticky left-40 z-30 w-22 min-w-22 border-r p-2">Status</th>{rawColumns(visibleRows).map((column) => <th key={`raw-${column}`} className="min-w-36 p-2">{column}</th>)}{DATA_FIELDS.map((field) => <th key={field} className="min-w-32 p-2">{field}</th>)}{LABEL_FIELDS.map((field) => <th key={field} className="min-w-40 p-2 align-top">{field}<p className="text-muted-foreground font-normal">{LABEL_OPTIONS[field]}</p></th>)}</tr></thead><tbody>{visibleRows.map((row) => <WorklistRow key={row.id} row={row} sourceName={sourceStore.items.find((source) => source.id === row.sourceId)?.originalFilename ?? 'Existing data'} categories={categories} tableDefs={tableDefs} rawColumns={rawColumns(visibleRows)} onChange={updateWorklist} ensureCategory={ensureCategory} onRestore={restoreRow} />)}{visibleRows.length === 0 && <tr><td colSpan={2 + DATA_FIELDS.length + LABEL_FIELDS.length} className="text-muted-foreground p-4 text-center">{showingConfirmed ? 'Nothing has been confirmed yet.' : 'No staged data yet.'}</td></tr>}</tbody></table>
           </div>
           <div className="flex items-center justify-between gap-2 text-xs">
             <div className="flex items-center gap-2">
               <Input value={worklistFieldName} onChange={(event) => setWorklistFieldName(event.target.value)} placeholder="Add blank canonical field, e.g. quantity" className="h-7 w-60 text-xs" />
               <Button type="button" size="xs" variant="outline" onClick={() => void addWorklistField()} disabled={!worklistFieldName.trim()}><Plus className="size-3" />Add blank data field</Button>
             </div>
-            <p className="text-muted-foreground shrink-0">{showingConfirmed
-              ? `${confirmedRows.length} confirmed row(s) · ${reallocatable.length} to reallocate`
-              : `${rows.length} row(s) · ${rows.filter((row) => row.status === 'ready').length} ready`}</p>
+            <div className="flex shrink-0 items-center gap-3">
+              {!showingConfirmed && discardedRows.length > 0 && (
+                <Button type="button" size="xs" variant={showDiscarded ? 'default' : 'ghost'} onClick={() => setShowDiscarded(!showDiscarded)}>
+                  {showDiscarded ? 'Back to the worklist' : `Show discarded (${discardedRows.length})`}
+                </Button>
+              )}
+              <p className="text-muted-foreground">{showingConfirmed
+                ? `${confirmedRows.length} confirmed row(s) · ${reallocatable.length} to reallocate`
+                : showDiscarded
+                  ? `${discardedRows.length} discarded row(s) · kept as provenance, never promoted`
+                  : `${rows.length} row(s) · ${rows.filter((row) => row.status === 'ready').length} ready`}</p>
+            </div>
           </div>
         </section>
       )}
@@ -338,7 +356,7 @@ function rawColumns(rows: StoredRow<IngestionRow>[]) {
   return [...new Set(rows.flatMap((row) => Object.keys(row.rawValues)))].sort((a, b) => a.localeCompare(b))
 }
 
-function WorklistRow({ row, sourceName, categories, tableDefs, rawColumns: columns, onChange, ensureCategory }: { row: StoredRow<IngestionRow>; sourceName: string; categories: { id: number; name: string }[]; tableDefs: { id: number; name: string }[]; rawColumns: string[]; onChange: (id: number, patch: { mappedValues?: Partial<IngestionRow['mappedValues']>; labels?: IngestionRowLabels; labelValues?: IngestionRowLabelValues; destinationTableId?: number | null }) => Promise<void>; ensureCategory: (name: string) => Promise<number | undefined> }) {
+function WorklistRow({ row, sourceName, categories, tableDefs, rawColumns: columns, onChange, ensureCategory, onRestore }: { row: StoredRow<IngestionRow>; sourceName: string; categories: { id: number; name: string }[]; tableDefs: { id: number; name: string }[]; rawColumns: string[]; onChange: (id: number, patch: { mappedValues?: Partial<IngestionRow['mappedValues']>; labels?: IngestionRowLabels; labelValues?: IngestionRowLabelValues; destinationTableId?: number | null }) => Promise<void>; ensureCategory: (name: string) => Promise<number | undefined>; onRestore: (id: number) => Promise<void> }) {
   function saveData(field: IngestionTargetField, value: string) { void onChange(row.id, { mappedValues: { [field]: value } }) }
   async function saveLabel(field: typeof LABEL_FIELDS[number], value: string) {
     const draft = { ...allLabelValues(row, categories, tableDefs), [field]: value }
@@ -346,7 +364,9 @@ function WorklistRow({ row, sourceName, categories, tableDefs, rawColumns: colum
     const categoryId = field === 'category' && !parsed.labels.categoryId ? await ensureCategory(value) : parsed.labels.categoryId
     await onChange(row.id, { labels: { ...parsed.labels, ...(categoryId ? { categoryId } : {}) }, labelValues: draft, destinationTableId: parsed.destinationTableId ?? null })
   }
-  return <tr className="border-t align-top"><td className="bg-background sticky left-0 z-10 w-40 min-w-40 max-w-40 truncate p-2 font-medium" title={sourceName}>{sourceName}</td><td className="bg-background sticky left-40 z-10 w-22 min-w-22 border-r p-2">{statusCell(row)}</td>{columns.map((column) => <td key={column} className="max-w-52 truncate p-2" title={row.rawValues[column] ?? ''}>{row.rawValues[column] ?? ''}</td>)}{DATA_FIELDS.map((field) => <td key={field} className="p-1"><EditableCell value={displayDataValue(field, row.mappedValues[field])} onCommit={(value) => saveData(field, value)} /></td>)}{LABEL_FIELDS.map((field) => <td key={field} className="p-1"><EditableCell value={labelValue(row, field, categories, tableDefs)} invalid={labelFieldInvalid(row, field, categories, tableDefs)} onCommit={(value) => void saveLabel(field, value)} /></td>)}</tr>
+  return <tr className="border-t align-top"><td className="bg-background sticky left-0 z-10 w-40 min-w-40 max-w-40 truncate p-2 font-medium" title={sourceName}>{sourceName}</td><td className="bg-background sticky left-40 z-10 w-22 min-w-22 border-r p-2">{row.status === 'discarded'
+    ? <><span className="text-muted-foreground">discarded</span><Button type="button" size="xs" variant="ghost" className="mt-1 h-5 px-1" onClick={() => void onRestore(row.id)}>Restore</Button></>
+    : statusCell(row)}</td>{columns.map((column) => <td key={column} className="max-w-52 truncate p-2" title={row.rawValues[column] ?? ''}>{row.rawValues[column] ?? ''}</td>)}{DATA_FIELDS.map((field) => <td key={field} className="p-1"><EditableCell value={displayDataValue(field, row.mappedValues[field])} onCommit={(value) => saveData(field, value)} /></td>)}{LABEL_FIELDS.map((field) => <td key={field} className="p-1"><EditableCell value={labelValue(row, field, categories, tableDefs)} invalid={labelFieldInvalid(row, field, categories, tableDefs)} onCommit={(value) => void saveLabel(field, value)} /></td>)}</tr>
 }
 
 /** Kept beside the source name and pinned with it: the state is why a row is on screen. */

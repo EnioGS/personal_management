@@ -171,6 +171,13 @@ Two things it optimizes for:
   *Confirm and reallocate rows* rewrites that entry in place — same entry id, new
   destination and labels, every Finance screen following immediately. An edit
   whose new destination cannot hold the row keeps its error and stays put.
+- The same transaction arrives twice more often than expected, so duplicates are
+  detected by comparing only the fields two rows *both* have: a file missing a
+  column is still checked on the columns it does have, and a missing column is
+  never evidence that two rows differ. An identical fingerprint is proof, three
+  agreeing fields is strong, two agreeing with the third missing is worth a look.
+  A row judged a copy is discarded with a reason — set aside, still readable,
+  restorable, and never promotable — rather than deleted.
 - A rule ("everything mentioning IOF is a card rebate") is applied with one
   matched bulk call rather than row by row, and that call previews by default:
   it returns the match count and examples, changes nothing, and only labels once

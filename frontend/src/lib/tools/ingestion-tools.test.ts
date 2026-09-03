@@ -5,7 +5,7 @@ import { assistantPromptsTable } from '@/lib/assistant-prompts-db'
 import { categoriesTable, ingestionRowsTable, ingestionSourcesTable, tableDefsTable } from '@/lib/model/model-db'
 import { promoteReadyIngestionRows } from '@/lib/model/ingestion-promotion'
 import type { Category, IngestionRow } from '@/lib/model/types'
-import { addIngestionBlankColumnTool, assignIngestionColumnsTool, labelIngestionRowsByMatchTool, listIngestionDatasetsTool, readIngestionGuideTool, readIngestionProvenanceTool, readIngestionTableTool, updateIngestionLabelsTool } from './ingestion-tools'
+import { addIngestionBlankColumnTool, assignIngestionColumnsTool, discardIngestionRowsTool, findIngestionDuplicatesTool, labelIngestionRowsByMatchTool, listIngestionDatasetsTool, readIngestionGuideTool, readIngestionProvenanceTool, readIngestionTableTool, updateIngestionLabelsTool } from './ingestion-tools'
 
 const context = { attachments: [] } as never
 
@@ -263,5 +263,71 @@ describe('reading an uploaded source before it is staged', () => {
 
     expect(read).not.toHaveProperty('sourceRows')
     expect(read.source.note).toContain('only need labels')
+  })
+})
+
+describe('duplicates and discarding', () => {
+  beforeEach(async () => { await wipeAllData() })
+
+  async function stageRow(overrides: Partial<IngestionRow['mappedValues']>, fingerprint: string) {
+    const sourceId = await ingestionSourcesTable.add({ createdAt: 1, data: { originalFilename: 'nubank.csv', sourceFingerprint: `f-${fingerprint}`, importedAt: 1, rawCsv: '', originalColumns: [], supplementalColumns: [], rowCount: 1, status: 'staged' } })
+    return ingestionRowsTable.add({
+      createdAt: 2,
+      data: { sourceId, sourceRowIndex: 0, sourceRowFingerprint: fingerprint, rawValues: {}, mappedValues: { date: '2026-01-02', amount: '19.90', description: 'Amazonprimebr assinatura', ...overrides }, labels: {}, status: 'unlabelled', validationErrors: [] } satisfies IngestionRow,
+    })
+  }
+
+  it('finds a staged row that repeats one already queued, and says what agreed', async () => {
+    const first = await stageRow({}, 'a')
+    const second = await stageRow({ description: 'Amazonprimebr' }, 'b')
+
+    const found = JSON.parse(await findIngestionDuplicatesTool.execute({ rowIds: [second] }, context))
+
+    expect(found.candidatesWithMatches).toBe(1)
+    expect(found.matches[0]).toMatchObject({ matchKey: `row:${first}`, confidence: 'high' })
+    expect(found.matches[0].comparedOn).toEqual(['date', 'amount', 'description'])
+  })
+
+  it('still flags a row whose file had no description column', async () => {
+    await stageRow({}, 'a')
+    const sparse = await stageRow({ description: '' }, 'b')
+
+    const found = JSON.parse(await findIngestionDuplicatesTool.execute({ rowIds: [sparse] }, context))
+
+    expect(found.matches[0]).toMatchObject({ confidence: 'medium', comparedOn: ['date', 'amount'] })
+  })
+
+  it('discards with a reason, keeping the row readable and out of the worklist', async () => {
+    const first = await stageRow({}, 'a')
+    const copy = await stageRow({}, 'b')
+
+    const result = JSON.parse(await discardIngestionRowsTool.execute({ rowIds: [copy], reason: `duplicate of row ${first}` }, context))
+
+    expect(result).toEqual({ changed: 1, errors: [] })
+    const stored = (await ingestionRowsTable.get(copy))!.data as IngestionRow
+    expect(stored).toMatchObject({ status: 'discarded', discardReason: `duplicate of row ${first}`, mappedValues: { description: 'Amazonprimebr assinatura' } })
+    expect(JSON.parse(await readIngestionTableTool.execute({}, context)).rows.map((row: { id: number }) => row.id)).toEqual([first])
+    expect(JSON.parse(await readIngestionTableTool.execute({ dataset: 'discarded' }, context)).rows.map((row: { id: number }) => row.id)).toEqual([copy])
+  })
+
+  it('restores a row that was set aside by mistake', async () => {
+    const rowId = await stageRow({}, 'a')
+    await discardIngestionRowsTool.execute({ rowIds: [rowId], reason: 'duplicate' }, context)
+
+    await discardIngestionRowsTool.execute({ rowIds: [rowId], reason: 'not a duplicate after all', restore: true }, context)
+
+    expect(((await ingestionRowsTable.get(rowId))!.data as IngestionRow).status).toBe('unlabelled')
+  })
+
+  it('refuses to discard a row that is already in a Finance table', async () => {
+    const tableId = await tableDefsTable.add({ createdAt: 1, data: { name: 'Fatura Nubank', kind: 'cardLedger' } })
+    const rowId = await stageRow({ rawCategory: 'Assinatura' }, 'a')
+    await updateIngestionLabelsTool.execute({ updates: [{ rowId, financeDestination: 'spending', flowRole: 'outflow', settlementChannel: 'creditCard', spendingTreatment: 'expense', recurrence: 'recurring', category: 'Assinaturas', destinationTableId: tableId }] }, context)
+    await promoteReadyIngestionRows([rowId])
+
+    const result = JSON.parse(await discardIngestionRowsTool.execute({ rowIds: [rowId], reason: 'duplicate' }, context))
+
+    expect(result.changed).toBe(0)
+    expect(result.errors[0]).toContain('already in a Finance table')
   })
 })

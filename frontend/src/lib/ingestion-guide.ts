@@ -79,6 +79,24 @@ for it. Moving a row to a table of another kind may need data the row never had 
 investment ledger wants asset, type, quantity and price): fill those in with
 update_ingestion_data_fields, or say what is missing and let the user decide.
 
+## Duplicates
+
+The same transaction arrives twice more often than anyone expects: a statement
+exported for overlapping periods, a card charge that also shows in the bank file, a
+file re-uploaded after an edit. Run find_ingestion_duplicates on new data — on the
+uploaded source while the mapping is still being decided, and again on staged rows
+before labelling them. It compares only the fields both rows have, so a file missing
+a column is still checked on the columns it does have; a missing column is never
+evidence that two rows differ.
+
+Judge what it returns rather than trusting it: an identical fingerprint is proof,
+three agreeing fields is strong, and two agreeing with the third missing means look
+at it. When a row really is a copy, discard_ingestion_rows sets it aside with a
+reason naming the row it duplicates — it keeps every raw value and can be restored,
+but leaves the worklist and can never be promoted. Say what you discarded and why.
+A row already in a Finance table cannot be discarded; relabel it and let the user
+reallocate it instead.
+
 ## Judgment rules
 
 - Never apply a blanket rule to IOF, Pix, or any merchant word. An IOF line can be a

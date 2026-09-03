@@ -21,6 +21,8 @@ describe('findTool', () => {
       'read_ingestion_provenance',
       'assign_ingestion_columns',
       'add_ingestion_blank_column',
+      'find_ingestion_duplicates',
+      'discard_ingestion_rows',
       'suggest_ingestion_labels',
       'update_ingestion_labels',
       'label_ingestion_rows_by_match',
