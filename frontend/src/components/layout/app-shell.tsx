@@ -28,7 +28,9 @@ export function AppShell() {
       <ActivityBar />
       {/* The width animates so expanding reads as the same bar widening rather than a
           different one appearing; 150ms matches the chat panel's own transition. */}
-      <div className={`${SECONDARY_BAR_WIDTH[secondaryBarMode]} shrink-0 overflow-hidden border-r transition-[width] duration-150 ease-out`}>
+      {/* No border and no background here: the bar paints its own, and stops where its
+          items stop — see SecondaryBar's slip edge. */}
+      <div className={`${SECONDARY_BAR_WIDTH[secondaryBarMode]} shrink-0 overflow-hidden transition-[width] duration-150 ease-out`}>
         <SecondaryBar />
       </div>
       <div className="min-w-0 flex-1 overflow-auto">

@@ -29,20 +29,20 @@ export function SecondaryBar() {
   const setMode = useUiStore((s) => s.setSecondaryBarMode)
   const iconsOnly = useUiStore((s) => s.secondaryBarMode) === 'icons'
   const barRef = useRef<HTMLDivElement>(null)
-  const navRef = useRef<HTMLElement>(null)
+  const sheetRef = useRef<HTMLDivElement>(null)
   const pointerInside = useRef(false)
-  // The accent is drawn against the item column's real size, so it follows both the
-  // number of items and the width the bar currently has.
-  const [navBox, setNavBox] = useState({ width: 0, height: 0 })
+  // The edge is drawn to the sheet's real width, so it follows the bar as the labels
+  // come and go; the sheet's height follows the items by itself.
+  const [sheetWidth, setSheetWidth] = useState(0)
 
   useLayoutEffect(() => {
-    const nav = navRef.current
-    if (!nav) return
-    const measure = () => setNavBox({ width: nav.offsetWidth, height: nav.offsetHeight })
+    const sheet = sheetRef.current
+    if (!sheet) return
+    const measure = () => setSheetWidth(sheet.offsetWidth)
     measure()
     if (typeof ResizeObserver === 'undefined') return
     const observer = new ResizeObserver(measure)
-    observer.observe(nav)
+    observer.observe(sheet)
     return () => observer.disconnect()
   }, [])
 
@@ -86,11 +86,10 @@ export function SecondaryBar() {
   const activeItemId = activeItemBySection[section.id] ?? section.items[0].id
 
   return (
-    <div ref={barRef} className="bg-sidebar flex h-full flex-col pt-2">
-      <ScrollArea className="flex-1">
-        <div className="relative">
-          <SectionAccent width={navBox.width} height={navBox.height} />
-          <nav ref={navRef} className={cn('relative flex flex-col gap-0.5 pb-2', iconsOnly ? 'px-1.5' : 'px-2')}>
+    <div ref={barRef} className="flex h-full min-h-0 flex-col">
+      <div ref={sheetRef} className="bg-sidebar flex max-h-[calc(100%-2.5rem)] min-h-0 flex-col border-r pt-2">
+        <ScrollArea className="min-h-0">
+          <nav className={cn('flex flex-col gap-0.5 pb-2', iconsOnly ? 'px-1.5' : 'px-2')}>
           {section.items.map((item) => {
             const isActive = item.id === activeItemId
             // labelKey is data-driven, not a static literal — see activity-bar.tsx
@@ -126,40 +125,29 @@ export function SecondaryBar() {
             )
           })}
           </nav>
-        </div>
-      </ScrollArea>
+        </ScrollArea>
+      </div>
+      <SlipEdge width={sheetWidth} />
     </div>
   )
 }
 
 /**
- * The curve that runs down the side of the item column.
+ * The slip's bottom edge.
  *
- * Drawn rather than decorated with a border because it has to belong to the items: it
- * spans exactly their height, so a section with three of them gets a shallow bend and
- * one with eight gets a long sweep, and it stretches with the bar as the labels come
- * and go. `preserveAspectRatio="none"` is what lets one path serve every size, and the
- * whole thing is hidden from assistive technology — it says nothing a label does not.
+ * The bar is a sheet that ends where its items end, not a column running the height of
+ * the window — so the surface stops after the last icon and this draws the shape it
+ * stops with: the right edge carries on down, then sweeps left and away. One filled
+ * path in the sidebar's own colour with the border stroked along the curve, so the
+ * edge reads as the same object as the block above it, at any width.
  */
-function SectionAccent({ width, height }: { width: number; height: number }) {
-  if (width === 0 || height === 0) return null
+function SlipEdge({ width }: { width: number }) {
+  if (width === 0) return null
+  const height = 40
   return (
-    <svg
-      aria-hidden
-      className="text-brand pointer-events-none absolute inset-y-0 right-0 opacity-70"
-      width={Math.max(10, Math.round(width * 0.22))}
-      height={height}
-      viewBox="0 0 24 100"
-      preserveAspectRatio="none"
-      fill="none"
-    >
-      <path
-        d="M20 2 C 20 26, 4 34, 4 50 C 4 66, 20 74, 20 98"
-        stroke="currentColor"
-        strokeWidth="2.5"
-        strokeLinecap="round"
-        vectorEffect="non-scaling-stroke"
-      />
+    <svg aria-hidden className="pointer-events-none shrink-0" width={width} height={height} viewBox={`0 0 ${width} ${height}`} fill="none">
+      <path d={`M0 0 H${width} C${width} ${height * 0.45}, ${width * 0.42} ${height * 0.3}, 0 ${height} Z`} className="fill-sidebar" />
+      <path d={`M${width} 0 C${width} ${height * 0.45}, ${width * 0.42} ${height * 0.3}, 0 ${height}`} className="stroke-border" strokeWidth="1" fill="none" />
     </svg>
   )
 }
