@@ -9,6 +9,10 @@
     "dropHint": "Drop .txt or .md files here",
     "removeAttachment": "Remove attachment",
     "statusWaiting": "Waiting for a response…",
-    "statusUsingTool": "Using tool: {{name}}…"
+    "statusUsingTool": "Using tool: {{name}}…",
+    "usageLast": "{{tokens}} tokens last message ({{rounds}} requests)",
+    "usageSession": "{{tokens}} this session",
+    "usageContext": "context {{tokens}} / {{window}} ({{percent}}%)",
+    "usageContextUnknown": "context {{tokens}} tokens — window unknown for this model"
   }
 }

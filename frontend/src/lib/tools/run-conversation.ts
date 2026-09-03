@@ -18,6 +18,20 @@ const DEFAULT_MAX_TOOL_ROUNDS = 30
 
 export type ConversationStatus = { type: 'waiting' } | { type: 'tool'; name: string }
 
+/**
+ * What one user message cost in total. A tool-call loop sends the whole growing
+ * conversation once per round, so the interesting number is the sum of the rounds,
+ * and `promptTokens` of the last round is what the next request starts from.
+ */
+export interface ConversationUsage {
+  rounds: number
+  promptTokens: number
+  completionTokens: number
+  totalTokens: number
+  /** The prompt size of the final round — the live context this conversation occupies. */
+  lastPromptTokens: number
+}
+
 export interface RunConversationArgs {
   apiKey: string
   model: string
@@ -27,6 +41,7 @@ export interface RunConversationArgs {
   maxIterations?: number
   requestFn?: RequestFn
   onStatus?: (status: ConversationStatus) => void
+  onUsage?: (usage: ConversationUsage) => void
 }
 
 /**
@@ -42,12 +57,22 @@ export async function runConversation({
   maxIterations = DEFAULT_MAX_TOOL_ROUNDS,
   requestFn = requestChatMessage,
   onStatus,
+  onUsage,
 }: RunConversationArgs): Promise<string> {
   const conversation = [...messages]
+  const usage: ConversationUsage = { rounds: 0, promptTokens: 0, completionTokens: 0, totalTokens: 0, lastPromptTokens: 0 }
 
   for (let iteration = 0; iteration < maxIterations; iteration++) {
     onStatus?.({ type: 'waiting' })
     const message = await requestFn(apiKey, model, conversation, tools)
+    if (message.usage) {
+      usage.rounds += 1
+      usage.promptTokens += message.usage.promptTokens
+      usage.completionTokens += message.usage.completionTokens
+      usage.totalTokens += message.usage.totalTokens
+      usage.lastPromptTokens = message.usage.promptTokens
+      onUsage?.({ ...usage })
+    }
 
     if (!message.tool_calls || message.tool_calls.length === 0) {
       if (typeof message.content !== 'string') throw new Error('Unexpected response from the assistant API.')

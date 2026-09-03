@@ -20,6 +20,28 @@ interface OpenRouterResponseMessage {
   role: 'assistant'
   content: string | null
   tool_calls?: OpenRouterToolCall[]
+  /**
+   * What the request actually cost, as reported by the API. Every round of a
+   * tool-call loop reports its own, and the prompt grows with each one — which is
+   * exactly the number a long labelling session needs to show.
+   */
+  usage?: TokenUsage
+}
+
+export interface TokenUsage {
+  promptTokens: number
+  completionTokens: number
+  totalTokens: number
+}
+
+export function readUsage(data: unknown): TokenUsage | undefined {
+  const usage = (data as { usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number } })?.usage
+  if (!usage || typeof usage.total_tokens !== 'number') return undefined
+  return {
+    promptTokens: usage.prompt_tokens ?? 0,
+    completionTokens: usage.completion_tokens ?? 0,
+    totalTokens: usage.total_tokens,
+  }
 }
 
 /**
@@ -61,7 +83,7 @@ export async function requestChatMessage(
   if (!message || (typeof message.content !== 'string' && message.content !== null)) {
     throw new Error('Unexpected response from OpenRouter.')
   }
-  return message
+  return { ...message, usage: readUsage(data) }
 }
 
 /** Non-streaming chat completion against OpenRouter — https://openrouter.ai/docs. */

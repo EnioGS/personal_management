@@ -9,6 +9,10 @@
     "dropHint": "Solte arquivos .txt ou .md aqui",
     "removeAttachment": "Remover anexo",
     "statusWaiting": "Aguardando resposta…",
-    "statusUsingTool": "Usando ferramenta: {{name}}…"
+    "statusUsingTool": "Usando ferramenta: {{name}}…",
+    "usageLast": "{{tokens}} tokens na última mensagem ({{rounds}} requisições)",
+    "usageSession": "{{tokens}} nesta sessão",
+    "usageContext": "contexto {{tokens}} / {{window}} ({{percent}}%)",
+    "usageContextUnknown": "contexto {{tokens}} tokens — janela desconhecida para este modelo"
   }
 }

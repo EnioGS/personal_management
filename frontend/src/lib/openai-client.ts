@@ -1,9 +1,10 @@
-import type { OpenRouterMessage, OpenRouterTool, OpenRouterToolCall } from './openrouter'
+import { readUsage, type OpenRouterMessage, type OpenRouterTool, type OpenRouterToolCall, type TokenUsage } from './openrouter'
 
 interface OpenAiResponseMessage {
   role: 'assistant'
   content: string | null
   tool_calls?: OpenRouterToolCall[]
+  usage?: TokenUsage
 }
 
 const MAX_RESPONSE_TOKENS = 4096
@@ -44,5 +45,5 @@ export async function requestOpenAiChatMessage(
   if (!message || (typeof message.content !== 'string' && message.content !== null)) {
     throw new Error('Unexpected response from OpenAI.')
   }
-  return message
+  return { ...message, usage: readUsage(data) }
 }

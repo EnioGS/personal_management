@@ -157,3 +157,30 @@ describe('keeping the screens in step with the tools', () => {
     }
   })
 })
+
+describe('what a message cost', () => {
+  it('adds up every round of a tool-call loop, and reports the last prompt as the live context', async () => {
+    const withUsage = (message: Record<string, unknown>, promptTokens: number, completionTokens: number) => ({
+      ...message,
+      usage: { promptTokens, completionTokens, totalTokens: promptTokens + completionTokens },
+    })
+    const requestFn = vi
+      .fn()
+      .mockResolvedValueOnce(withUsage(toolCallMessage('call_1', 'read_text_file', { fileId: 'f1' }), 1000, 50))
+      .mockResolvedValueOnce(withUsage(textMessage('done'), 1400, 120))
+    const seen: unknown[] = []
+
+    await runConversation({ apiKey: 'k', model: 'm', messages: baseMessages, context, requestFn, onUsage: (usage) => seen.push(usage) })
+
+    expect(seen.at(-1)).toEqual({ rounds: 2, promptTokens: 2400, completionTokens: 170, totalTokens: 2570, lastPromptTokens: 1400 })
+  })
+
+  it('says nothing when the API reports no usage, rather than inventing zeros', async () => {
+    const requestFn = vi.fn().mockResolvedValue(textMessage('done'))
+    const seen: unknown[] = []
+
+    await runConversation({ apiKey: 'k', model: 'm', messages: baseMessages, context, requestFn, onUsage: (usage) => seen.push(usage) })
+
+    expect(seen).toEqual([])
+  })
+})

@@ -34,6 +34,7 @@ export function ChatPanel() {
   const addAttachment = useChatStore((s) => s.addAttachment)
   const removeAttachment = useChatStore((s) => s.removeAttachment)
   const pushError = useChatStore((s) => s.pushError)
+  const usage = useChatStore((s) => s.usage)
 
   const [draft, setDraft] = useState('')
   /** Anything typed hands the composer the whole width until it is sent or cleared. */
@@ -282,8 +283,23 @@ export function ChatPanel() {
           </div>
         )}
 
+        {/* One quiet line, under the messages and above the composer: what the last
+            exchange cost, what the session has cost, and how full the model's window
+            is. Hidden until there is something to report, so an idle panel stays calm. */}
+        {usage.sessionTokens > 0 && (
+          <div className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-0.5 border-t px-3 pt-1.5 text-[11px]">
+            <span>{t('panel.usageLast', { tokens: usage.lastMessageTokens.toLocaleString(), rounds: usage.lastMessageRounds })}</span>
+            <span>{t('panel.usageSession', { tokens: usage.sessionTokens.toLocaleString() })}</span>
+            <span className={cn(usage.contextWindow && usage.contextTokens / usage.contextWindow > 0.8 && 'text-amber-600 dark:text-amber-300')}>
+              {usage.contextWindow
+                ? t('panel.usageContext', { tokens: usage.contextTokens.toLocaleString(), window: usage.contextWindow.toLocaleString(), percent: Math.round((usage.contextTokens / usage.contextWindow) * 100) })
+                : t('panel.usageContextUnknown', { tokens: usage.contextTokens.toLocaleString() })}
+            </span>
+          </div>
+        )}
+
         <form
-          className={cn('flex items-end gap-2 p-3', attachments.length === 0 && 'border-t')}
+          className={cn('flex items-end gap-2 p-3', attachments.length === 0 && !usage.sessionTokens && 'border-t')}
           onSubmit={(e) => {
             e.preventDefault()
             submitDraft()

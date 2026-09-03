@@ -8,6 +8,7 @@ import { formatAttachmentsForPrompt, type ChatAttachment } from '@/lib/chat-atta
 import type { OpenRouterMessage } from '@/lib/openrouter'
 import { toolsForRequest } from '@/lib/tools/registry'
 import { runConversation, type ConversationStatus } from '@/lib/tools/run-conversation'
+import { contextWindowFor } from '@/lib/model-context-window'
 import { useChatPanelStore } from './chat-panel-store'
 
 export interface ChatMessage {
@@ -20,11 +21,27 @@ export interface ChatMessage {
 
 export type ChatStatus = { type: 'idle' } | ConversationStatus
 
+/** What the conversation has cost so far, and how much of the model's window it fills. */
+export interface ChatUsage {
+  /** Tokens for the most recent user message, including every tool-call round it took. */
+  lastMessageTokens: number
+  /** Rounds the last message needed — one request each. */
+  lastMessageRounds: number
+  /** Every token this session has spent. */
+  sessionTokens: number
+  /** The prompt size of the last request: what the next one starts from. */
+  contextTokens: number
+  /** The model's window, when it could be looked up. */
+  contextWindow: number | null
+  model?: string
+}
+
 interface ChatState {
   messages: ChatMessage[]
   attachments: ChatAttachment[]
   isSending: boolean
   status: ChatStatus
+  usage: ChatUsage
   sendMessage: (text: string) => Promise<void>
   clearMessages: () => void
   addAttachment: (attachment: ChatAttachment) => void
@@ -49,6 +66,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   attachments: [],
   isSending: false,
   status: { type: 'idle' },
+  usage: { lastMessageTokens: 0, lastMessageRounds: 0, sessionTokens: 0, contextTokens: 0, contextWindow: null },
 
   sendMessage: async (text) => {
     const userMessage: ChatMessage = { id: crypto.randomUUID(), role: 'user', content: text }
@@ -77,6 +95,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
       ]
 
       const requestFn = connection.provider === 'openai' ? requestOpenAiChatMessage : requestChatMessage
+      const sessionTokensBefore = get().usage.sessionTokens
+      // The window is looked up once per model and never blocks the request itself.
+      void contextWindowFor(connection.model).then((contextWindow) => set({ usage: { ...get().usage, contextWindow, model: connection.model } }))
       const replyText = await runConversation({
         apiKey: connection.apiKey,
         model: connection.model,
@@ -85,6 +106,21 @@ export const useChatStore = create<ChatState>((set, get) => ({
         tools: toolsForRequest(),
         requestFn,
         onStatus: (status) => set({ status }),
+        onUsage: (usage) => {
+          const previous = get().usage
+          set({
+            usage: {
+              ...previous,
+              lastMessageTokens: usage.totalTokens,
+              lastMessageRounds: usage.rounds,
+              // The session total counts each round once, however many rounds a
+              // message took, so it keeps rising while a message is still working.
+              sessionTokens: sessionTokensBefore + usage.totalTokens,
+              contextTokens: usage.lastPromptTokens,
+              model: connection.model,
+            },
+          })
+        },
       })
       const assistantMessage: ChatMessage = {
         id: crypto.randomUUID(),
@@ -102,7 +138,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
     if (useChatPanelStore.getState().panelWidth === 0) useChatPanelStore.getState().markUnread()
   },
 
-  clearMessages: () => set({ messages: [], attachments: [] }),
+  clearMessages: () => set({
+    messages: [],
+    attachments: [],
+    // The window survives a cleared conversation; what it cost does not.
+    usage: { ...get().usage, lastMessageTokens: 0, lastMessageRounds: 0, sessionTokens: 0, contextTokens: 0 },
+  }),
   addAttachment: (attachment) => set({ attachments: [...get().attachments, attachment] }),
   removeAttachment: (id) => set({ attachments: get().attachments.filter((a) => a.id !== id) }),
   pushError: (text) => {
