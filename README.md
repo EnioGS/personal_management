@@ -178,6 +178,19 @@ Two things it optimizes for:
   agreeing fields is strong, two agreeing with the third missing is worth a look.
   A row judged a copy is discarded with a reason — set aside, still readable,
   restorable, and never promotable — rather than deleted.
+- What was worked out once becomes a **standing labelling rule**: it matches text
+  in a field, fills only labels a row does not already have, runs by itself when
+  rows are staged, and carries a rationale saying why that label set is safe for
+  everything matching it. A rule may claim a row only when the user confirmed it
+  with the rule's own labels intact — computed from the rows every time rather
+  than tallied, so "overridden" honestly reports a rule that was wrong.
+- Tables sort from any column header (alphabetic or numeric, either direction,
+  chosen rather than sniffed) and render one page at a time, growing as the
+  container nears the bottom. The assistant asks the same questions through
+  count/group/query tools instead of paging a backlog it cannot filter.
+- The chat reports what it costs: tokens for the last message and the requests it
+  took, the session total, and how full the model's context window is when that
+  window can be looked up.
 - A source file whose rows have all been dealt with can be removed from the
   Confirmed view: discarded duplicates count as dealt with, since by definition
   they never reach a Finance table, while a row still waiting in the worklist

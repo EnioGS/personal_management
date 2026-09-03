@@ -35,6 +35,14 @@ already show where you are.
   `icons` — the labels were opened to make that choice, and holding the width
   afterwards serves nobody.
 
+  Expanded, the bar behaves like a **flyout**, not a second permanent column: a
+  click anywhere outside puts it away at once, and it puts itself away about three
+  seconds after opening — a countdown suspended while the pointer or keyboard
+  focus is inside it, since collapsing while someone is reading would be worse
+  than never collapsing. A control inside the bar toggles it too, so it can be
+  closed without travelling back to the icon that opened it, and the width
+  animates over 150ms to match the chat panel's own transition.
+
   A third `hidden` state was tried and removed. Reclaiming twelve pixels was
   never worth losing the ability to switch items, and the state existed mainly
   to complete a cycle.
