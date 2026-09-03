@@ -21,9 +21,8 @@ function useLabelledEntries(): StoredRow<Entry>[] {
 /**
  * The rows of whichever table a workspace currently has selected.
  *
- * Mirrors the fallback in TableWorkspace — first available table when nothing is
- * remembered — so a panel's chart and its table always show the same table, without
- * the selection having to be lifted into a shared parent.
+ * Falls back to the first available table when nothing is remembered, so a panel
+ * always has one to read even before anything has been chosen.
  */
 export function useActiveTableEntries(workspaceId: string, kinds: TableKind[], investmentClass?: InvestmentClass): StoredRow<Entry>[] {
   const tableDefs = useTableDefsStore((s) => s.items)

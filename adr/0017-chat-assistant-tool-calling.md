@@ -1,5 +1,11 @@
 # Chat assistant as a global overlay, with a flat tool-calling registry
 
+> **Since adr/0031 and the ingestion centre**: the write tools described here —
+> `write_to_table`, `update_table_rows`, `delete_table_rows`, `restore_table_rows` —
+> no longer exist. Finance tables are read-only to the assistant, and every change to
+> the data goes through the Data ingestion centre, where a row keeps its raw values
+> and its labels are explicit. The tool-calling loop itself is unchanged.
+
 ## Status
 
 Accepted — builds on the shared vault decision (adr/0014) and the

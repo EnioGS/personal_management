@@ -145,7 +145,8 @@ export const SQLITE_SCHEMAS: Record<DataTableKey, SqliteTableSchema> = {
     sqlName: 'entry_labels',
     columns: [
       { column: 'entry_id', key: 'entryId', type: 'integer' },
-      { column: 'finance_destination', key: 'financeDestination', type: 'text' },
+      { column: 'sections', key: 'sections', type: 'json' },
+      { column: 'subsections', key: 'subsections', type: 'json' },
       { column: 'flow_role', key: 'flowRole', type: 'text' },
       { column: 'settlement_channel', key: 'settlementChannel', type: 'text' },
       { column: 'spending_treatment', key: 'spendingTreatment', type: 'text' },

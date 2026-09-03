@@ -138,10 +138,9 @@ Two things it optimizes for:
   section — it stays available regardless of which section/item is active.
 - Tools the assistant can call are a flat registry (`lib/tools/registry.ts`):
   adding one is a single new `ToolDefinition` file plus one array entry,
-  nothing else changes. `write_to_table` and friends read the current table
-  list from `lib/tools/writable-tables.ts` fresh on every call rather than a
-  fixed array, so a table created in the UI mid-conversation is visible to
-  the very next tool call.
+  nothing else changes. Tools read the current table list from
+  `lib/tools/writable-tables.ts` fresh on every call rather than from a fixed
+  array, so a table created mid-conversation is visible to the very next call.
 - One export carries a whole setup, not only its rows: accounts, cards, tables,
   entries, labels, ingestion sources and staged rows, standing rules, notes,
   budgets, the assistant's prompts and its API keys, and the interface

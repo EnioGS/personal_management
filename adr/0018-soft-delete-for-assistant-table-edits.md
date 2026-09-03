@@ -1,5 +1,10 @@
 # Soft-delete for anything the assistant removes or corrects
 
+> **Since adr/0031**: the assistant no longer edits or deletes table rows at all; it
+> works in the ingestion centre, where discarding a confirmed row flags its entry
+> exactly as this ADR describes. The soft-delete decision stands — it is what makes
+> discarding reversible — but the tools it was written for are gone.
+
 ## Status
 
 Accepted — extends the tool-calling architecture (adr/0017).

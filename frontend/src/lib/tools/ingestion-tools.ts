@@ -691,7 +691,7 @@ export const queryIngestionRowsTool: ToolDefinition = {
     const offset = typeof args.offset === 'number' && args.offset > 0 ? Math.floor(args.offset) : 0
     const fields = Array.isArray(args.fields) && args.fields.length > 0
       ? args.fields.map(String)
-      : ['status', 'date', 'amount', 'description', 'financeDestination', 'flowRole', 'settlementChannel', 'spendingTreatment', 'recurrence', 'category', 'destinationTable']
+      : ['status', 'date', 'amount', 'description', 'sections', 'subsections', 'flowRole', 'settlementChannel', 'spendingTreatment', 'recurrence', 'category', 'destinationTable']
     const result = queryRows(rows, resolve, { ...asQuery(args), offset, limit })
     return JSON.stringify({
       searched: result.total,
