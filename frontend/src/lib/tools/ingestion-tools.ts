@@ -524,7 +524,7 @@ export const readIngestionProvenanceTool: ToolDefinition = {
       .filter((event) => (event.data as IngestionAuditEvent).ingestionRowIds?.includes(args.rowId as number))
       .slice(-10)
       .map((event) => ({ at: event.createdAt, ...(event.data as object) }))
-    return JSON.stringify({ id: stored.id, sourceFilename: source ? (source.data as { originalFilename: string }).originalFilename : 'unknown', row, auditTrail: events })
+    return JSON.stringify({ id: stored.id, sourceFilename: source ? (source.data as { originalFilename: string }).originalFilename : (row.sourceFilename ?? 'unknown'), row, auditTrail: events })
   },
 }
 

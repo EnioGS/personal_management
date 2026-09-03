@@ -224,3 +224,43 @@ export async function stageIngestionSource(sourceId: number): Promise<{ staged: 
   })
   return { staged: staged.length, duplicates }
 }
+
+/**
+ * Removes a source file whose rows have all been dealt with — every one of them
+ * either confirmed into a Finance table or discarded as a duplicate. A row still
+ * waiting in the worklist blocks removal, since that is unfinished work rather than
+ * clutter.
+ *
+ * Confirmed rows survive: they are the provenance of real entries, so they keep their
+ * raw values and are stamped with the filename they came from. The file's own copy,
+ * its column mappings and its discarded rows go — a discarded row is a duplicate of
+ * something that exists elsewhere, which is exactly what nobody needs a second copy of.
+ */
+export async function removeFinishedIngestionSource(sourceId: number): Promise<{ keptRows: number; deletedRows: number; originalFilename: string }> {
+  const sourceRow = await ingestionSourcesTable.get(sourceId)
+  if (!sourceRow) throw new Error(`Ingestion source ${sourceId} was not found.`)
+  const source = sourceData(sourceRow)
+  if (source.legacy) throw new Error('The existing-data migration is not an uploaded file; it disappears on its own once every queued row is dealt with.')
+
+  const rows = (await ingestionRowsTable.toArray()).filter((row) => (row.data as IngestionRow).sourceId === sourceId)
+  const pending = rows.filter((row) => {
+    const status = (row.data as IngestionRow).status
+    return status !== 'promoted' && status !== 'reconciledExisting' && status !== 'discarded'
+  })
+  if (pending.length > 0) throw new Error(`"${source.originalFilename}" still has ${pending.length} row(s) waiting in the worklist. Confirm or discard them first.`)
+
+  const discarded = rows.filter((row) => (row.data as IngestionRow).status === 'discarded')
+  const kept = rows.filter((row) => (row.data as IngestionRow).status !== 'discarded')
+  for (const row of kept) {
+    await ingestionRowsTable.update(row.id, { data: { ...(row.data as IngestionRow), sourceFilename: source.originalFilename } })
+  }
+  await ingestionRowsTable.bulkDelete(discarded.map((row) => row.id))
+  const mappings = (await ingestionColumnMappingsTable.toArray()).filter((row) => mappingData(row).sourceId === sourceId)
+  await ingestionColumnMappingsTable.bulkDelete(mappings.map((row) => row.id))
+  await ingestionSourcesTable.delete(sourceId)
+  await ingestionAuditEventsTable.add({
+    createdAt: Date.now(),
+    data: { event: 'rowsDiscarded', actor: 'user', sourceId, details: { removedSource: source.originalFilename, keptRows: kept.length, deletedRows: discarded.length } },
+  })
+  return { keptRows: kept.length, deletedRows: discarded.length, originalFilename: source.originalFilename }
+}

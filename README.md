@@ -178,6 +178,11 @@ Two things it optimizes for:
   agreeing fields is strong, two agreeing with the third missing is worth a look.
   A row judged a copy is discarded with a reason — set aside, still readable,
   restorable, and never promotable — rather than deleted.
+- A source file whose rows have all been dealt with can be removed from the
+  Confirmed view: discarded duplicates count as dealt with, since by definition
+  they never reach a Finance table, while a row still waiting in the worklist
+  blocks removal. Confirmed rows survive with their raw values and are stamped
+  with the filename they came from, so provenance outlives the file.
 - A rule ("everything mentioning IOF is a card rebate") is applied with one
   matched bulk call rather than row by row, and that call previews by default:
   it returns the match count and examples, changes nothing, and only labels once

@@ -238,6 +238,12 @@ export interface IngestionRow {
   /** Why the row was discarded, and by whom, so the decision can be reviewed. */
   discardReason?: string
   /**
+   * Stamped onto a row when its source file is removed after everything in it was
+   * dealt with, so a confirmed row can still say which file it came from once the
+   * source record is gone.
+   */
+  sourceFilename?: string
+  /**
    * True when a confirmed row's labels or data have been edited but its promoted
    * entry has not been rewritten yet. Reallocation — a user click, like promotion —
    * applies the edit and clears this.

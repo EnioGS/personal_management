@@ -3,6 +3,7 @@ import {
   createIngestionSource,
   createSupplementalColumn,
   parseIngestionCsv,
+  removeFinishedIngestionSource,
   saveIngestionMappings,
   stageIngestionSource,
   validateIngestionMappings,
@@ -72,5 +73,36 @@ describe('ingestion source staging', () => {
     await stageIngestionSource(sourceId)
     await expect(stageIngestionSource(sourceId)).resolves.toEqual({ staged: 0, duplicates: 2 })
     expect(await ingestionRowsTable.count()).toBe(2)
+  })
+})
+
+describe('removing a source file once everything in it is dealt with', () => {
+  beforeEach(async () => { await wipeAllData() })
+
+  async function sourceWithRows(statuses: string[]) {
+    const sourceId = await ingestionSourcesTable.add({ createdAt: 1, data: { originalFilename: 'fatura.csv', sourceFingerprint: 'f', importedAt: 1, rawCsv: 'a\n1\n', originalColumns: ['a'], supplementalColumns: [], rowCount: statuses.length, status: 'staged' } })
+    const ids: number[] = []
+    for (const [index, status] of statuses.entries()) {
+      ids.push(await ingestionRowsTable.add({ createdAt: 2, data: { sourceId, sourceRowIndex: index, sourceRowFingerprint: `r${index}`, rawValues: { description: `Row ${index}` }, mappedValues: {}, labels: {}, status, validationErrors: [] } }))
+    }
+    return { sourceId, ids }
+  }
+
+  it('counts a discarded duplicate as dealt with, since it can never reach the confirmed table', async () => {
+    const { sourceId, ids } = await sourceWithRows(['promoted', 'discarded'])
+
+    const result = await removeFinishedIngestionSource(sourceId)
+
+    expect(result).toMatchObject({ originalFilename: 'fatura.csv', keptRows: 1, deletedRows: 1 })
+    expect(await ingestionSourcesTable.get(sourceId)).toBeUndefined()
+    expect(await ingestionRowsTable.get(ids[1])).toBeUndefined()
+    expect((await ingestionRowsTable.get(ids[0]))!.data).toMatchObject({ status: 'promoted', sourceFilename: 'fatura.csv', rawValues: { description: 'Row 0' } })
+  })
+
+  it('refuses while any row is still waiting, and says how many', async () => {
+    const { sourceId } = await sourceWithRows(['promoted', 'unlabelled', 'ready'])
+
+    await expect(removeFinishedIngestionSource(sourceId)).rejects.toThrow(/still has 2 row\(s\) waiting/)
+    expect(await ingestionSourcesTable.get(sourceId)).toBeDefined()
   })
 })

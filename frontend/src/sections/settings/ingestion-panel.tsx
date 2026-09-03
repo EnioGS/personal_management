@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState, type ChangeEvent, type DragEvent } from 'react'
-import { Check, FilePlus2, Plus, Upload } from 'lucide-react'
+import { Check, FilePlus2, Plus, Trash2, Upload } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -8,6 +8,7 @@ import {
   createIngestionSource,
   createSupplementalColumn,
   parseIngestionCsv,
+  removeFinishedIngestionSource,
   saveIngestionMappings,
   stageIngestionSource,
   validateIngestionMappings,
@@ -104,6 +105,14 @@ export function IngestionPanel() {
   const showingConfirmed = selected === CONFIRMED_DATASET
   const visibleRows = showingConfirmed ? confirmedRows : showDiscarded ? discardedRows : rows
   const reallocatable = confirmedRows.filter((row) => row.hasPendingChange && row.validationErrors.length === 0)
+  // A source file is finished when nothing of it is still waiting: every row either
+  // reached a Finance table or was set aside as a duplicate. Duplicates count as dealt
+  // with — by definition they never reach the confirmed table.
+  const finishedSources = sourceStore.items.filter((source) => {
+    if (source.legacy) return false
+    const own = rowStore.items.filter((row) => row.sourceId === source.id)
+    return own.length > 0 && own.every((row) => row.status === 'promoted' || row.status === 'reconciledExisting' || row.status === 'discarded')
+  })
 
   function selectDataset(value: string) {
     if (value === '__none__') return
@@ -146,6 +155,16 @@ export function IngestionPanel() {
       await refresh()
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Could not add the blank data field.')
+    }
+  }
+
+  async function removeSource(sourceId: number) {
+    try {
+      const result = await removeFinishedIngestionSource(sourceId)
+      await refresh()
+      setMessage(`Removed "${result.originalFilename}". Its ${result.keptRows} confirmed row(s) keep their raw values and their filename; ${result.deletedRows} discarded duplicate(s) were deleted with it.`)
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Could not remove that source file.')
     }
   }
 
@@ -305,6 +324,17 @@ export function IngestionPanel() {
 
       {message && <p className="text-muted-foreground rounded-md border p-2 text-xs">{message}</p>}
 
+      {showingConfirmed && finishedSources.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 rounded-md border p-2 text-xs">
+          <span className="text-muted-foreground">Fully processed — every row confirmed or discarded:</span>
+          {finishedSources.map((source) => (
+            <Button key={source.id} type="button" size="xs" variant="outline" onClick={() => void removeSource(source.id)}>
+              <Trash2 className="size-3" />Remove {source.originalFilename}
+            </Button>
+          ))}
+        </div>
+      )}
+
       {selectedSource ? (
         selectedSource.legacy || selectedSource.originalColumns.length === 0 ? (
           <section className="flex flex-col gap-2 rounded-md border p-3 text-xs">
@@ -341,7 +371,7 @@ export function IngestionPanel() {
             ? 'These rows are already in a Finance table. Editing a label or a data field marks the row for reallocation — its entry is rewritten, and every Finance screen follows, only when you confirm below.'
             : 'Source data is shown in its own columns. Canonical fields can be edited here; label cells accept text and turn red when the value is not one of the accepted options. Typing a category name that does not exist yet creates it.'}</p>
           <div className="min-h-0 flex-1 overflow-auto rounded border">
-            <table className="min-w-max text-left text-xs"><thead className="bg-muted"><tr><th className="bg-muted sticky left-0 z-30 w-40 min-w-40 p-2">Source</th><th className="bg-muted sticky left-40 z-30 w-22 min-w-22 border-r p-2">Status</th>{rawColumns(visibleRows).map((column) => <th key={`raw-${column}`} className="min-w-36 p-2">{column}</th>)}{DATA_FIELDS.map((field) => <th key={field} className="min-w-32 p-2">{field}</th>)}{LABEL_FIELDS.map((field) => <th key={field} className="min-w-40 p-2 align-top">{field}<p className="text-muted-foreground font-normal">{LABEL_OPTIONS[field]}</p></th>)}</tr></thead><tbody>{visibleRows.map((row) => <WorklistRow key={row.id} row={row} sourceName={sourceStore.items.find((source) => source.id === row.sourceId)?.originalFilename ?? 'Existing data'} categories={categories} tableDefs={tableDefs} rawColumns={rawColumns(visibleRows)} onChange={updateWorklist} ensureCategory={ensureCategory} onRestore={restoreRow} />)}{visibleRows.length === 0 && <tr><td colSpan={2 + DATA_FIELDS.length + LABEL_FIELDS.length} className="text-muted-foreground p-4 text-center">{showingConfirmed ? 'Nothing has been confirmed yet.' : 'No staged data yet.'}</td></tr>}</tbody></table>
+            <table className="min-w-max text-left text-xs"><thead className="bg-muted"><tr><th className="bg-muted sticky left-0 z-30 w-40 min-w-40 p-2">Source</th><th className="bg-muted sticky left-40 z-30 w-22 min-w-22 border-r p-2">Status</th>{rawColumns(visibleRows).map((column) => <th key={`raw-${column}`} className="min-w-36 p-2">{column}</th>)}{DATA_FIELDS.map((field) => <th key={field} className="min-w-32 p-2">{field}</th>)}{LABEL_FIELDS.map((field) => <th key={field} className="min-w-40 p-2 align-top">{field}<p className="text-muted-foreground font-normal">{LABEL_OPTIONS[field]}</p></th>)}</tr></thead><tbody>{visibleRows.map((row) => <WorklistRow key={row.id} row={row} sourceName={sourceStore.items.find((source) => source.id === row.sourceId)?.originalFilename ?? row.sourceFilename ?? 'Existing data'} categories={categories} tableDefs={tableDefs} rawColumns={rawColumns(visibleRows)} onChange={updateWorklist} ensureCategory={ensureCategory} onRestore={restoreRow} />)}{visibleRows.length === 0 && <tr><td colSpan={2 + DATA_FIELDS.length + LABEL_FIELDS.length} className="text-muted-foreground p-4 text-center">{showingConfirmed ? 'Nothing has been confirmed yet.' : 'No staged data yet.'}</td></tr>}</tbody></table>
           </div>
           <div className="flex items-center justify-between gap-2 text-xs">
             <div className="flex items-center gap-2">
