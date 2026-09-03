@@ -34,6 +34,10 @@ export function SecondaryBar() {
   // The edge is drawn to the sheet's real width, so it follows the bar as the labels
   // come and go; the sheet's height follows the items by itself.
   const [sheetWidth, setSheetWidth] = useState(0)
+  // A sweep that reads well across 48px looks squashed across 224px: the same curve
+  // over four times the width is nearly flat. The edge takes its height from the
+  // width, so the shape stays the shape at either size.
+  const edgeHeight = Math.round(Math.min(80, Math.max(28, sheetWidth * 0.34)))
 
   useLayoutEffect(() => {
     const sheet = sheetRef.current
@@ -87,7 +91,7 @@ export function SecondaryBar() {
 
   return (
     <div ref={barRef} className="flex h-full min-h-0 flex-col">
-      <div ref={sheetRef} className="bg-sidebar flex max-h-[calc(100%-2.5rem)] min-h-0 flex-col border-r pt-2">
+      <div ref={sheetRef} style={{ maxHeight: `calc(100% - ${edgeHeight}px)` }} className="bg-sidebar flex min-h-0 flex-col border-r pt-2">
         <ScrollArea className="min-h-0">
           <nav className={cn('flex flex-col gap-0.5 pb-2', iconsOnly ? 'px-1.5' : 'px-2')}>
           {section.items.map((item) => {
@@ -127,7 +131,7 @@ export function SecondaryBar() {
           </nav>
         </ScrollArea>
       </div>
-      <SlipEdge width={sheetWidth} />
+      <SlipEdge width={sheetWidth} height={edgeHeight} />
     </div>
   )
 }
@@ -141,13 +145,12 @@ export function SecondaryBar() {
  * path in the sidebar's own colour with the border stroked along the curve, so the
  * edge reads as the same object as the block above it, at any width.
  */
-function SlipEdge({ width }: { width: number }) {
+function SlipEdge({ width, height }: { width: number; height: number }) {
   if (width === 0) return null
-  const height = 40
   return (
     <svg aria-hidden className="pointer-events-none shrink-0" width={width} height={height} viewBox={`0 0 ${width} ${height}`} fill="none">
-      <path d={`M0 0 H${width} C${width} ${height * 0.45}, ${width * 0.42} ${height * 0.3}, 0 ${height} Z`} className="fill-sidebar" />
-      <path d={`M${width} 0 C${width} ${height * 0.45}, ${width * 0.42} ${height * 0.3}, 0 ${height}`} className="stroke-border" strokeWidth="1" fill="none" />
+      <path d={`M0 0 H${width} C${width} ${height * 0.5}, ${width * 0.5} ${height * 0.35}, 0 ${height} Z`} className="fill-sidebar" />
+      <path d={`M${width} 0 C${width} ${height * 0.5}, ${width * 0.5} ${height * 0.35}, 0 ${height}`} className="stroke-border" strokeWidth="1" fill="none" />
     </svg>
   )
 }
