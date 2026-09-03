@@ -331,3 +331,48 @@ describe('duplicates and discarding', () => {
     expect(result.errors[0]).toContain('already in a Finance table')
   })
 })
+
+describe('mapping a file over several calls', () => {
+  beforeEach(async () => { await wipeAllData() })
+
+  async function csvSource() {
+    return ingestionSourcesTable.add({
+      createdAt: 1,
+      data: { originalFilename: 'nubank.csv', sourceFingerprint: 'f', importedAt: 1, rawCsv: 'date,title,amount\n2026-01-02,Coffee,12.50\n', originalColumns: ['date', 'title', 'amount'], supplementalColumns: [], rowCount: 1, status: 'draftSource' },
+    })
+  }
+
+  it('keeps earlier assignments instead of replacing them', async () => {
+    const sourceId = await csvSource()
+    await assignIngestionColumnsTool.execute({ sourceId, mappings: [{ sourceColumn: 'date', targetField: 'date' }, { sourceColumn: 'amount', targetField: 'amount' }] }, context)
+
+    const second = JSON.parse(await assignIngestionColumnsTool.execute({ sourceId, mappings: [{ sourceColumn: 'title', targetField: 'description' }] }, context))
+
+    expect(second.assignments).toEqual(expect.arrayContaining([
+      { sourceColumn: 'date', targetField: 'date' },
+      { sourceColumn: 'amount', targetField: 'amount' },
+      { sourceColumn: 'title', targetField: 'description' },
+    ]))
+  })
+
+  it('reassigns a column named again, without dropping the others', async () => {
+    const sourceId = await csvSource()
+    await assignIngestionColumnsTool.execute({ sourceId, mappings: [{ sourceColumn: 'title', targetField: 'description' }, { sourceColumn: 'date', targetField: 'date' }] }, context)
+
+    const second = JSON.parse(await assignIngestionColumnsTool.execute({ sourceId, mappings: [{ sourceColumn: 'title', targetField: 'note' }] }, context))
+
+    expect(second.assignments).toEqual(expect.arrayContaining([{ sourceColumn: 'date', targetField: 'date' }, { sourceColumn: 'title', targetField: 'note' }]))
+    expect(second.assignments).toHaveLength(2)
+  })
+
+  it('assigns a blank column named after the field it stands in for', async () => {
+    const sourceId = await csvSource()
+    await assignIngestionColumnsTool.execute({ sourceId, mappings: [{ sourceColumn: 'date', targetField: 'date' }] }, context)
+
+    const added = JSON.parse(await addIngestionBlankColumnTool.execute({ sourceId, name: 'quantity' }, context))
+
+    expect(added.assignedTo).toBe('quantity')
+    expect(added.validation.missingFields).not.toContain('quantity')
+    expect(added.validation.missingFields).not.toContain('date')
+  })
+})

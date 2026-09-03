@@ -128,31 +128,60 @@ export const readIngestionTableTool: ToolDefinition = {
   },
 }
 
+/**
+ * Adds assignments to what a source already has, replacing only the columns and
+ * target fields the call actually names. Mapping a sparse file takes several calls —
+ * the real columns, then each blank column added afterwards — and replacing the whole
+ * set each time silently undid the work that came before.
+ */
+async function mergedMappings(sourceId: number, incoming: IngestionColumnMapping[], replaceAll: boolean): Promise<IngestionColumnMapping[]> {
+  if (replaceAll) return incoming
+  const existing = (await ingestionColumnMappingsTable.toArray())
+    .map((row) => row.data as IngestionColumnMapping)
+    .filter((mapping) => mapping.sourceId === sourceId)
+  const takenColumns = new Set(incoming.map((mapping) => mapping.sourceColumn))
+  const takenTargets = new Set(incoming.map((mapping) => mapping.targetField))
+  return [...existing.filter((mapping) => !takenColumns.has(mapping.sourceColumn) && !takenTargets.has(mapping.targetField)), ...incoming]
+}
+
 export const assignIngestionColumnsTool: ToolDefinition = {
   name: 'assign_ingestion_columns',
-  description: 'Assigns, changes, or clears canonical field mappings for an uploaded source. Inspect the source with read_ingestion_table first. This changes mapping metadata only; it does not stage or promote rows. Reject ambiguous assignments and report missing required fields.',
-  parameters: { type: 'object', properties: { sourceId: { type: 'number' }, mappings: { type: 'array', items: { type: 'object', properties: { sourceColumn: { type: 'string' }, targetField: { type: 'string', enum: TARGET_FIELDS } }, required: ['sourceColumn', 'targetField'] } } }, required: ['sourceId', 'mappings'], additionalProperties: false },
+  description: "Assigns canonical field mappings for an uploaded source. Read the source first: it returns the file's own columns and values, which is what a mapping has to be judged from. Assignments ADD to what the source already has — a source column or target field named in this call replaces its previous assignment, everything else is kept — so mapping a file over several calls is safe. Pass replaceAll to start from nothing instead. This changes mapping metadata only; it does not stage or promote rows.",
+  parameters: { type: 'object', properties: { sourceId: { type: 'number' }, mappings: { type: 'array', items: { type: 'object', properties: { sourceColumn: { type: 'string' }, targetField: { type: 'string', enum: TARGET_FIELDS } }, required: ['sourceColumn', 'targetField'] } }, replaceAll: { type: 'boolean', description: 'Discard every existing assignment for this source first. Rarely wanted.' } }, required: ['sourceId', 'mappings'], additionalProperties: false },
   execute: async (args) => {
     if (typeof args.sourceId !== 'number' || !Array.isArray(args.mappings)) return 'Error: sourceId and mappings are required.'
-    const rejection = await rejectIfLegacy(args.sourceId)
+    const sourceId = args.sourceId
+    const rejection = await rejectIfLegacy(sourceId)
     if (rejection) return rejection
     try {
-      const mappings = args.mappings.map((item) => ({ sourceId: args.sourceId as number, sourceColumn: String((item as Record<string, unknown>).sourceColumn ?? ''), targetField: (item as Record<string, unknown>).targetField as IngestionTargetField }))
-      const result = await saveIngestionMappings(args.sourceId, mappings)
-      return JSON.stringify(result)
+      const incoming = args.mappings.map((item) => ({ sourceId, sourceColumn: String((item as Record<string, unknown>).sourceColumn ?? ''), targetField: (item as Record<string, unknown>).targetField as IngestionTargetField }))
+      const merged = await mergedMappings(sourceId, incoming, args.replaceAll === true)
+      const result = await saveIngestionMappings(sourceId, merged)
+      return JSON.stringify({ ...result, assignments: merged.map((mapping) => ({ sourceColumn: mapping.sourceColumn, targetField: mapping.targetField })) })
     } catch (error) { return `Error: ${error instanceof Error ? error.message : 'could not assign mappings.'}` }
   },
 }
 
 export const addIngestionBlankColumnTool: ToolDefinition = {
   name: 'add_ingestion_blank_column',
-  description: 'Adds an explicitly blank supplemental column to a sparse uploaded source so it can satisfy a possible future destination. This does not alter the original CSV; inspect the source first and explain why the blank field is needed.',
+  description: 'Adds an explicitly blank supplemental column to a sparse uploaded source so it can satisfy a possible future destination. Name it after the canonical field it stands in for (quantity, asset, price...) and it is assigned to that field in the same step; any other name still has to be assigned with assign_ingestion_columns. This does not alter the original CSV; inspect the source first and explain why the blank field is needed.',
   parameters: { type: 'object', properties: { sourceId: { type: 'number' }, name: { type: 'string' } }, required: ['sourceId', 'name'], additionalProperties: false },
   execute: async (args) => {
     if (typeof args.sourceId !== 'number' || typeof args.name !== 'string') return 'Error: sourceId and name are required.'
-    const rejection = await rejectIfLegacy(args.sourceId)
+    const sourceId = args.sourceId
+    const name = args.name.trim()
+    const rejection = await rejectIfLegacy(sourceId)
     if (rejection) return rejection
-    try { return JSON.stringify(await createSupplementalColumn(args.sourceId, args.name)) } catch (error) { return `Error: ${error instanceof Error ? error.message : 'could not add blank column.'}` }
+    try {
+      const source = await createSupplementalColumn(sourceId, name)
+      // A blank column exists only to stand in for a canonical field, so a column named
+      // after one is assigned to it here rather than left as an unmapped column that
+      // still fails validation for the very field it was created to satisfy.
+      const target = TARGET_FIELDS.find((field) => field.toLowerCase() === name.toLowerCase())
+      if (!target) return JSON.stringify({ source, assignedTo: null, next: `Assign "${name}" with assign_ingestion_columns; a blank column that is not assigned satisfies nothing.` })
+      const merged = await mergedMappings(sourceId, [{ sourceId, sourceColumn: name, targetField: target, isSupplemental: true }], false)
+      return JSON.stringify({ source, assignedTo: target, validation: await saveIngestionMappings(sourceId, merged) })
+    } catch (error) { return `Error: ${error instanceof Error ? error.message : 'could not add blank column.'}` }
   },
 }
 

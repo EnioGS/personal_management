@@ -1,3 +1,4 @@
+import { refreshAllLocalStores } from '@/lib/local-store/create-local-list-store'
 import { requestChatMessage, type OpenRouterMessage, type OpenRouterTool } from '@/lib/openrouter'
 import { findTool } from './registry'
 import type { ToolContext } from './types'
@@ -79,5 +80,12 @@ async function executeToolCall(
     return `Error: could not parse arguments for "${toolCall.function.name}" as JSON.`
   }
 
-  return tool.execute(args, context)
+  const result = await tool.execute(args, context)
+  // Tools write through the Dexie tables directly, so nothing tells the screens that
+  // read them that anything changed: a mapping the assistant assigned, or a label it
+  // set, would sit in the database while the panel kept showing what it loaded when it
+  // mounted. Re-reading after every call keeps what the user sees and what the
+  // assistant just did the same thing, without a reload.
+  await refreshAllLocalStores()
+  return result
 }
