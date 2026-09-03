@@ -9,8 +9,11 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 
 /** How long the labels stay up on their own before the bar gives the width back. */
 const AUTO_COLLAPSE_MS = 3000
-/** The slip's bottom-right corner, in pixels. Constant, whatever width the bar has. */
-const CORNER = 44
+/**
+ * The slip's bottom-right corner, in pixels: a rounded corner rather than a sweep,
+ * and constant whatever width the bar has.
+ */
+const CORNER = 18
 
 /**
  * Items of the active section, as an icon strip or with labels (see store/ui-store.ts).
@@ -95,7 +98,7 @@ export function SecondaryBar() {
     <div ref={barRef} className="flex h-full min-h-0 flex-col">
       <div ref={sheetRef} style={{ maxHeight: `calc(100% - ${edgeHeight}px)` }} className="bg-sidebar flex min-h-0 flex-col border-r pt-2">
         <ScrollArea className="min-h-0">
-          <nav className={cn('flex flex-col gap-0.5 pb-2', iconsOnly ? 'px-1.5' : 'px-2')}>
+          <nav className={cn('flex flex-col gap-0.5 pb-1', iconsOnly ? 'px-1.5' : 'px-2')}>
           {section.items.map((item) => {
             const isActive = item.id === activeItemId
             // labelKey is data-driven, not a static literal — see activity-bar.tsx

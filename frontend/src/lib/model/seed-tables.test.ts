@@ -23,3 +23,14 @@ describe('a fresh vault', () => {
     expect(await tableDefsTable.count()).toBe(1)
   })
 })
+
+describe('seeding twice at once', () => {
+  beforeEach(async () => { await wipeAllData() })
+
+  it('creates one set, not two — StrictMode runs the effect twice', async () => {
+    await Promise.all([seedDefaultTables(), seedDefaultTables()])
+
+    expect(await tableDefsTable.count()).toBe(6)
+    expect(await accountsTable.count()).toBe(1)
+  })
+})

@@ -23,6 +23,7 @@ import {
   wipeAllData,
 } from '@/lib/data-file'
 import { saveBinaryFile } from '@/lib/file-io'
+import { seedDefaultTables } from '@/lib/model/seed-tables'
 import { buildSqliteFile, looksLikeSqlite, parseSqliteFile } from '@/lib/sqlite-export'
 
 type DialogState =
@@ -94,11 +95,15 @@ export function DataPanel() {
     }
 
     await importData(parsed)
+    await seedDefaultTables()
     await refreshCount()
   }
 
   async function handleWipe() {
     await wipeAllData()
+    // The tables every screen needs come straight back: clearing the data means the
+    // rows, not the shape of the app.
+    await seedDefaultTables()
     await refreshCount()
   }
 

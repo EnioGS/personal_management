@@ -22,16 +22,32 @@ const DEFAULT_TABLES: TableDef[] = [
   { name: 'Outros lançamentos', kind: 'generic' },
 ]
 
-export async function seedDefaultTables(): Promise<{ created: string[] }> {
-  const existing = (await tableDefsTable.toArray()).map((row) => row.data as TableDef)
-  // Only a genuinely empty vault is seeded: a user who deleted a table meant to.
-  if (existing.length > 0) return { created: [] }
+/**
+ * One run at a time, whoever asks.
+ *
+ * React's StrictMode invokes an effect twice in development, and two runs that both
+ * read an empty table before either writes will both seed it — which is how a fresh
+ * vault ended up with every table twice. The check and the writes share a transaction,
+ * and callers share a promise.
+ */
+let seeding: Promise<{ created: string[] }> | null = null
 
-  const accountId = await accountsTable.add({ createdAt: Date.now(), data: DEFAULT_ACCOUNT })
-  const created: string[] = []
-  for (const table of DEFAULT_TABLES) {
-    await tableDefsTable.add({ createdAt: Date.now(), data: table.kind === 'bankLedger' ? { ...table, accountId } : table })
-    created.push(table.name)
-  }
-  return { created }
+export async function seedDefaultTables(): Promise<{ created: string[] }> {
+  seeding ??= runSeed().finally(() => { seeding = null })
+  return seeding
+}
+
+async function runSeed(): Promise<{ created: string[] }> {
+  return tableDefsTable.db.transaction('rw', tableDefsTable, accountsTable, async () => {
+    // Only a genuinely empty vault is seeded: a user who deleted a table meant to.
+    if ((await tableDefsTable.count()) > 0) return { created: [] }
+
+    const accountId = await accountsTable.add({ createdAt: Date.now(), data: DEFAULT_ACCOUNT })
+    const created: string[] = []
+    for (const table of DEFAULT_TABLES) {
+      await tableDefsTable.add({ createdAt: Date.now(), data: table.kind === 'bankLedger' ? { ...table, accountId } : table })
+      created.push(table.name)
+    }
+    return { created }
+  })
 }
