@@ -351,13 +351,15 @@ function WorklistRow({ row, sourceName, categories, tableDefs, rawColumns: colum
 
 /** Kept beside the source name and pinned with it: the state is why a row is on screen. */
 function statusCell(row: StoredRow<IngestionRow>) {
+  if (row.hasPendingChange) return <span className="text-amber-600 dark:text-amber-300">Pending reallocation</span>
+  if (row.status === 'ready') return <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-300"><Check className="size-3" />Ready</span>
+  // "Unlabelled" is the whole story for a row nobody has touched yet: every one of the
+  // 1,500 carries the same "assign the labels" note, which says nothing the status
+  // does not. A row that was actually worked on and failed keeps its reason.
+  if (row.status === 'unlabelled') return <span className="text-yellow-600 dark:text-yellow-300">unlabelled</span>
   return (
     <>
-      {row.hasPendingChange
-        ? <span className="text-amber-600 dark:text-amber-300">Pending reallocation</span>
-        : row.status === 'ready'
-          ? <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-300"><Check className="size-3" />Ready</span>
-          : row.status}
+      {row.status}
       {row.validationErrors.length > 0 && <p className="mt-1 text-amber-600 dark:text-amber-300">{row.validationErrors[0]}</p>}
     </>
   )
