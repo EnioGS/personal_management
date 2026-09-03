@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ChangeEvent, type DragEvent, type PointerEvent } from 'react'
-import { GripVertical, Hourglass, Paperclip, Trash2, X } from 'lucide-react'
+import { GripVertical, Hourglass, Paperclip, SendHorizontal, Trash2, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { readAttachedFile } from '@/lib/chat-attachments'
 import { cn } from '@/lib/utils'
@@ -36,6 +36,8 @@ export function ChatPanel() {
   const pushError = useChatStore((s) => s.pushError)
 
   const [draft, setDraft] = useState('')
+  /** Anything typed hands the composer the whole width until it is sent or cleared. */
+  const isComposing = draft.trim().length > 0
   const [dragOffset, setDragOffset] = useState<number | null>(null)
   const [isDraggingFileOver, setIsDraggingFileOver] = useState(false)
   const dragStartX = useRef(0)
@@ -295,27 +297,34 @@ export function ChatPanel() {
             className="hidden"
             onChange={handleFileInputChange}
           />
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            aria-label={t('panel.attachButton')}
-            onClick={() => fileInputRef.current?.click()}
-            className="shrink-0"
-          >
-            <Paperclip className="size-4" />
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            aria-label={t('panel.clearHistory')}
-            disabled={messages.length === 0}
-            onClick={() => clearMessages()}
-            className="shrink-0"
-          >
-            <Trash2 className="size-4" />
-          </Button>
+          {/* Attaching and clearing belong to an empty composer: once there is a
+              message being written, the width is worth more than two buttons that
+              are not part of writing it. Files can still be dragged onto the panel. */}
+          {!isComposing && (
+            <>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                aria-label={t('panel.attachButton')}
+                onClick={() => fileInputRef.current?.click()}
+                className="shrink-0"
+              >
+                <Paperclip className="size-4" />
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                aria-label={t('panel.clearHistory')}
+                disabled={messages.length === 0}
+                onClick={() => clearMessages()}
+                className="shrink-0"
+              >
+                <Trash2 className="size-4" />
+              </Button>
+            </>
+          )}
           <Textarea
             ref={composerRef}
             rows={1}
@@ -331,8 +340,18 @@ export function ChatPanel() {
             disabled={isSending}
             className="[field-sizing:fixed] min-h-0 resize-none overflow-y-hidden leading-5"
           />
-          <Button type="submit" disabled={!draft.trim() || isSending} className="shrink-0">
-            {t('panel.send')}
+          {/* Send cannot go away, so it gives its width back instead: the label at
+              rest, where it is the affordance that says what this box does, and an
+              icon square once there is something to send. */}
+          <Button
+            type="submit"
+            disabled={!draft.trim() || isSending}
+            size={isComposing ? 'icon' : 'default'}
+            aria-label={t('panel.send')}
+            title={t('panel.send')}
+            className="shrink-0"
+          >
+            {isComposing ? <SendHorizontal className="size-4" /> : t('panel.send')}
           </Button>
         </form>
       </div>
