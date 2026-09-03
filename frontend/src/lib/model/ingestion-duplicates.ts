@@ -45,7 +45,13 @@ export function normalizeText(value: unknown): string {
 
 /** Sign lives in the flow-role label, not in the number, so magnitude is what compares. */
 export function normalizeAmount(value: unknown): number | null {
-  const amount = typeof value === 'number' ? value : Number(String(value ?? '').replace(/[^\d.,-]/g, '').replace(',', '.'))
+  if (typeof value === 'number') return Number.isFinite(value) ? Math.round(Math.abs(value) * 100) / 100 : null
+  const text = String(value ?? '')
+  // Text with no digit at all is not a number: stripping the letters would leave an
+  // empty string, which Number() reads as 0 — and a description would then satisfy
+  // "amount below 10".
+  if (!/\d/.test(text)) return null
+  const amount = Number(text.replace(/[^\d.,-]/g, '').replace(',', '.'))
   return Number.isFinite(amount) ? Math.round(Math.abs(amount) * 100) / 100 : null
 }
 

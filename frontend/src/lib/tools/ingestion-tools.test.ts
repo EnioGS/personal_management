@@ -5,7 +5,7 @@ import { assistantPromptsTable } from '@/lib/assistant-prompts-db'
 import { categoriesTable, ingestionRowsTable, ingestionSourcesTable, tableDefsTable } from '@/lib/model/model-db'
 import { promoteReadyIngestionRows } from '@/lib/model/ingestion-promotion'
 import type { Category, IngestionRow } from '@/lib/model/types'
-import { addIngestionBlankColumnTool, assignIngestionColumnsTool, discardIngestionRowsTool, findIngestionDuplicatesTool, labelIngestionRowsByMatchTool, listIngestionDatasetsTool, readIngestionGuideTool, readIngestionProvenanceTool, readIngestionTableTool, updateIngestionLabelsTool } from './ingestion-tools'
+import { addIngestionBlankColumnTool, assignIngestionColumnsTool, countIngestionRowsTool, discardIngestionRowsTool, findIngestionDuplicatesTool, groupIngestionRowsTool, labelIngestionRowsByMatchTool, listIngestionDatasetsTool, queryIngestionRowsTool, readIngestionGuideTool, readIngestionProvenanceTool, readIngestionTableTool, updateIngestionLabelsTool } from './ingestion-tools'
 
 const context = { attachments: [] } as never
 
@@ -374,5 +374,61 @@ describe('mapping a file over several calls', () => {
     expect(added.assignedTo).toBe('quantity')
     expect(added.validation.missingFields).not.toContain('quantity')
     expect(added.validation.missingFields).not.toContain('date')
+  })
+})
+
+describe('working on a backlog without reading it all', () => {
+  beforeEach(async () => { await wipeAllData() })
+
+  async function backlog() {
+    const tableId = await tableDefsTable.add({ createdAt: 1, data: { name: 'Extrato Nubank', kind: 'bankLedger' } })
+    const sourceId = await ingestionSourcesTable.add({ createdAt: 1, data: { originalFilename: 'nubank.csv', sourceFingerprint: 'f', importedAt: 1, rawCsv: '', originalColumns: [], supplementalColumns: [], rowCount: 4, status: 'staged' } })
+    const rows = [
+      { description: 'Pagamento de fatura', amount: '2539.24' },
+      { description: 'PAGAMENTO DE FATURA', amount: '1200' },
+      { description: 'Transferência recebida pelo Pix', amount: '260' },
+      { description: 'Amazonprimebr', amount: '19.90' },
+    ]
+    for (const [index, row] of rows.entries()) {
+      await ingestionRowsTable.add({ createdAt: 2, data: { sourceId, sourceRowIndex: index, sourceRowFingerprint: `r${index}`, rawValues: { description: row.description }, mappedValues: { date: '2026-01-02', amount: row.amount, description: row.description }, labels: {}, status: 'unlabelled', validationErrors: [] } satisfies IngestionRow })
+    }
+    return { sourceId, tableId }
+  }
+
+  it('sizes a rule before anyone reads a row', async () => {
+    await backlog()
+
+    const counted = JSON.parse(await countIngestionRowsTool.execute({ filters: [{ field: 'description', op: 'contains', value: 'pagamento de fatura' }] }, context))
+
+    expect(counted).toMatchObject({ searched: 4, matched: 2 })
+    expect(counted.byStatus).toEqual({ unlabelled: 2 })
+  })
+
+  it('returns only the matching rows, and only the asked-for fields', async () => {
+    await backlog()
+
+    const result = JSON.parse(await queryIngestionRowsTool.execute({ filters: [{ field: 'amount', op: 'gt', value: 1000 }], sortBy: 'amount', sortType: 'number', sortDirection: 'desc', fields: ['amount', 'description'] }, context))
+
+    expect(result).toMatchObject({ searched: 4, matched: 2, returned: 2, hasMore: false })
+    expect(result.rows.map((row: { amount: string }) => row.amount)).toEqual(['2539.24', '1200'])
+    expect(Object.keys(result.rows[0])).toEqual(['rowId', 'amount', 'description'])
+  })
+
+  it('finds the pattern worth writing a rule about', async () => {
+    await backlog()
+
+    const grouped = JSON.parse(await groupIngestionRowsTool.execute({ field: 'description' }, context))
+
+    expect(grouped.values[0]).toEqual({ value: 'Pagamento de fatura', count: 2 })
+  })
+
+  it('keeps confirmed and discarded rows out of the worklist it searches', async () => {
+    const { sourceId } = await backlog()
+    const stored = (await ingestionRowsTable.toArray())[0]
+    await ingestionRowsTable.update(stored.id, { data: { ...(stored.data as IngestionRow), status: 'discarded' } })
+
+    expect(JSON.parse(await countIngestionRowsTool.execute({}, context)).matched).toBe(3)
+    expect(JSON.parse(await countIngestionRowsTool.execute({ dataset: 'discarded' }, context)).matched).toBe(1)
+    expect(JSON.parse(await countIngestionRowsTool.execute({ dataset: 'all', sourceId }, context)).matched).toBe(4)
   })
 })

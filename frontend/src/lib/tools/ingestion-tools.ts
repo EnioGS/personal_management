@@ -3,6 +3,8 @@ import { ingestionLabelErrors } from '@/lib/model/ingestion'
 import { ensureCategoryByName } from '@/lib/model/category-vocabulary'
 import { createSupplementalColumn, parseIngestionCsv, saveIngestionMappings } from '@/lib/model/ingestion-source'
 import { discardIngestionRows, updateIngestionRowLabels, updateIngestionRowWorklist } from '@/lib/model/ingestion-promotion'
+import { ingestionFieldContext, INGESTION_QUERY_FIELDS, resolveIngestionField } from '@/lib/model/ingestion-fields'
+import { groupRows, queryRows, type RowFilter, type RowQuery } from '@/lib/model/row-query'
 import { findDuplicateMatches, findDuplicateMatchesWithin, normalizeAmount, normalizeDate, normalizeText, type ComparableRow } from '@/lib/model/ingestion-duplicates'
 import { FINANCE_DESTINATIONS, FLOW_ROLES, labelValues, matchLabelValue, RECURRENCES, SETTLEMENT_CHANNELS, SPENDING_TREATMENTS } from '@/lib/model/label-vocabulary'
 import { assistantPromptsTable } from '@/lib/assistant-prompts-db'
@@ -484,6 +486,133 @@ export const discardIngestionRowsTool: ToolDefinition = {
     if (rowIds.length === 0) return 'Error: rowIds are required.'
     if (typeof args.reason !== 'string' || !args.reason.trim()) return 'Error: a reason is required.'
     return JSON.stringify(await discardIngestionRows(rowIds, args.reason.trim(), 'assistant', args.restore === true))
+  },
+}
+
+type StoredIngestionRow = { id: number } & IngestionRow
+
+/** The rows a query runs over, plus the name lookups its fields need. */
+async function ingestionQueryScope(dataset: string | undefined, sourceId: number | undefined) {
+  const [storedRows, sources, tables, categories] = await Promise.all([
+    ingestionRowsTable.toArray(), ingestionSourcesTable.toArray(), tableDefsTable.toArray(), categoriesTable.toArray(),
+  ])
+  const context = ingestionFieldContext(sources, tables, categories)
+  const isConfirmed = (row: IngestionRow) => row.status === 'promoted' || row.status === 'reconciledExisting'
+  const rows = storedRows
+    .map((row) => ({ id: row.id, ...(row.data as IngestionRow) }) as StoredIngestionRow)
+    .filter((row) => {
+      if (sourceId !== undefined && row.sourceId !== sourceId) return false
+      if (dataset === 'confirmed') return isConfirmed(row)
+      if (dataset === 'discarded') return row.status === 'discarded'
+      if (dataset === 'all') return true
+      return !isConfirmed(row) && row.status !== 'discarded'
+    })
+  return { rows, resolve: (row: StoredIngestionRow, field: string) => resolveIngestionField(row, field, context) }
+}
+
+function asQuery(args: Record<string, unknown>): RowQuery {
+  const filters = Array.isArray(args.filters)
+    ? (args.filters as Record<string, unknown>[]).map((filter) => ({
+      field: String(filter.field ?? ''),
+      op: String(filter.op ?? 'contains') as RowFilter['op'],
+      value: filter.value as RowFilter['value'],
+      caseSensitive: filter.caseSensitive === true,
+    }))
+    : []
+  const sort = typeof args.sortBy === 'string' && args.sortBy
+    ? { field: args.sortBy, direction: args.sortDirection === 'desc' ? ('desc' as const) : ('asc' as const), type: (args.sortType === 'number' || args.sortType === 'date' ? args.sortType : 'text') as 'text' | 'number' | 'date' }
+    : undefined
+  return { filters, match: args.match === 'any' ? 'any' : 'all', sort }
+}
+
+const FILTER_SCHEMA = {
+  type: 'array',
+  description: 'Conditions on named fields. Combined with match: all (default) or any.',
+  items: {
+    type: 'object',
+    properties: {
+      field: { type: 'string', description: `One of: ${INGESTION_QUERY_FIELDS.join(', ')} — or raw.<original column> / mapped.<canonical field> for anything else.` },
+      op: { type: 'string', enum: ['contains', 'notContains', 'equals', 'notEquals', 'gt', 'gte', 'lt', 'lte', 'in', 'notIn', 'isEmpty', 'isNotEmpty'] },
+      value: { description: 'Text or number; an array for in/notIn; omitted for isEmpty/isNotEmpty.' },
+      caseSensitive: { type: 'boolean' },
+    },
+    required: ['field', 'op'],
+  },
+} as const
+
+const DATASET_SCHEMA = { type: 'string', enum: ['worklist', 'confirmed', 'discarded', 'all'], description: 'worklist (default), confirmed, discarded, or all.' } as const
+
+export const countIngestionRowsTool: ToolDefinition = {
+  name: 'count_ingestion_rows',
+  description: 'Counts the rows matching a filter, without returning any of them, broken down by status and by source. This is how you size anything before reading it: how many rows a rule would cover, how much of a dataset is still unlabelled, whether a filter is too broad. Always cheaper than a page of rows, and the right first call on a dataset of any size.',
+  parameters: { type: 'object', properties: { dataset: DATASET_SCHEMA, sourceId: { type: 'number' }, filters: FILTER_SCHEMA, match: { type: 'string', enum: ['all', 'any'] } }, additionalProperties: false },
+  execute: async (args) => {
+    const { rows, resolve } = await ingestionQueryScope(args.dataset as string | undefined, typeof args.sourceId === 'number' ? args.sourceId : undefined)
+    const result = queryRows(rows, resolve, asQuery(args))
+    const byStatus: Record<string, number> = {}
+    const bySource: Record<string, number> = {}
+    for (const row of result.rows) {
+      byStatus[row.status] = (byStatus[row.status] ?? 0) + 1
+      const source = String(resolve(row, 'source') || 'unknown')
+      bySource[source] = (bySource[source] ?? 0) + 1
+    }
+    return JSON.stringify({ searched: result.total, matched: result.matched, byStatus, bySource })
+  },
+}
+
+export const queryIngestionRowsTool: ToolDefinition = {
+  name: 'query_ingestion_rows',
+  description: 'Returns the rows matching a filter, sorted and paged, with only the fields you ask for. Prefer this over read_ingestion_table for anything but a first look: filtering to the rows a question is about costs a fraction of sweeping a backlog, and keeps the answer readable. Count first with count_ingestion_rows when the match might be large, and ask for the narrowest set of fields that answers the question.',
+  parameters: {
+    type: 'object',
+    properties: {
+      dataset: DATASET_SCHEMA,
+      sourceId: { type: 'number' },
+      filters: FILTER_SCHEMA,
+      match: { type: 'string', enum: ['all', 'any'] },
+      sortBy: { type: 'string', description: 'Field to order by.' },
+      sortDirection: { type: 'string', enum: ['asc', 'desc'] },
+      sortType: { type: 'string', enum: ['text', 'number', 'date'], description: 'How to order: text (default), number, or date.' },
+      fields: { type: 'array', items: { type: 'string' }, description: 'Fields to return per row. Defaults to id, status, date, amount, description and the labels.' },
+      offset: { type: 'number' },
+      limit: { type: 'number', description: 'Rows to return, at most 100. Default 25.' },
+    },
+    additionalProperties: false,
+  },
+  execute: async (args) => {
+    const { rows, resolve } = await ingestionQueryScope(args.dataset as string | undefined, typeof args.sourceId === 'number' ? args.sourceId : undefined)
+    const limit = typeof args.limit === 'number' && args.limit > 0 ? Math.min(MAX_ROWS, Math.floor(args.limit)) : 25
+    const offset = typeof args.offset === 'number' && args.offset > 0 ? Math.floor(args.offset) : 0
+    const fields = Array.isArray(args.fields) && args.fields.length > 0
+      ? args.fields.map(String)
+      : ['status', 'date', 'amount', 'description', 'financeDestination', 'flowRole', 'settlementChannel', 'spendingTreatment', 'recurrence', 'category', 'destinationTable']
+    const result = queryRows(rows, resolve, { ...asQuery(args), offset, limit })
+    return JSON.stringify({
+      searched: result.total,
+      matched: result.matched,
+      offset: result.offset,
+      returned: result.returned,
+      hasMore: result.hasMore,
+      rows: result.rows.map((row) => ({ rowId: row.id, ...Object.fromEntries(fields.map((field) => [field, resolveIngestionFieldValue(resolve, row, field)])) })),
+    })
+  },
+}
+
+function resolveIngestionFieldValue(resolve: (row: StoredIngestionRow, field: string) => unknown, row: StoredIngestionRow, field: string) {
+  const value = resolve(row, field)
+  return value === undefined ? null : value
+}
+
+export const groupIngestionRowsTool: ToolDefinition = {
+  name: 'group_ingestion_rows',
+  description: 'Returns the most common values of one field with their counts — the way to find what a labelling rule could cover without reading rows until a pattern appears. Group on description or rawCategory to find repeated narrations, on category or flowRole to see how a batch was labelled, on source to see where rows came from. Filters apply first, so you can group within a subset.',
+  parameters: { type: 'object', properties: { dataset: DATASET_SCHEMA, sourceId: { type: 'number' }, field: { type: 'string' }, filters: FILTER_SCHEMA, match: { type: 'string', enum: ['all', 'any'] }, limit: { type: 'number', description: 'How many distinct values to return. Default 20.' } }, required: ['field'], additionalProperties: false },
+  execute: async (args) => {
+    if (typeof args.field !== 'string' || !args.field) return 'Error: field is required.'
+    const { rows, resolve } = await ingestionQueryScope(args.dataset as string | undefined, typeof args.sourceId === 'number' ? args.sourceId : undefined)
+    const filtered = queryRows(rows, resolve, asQuery(args))
+    const limit = typeof args.limit === 'number' && args.limit > 0 ? Math.min(200, Math.floor(args.limit)) : 20
+    return JSON.stringify({ searched: filtered.total, matched: filtered.matched, field: args.field, values: groupRows(filtered.rows, resolve, args.field, limit) })
   },
 }
 
