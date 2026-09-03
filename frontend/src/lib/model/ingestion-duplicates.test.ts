@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { findDuplicateMatches, findDuplicateMatchesWithin, normalizeAmount, normalizeDate, type ComparableRow } from './ingestion-duplicates'
 
+
 function row(key: string, overrides: Partial<ComparableRow> = {}): ComparableRow {
   return { key, date: '2026-01-02', amount: 19.9, description: 'amazonprimebr assinatura', ...overrides }
 }
@@ -58,5 +59,23 @@ describe('finding duplicates across partial data', () => {
     expect(normalizeDate(Date.UTC(2026, 0, 2))).toBe('2026-01-02')
     expect(normalizeDate('1767312000000')).toBe(normalizeDate(1767312000000))
     expect(normalizeDate('not a date')).toBeNull()
+  })
+})
+
+describe('dates as the bank actually writes them', () => {
+  it('compares a day-first file date against a stored epoch, instead of skipping the field', () => {
+    const fileRow: ComparableRow = { key: 'file:13', date: normalizeDate('15/08/2025'), amount: 2.69, description: 'transferencia enviada pelo pix paulo' }
+    const legacyRow: ComparableRow = { key: 'row:173', date: normalizeDate('1755216000000'), amount: 2.69, description: 'transferencia enviada pelo pix paulo' }
+
+    const matches = findDuplicateMatches([fileRow], [legacyRow])
+
+    expect(matches[0]).toMatchObject({ confidence: 'high', comparedOn: ['date', 'amount', 'description'] })
+  })
+
+  it('rules out the pair whose dates only looked incomparable', () => {
+    const fileRow: ComparableRow = { key: 'file:15', date: normalizeDate('20/08/2025'), amount: 260, description: 'transferencia recebida pelo pix enio' }
+    const legacyRow: ComparableRow = { key: 'row:146', date: normalizeDate('1752537600000'), amount: 260, description: 'transferencia recebida pelo pix enio' }
+
+    expect(findDuplicateMatches([fileRow], [legacyRow])).toEqual([])
   })
 })

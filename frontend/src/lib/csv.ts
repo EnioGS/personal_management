@@ -1,4 +1,5 @@
 import Papa from 'papaparse'
+import { parseDateValue } from './parse-date'
 import type { ColumnDef, TableSchema } from './table-schema'
 
 export interface CsvError {
@@ -36,8 +37,8 @@ export function coerceValue<T>(
       return { ok: true, value: num }
     }
     case 'date': {
-      const ms = Date.parse(trimmed)
-      if (Number.isNaN(ms)) return { ok: false, message: `"${String(col.key)}" is not a valid date` }
+      const ms = parseDateValue(trimmed)
+      if (ms === null) return { ok: false, message: `"${String(col.key)}" is not a valid date` }
       return { ok: true, value: ms }
     }
     case 'select': {

@@ -10,6 +10,8 @@
  * human (or the assistant) to judge; one is not.
  */
 
+import { parseDateValue } from '@/lib/parse-date'
+
 export type DuplicateConfidence = 'identical' | 'high' | 'medium'
 
 export interface ComparableRow {
@@ -49,11 +51,8 @@ export function normalizeAmount(value: unknown): number | null {
 
 /** Day precision: the same transaction can carry different timestamps in two files. */
 export function normalizeDate(value: unknown): string | null {
-  if (typeof value === 'number' && Number.isFinite(value)) return new Date(value).toISOString().slice(0, 10)
-  const text = String(value ?? '').trim()
-  if (!text) return null
-  const ms = /^\d{11,}$/.test(text) ? Number(text) : Date.parse(text)
-  return Number.isFinite(ms) ? new Date(ms).toISOString().slice(0, 10) : null
+  const ms = parseDateValue(value)
+  return ms === null ? null : new Date(ms).toISOString().slice(0, 10)
 }
 
 /**
