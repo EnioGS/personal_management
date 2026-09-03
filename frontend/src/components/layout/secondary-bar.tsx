@@ -9,6 +9,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 
 /** How long the labels stay up on their own before the bar gives the width back. */
 const AUTO_COLLAPSE_MS = 3000
+/** The slip's bottom-right corner, in pixels. Constant, whatever width the bar has. */
+const CORNER = 44
 
 /**
  * Items of the active section, as an icon strip or with labels (see store/ui-store.ts).
@@ -34,10 +36,10 @@ export function SecondaryBar() {
   // The edge is drawn to the sheet's real width, so it follows the bar as the labels
   // come and go; the sheet's height follows the items by itself.
   const [sheetWidth, setSheetWidth] = useState(0)
-  // A sweep that reads well across 48px looks squashed across 224px: the same curve
-  // over four times the width is nearly flat. The edge takes its height from the
-  // width, so the shape stays the shape at either size.
-  const edgeHeight = Math.round(Math.min(80, Math.max(28, sheetWidth * 0.34)))
+  // The corner is a fixed size, so widening the bar lengthens the flat part and leaves
+  // the curve alone — stretching one shape across four times the width is what made
+  // the expanded bar look wrong.
+  const edgeHeight = CORNER
 
   useLayoutEffect(() => {
     const sheet = sheetRef.current
@@ -147,10 +149,15 @@ export function SecondaryBar() {
  */
 function SlipEdge({ width, height }: { width: number; height: number }) {
   if (width === 0) return null
+  // The right border turns through a quarter round of a fixed size and then runs flat
+  // to the left, meeting the activity bar square. Only that flat run changes with the
+  // bar's width, so the corner keeps its shape at 48px and at 224px alike.
+  const corner = Math.min(height, width)
+  const turn = `C${width} ${corner * 0.55}, ${width - corner * 0.45} ${corner}, ${width - corner} ${corner}`
   return (
     <svg aria-hidden className="pointer-events-none shrink-0" width={width} height={height} viewBox={`0 0 ${width} ${height}`} fill="none">
-      <path d={`M0 0 H${width} C${width} ${height * 0.5}, ${width * 0.5} ${height * 0.35}, 0 ${height} Z`} className="fill-sidebar" />
-      <path d={`M${width} 0 C${width} ${height * 0.5}, ${width * 0.5} ${height * 0.35}, 0 ${height}`} className="stroke-border" strokeWidth="1" fill="none" />
+      <path d={`M0 0 H${width} ${turn} H0 Z`} className="fill-sidebar" />
+      <path d={`M${width} 0 ${turn} H0`} className="stroke-border" strokeWidth="1" fill="none" />
     </svg>
   )
 }
