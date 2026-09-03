@@ -173,12 +173,14 @@ export function EditableDataTable<T extends Record<string, unknown>>({
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
                 {headerGroup.headers.map((header) => {
-                  const field = header.column.id
-                  const sortable = schema.some((column) => String(column.key) === field)
+                  // The header is a React element, so its own text has to come from the
+                  // schema rather than from rendering it — flexRender's output stringifies
+                  // to [object Object].
+                  const column = schema.find((candidate) => String(candidate.key) === header.column.id)
                   return (
                     <TableHead key={header.id}>
-                      {header.isPlaceholder ? null : sortable
-                        ? <ColumnSortMenu field={field} label={String(flexRender(header.column.columnDef.header, header.getContext()))} sort={sort} onSort={setSort} />
+                      {header.isPlaceholder ? null : column
+                        ? <ColumnSortMenu field={header.column.id} label={String(t(column.labelKey as never))} sort={sort} onSort={setSort} />
                         : flexRender(header.column.columnDef.header, header.getContext())}
                     </TableHead>
                   )
