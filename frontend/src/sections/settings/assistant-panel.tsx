@@ -178,7 +178,7 @@ function ConnectionsSection() {
                 setNewKey('')
               }}
             >
-              {t('tables.cancel')}
+              {t('common.cancel')}
             </Button>
           </div>
         </div>
@@ -197,7 +197,7 @@ function ConnectionsSection() {
             <AlertDialogDescription>{t('assistant.replaceDescription')}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>{t('tables.cancel')}</AlertDialogCancel>
+            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
                 if (replacing) void commitNewConnection(replacing.provider)

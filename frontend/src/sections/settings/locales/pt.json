@@ -6,8 +6,7 @@
     "general": "Geral",
     "assistant": "Assistente",
     "accountsCards": "Contas e Cartões",
-    "ingestion": "Centro de ingestão de dados",
-    "tables": "Tabelas"
+    "ingestion": "Centro de ingestão de dados"
   },
   "appearance": {
     "themeLabel": "Tema",
@@ -78,18 +77,7 @@
     "deleteCardDialogDescription": "Isso exclui permanentemente o cartão. Não pode ser desfeito.",
     "deleteCardConfirm": "Excluir cartão"
   },
-  "tables": {
-    "heading": "Todas as tabelas",
-    "description": "Todas as tabelas de todas as seções, em um só lugar — renomeie ou exclua uma que você não está vendo agora.",
-    "noTables": "Nenhuma tabela ainda.",
-    "rowCount": "{{count}} linha(s)",
-    "rename": "Renomear",
-    "delete": "Excluir tabela",
-    "renameTitle": "Renomear tabela",
-    "renameConfirm": "Renomear",
-    "cancel": "Cancelar",
-    "deleteTitle": "Excluir \"{{name}}\"?",
-    "deleteDescription": "Isso exclui permanentemente a tabela e todas as suas linhas. Não pode ser desfeito.",
-    "deleteConfirm": "Excluir tabela"
+  "common": {
+    "cancel": "Cancelar"
   }
 }

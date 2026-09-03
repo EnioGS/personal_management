@@ -6,8 +6,7 @@
     "general": "General",
     "assistant": "Assistant",
     "accountsCards": "Accounts & Cards",
-    "ingestion": "Data ingestion centre",
-    "tables": "Tables"
+    "ingestion": "Data ingestion centre"
   },
   "appearance": {
     "themeLabel": "Theme",
@@ -78,18 +77,7 @@
     "deleteCardDialogDescription": "This permanently deletes the card. This cannot be undone.",
     "deleteCardConfirm": "Delete card"
   },
-  "tables": {
-    "heading": "All tables",
-    "description": "Every table across every section, in one place — rename or delete one you're not currently looking at.",
-    "noTables": "No tables yet.",
-    "rowCount": "{{count}} row(s)",
-    "rename": "Rename",
-    "delete": "Delete table",
-    "renameTitle": "Rename table",
-    "renameConfirm": "Rename",
-    "cancel": "Cancel",
-    "deleteTitle": "Delete \"{{name}}\"?",
-    "deleteDescription": "This permanently deletes the table and every row in it. This cannot be undone.",
-    "deleteConfirm": "Delete table"
+  "common": {
+    "cancel": "Cancel"
   }
 }

@@ -1,10 +1,9 @@
-import { Bot, DatabaseZap, Landmark, Settings, SlidersHorizontal, Table2 } from 'lucide-react'
+import { Bot, DatabaseZap, Landmark, Settings, SlidersHorizontal } from 'lucide-react'
 import type { AppSection } from '../types'
 import { AccountsCardsPanel } from './accounts-cards-panel'
 import { AssistantPanel } from './assistant-panel'
 import { GeneralPanel } from './general-panel'
 import { IngestionPanel } from './ingestion-panel'
-import { TablesPanel } from './tables-panel'
 
 export const settingsSection: AppSection = {
   id: 'settings',
@@ -16,6 +15,5 @@ export const settingsSection: AppSection = {
     { id: 'assistant', labelKey: 'settings:items.assistant', icon: Bot, component: AssistantPanel },
     { id: 'accountsCards', labelKey: 'settings:items.accountsCards', icon: Landmark, component: AccountsCardsPanel },
     { id: 'ingestion', labelKey: 'settings:items.ingestion', icon: DatabaseZap, component: IngestionPanel },
-    { id: 'tables', labelKey: 'settings:items.tables', icon: Table2, component: TablesPanel },
   ],
 }
