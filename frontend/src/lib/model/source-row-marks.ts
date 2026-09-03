@@ -4,13 +4,34 @@ import type { Entry, IngestionRow, IngestionSource } from './types'
 export type SourceRowMark = 'duplicate' | 'eliminate'
 
 /**
+ * Who decided. A scan may revise what a scan said before — the rule it applies keeps
+ * improving — but it may never overturn a person's verdict, or the assistant's, which
+ * is a judgement about the data rather than a reading of it.
+ *
+ * Older sources stored the mark alone; those came from a scan, and are read as such.
+ */
+export interface MarkRecord {
+  mark: SourceRowMark
+  by: 'scan' | 'person'
+}
+
+export function readMark(value: SourceRowMarks[string] | undefined): MarkRecord | undefined {
+  if (!value) return undefined
+  return typeof value === 'string' ? { mark: value, by: 'scan' } : value
+}
+
+export function markValue(value: SourceRowMarks[string] | undefined): SourceRowMark | undefined {
+  return readMark(value)?.mark
+}
+
+/**
  * How a file's rows are marked before they are staged.
  *
  * `duplicate` is what the system found on its own and nobody has ruled on yet;
  * `eliminate` is a decision — by the user or the assistant — that this row should not
  * enter the worklist at all. Anything unmarked is ready to go.
  */
-export type SourceRowMarks = Record<string, SourceRowMark>
+export type SourceRowMarks = Record<string, SourceRowMark | MarkRecord>
 
 /** Values a row genuinely arrived with. A blank column the ingestion centre added is not evidence. */
 export function originalValues(row: Record<string, string>, originalColumns: readonly string[]): Record<string, string> {
@@ -100,7 +121,14 @@ export function markDuplicateSourceRows(
   fileRows.forEach((row, index) => {
     const key = String(index)
     const values = originalValues(row, source.originalColumns)
-    if (!marks[key] && (isDuplicateOfStored(values, corpus) || isDuplicateOfStored(values, seen))) marks[key] = 'duplicate'
+    const held = readMark(marks[key])
+    const duplicate = isDuplicateOfStored(values, corpus) || isDuplicateOfStored(values, seen)
+    // A scan owns only what a scan wrote, so a verdict it no longer reaches is dropped
+    // and a fresh one takes its place — while anything a person decided stays put.
+    if (!held || held.by === 'scan') {
+      if (duplicate) marks[key] = { mark: 'duplicate', by: 'scan' }
+      else if (held?.by === 'scan') delete marks[key]
+    }
     seen.push(values)
   })
   return marks

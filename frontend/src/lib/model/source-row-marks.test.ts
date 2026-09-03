@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { isDuplicateOfStored, markDuplicateSourceRows, originalValues } from './source-row-marks'
+import { isDuplicateOfStored, markDuplicateSourceRows, markValue, originalValues, type SourceRowMarks } from './source-row-marks'
+
+/** Marks compare more readably as "who said what" than as their stored shape. */
+function verdicts(marks: SourceRowMarks): Record<string, string> {
+  return Object.fromEntries(Object.entries(marks).map(([index, value]) => [index, `${markValue(value)}`]))
+}
 import type { Entry, IngestionRow, IngestionSource } from './types'
 
 const source = { originalFilename: 'nubank.csv', sourceFingerprint: 'f', importedAt: 1, rawCsv: '', originalColumns: ['date', 'title', 'amount'], supplementalColumns: ['quantity'], rowCount: 2, status: 'draftSource' } satisfies IngestionSource
@@ -40,25 +45,25 @@ describe('marking a file against everything stored', () => {
   it('marks the rows that already exist, in the worklist or in a finance table', () => {
     const marks = markDuplicateSourceRows(source, fileRows, [storedRow({ date: '2026-01-02', title: 'Coffee', amount: '12.50' })], [])
 
-    expect(marks).toEqual({ '0': 'duplicate' })
+    expect(verdicts(marks)).toEqual({ '0': 'duplicate' })
   })
 
   it('sees a row that reached a finance table, not only one still queued', () => {
     const entry = { tableId: 1, deleted: false, date: '2026-01-03', title: 'Market', amount: '80' } as unknown as Entry
 
-    expect(markDuplicateSourceRows(source, fileRows, [], [entry])).toEqual({ '1': 'duplicate' })
+    expect(verdicts(markDuplicateSourceRows(source, fileRows, [], [entry]))).toEqual({ '1': 'duplicate' })
   })
 
   it('never undoes a mark somebody made, however a later scan reads the row', () => {
-    const marks = markDuplicateSourceRows(source, fileRows, [], [], { '0': 'eliminate', '1': 'duplicate' })
+    const marks = markDuplicateSourceRows(source, fileRows, [], [], { '0': { mark: 'eliminate', by: 'person' }, '1': { mark: 'duplicate', by: 'person' } })
 
-    expect(marks).toEqual({ '0': 'eliminate', '1': 'duplicate' })
+    expect(verdicts(marks)).toEqual({ '0': 'eliminate', '1': 'duplicate' })
   })
 
   it('flags the second copy inside one file and keeps the first', () => {
     const twice = [fileRows[0], fileRows[1], { ...fileRows[0] }]
 
-    expect(markDuplicateSourceRows(source, twice, [], [])).toEqual({ '2': 'duplicate' })
+    expect(verdicts(markDuplicateSourceRows(source, twice, [], []))).toEqual({ '2': 'duplicate' })
   })
 })
 
@@ -76,17 +81,35 @@ describe('files dropped together', () => {
   it('flags the rows a second statement repeats from the first, before either is staged', () => {
     const marks = markDuplicateSourceRows(september, septemberRows, [], [], {}, [august])
 
-    expect(marks).toEqual({ '0': 'duplicate' })
+    expect(verdicts(marks)).toEqual({ '0': 'duplicate' })
   })
 
   it('leaves the earlier file alone: a shared row is a copy only where it arrived second', () => {
     // September is checked against August, never the other way round.
-    expect(markDuplicateSourceRows({ ...source, originalColumns: august.originalColumns as unknown as string[] }, august.rows, [], [], {}, [])).toEqual({})
+    expect(verdicts(markDuplicateSourceRows({ ...source, originalColumns: august.originalColumns as unknown as string[] }, august.rows, [], [], {}, []))).toEqual({})
   })
 
   it('finds nothing when the files do not overlap', () => {
     const marks = markDuplicateSourceRows(september, septemberRows.slice(1), [], [], {}, [august])
 
     expect(marks).toEqual({})
+  })
+})
+
+describe('who owns a verdict', () => {
+  const fileRows = [{ date: '2026-01-02', title: 'Coffee', amount: '12.50', quantity: '' }]
+
+  it('lets a later scan drop a verdict an earlier scan reached', () => {
+    const stale = markDuplicateSourceRows(source, fileRows, [storedRow({ date: '2026-01-02', title: 'Coffee', amount: '12.50' })], [])
+    expect(verdicts(stale)).toEqual({ '0': 'duplicate' })
+
+    // The row it matched is gone; the scan that flagged it may take it back.
+    expect(verdicts(markDuplicateSourceRows(source, fileRows, [], [], stale))).toEqual({})
+  })
+
+  it('never drops one a person reached', () => {
+    const byHand = { '0': { mark: 'duplicate' as const, by: 'person' as const } }
+
+    expect(verdicts(markDuplicateSourceRows(source, fileRows, [], [], byHand))).toEqual({ '0': 'duplicate' })
   })
 })

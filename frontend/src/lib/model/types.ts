@@ -179,7 +179,7 @@ export interface IngestionSource {
    * scan found, and what anyone decided about it. Kept on the source because a file's
    * rows have no identity of their own until they are staged.
    */
-  rowMarks?: Record<string, 'duplicate' | 'eliminate'>
+  rowMarks?: Record<string, 'duplicate' | 'eliminate' | { mark: 'duplicate' | 'eliminate'; by: 'scan' | 'person' }>
   /**
    * Marks which one-off repair of the legacy queue has already run for this
    * source, so a repair corrects historical data exactly once instead of

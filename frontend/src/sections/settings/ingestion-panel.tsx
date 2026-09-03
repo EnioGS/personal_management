@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type ChangeEvent, type DragEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Check, ChevronDown, FilePlus2, Plus, Trash2, Upload } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -9,6 +9,7 @@ import { ColumnSortMenu, type ColumnSort } from '@/components/data-table/column-
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { useProgressiveRows } from '@/components/data-table/use-progressive-rows'
 import { queryRows } from '@/lib/model/row-query'
+import { markValue } from '@/lib/model/source-row-marks'
 import { tableDisplayName } from '@/lib/model/table-name'
 import { cn } from '@/lib/utils'
 import { LabellingRules } from './labelling-rules'
@@ -19,6 +20,7 @@ import {
   parseIngestionCsv,
   planIngestionStaging,
   removeFinishedIngestionSource,
+  rescanSourceRowDuplicates,
   saveIngestionMappings,
   stageIngestionSource,
   validateIngestionMappings,
@@ -159,6 +161,17 @@ export function IngestionPanel() {
     setDraftMappings(null)
     setMessage(null)
   }
+
+  // Sources are rescanned when the screen opens: the rule a scan applies keeps
+  // improving, and a file marked up by an older one should not stay wrong until
+  // somebody happens to upload something.
+  useEffect(() => {
+    void (async () => {
+      for (const source of sourceStore.items) await rescanSourceRowDuplicates(source.id).catch(() => undefined)
+      await sourceStore.refresh()
+    })()
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per mount, over whatever is loaded
+  }, [])
 
   async function refresh() {
     await Promise.all([sourceStore.refresh(), mappingStore.refresh(), rowStore.refresh()])
@@ -449,7 +462,7 @@ export function IngestionPanel() {
                 <tr><th className="bg-muted sticky left-0 z-30 w-28 min-w-28 border-b border-r p-2 font-medium">Status</th>{[...selectedSource.originalColumns, ...selectedSource.supplementalColumns].map((column) => <th key={column} className="border-b p-2 font-medium">{column}{selectedSource.supplementalColumns.includes(column) && <span className="text-muted-foreground"> · blank</span>}</th>)}</tr>
               </thead>
               <tbody>{sourceRows.map(({ index, values }) => {
-                const mark = selectedSource.rowMarks?.[String(index)]
+                const mark = markValue(selectedSource.rowMarks?.[String(index)])
                 return (
                   <tr key={index} className="border-b">
                     <td className="bg-background sticky left-0 z-10 w-28 min-w-28 border-r p-2 align-top">

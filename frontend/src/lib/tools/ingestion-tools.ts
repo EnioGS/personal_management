@@ -7,7 +7,7 @@ import { discardIngestionRows, updateIngestionRowLabels, updateIngestionRowWorkl
 import { ingestionFieldContext, INGESTION_QUERY_FIELDS, resolveIngestionField } from '@/lib/model/ingestion-fields'
 import { groupRows, queryRows, type RowFilter, type RowQuery } from '@/lib/model/row-query'
 import { findDuplicateMatches, findDuplicateMatchesWithin, normalizeAmount, normalizeDate, normalizeText, type ComparableRow } from '@/lib/model/ingestion-duplicates'
-import { buildDuplicateCorpus, isDuplicateOfStored, originalValues } from '@/lib/model/source-row-marks'
+import { buildDuplicateCorpus, isDuplicateOfStored, markValue, originalValues } from '@/lib/model/source-row-marks'
 import { FLOW_ROLES, labelValues, matchLabelValue, RECURRENCES, SETTLEMENT_CHANNELS, SPENDING_TREATMENTS } from '@/lib/model/label-vocabulary'
 import { parsePlacementLabels, resolveSectionLabel, resolveSubsectionLabel } from '@/lib/model/label-catalogue'
 import { buildLabelCatalogue } from '@/lib/label-catalogue-source'
@@ -131,7 +131,7 @@ export const readIngestionTableTool: ToolDefinition = {
           const stored = source!.data as IngestionSource
           return {
             rowIndex,
-            mark: stored.rowMarks?.[String(rowIndex)] ?? null,
+            mark: markValue(stored.rowMarks?.[String(rowIndex)]) ?? null,
             values: { ...values, ...Object.fromEntries(stored.supplementalColumns.map((column) => [column, supplementalValueFor(stored, column, rowIndex)])) },
           }
         }),

@@ -9,7 +9,7 @@ import {
 } from './model-db'
 import { allPotentialIngestionFields } from './ingestion'
 import { applyLabelRulesToRows } from './label-rules-repository'
-import { markDuplicateSourceRows, type SourceRowMark } from './source-row-marks'
+import { markDuplicateSourceRows, markValue, type SourceRowMark } from './source-row-marks'
 import { FLOW_ROLES, matchLabelValue, RECURRENCES, SETTLEMENT_CHANNELS, SPENDING_TREATMENTS } from './label-vocabulary'
 import type { Entry, IngestionColumnMapping, IngestionRow, IngestionSource, IngestionTargetField } from './types'
 
@@ -238,7 +238,7 @@ export async function planIngestionStaging(sourceId: number): Promise<StagingPla
   const plan: StagingPlan = { ready: [], duplicate: [], eliminate: [], alreadyStaged: [] }
   parsed.rows.forEach((_row, index) => {
     if (staged.has(index)) { plan.alreadyStaged.push(index); return }
-    const mark = source.rowMarks?.[String(index)]
+    const mark = markValue(source.rowMarks?.[String(index)])
     if (mark === 'eliminate') plan.eliminate.push(index)
     else if (mark === 'duplicate') plan.duplicate.push(index)
     else plan.ready.push(index)
@@ -272,7 +272,7 @@ export async function stageIngestionSource(sourceId: number, options: { readyOnl
   let eliminated = 0
 
   for (const [sourceRowIndex, rawOriginalValues] of parsed.rows.entries()) {
-    const mark = source.rowMarks?.[String(sourceRowIndex)]
+    const mark = markValue(source.rowMarks?.[String(sourceRowIndex)])
     // A row someone ruled against never enters the worklist, however it was mapped.
     if (mark === 'eliminate') { eliminated += 1; continue }
     if (mark === 'duplicate' && options.readyOnly) { skippedDuplicateMarks += 1; continue }
@@ -390,7 +390,8 @@ export async function markSourceRows(sourceId: number, rowIndexes: number[], mar
   const source = sourceData(sourceRow)
   const rowMarks = { ...(source.rowMarks ?? {}) }
   for (const index of rowIndexes) {
-    if (mark) rowMarks[String(index)] = mark
+    // Recorded as a person's decision, so no later scan overturns it.
+    if (mark) rowMarks[String(index)] = { mark, by: 'person' }
     else delete rowMarks[String(index)]
   }
   const next = { ...source, rowMarks }
