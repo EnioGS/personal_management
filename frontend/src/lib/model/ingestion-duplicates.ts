@@ -11,6 +11,7 @@
  */
 
 import { parseDateValue } from '@/lib/parse-date'
+import { parseNumberValue } from '@/lib/parse-number'
 
 export type DuplicateConfidence = 'identical' | 'high' | 'medium'
 
@@ -45,14 +46,8 @@ export function normalizeText(value: unknown): string {
 
 /** Sign lives in the flow-role label, not in the number, so magnitude is what compares. */
 export function normalizeAmount(value: unknown): number | null {
-  if (typeof value === 'number') return Number.isFinite(value) ? Math.round(Math.abs(value) * 100) / 100 : null
-  const text = String(value ?? '')
-  // Text with no digit at all is not a number: stripping the letters would leave an
-  // empty string, which Number() reads as 0 — and a description would then satisfy
-  // "amount below 10".
-  if (!/\d/.test(text)) return null
-  const amount = Number(text.replace(/[^\d.,-]/g, '').replace(',', '.'))
-  return Number.isFinite(amount) ? Math.round(Math.abs(amount) * 100) / 100 : null
+  const amount = parseNumberValue(value)
+  return amount === null ? null : Math.round(Math.abs(amount) * 100) / 100
 }
 
 /** Day precision: the same transaction can carry different timestamps in two files. */

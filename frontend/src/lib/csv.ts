@@ -1,5 +1,6 @@
 import Papa from 'papaparse'
 import { parseDateValue } from './parse-date'
+import { parseNumberValue } from './parse-number'
 import type { ColumnDef, TableSchema } from './table-schema'
 
 export interface CsvError {
@@ -32,8 +33,8 @@ export function coerceValue<T>(
   const trimmed = raw.trim()
   switch (col.type) {
     case 'number': {
-      const num = Number(trimmed)
-      if (trimmed === '' || Number.isNaN(num)) return { ok: false, message: `"${String(col.key)}" is not a number` }
+      const num = parseNumberValue(trimmed)
+      if (num === null) return { ok: false, message: `"${String(col.key)}" is not a number` }
       return { ok: true, value: num }
     }
     case 'date': {

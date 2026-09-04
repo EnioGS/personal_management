@@ -348,3 +348,42 @@ export async function discardIngestionRows(
   }
   return result
 }
+
+/**
+ * Re-runs validation over rows that are still open, and saves what it finds.
+ *
+ * A row's verdict is stored, so it outlives the code that reached it: rows rejected
+ * because "87,40" was not a number stayed rejected after the parser learned to read
+ * it, and only a fresh edit would have shaken them loose. This recomputes from the
+ * labels each row already carries and writes back only where the answer changed, so a
+ * fix to the reading of the data reaches the data that was misread.
+ */
+export async function revalidateIngestionRows(rowIds?: number[]): Promise<{ checked: number; changed: number; nowReady: number }> {
+  const result = { checked: 0, changed: 0, nowReady: 0 }
+  for (const stored of await ingestionRowsTable.toArray()) {
+    if (rowIds && !rowIds.includes(stored.id)) continue
+    const row = asIngestionRow(stored.data)
+    if (row.status === 'promoted' || row.status === 'reconciledExisting' || row.status === 'discarded') continue
+
+    result.checked += 1
+    const errors = ingestionLabelErrors(row.labels, row.destinationTableId)
+    if (errors.length === 0) {
+      try {
+        await entryFromIngestionRow(row)
+      } catch (error) {
+        errors.push(error instanceof Error ? error.message : 'The destination table rejected this row.')
+      }
+    }
+    const status: IngestionRow['status'] = errors.length === 0
+      ? 'ready'
+      : row.labels.subsections?.length || Object.values(row.labelValues ?? {}).some(Boolean)
+        ? 'invalid'
+        : 'unlabelled'
+    if (status === row.status && errors.join('|') === row.validationErrors.join('|')) continue
+
+    await ingestionRowsTable.update(stored.id, { data: { ...row, status, validationErrors: errors } })
+    result.changed += 1
+    if (status === 'ready') result.nowReady += 1
+  }
+  return result
+}

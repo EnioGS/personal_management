@@ -27,7 +27,7 @@ import {
   validateIngestionMappings,
 } from '@/lib/model/ingestion-source'
 import { createIngestionSourcesFromDatabaseFile } from '@/lib/model/ingestion-database-file'
-import { discardIngestionRows, promoteReadyIngestionRows, reallocateConfirmedIngestionRows, updateIngestionRowWorklist } from '@/lib/model/ingestion-promotion'
+import { discardIngestionRows, promoteReadyIngestionRows, reallocateConfirmedIngestionRows, revalidateIngestionRows, updateIngestionRowWorklist } from '@/lib/model/ingestion-promotion'
 import {
   useCategoriesStore,
   useIngestionColumnMappingsStore,
@@ -169,7 +169,11 @@ export function IngestionPanel() {
   useEffect(() => {
     void (async () => {
       for (const source of sourceStore.items) await rescanSourceRowDuplicates(source.id).catch(() => undefined)
-      await sourceStore.refresh()
+      // A stored verdict outlives the code that reached it, so the rows are re-checked
+      // too: a row rejected by a reading of the data that has since been fixed should
+      // not stay rejected until somebody edits it.
+      await revalidateIngestionRows().catch(() => undefined)
+      await refreshAllLocalStores()
     })()
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once per mount, over whatever is loaded
   }, [])

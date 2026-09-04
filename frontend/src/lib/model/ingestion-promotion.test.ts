@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { wipeAllData } from '@/lib/data-file'
 import { categoriesTable, entriesTable, entryLabelsTable, ingestionRowsTable, tableDefsTable } from './model-db'
-import { promoteReadyIngestionRows, reallocateConfirmedIngestionRows, updateIngestionRowLabels, updateIngestionRowWorklist } from './ingestion-promotion'
+import { promoteReadyIngestionRows, reallocateConfirmedIngestionRows, revalidateIngestionRows, updateIngestionRowLabels, updateIngestionRowWorklist } from './ingestion-promotion'
 import type { IngestionRow } from './types'
 
 async function addCardRow() {
@@ -158,5 +158,36 @@ describe('relabelling a row that is already in a Finance table', () => {
     const { rowId } = await confirmedRow()
 
     expect(await reallocateConfirmedIngestionRows([rowId])).toEqual({ reallocated: 0, errors: [] })
+  })
+})
+
+describe('a verdict that outlived the code that reached it', () => {
+  beforeEach(async () => { await wipeAllData() })
+
+  it('is re-checked and cleared, without anyone editing the row', async () => {
+    const tableId = await tableDefsTable.add({ createdAt: 1, data: { name: 'Fatura', kind: 'cardLedger' } })
+    const rowId = await ingestionRowsTable.add({
+      createdAt: 2,
+      data: {
+        sourceId: 1, sourceRowIndex: 0, sourceRowFingerprint: 'r0', rawValues: {},
+        // An amount written the way a Brazilian statement writes it.
+        mappedValues: { date: '02/01/2026', amount: '87,40', description: 'Padaria', rawCategory: 'Alimentação' },
+        labels: { sections: ['finances'], subsections: ['spending'], flowRole: 'outflow', settlementChannel: 'creditCard', spendingTreatment: 'expense', recurrence: 'oneOff', categoryId: 1 },
+        destinationTableId: tableId,
+        // The verdict an older parser reached, stored on the row.
+        status: 'invalid', validationErrors: ['"amount" is not a number'],
+      } satisfies IngestionRow,
+    })
+    await categoriesTable.add({ createdAt: 1, data: { name: 'Alimentação' } })
+
+    const result = await revalidateIngestionRows()
+
+    expect(result).toMatchObject({ checked: 1, changed: 1, nowReady: 1 })
+    const stored = (await ingestionRowsTable.get(rowId))!.data as IngestionRow
+    expect(stored.status).toBe('ready')
+    expect(stored.validationErrors).toEqual([])
+
+    await promoteReadyIngestionRows([rowId])
+    expect((await entriesTable.toArray())[0].data).toMatchObject({ amount: 87.4 })
   })
 })

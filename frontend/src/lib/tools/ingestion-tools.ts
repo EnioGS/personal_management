@@ -1,9 +1,8 @@
 import { DEFAULT_INGESTION_GUIDE, INGESTION_GUIDE_KEY } from '@/lib/ingestion-guide'
 import { renderPrompt } from '@/lib/prompt-placeholders'
-import { ingestionLabelErrors } from '@/lib/model/ingestion'
 import { ensureCategoryByName } from '@/lib/model/category-vocabulary'
 import { createSupplementalColumn, fillSupplementalColumn, markSourceRows, parseIngestionCsv, planIngestionStaging, saveIngestionMappings, stageIngestionSource, supplementalValueFor } from '@/lib/model/ingestion-source'
-import { discardIngestionRows, updateIngestionRowLabels, updateIngestionRowWorklist } from '@/lib/model/ingestion-promotion'
+import { discardIngestionRows, revalidateIngestionRows, updateIngestionRowLabels, updateIngestionRowWorklist } from '@/lib/model/ingestion-promotion'
 import { ingestionFieldContext, INGESTION_QUERY_FIELDS, resolveIngestionField } from '@/lib/model/ingestion-fields'
 import { groupRows, queryRows, type RowFilter, type RowQuery } from '@/lib/model/row-query'
 import { findDuplicateMatches, findDuplicateMatchesWithin, normalizeAmount, normalizeDate, normalizeText, type ComparableRow } from '@/lib/model/ingestion-duplicates'
@@ -753,19 +752,19 @@ export const groupIngestionRowsTool: ToolDefinition = {
 
 export const validateIngestionRowsTool: ToolDefinition = {
   name: 'validate_ingestion_rows',
-  description: 'Returns readiness and label blockers for explicit imported row IDs. Read-only; use it before telling the user which rows are ready for the user-only confirmation action.',
-  parameters: { type: 'object', properties: { rowIds: { type: 'array', items: { type: 'number' } } }, required: ['rowIds'], additionalProperties: false },
+  description: "Re-checks rows against their current labels and the destination table, and saves what it finds. A verdict is stored, so it can outlive the code that reached it — rows rejected by an older reading of the data stay rejected until something re-checks them, and this is that. Pass rowIds for specific rows, or omit them to sweep everything still waiting. Use it before telling the user which rows are ready, and whenever a row looks stuck for a reason that no longer applies.",
+  parameters: { type: 'object', properties: { rowIds: { type: 'array', items: { type: 'number' }, description: 'Omit to re-check every row still waiting.' } }, additionalProperties: false },
   execute: async (args) => {
-    if (!Array.isArray(args.rowIds)) return 'Error: rowIds are required.'
-    const result = []
-    for (const id of args.rowIds) {
-      if (typeof id !== 'number') continue
+    const rowIds = Array.isArray(args.rowIds) ? args.rowIds.filter((id): id is number => typeof id === 'number') : undefined
+    const swept = await revalidateIngestionRows(rowIds)
+    const rows = []
+    for (const id of rowIds ?? []) {
       const stored = await ingestionRowsTable.get(id)
-      if (!stored) { result.push({ id, error: 'not found' }); continue }
+      if (!stored) { rows.push({ id, error: 'not found' }); continue }
       const row = stored.data as IngestionRow
-      result.push({ id, status: row.status, errors: row.validationErrors.length ? row.validationErrors : ingestionLabelErrors(row.labels, row.destinationTableId) })
+      rows.push({ id, status: row.status, errors: row.validationErrors })
     }
-    return JSON.stringify(result)
+    return JSON.stringify({ ...swept, ...(rows.length > 0 ? { rows } : {}) })
   },
 }
 

@@ -176,6 +176,11 @@ Two things it optimizes for:
   *Confirm and reallocate rows* rewrites that entry in place — same entry id, new
   destination and labels, every Finance screen following immediately. An edit
   whose new destination cannot hold the row keeps its error and stays put.
+- Dates and amounts are read the way statements write them, not the way a parser
+  wishes they did: `15/08/2025` is day-first, `87,40` and `1.234,56` are numbers,
+  and whichever of `.` or `,` comes last is the decimal point. A stored verdict is
+  re-checked when the ingestion centre opens, so rows rejected by an older reading
+  of the data do not stay rejected until somebody edits them.
 - An uploaded file is triaged before it is staged: every row is scanned on arrival
   and shows as ready, duplicate? or eliminate beside itself. A row counts as a
   duplicate only when everything it actually carries matches a stored row —
