@@ -370,7 +370,7 @@ function searchableText(row: IngestionRow, field: string): string {
 
 export const labelIngestionRowsByMatchTool: ToolDefinition = {
   name: 'label_ingestion_rows_by_match',
-  description: `Applies one set of labels to every unfinalized row whose text matches a string — the efficient way to act on a rule such as "every row mentioning IOF" without reading each row. ALWAYS call it once with apply=false first: that changes nothing and returns the match count with examples, so the user can confirm the rule really describes those rows before hundreds are labelled. Report the count and the examples, and say plainly when the matches look mixed (a description containing IOF may be a charge on one row and a reversal on another). Only then call it again with apply=true. When the pattern will recur — a merchant, a fee, a transfer that always means the same thing — save it with save_label_rule rather than only applying it here, so the next import arrives already labelled. You need no permission for that; check list_label_rules first in case one already covers it, and say what you saved. Values are the same closed vocabulary as update_ingestion_labels; fields you omit keep whatever each row already has. Finalized rows are never touched, and this cannot promote anything.`,
+  description: `Applies one set of labels to every unfinalized row whose text matches a string — the efficient way to act on a rule such as "every row mentioning IOF" without reading each row. Called without apply it changes nothing and returns the match count with examples, which is worth doing whenever the matches might be mixed: a description that means one thing on a card export can mean another on a bank export, and the examples are how you find that out. When the pattern is unambiguous you may apply it straight away — you do not need permission, and nothing here reaches a Finance table. Report the count and what you set either way, and say plainly when a match looked mixed. When the pattern will recur, save it with save_label_rule too, narrowing it with a source condition if it belongs to one file; check list_label_rules first in case one already covers it.`,
   parameters: {
     type: 'object',
     properties: {
@@ -405,7 +405,7 @@ export const labelIngestionRowsByMatchTool: ToolDefinition = {
 
     const examples = matches.slice(0, 5).map((row) => ({ rowId: row.id, text: searchableText(row.data as IngestionRow, 'description').slice(0, 160), amount: (row.data as IngestionRow).mappedValues.amount, status: (row.data as IngestionRow).status }))
     if (args.apply !== true) {
-      return JSON.stringify({ applied: false, matched: matches.length, examples, next: 'Show the user the count and these examples, confirm the rule really covers them, then call again with apply=true.' })
+      return JSON.stringify({ applied: false, matched: matches.length, examples, next: 'Nothing was changed. Read the examples: if they all mean the same thing, call again with apply=true — no permission needed. If they look mixed, narrow the match or say so to the user rather than labelling them together.' })
     }
 
     const catalogue = buildLabelCatalogue(context.translate)
