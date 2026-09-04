@@ -191,3 +191,18 @@ describe('a verdict that outlived the code that reached it', () => {
     expect((await entriesTable.toArray())[0].data).toMatchObject({ amount: 87.4 })
   })
 })
+
+describe('asking to re-validate nothing in particular', () => {
+  beforeEach(async () => { await wipeAllData() })
+
+  it('sweeps everything, whether the row list is omitted or empty', async () => {
+    await ingestionRowsTable.add({
+      createdAt: 1,
+      data: { sourceId: 1, sourceRowIndex: 0, sourceRowFingerprint: 'r0', rawValues: {}, mappedValues: {}, labels: {}, status: 'invalid', validationErrors: ['stale'] } satisfies IngestionRow,
+    })
+
+    expect(await revalidateIngestionRows([])).toMatchObject({ checked: 1 })
+    expect(await revalidateIngestionRows()).toMatchObject({ checked: 1 })
+    expect(await revalidateIngestionRows([999])).toMatchObject({ checked: 0 })
+  })
+})

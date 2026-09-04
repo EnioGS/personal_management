@@ -755,16 +755,31 @@ export const validateIngestionRowsTool: ToolDefinition = {
   description: "Re-checks rows against their current labels and the destination table, and saves what it finds. A verdict is stored, so it can outlive the code that reached it — rows rejected by an older reading of the data stay rejected until something re-checks them, and this is that. Pass rowIds for specific rows, or omit them to sweep everything still waiting. Use it before telling the user which rows are ready, and whenever a row looks stuck for a reason that no longer applies.",
   parameters: { type: 'object', properties: { rowIds: { type: 'array', items: { type: 'number' }, description: 'Omit to re-check every row still waiting.' } }, additionalProperties: false },
   execute: async (args) => {
-    const rowIds = Array.isArray(args.rowIds) ? args.rowIds.filter((id): id is number => typeof id === 'number') : undefined
+    const named = Array.isArray(args.rowIds) ? args.rowIds.filter((id): id is number => typeof id === 'number') : []
+    const rowIds = named.length > 0 ? named : undefined
     const swept = await revalidateIngestionRows(rowIds)
-    const rows = []
-    for (const id of rowIds ?? []) {
-      const stored = await ingestionRowsTable.get(id)
-      if (!stored) { rows.push({ id, error: 'not found' }); continue }
+
+    // What is blocking the rest, grouped — the question anyone asking this actually
+    // has. One example per reason is enough to go and look.
+    const blockers = new Map<string, { count: number; exampleRowId: number }>()
+    let ready = 0
+    for (const stored of await ingestionRowsTable.toArray()) {
       const row = stored.data as IngestionRow
-      rows.push({ id, status: row.status, errors: row.validationErrors })
+      if (row.status === 'promoted' || row.status === 'reconciledExisting' || row.status === 'discarded') continue
+      if (rowIds && !rowIds.includes(stored.id)) continue
+      if (row.status === 'ready') { ready += 1; continue }
+      const reason = row.validationErrors[0] ?? 'No labels yet.'
+      const seen = blockers.get(reason)
+      if (seen) seen.count += 1
+      else blockers.set(reason, { count: 1, exampleRowId: stored.id })
     }
-    return JSON.stringify({ ...swept, ...(rows.length > 0 ? { rows } : {}) })
+
+    return JSON.stringify({
+      ...swept,
+      ready,
+      blockedBy: [...blockers.entries()].map(([reason, seen]) => ({ reason, ...seen })).sort((left, right) => right.count - left.count),
+      ...(rowIds ? { rows: rowIds.map((id) => id) } : {}),
+    })
   },
 }
 

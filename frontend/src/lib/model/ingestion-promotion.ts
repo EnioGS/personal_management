@@ -360,8 +360,12 @@ export async function discardIngestionRows(
  */
 export async function revalidateIngestionRows(rowIds?: number[]): Promise<{ checked: number; changed: number; nowReady: number }> {
   const result = { checked: 0, changed: 0, nowReady: 0 }
+  // An empty list means "no rows named", which is the same request as naming none at
+  // all: sweep everything. Read literally it meant "check exactly these zero rows",
+  // and a caller asking for a full sweep got a confident report of nothing.
+  const only = rowIds && rowIds.length > 0 ? rowIds : undefined
   for (const stored of await ingestionRowsTable.toArray()) {
-    if (rowIds && !rowIds.includes(stored.id)) continue
+    if (only && !only.includes(stored.id)) continue
     const row = asIngestionRow(stored.data)
     if (row.status === 'promoted' || row.status === 'reconciledExisting' || row.status === 'discarded') continue
 
