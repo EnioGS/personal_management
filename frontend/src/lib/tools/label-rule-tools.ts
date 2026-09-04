@@ -44,7 +44,7 @@ export const listLabelRulesTool: ToolDefinition = {
 
 export const saveLabelRuleTool: ToolDefinition = {
   name: 'save_label_rule',
-  description: `Saves a standing rule: rows whose text contains this string get these labels automatically when they are staged, so a decision made once is not made again on the next import. Ask the user before saving one — a rule outlives the batch it was written for. A rule fills only labels a row does not already have, so it never overwrites a judgement. Write the rationale as if explaining to someone else why this label set is safe for everything matching this string, including what you checked and what you deliberately excluded; a few lines is right. Values: sections and subsections are free text naming the app's own sections and screens (list_label_options says what exists, several separated by commas); flowRole ${labelValues(FLOW_ROLES).join(' | ')}; settlementChannel ${labelValues(SETTLEMENT_CHANNELS).join(' | ')}; spendingTreatment ${labelValues(SPENDING_TREATMENTS).join(' | ')}; recurrence ${labelValues(RECURRENCES).join(' | ')}; category is free text.`,
+  description: `Saves a standing rule: rows whose text contains this string get these labels automatically when they are staged, so a decision made once is not made again on the next import. Save one whenever you find a pattern that will recur — you do not need to ask first. What makes that safe is that a rule fills only labels a row does not already have, so it never overwrites a judgement, and the user can read, edit or delete any rule in Settings → Data ingestion centre. Say afterwards what you saved and what it filled. Write the rationale as if explaining to someone else why this label set is safe for everything matching this string, including what you checked and what you deliberately excluded; a few lines is right. Values: sections and subsections are free text naming the app's own sections and screens (list_label_options says what exists, several separated by commas); flowRole ${labelValues(FLOW_ROLES).join(' | ')}; settlementChannel ${labelValues(SETTLEMENT_CHANNELS).join(' | ')}; spendingTreatment ${labelValues(SPENDING_TREATMENTS).join(' | ')}; recurrence ${labelValues(RECURRENCES).join(' | ')}; category is free text.`,
   parameters: {
     type: 'object',
     properties: {
@@ -90,7 +90,7 @@ export const saveLabelRuleTool: ToolDefinition = {
 
 export const applyLabelRulesTool: ToolDefinition = {
   name: 'apply_label_rules',
-  description: 'Runs every standing rule over the rows still waiting, filling labels they do not already have and reporting what each rule filled and how many rows became ready. Rules run by themselves when rows are staged; this is for after a rule is added or edited, or to catch rows that predate it.',
+  description: 'Runs every standing rule over the rows still waiting, filling labels they do not already have and reporting what each rule filled and how many rows became ready. Run it freely — it needs no permission, since it only fills blanks and can never overwrite a decision or promote anything. Rules run by themselves when rows are staged; this is for after a rule is added or edited, or to catch rows that predate it.',
   parameters: { type: 'object', properties: { rowIds: { type: 'array', items: { type: 'number' }, description: 'Limit the run to these rows. Omit for every waiting row.' } }, additionalProperties: false },
   execute: async (args) => {
     const rowIds = Array.isArray(args.rowIds) ? args.rowIds.filter((id): id is number => typeof id === 'number') : undefined
@@ -100,7 +100,7 @@ export const applyLabelRulesTool: ToolDefinition = {
 
 export const deleteLabelRuleTool: ToolDefinition = {
   name: 'delete_label_rule',
-  description: 'Removes a standing rule. Rows it already labelled keep their labels — only the standing decision goes, so future imports stop being labelled by it. Ask the user for confirmation first: a rule is a decision they own.',
+  description: 'Removes a standing rule. Rows it already labelled keep their labels — only the standing decision goes, so future imports stop being labelled by it. Deleting is the one rule action that needs the user first: creating one is reversible from the panel, removing one they wrote is not.',
   parameters: { type: 'object', properties: { ruleId: { type: 'number' }, confirmed: { type: 'boolean' } }, required: ['ruleId'], additionalProperties: false },
   execute: async (args) => {
     if (typeof args.ruleId !== 'number') return 'Error: ruleId is required.'

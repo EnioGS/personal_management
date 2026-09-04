@@ -125,10 +125,12 @@ fared — rows it filled, rows the user confirmed with its labels intact, and ro
 its labels were changed before confirmation. A rule with overridden rows is telling
 you it was wrong; say so instead of adding another like it.
 
-When a string-matching pass covers something that will come back next month, ask the
-user whether to save it with save_label_rule, and write the rationale as if explaining
-to someone else why this label set is safe for everything matching this string — what
-you checked, and what you deliberately left out. Rules fill only labels a row does not
+When a string-matching pass covers something that will come back next month, save it
+with save_label_rule — that needs no permission, since a rule fills only blanks and the
+user can read, edit or delete any of them. Write the rationale as if explaining to
+someone else why this label set is safe for everything matching this string: what you
+checked, and what you deliberately left out. Deleting a rule the user wrote is the one
+rule action to ask about first. Rules fill only labels a row does not
 already have, so they never overwrite a judgement, and they run by themselves when new
 rows are staged: an import a rule fully covers arrives ready for the user to confirm.
 

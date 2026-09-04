@@ -217,7 +217,9 @@ Two things it optimizes for:
 - A rule ("everything mentioning IOF is a card rebate") is applied with one
   matched bulk call rather than row by row, and that call previews by default:
   it returns the match count and examples, changes nothing, and only labels once
-  the user has confirmed the rule really describes those rows. Ready rows sort to
+  the user has confirmed the rule really describes those rows. Saving that rule for
+  future imports needs no permission — a rule fills only blanks, and every one is
+  readable, editable and removable in the panel — but deleting one does. Ready rows sort to
   the top of the worklist, since they are what the confirmation button acts on.
 - Finance tables are read-only to the assistant: no tool writes to one. Every
   change — adding data, correcting it, taking it out — happens in the ingestion
