@@ -64,3 +64,22 @@ export function parsePlacementLabels(
   }
   return { values, unknown }
 }
+
+/**
+ * Fills in the section from the screens, when it was left out.
+ *
+ * Every screen belongs to exactly one section, so naming both is naming the same fact
+ * twice — and a row labelled "spending" but not "finances" was being reported as
+ * unlabelled, which is a blocker made of bookkeeping rather than of missing judgement.
+ * A section named explicitly is kept: a row can belong to a section beyond the ones
+ * its screens imply.
+ */
+export function withDerivedSections<T extends { sections?: string[]; subsections?: string[] }>(labels: T, catalogue: LabelCatalogue): T {
+  if (labels.sections?.length || !labels.subsections?.length) return labels
+  const sections = [...new Set(
+    labels.subsections
+      .map((screen) => catalogue.subsections.find((item) => item.id === screen)?.sectionId)
+      .filter((sectionId): sectionId is string => Boolean(sectionId)),
+  )]
+  return sections.length > 0 ? { ...labels, sections } : labels
+}

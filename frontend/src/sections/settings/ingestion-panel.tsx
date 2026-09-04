@@ -36,7 +36,7 @@ import {
   useTableDefsStore,
 } from '@/lib/model/model-stores'
 import { FLOW_ROLES, labelValues, matchLabelValue, RECURRENCES, SETTLEMENT_CHANNELS, SPENDING_TREATMENTS } from '@/lib/model/label-vocabulary'
-import { parsePlacementLabels, resolveSectionLabel, resolveSubsectionLabel, sectionLabelFor, subsectionLabelFor, type LabelCatalogue } from '@/lib/model/label-catalogue'
+import { parsePlacementLabels, resolveSectionLabel, resolveSubsectionLabel, sectionLabelFor, subsectionLabelFor, withDerivedSections, type LabelCatalogue } from '@/lib/model/label-catalogue'
 import { buildLabelCatalogue } from '@/lib/label-catalogue-source'
 import type { IngestionColumnMapping, IngestionRowLabels, IngestionRowLabelValues, IngestionTargetField } from '@/lib/model/types'
 import type { StoredRow } from '@/lib/local-store/create-local-table'
@@ -676,7 +676,7 @@ function parseLabelValues(values: IngestionRowLabelValues, categories: { id: num
   const spendingTreatment = matchLabelValue(SPENDING_TREATMENTS, values.spendingTreatment)
   const recurrence = matchLabelValue(RECURRENCES, values.recurrence)
   return {
-    labels: {
+    labels: withDerivedSections({
       ...(sections.values.length ? { sections: sections.values } : {}),
       ...(subsections.values.length ? { subsections: subsections.values } : {}),
       ...(flowRole ? { flowRole } : {}),
@@ -684,7 +684,7 @@ function parseLabelValues(values: IngestionRowLabelValues, categories: { id: num
       ...(spendingTreatment ? { spendingTreatment } : {}),
       ...(category ? { categoryId: category.id } : {}),
       ...(recurrence ? { recurrence } : {}),
-    } satisfies IngestionRowLabels,
+    } satisfies IngestionRowLabels, catalogue),
     destinationTableId: table?.id,
     unknownPlacements: [...sections.unknown, ...subsections.unknown],
   }

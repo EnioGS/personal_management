@@ -55,7 +55,10 @@ contributions date/destination/amount; dividends date/asset/amount/note.
 ## The labels
 
 Where the row belongs — two labels, and the only ones that are not a fixed list.
-"Sections" names the parts of the app it belongs to, "screens" the pages inside them.
+"Screens" names the pages a row belongs to; "sections" names the parts of the app, and
+is filled in from the screens when you leave it out, since every screen belongs to one
+section. Name the screens and let the section follow, unless a row belongs somewhere
+its screens do not imply.
 Both take more than one value, separated by commas, for a row that genuinely belongs
 to several; most rows name one of each. A value is valid when it names something that
 exists right now — either its id or the name currently shown — and these are what

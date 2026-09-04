@@ -1,7 +1,7 @@
 import { applyLabelRulesToRows, deleteLabelRule, labelRulesWithStats, saveLabelRule } from '@/lib/model/label-rules-repository'
 import { ensureCategoryByName } from '@/lib/model/category-vocabulary'
 import { FLOW_ROLES, labelValues, matchLabelValue, RECURRENCES, SETTLEMENT_CHANNELS, SPENDING_TREATMENTS } from '@/lib/model/label-vocabulary'
-import { parsePlacementLabels, resolveSectionLabel, resolveSubsectionLabel } from '@/lib/model/label-catalogue'
+import { parsePlacementLabels, resolveSectionLabel, resolveSubsectionLabel, withDerivedSections } from '@/lib/model/label-catalogue'
 import { buildLabelCatalogue } from '@/lib/label-catalogue-source'
 import { INGESTION_QUERY_FIELDS } from '@/lib/model/ingestion-fields'
 import type { IngestionRowLabels, LabelRule } from '@/lib/model/types'
@@ -12,7 +12,7 @@ async function labelsFromArgs(update: Record<string, unknown>, translate: (key: 
   const text = (field: string) => (typeof update[field] === 'string' ? (update[field] as string) : undefined)
   const categoryName = text('category')
   const categoryId = categoryName ? await ensureCategoryByName(categoryName) : undefined
-  return {
+  return withDerivedSections({
     ...(text('sections') ? { sections: parsePlacementLabels(text('sections')!, (value) => resolveSectionLabel(catalogue, value)).values } : {}),
     ...(text('subsections') ? { subsections: parsePlacementLabels(text('subsections')!, (value) => resolveSubsectionLabel(catalogue, value)).values } : {}),
     ...(text('flowRole') ? { flowRole: matchLabelValue(FLOW_ROLES, text('flowRole')) } : {}),
@@ -20,7 +20,7 @@ async function labelsFromArgs(update: Record<string, unknown>, translate: (key: 
     ...(text('spendingTreatment') ? { spendingTreatment: matchLabelValue(SPENDING_TREATMENTS, text('spendingTreatment')) } : {}),
     ...(text('recurrence') ? { recurrence: matchLabelValue(RECURRENCES, text('recurrence')) } : {}),
     ...(categoryId ? { categoryId } : {}),
-  }
+  }, catalogue)
 }
 
 export const listLabelRulesTool: ToolDefinition = {

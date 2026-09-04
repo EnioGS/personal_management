@@ -8,7 +8,7 @@ import { groupRows, queryRows, type RowFilter, type RowQuery } from '@/lib/model
 import { findDuplicateMatches, findDuplicateMatchesWithin, normalizeAmount, normalizeDate, normalizeText, type ComparableRow } from '@/lib/model/ingestion-duplicates'
 import { buildDuplicateCorpus, isDuplicateOfStored, markValue, originalValues } from '@/lib/model/source-row-marks'
 import { FLOW_ROLES, labelValues, matchLabelValue, RECURRENCES, SETTLEMENT_CHANNELS, SPENDING_TREATMENTS } from '@/lib/model/label-vocabulary'
-import { parsePlacementLabels, resolveSectionLabel, resolveSubsectionLabel } from '@/lib/model/label-catalogue'
+import { parsePlacementLabels, resolveSectionLabel, resolveSubsectionLabel, withDerivedSections } from '@/lib/model/label-catalogue'
 import { buildLabelCatalogue } from '@/lib/label-catalogue-source'
 import { assistantPromptsTable } from '@/lib/assistant-prompts-db'
 import { categoriesTable, entriesTable, ingestionAuditEventsTable, ingestionColumnMappingsTable, ingestionRowsTable, ingestionSourcesTable, tableDefsTable } from '@/lib/model/model-db'
@@ -342,7 +342,7 @@ export const updateIngestionLabelsTool: ToolDefinition = {
       }
       const destinationTableId = typeof update.destinationTableId === 'number' ? update.destinationTableId : current.destinationTableId
       try {
-        const next = await updateIngestionRowLabels(update.rowId, labels, destinationTableId, 'assistant')
+        const next = await updateIngestionRowLabels(update.rowId, withDerivedSections(labels, catalogue), destinationTableId, 'assistant')
         result.push({ rowId: update.rowId, status: next.status, errors: next.validationErrors })
       } catch (error) { result.push({ rowId: update.rowId, error: error instanceof Error ? error.message : 'could not update labels.' }) }
     }
@@ -431,7 +431,7 @@ export const labelIngestionRowsByMatchTool: ToolDefinition = {
       }
       const destinationTableId = typeof update.destinationTableId === 'number' ? update.destinationTableId : current.destinationTableId
       try {
-        const next = await updateIngestionRowLabels(row.id, labels, destinationTableId, 'assistant')
+        const next = await updateIngestionRowLabels(row.id, withDerivedSections(labels, catalogue), destinationTableId, 'assistant')
         if (next.hasPendingChange) result.pendingReallocation += 1
         else if (next.status === 'ready') result.ready += 1
         else if (next.status === 'invalid') result.invalid += 1
