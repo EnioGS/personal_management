@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ChangeEvent, type DragEvent, type PointerEvent } from 'react'
 import { GripVertical, Hourglass, Paperclip, SendHorizontal, Trash2, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { MessageContent } from './message-content'
 import { readAttachedFile } from '@/lib/chat-attachments'
 import { cn } from '@/lib/utils'
 import { GRIP_WIDTH, MAX_PANEL_WIDTH, useChatPanelStore } from '@/store/chat-panel-store'
@@ -246,7 +247,7 @@ export function ChatPanel() {
                           : 'bg-muted',
                     )}
                   >
-                    {message.content}
+                    <MessageContent content={message.content} tone={message.role} />
                   </div>
                 </div>
               ))}
