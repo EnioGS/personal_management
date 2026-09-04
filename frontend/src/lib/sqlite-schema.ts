@@ -77,6 +77,7 @@ export const SQLITE_SCHEMAS: Record<DataTableKey, SqliteTableSchema> = {
       { column: 'date', key: 'date', type: 'integer' },
       { column: 'direction', key: 'direction', type: 'text' },
       { column: 'category', key: 'category', type: 'text' },
+      { column: 'investment_class', key: 'investmentClass', type: 'text' },
       { column: 'description', key: 'description', type: 'text' },
       { column: 'amount', key: 'amount', type: 'real' },
       { column: 'asset', key: 'asset', type: 'text' },

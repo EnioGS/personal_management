@@ -58,7 +58,14 @@ export async function saveTextFile({
 
 interface SaveBinaryFileOptions {
   filename: string
-  contents: Uint8Array
+  /**
+   * Produces the bytes. A function, not the bytes themselves, because the save picker
+   * may only be opened while the click that asked for it is still "active" — and
+   * building a database export (reading every table, starting sql.js's WebAssembly)
+   * takes long enough to spend that activation, after which the browser refuses the
+   * picker and the button appears to do nothing at all.
+   */
+  contents: () => Promise<Uint8Array> | Uint8Array
   mimeType?: string
   extension?: string
   description?: string
@@ -72,28 +79,29 @@ export async function saveBinaryFile({
   extension,
   description,
 }: SaveBinaryFileOptions): Promise<void> {
-  // sql.js's `Database.export()` types its result as `Uint8Array<ArrayBufferLike>`,
-  // which admits a SharedArrayBuffer backing and so isn't assignable to the plain
-  // `ArrayBuffer`-backed types `write`/`Blob` want — copy into a fresh, ordinary one.
-  const bytes = Uint8Array.from(contents)
-
   if (supportsFileSystemAccess()) {
+    let handle: FileSystemFileHandle
     try {
-      const handle = await window.showSaveFilePicker!({
+      // Opened first, before a single byte is prepared, so the click is still what
+      // opened it.
+      handle = await window.showSaveFilePicker!({
         suggestedName: filename,
         types: extension ? [{ description, accept: { [mimeType]: [extension] } }] : undefined,
       })
-      const writable = await handle.createWritable()
-      await writable.write(bytes)
-      await writable.close()
-      return
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') return // user cancelled the picker
       throw err
     }
+    const writable = await handle.createWritable()
+    // sql.js's `Database.export()` types its result as `Uint8Array<ArrayBufferLike>`,
+    // which admits a SharedArrayBuffer backing and so isn't assignable to the plain
+    // `ArrayBuffer`-backed types `write`/`Blob` want — copy into a fresh, ordinary one.
+    await writable.write(Uint8Array.from(await contents()))
+    await writable.close()
+    return
   }
 
-  const blob = new Blob([bytes], { type: mimeType })
+  const blob = new Blob([Uint8Array.from(await contents())], { type: mimeType })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url

@@ -54,15 +54,19 @@ export function DataPanel() {
   const hasData = (rowCount ?? 0) > 0
 
   async function handleExport() {
-    const data = await exportData()
-    const bytes = await buildSqliteFile(data)
-    await saveBinaryFile({
-      filename: DATA_FILE_NAME,
-      contents: bytes,
-      mimeType: 'application/vnd.sqlite3',
-      extension: DATA_FILE_EXTENSION,
-      description: t('data.fileDescription'),
-    })
+    // Failures were invisible: the button simply did nothing, whether the picker had
+    // been refused or the file could not be built. Say which.
+    try {
+      await saveBinaryFile({
+        filename: DATA_FILE_NAME,
+        contents: async () => buildSqliteFile(await exportData()),
+        mimeType: 'application/vnd.sqlite3',
+        extension: DATA_FILE_EXTENSION,
+        description: t('data.fileDescription'),
+      })
+    } catch (error) {
+      setDialog({ kind: 'error', message: error instanceof Error ? error.message : String(error) })
+    }
   }
 
   function handleImportClick() {

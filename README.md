@@ -223,6 +223,9 @@ Two things it optimizes for:
   change — adding data, correcting it, taking it out — happens in the ingestion
   centre, so a row on a dashboard always has raw values and explicit labels behind
   it. Discarding a confirmed row flags its entry, which restoring undoes.
+- Importing only the unflagged rows is the assistant's to run: nothing reaches a
+  Finance table and any row it moves can still be discarded. Importing the flagged
+  ones too — which retires the file — needs the user's word first.
 - The assistant can map columns, edit staged values, label rows and validate
   them, but has no tool for the steps that move data (staging a mapped
   source, promoting labelled rows); those are the user's clicks. Its whole

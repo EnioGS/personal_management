@@ -5,7 +5,7 @@ import { assistantPromptsTable } from '@/lib/assistant-prompts-db'
 import { categoriesTable, ingestionRowsTable, ingestionSourcesTable, tableDefsTable } from '@/lib/model/model-db'
 import { promoteReadyIngestionRows } from '@/lib/model/ingestion-promotion'
 import type { Category, IngestionRow } from '@/lib/model/types'
-import { addIngestionBlankColumnTool, assignIngestionColumnsTool, countIngestionRowsTool, discardIngestionRowsTool, findIngestionDuplicatesTool, groupIngestionRowsTool, labelIngestionRowsByMatchTool, listIngestionDatasetsTool, queryIngestionRowsTool, readIngestionGuideTool, readIngestionProvenanceTool, readIngestionTableTool, updateIngestionLabelsTool } from './ingestion-tools'
+import { addIngestionBlankColumnTool, assignIngestionColumnsTool, countIngestionRowsTool, stageIngestionSourceTool, discardIngestionRowsTool, findIngestionDuplicatesTool, groupIngestionRowsTool, labelIngestionRowsByMatchTool, listIngestionDatasetsTool, queryIngestionRowsTool, readIngestionGuideTool, readIngestionProvenanceTool, readIngestionTableTool, updateIngestionLabelsTool } from './ingestion-tools'
 
 const context = { attachments: [], translate: (key: string) => key } as never
 
@@ -442,5 +442,40 @@ describe('working on a backlog without reading it all', () => {
     expect(JSON.parse(await countIngestionRowsTool.execute({}, context)).matched).toBe(3)
     expect(JSON.parse(await countIngestionRowsTool.execute({ dataset: 'discarded' }, context)).matched).toBe(1)
     expect(JSON.parse(await countIngestionRowsTool.execute({ dataset: 'all', sourceId }, context)).matched).toBe(4)
+  })
+})
+
+describe('which half of staging the assistant may press', () => {
+  beforeEach(async () => { await wipeAllData() })
+
+  async function mappedSource() {
+    const sourceId = await ingestionSourcesTable.add({
+      createdAt: 1,
+      data: { originalFilename: 'nubank.csv', sourceFingerprint: 'f', importedAt: 1, rawCsv: 'date,title,amount\n2026-01-02,Coffee,12.50\n2026-01-03,Market,80\n', originalColumns: ['date', 'title', 'amount'], supplementalColumns: [], rowCount: 2, status: 'draftSource', rowMarks: { '1': { mark: 'duplicate', by: 'scan' } } },
+    })
+    await assignIngestionColumnsTool.execute({ sourceId, mappings: [{ sourceColumn: 'date', targetField: 'date' }, { sourceColumn: 'title', targetField: 'description' }, { sourceColumn: 'amount', targetField: 'amount' }] }, context)
+    for (const field of ['direction', 'rawCategory', 'asset', 'investmentType', 'investmentClass', 'quantity', 'price', 'note', 'destination']) {
+      await addIngestionBlankColumnTool.execute({ sourceId, name: field }, context)
+    }
+    return sourceId
+  }
+
+  it('imports the new values on its own, leaving the flagged row in the file', async () => {
+    const sourceId = await mappedSource()
+
+    const result = JSON.parse(await stageIngestionSourceTool.execute({ sourceId, readyOnly: true }, context))
+
+    expect(result).toMatchObject({ movedToWorklist: true, staged: 1, skippedDuplicateMarks: 1 })
+    expect(await ingestionRowsTable.count()).toBe(1)
+  })
+
+  it('still stops before importing the flagged rows and retiring the file', async () => {
+    const sourceId = await mappedSource()
+
+    const asked = JSON.parse(await stageIngestionSourceTool.execute({ sourceId }, context))
+
+    expect(asked.staged).toBe(false)
+    expect(asked.next).toContain('confirmed: true')
+    expect(await ingestionRowsTable.count()).toBe(0)
   })
 })

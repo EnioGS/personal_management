@@ -262,7 +262,7 @@ export const markSourceRowsTool: ToolDefinition = {
 
 export const stageIngestionSourceTool: ToolDefinition = {
   name: 'stage_ingestion_source',
-  description: 'Moves a mapped file\'s rows into the imported-unlabelled worklist. This changes where data lives, so it runs ONLY on the user\'s explicit say-so: describe what would move — call it with confirmed omitted to see the plan without doing anything — get their agreement, then call again with confirmed: true. One agreement can cover several files; it cannot cover files the user has not been told about. readyOnly leaves rows marked as possible duplicates in the file instead of importing them, which is the safer choice whenever the scan flagged anything. Rows marked for elimination are never staged either way.',
+  description: "Moves a mapped file's rows into the imported-unlabelled worklist — the same two buttons the user has. With readyOnly: true it is \"Import new values\": only rows nobody flagged, leaving anything questionable in the file, and you may run that yourself without asking, since nothing reaches a Finance table and any row can still be discarded. Without readyOnly it is \"Import and discard\": it brings in rows flagged as possible duplicates too and then retires the file, so that one needs the user's explicit say-so — call it with confirmed omitted to show them the plan, get their agreement, then call again with confirmed: true. One agreement can cover several files, never a file they were not told about. Rows marked for elimination are never staged either way.",
   parameters: {
     type: 'object',
     properties: {
@@ -279,8 +279,12 @@ export const stageIngestionSourceTool: ToolDefinition = {
     if (rejection) return rejection
     try {
       const plan = await planIngestionStaging(args.sourceId)
-      if (args.confirmed !== true) {
-        return JSON.stringify({ staged: false, plan: { ready: plan.ready.length, duplicate: plan.duplicate.length, eliminate: plan.eliminate.length, alreadyStaged: plan.alreadyStaged.length }, next: 'Tell the user exactly what this would move — including any rows flagged as duplicates — and call again with confirmed: true only once they agree.' })
+      // Importing only the unflagged rows is the reversible half: nothing reaches a
+      // Finance table, and every row it moves can still be discarded. Bringing in the
+      // flagged ones, and retiring the file with them, is the user's call.
+      const needsSaySo = args.readyOnly !== true
+      if (needsSaySo && args.confirmed !== true) {
+        return JSON.stringify({ staged: false, plan: { ready: plan.ready.length, duplicate: plan.duplicate.length, eliminate: plan.eliminate.length, alreadyStaged: plan.alreadyStaged.length }, next: 'This would import the flagged rows too and then retire the file. Tell the user exactly what that moves and call again with confirmed: true only once they agree — or use readyOnly to bring in just the new values, which needs no agreement.' })
       }
       const result = await stageIngestionSource(args.sourceId, { readyOnly: args.readyOnly === true })
       return JSON.stringify({ ...result, movedToWorklist: true })
