@@ -6,10 +6,20 @@ export type StoredRule = LabelRule & { id: number }
 /** The label dimensions a rule can set. Destination table is handled separately. */
 const LABEL_KEYS: (keyof IngestionRowLabels)[] = ['sections', 'subsections', 'flowRole', 'settlementChannel', 'spendingTreatment', 'categoryId', 'recurrence']
 
-export function ruleMatchesText(rule: LabelRule, text: unknown): boolean {
+export function ruleMatchesText(rule: Pick<LabelRule, 'contains' | 'caseSensitive'>, text: unknown): boolean {
   const needle = comparableText(rule.contains, rule.caseSensitive)
   if (!needle) return false
   return comparableText(text, rule.caseSensitive).includes(needle)
+}
+
+/**
+ * Whether a rule applies to a row: its own text condition, and every further one.
+ * All must hold — a rule narrowed by where it came from should not fire on a file it
+ * was never meant for.
+ */
+export function ruleMatchesRow(rule: LabelRule, row: IngestionRow, resolveField: (row: IngestionRow, field: string) => unknown): boolean {
+  if (!ruleMatchesText(rule, resolveField(row, rule.field || 'description'))) return false
+  return (rule.where ?? []).every((condition) => ruleMatchesText(condition, resolveField(row, condition.field || 'description')))
 }
 
 export interface RuleApplication {
@@ -35,7 +45,7 @@ export function applyLabelRules(row: IngestionRow, rules: StoredRule[], resolveF
   const filled: RuleApplication['filled'] = []
 
   for (const rule of rules) {
-    if (!ruleMatchesText(rule, resolveField(row, rule.field || 'description'))) continue
+    if (!ruleMatchesRow(rule, row, resolveField)) continue
     const fields: string[] = []
     for (const key of LABEL_KEYS) {
       const value = rule.labels[key]

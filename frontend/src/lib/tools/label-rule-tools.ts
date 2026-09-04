@@ -32,7 +32,7 @@ export const listLabelRulesTool: ToolDefinition = {
     return JSON.stringify(rules.map(({ rule, stats }) => ({
       ruleId: rule.id,
       name: rule.name || rule.contains,
-      matches: { field: rule.field, contains: rule.contains, caseSensitive: rule.caseSensitive === true },
+      matches: { field: rule.field, contains: rule.contains, caseSensitive: rule.caseSensitive === true, and: rule.where ?? [] },
       labels: rule.labels,
       destinationTableId: rule.destinationTableId,
       rationale: rule.rationale,
@@ -44,7 +44,7 @@ export const listLabelRulesTool: ToolDefinition = {
 
 export const saveLabelRuleTool: ToolDefinition = {
   name: 'save_label_rule',
-  description: `Saves a standing rule: rows whose text contains this string get these labels automatically when they are staged, so a decision made once is not made again on the next import. Save one whenever you find a pattern that will recur — you do not need to ask first. What makes that safe is that a rule fills only labels a row does not already have, so it never overwrites a judgement, and the user can read, edit or delete any rule in Settings → Data ingestion centre. Say afterwards what you saved and what it filled. Write the rationale as if explaining to someone else why this label set is safe for everything matching this string, including what you checked and what you deliberately excluded; a few lines is right. Values: sections and subsections are free text naming the app's own sections and screens (list_label_options says what exists, several separated by commas); flowRole ${labelValues(FLOW_ROLES).join(' | ')}; settlementChannel ${labelValues(SETTLEMENT_CHANNELS).join(' | ')}; spendingTreatment ${labelValues(SPENDING_TREATMENTS).join(' | ')}; recurrence ${labelValues(RECURRENCES).join(' | ')}; category is free text.`,
+  description: `Saves a standing rule: rows whose text contains this string get these labels automatically when they are staged, so a decision made once is not made again on the next import. Save one whenever you find a pattern that will recur — you do not need to ask first. A rule may carry further conditions in "where", all of which must hold: what a row means often depends on where it came from as much as on what it says, so "uber" on a card export and "uber" on a bank export can be two rules that never fire on each other's files. Match the file with the field named source against part of its filename. What makes that safe is that a rule fills only labels a row does not already have, so it never overwrites a judgement, and the user can read, edit or delete any rule in Settings → Data ingestion centre. Say afterwards what you saved and what it filled. Write the rationale as if explaining to someone else why this label set is safe for everything matching this string, including what you checked and what you deliberately excluded; a few lines is right. Values: sections and subsections are free text naming the app's own sections and screens (list_label_options says what exists, several separated by commas); flowRole ${labelValues(FLOW_ROLES).join(' | ')}; settlementChannel ${labelValues(SETTLEMENT_CHANNELS).join(' | ')}; spendingTreatment ${labelValues(SPENDING_TREATMENTS).join(' | ')}; recurrence ${labelValues(RECURRENCES).join(' | ')}; category is free text.`,
   parameters: {
     type: 'object',
     properties: {
@@ -52,6 +52,19 @@ export const saveLabelRuleTool: ToolDefinition = {
       field: { type: 'string', description: `Field the text is looked for in. Usually description. One of: ${INGESTION_QUERY_FIELDS.join(', ')}.` },
       contains: { type: 'string' },
       caseSensitive: { type: 'boolean' },
+      where: {
+        type: 'array',
+        description: 'Further conditions, all of which must hold. Use it to narrow a rule by where a row came from — field "source" contains part of the filename — or by any other field.',
+        items: {
+          type: 'object',
+          properties: {
+            field: { type: 'string', description: 'e.g. source, description, rawCategory, amount.' },
+            contains: { type: 'string' },
+            caseSensitive: { type: 'boolean' },
+          },
+          required: ['field', 'contains'],
+        },
+      },
       rationale: { type: 'string', description: 'Why this label set is right for everything matching this string.' },
       sections: { type: 'string', description: 'Section names or ids, comma-separated.' },
       subsections: { type: 'string', description: 'Screen names or ids, comma-separated.' },
@@ -76,6 +89,11 @@ export const saveLabelRuleTool: ToolDefinition = {
       field: typeof args.field === 'string' && args.field ? args.field : 'description',
       contains: args.contains.trim(),
       caseSensitive: args.caseSensitive === true,
+      where: Array.isArray(args.where)
+        ? (args.where as Record<string, unknown>[])
+          .filter((condition) => typeof condition.field === 'string' && typeof condition.contains === 'string' && condition.contains.trim())
+          .map((condition) => ({ field: String(condition.field), contains: String(condition.contains).trim(), caseSensitive: condition.caseSensitive === true }))
+        : undefined,
       labels,
       destinationTableId: typeof args.destinationTableId === 'number' ? args.destinationTableId : undefined,
       rationale: args.rationale.trim(),

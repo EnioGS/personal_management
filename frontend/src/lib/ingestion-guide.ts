@@ -127,8 +127,11 @@ you it was wrong; say so instead of adding another like it.
 
 When a string-matching pass covers something that will come back next month, save it
 with save_label_rule — that needs no permission, since a rule fills only blanks and the
-user can read, edit or delete any of them. Write the rationale as if explaining to
-someone else why this label set is safe for everything matching this string: what you
+user can read, edit or delete any of them. A rule can carry more than one condition, and often should: what a row means depends
+on where it came from as much as on what it says, so narrow a rule with the source
+field when the same word would mean something else in another file. Write the
+rationale as if explaining to someone else why this label set is safe for everything
+matching it: what you
 checked, and what you deliberately left out. Deleting a rule the user wrote is the one
 rule action to ask about first. Rules fill only labels a row does not
 already have, so they never overwrite a judgement, and they run by themselves when new

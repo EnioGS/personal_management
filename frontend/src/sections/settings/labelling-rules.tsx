@@ -15,7 +15,7 @@ import type { IngestionRowLabels, LabelRule } from '@/lib/model/types'
 
 interface RuleWithStats { rule: StoredRule; stats: RuleStats }
 
-const BLANK_DRAFT = { name: '', contains: '', rationale: '', sections: '', subsections: '', flowRole: '', settlementChannel: '', spendingTreatment: '', recurrence: '', category: '', destinationTable: '' }
+const BLANK_DRAFT = { name: '', contains: '', andField: '', andContains: '', rationale: '', sections: '', subsections: '', flowRole: '', settlementChannel: '', spendingTreatment: '', recurrence: '', category: '', destinationTable: '' }
 
 /**
  * Standing rules, listed one line each. A rule is a decision that outlives the batch
@@ -75,7 +75,21 @@ export function LabellingRules({ onChanged }: { onChanged: () => Promise<void> |
       setMessage('A rule has to set at least one label or a destination table.')
       return
     }
-    const rule: LabelRule = { name: draft.name.trim() || undefined, field: 'description', contains: draft.contains.trim(), labels, destinationTableId, rationale: draft.rationale.trim(), createdBy: 'user', createdAt: Date.now() }
+    const rule: LabelRule = {
+      name: draft.name.trim() || undefined,
+      field: 'description',
+      contains: draft.contains.trim(),
+      // One further condition is enough for the case that keeps coming up: the same
+      // word meaning different things depending on which file it arrived in.
+      where: draft.andField.trim() && draft.andContains.trim()
+        ? [{ field: draft.andField.trim(), contains: draft.andContains.trim() }]
+        : undefined,
+      labels,
+      destinationTableId,
+      rationale: draft.rationale.trim(),
+      createdBy: 'user',
+      createdAt: Date.now(),
+    }
     await saveLabelRule(rule)
     const applied = await applyLabelRulesToRows()
     setDraft(null)
@@ -121,7 +135,7 @@ export function LabellingRules({ onChanged }: { onChanged: () => Promise<void> |
           <button key={entry.rule.id} type="button" onClick={() => setOpenRule(entry)} className="hover:bg-muted/50 flex items-center justify-between gap-3 py-1.5 text-left text-xs">
             <span className="min-w-0 flex-1 truncate">
               <span className="font-medium">{entry.rule.name || entry.rule.contains}</span>
-              <span className="text-muted-foreground"> · contains "{entry.rule.contains}" → {summarise(entry.rule)}</span>
+              <span className="text-muted-foreground"> · contains "{entry.rule.contains}"{(entry.rule.where ?? []).map((condition) => ` and ${condition.field} contains "${condition.contains}"`).join('')} → {summarise(entry.rule)}</span>
             </span>
             <span className="text-muted-foreground shrink-0">{entry.stats.confirmedRespected} confirmed{entry.stats.overridden > 0 && ` · ${entry.stats.overridden} overridden`}</span>
           </button>
@@ -133,6 +147,8 @@ export function LabellingRules({ onChanged }: { onChanged: () => Promise<void> |
           <div className="grid grid-cols-2 gap-2">
             <Input value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} placeholder="Name (optional)" className="h-7 text-xs" />
             <Input value={draft.contains} onChange={(event) => setDraft({ ...draft, contains: event.target.value })} placeholder="Description contains…" className="h-7 text-xs" />
+            <Input value={draft.andField} onChange={(event) => setDraft({ ...draft, andField: event.target.value })} placeholder="and field (e.g. source)" className="h-7 text-xs" />
+            <Input value={draft.andContains} onChange={(event) => setDraft({ ...draft, andContains: event.target.value })} placeholder="…contains" className="h-7 text-xs" />
             <Input value={draft.sections} onChange={(event) => setDraft({ ...draft, sections: event.target.value })} placeholder="sections (comma-separated)" className="h-7 text-xs" />
             <Input value={draft.subsections} onChange={(event) => setDraft({ ...draft, subsections: event.target.value })} placeholder="screens (comma-separated)" className="h-7 text-xs" />
             <Input value={draft.flowRole} onChange={(event) => setDraft({ ...draft, flowRole: event.target.value })} placeholder={`flow role: ${labelValues(FLOW_ROLES).join(' | ')}`} className="h-7 text-xs" />
@@ -157,7 +173,7 @@ export function LabellingRules({ onChanged }: { onChanged: () => Promise<void> |
               <DialogHeader>
                 <DialogTitle>{openRule.rule.name || openRule.rule.contains}</DialogTitle>
                 <DialogDescription>
-                  Matches {openRule.rule.field} containing "{openRule.rule.contains}" → {summarise(openRule.rule)}. Created by {openRule.rule.createdBy}.
+                  Matches {openRule.rule.field} containing "{openRule.rule.contains}"{(openRule.rule.where ?? []).map((condition) => `, and ${condition.field} containing "${condition.contains}"`).join('')} → {summarise(openRule.rule)}. Created by {openRule.rule.createdBy}.
                 </DialogDescription>
               </DialogHeader>
               <div className="flex flex-col gap-3 text-xs">

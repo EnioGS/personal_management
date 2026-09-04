@@ -222,7 +222,10 @@ Two things it optimizes for:
 - A rule ("everything mentioning IOF is a card rebate") is applied with one
   matched bulk call rather than row by row, and that call previews by default:
   it returns the match count and examples, changes nothing, and only labels once
-  the user has confirmed the rule really describes those rows. Saving that rule for
+  the user has confirmed the rule really describes those rows. A rule can hold
+  more than one condition, all of which must match: what a row means depends on
+  where it came from as much as on what it says, so "uber" on a card export and
+  "uber" on a bank export can be two rules that never fire on each other's files. Saving that rule for
   future imports needs no permission — a rule fills only blanks, and every one is
   readable, editable and removable in the panel — but deleting one does. Ready rows sort to
   the top of the worklist, since they are what the confirmation button acts on.

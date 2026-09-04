@@ -291,6 +291,13 @@ export interface LabelRule {
   field: string
   contains: string
   caseSensitive?: boolean
+  /**
+   * Further conditions, all of which must hold. What a row means often depends on
+   * where it came from as much as on what it says: "uber" on a card statement is a
+   * card expense, the same word on a bank export is a Pix to a driver, and a rule that
+   * can only look at one field cannot tell them apart.
+   */
+  where?: { field: string; contains: string; caseSensitive?: boolean }[]
   labels: IngestionRowLabels
   destinationTableId?: number
   /**

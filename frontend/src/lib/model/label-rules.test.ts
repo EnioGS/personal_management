@@ -138,3 +138,27 @@ describe('rules meeting real rows', () => {
     expect(stats).toMatchObject({ applied: 2, confirmedRespected: 1, overridden: 1 })
   })
 })
+
+describe('a rule narrowed by where the row came from', () => {
+  const cardRule = rule({
+    id: 5,
+    contains: 'uber',
+    where: [{ field: 'source', contains: 'cartao' }],
+    labels: { subsections: ['spending'], settlementChannel: 'creditCard' },
+    destinationTableId: undefined,
+  })
+  const resolveWithSource = (row: IngestionRow, field: string) =>
+    field === 'source' ? row.rawValues.source : row.mappedValues.description
+
+  it('fires on the file it was written for', () => {
+    const card = row({ mappedValues: { description: 'Uber Trip' }, rawValues: { source: '03-cartao-agosto.csv' } })
+
+    expect(applyLabelRules(card, [cardRule], resolveWithSource).labels).toMatchObject({ settlementChannel: 'creditCard' })
+  })
+
+  it('leaves the same words alone in another file', () => {
+    const bank = row({ mappedValues: { description: 'Pix - UBER DO BRASIL' }, rawValues: { source: '01-banco-agosto.csv' } })
+
+    expect(applyLabelRules(bank, [cardRule], resolveWithSource).labels).toEqual({})
+  })
+})
