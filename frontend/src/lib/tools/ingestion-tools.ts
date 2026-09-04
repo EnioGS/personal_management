@@ -375,6 +375,7 @@ export const labelIngestionRowsByMatchTool: ToolDefinition = {
     type: 'object',
     properties: {
       contains: { type: 'string', description: 'Text to look for, case-insensitive unless caseSensitive is true.' },
+      match: { type: 'string', enum: ['contains', 'equals', 'startsWith'], description: 'contains (default) is a substring — wrong for a short name, since "of" is inside Microsoft. equals and startsWith compare the whole value or its beginning.' },
       field: { type: 'string', enum: ['any', 'description', 'rawCategory'], description: 'Where to look. "any" (default) searches every raw source value.' },
       caseSensitive: { type: 'boolean' },
       sourceId: { type: 'number', description: 'Restrict to one dataset.' },
@@ -392,6 +393,7 @@ export const labelIngestionRowsByMatchTool: ToolDefinition = {
     const field = typeof args.field === 'string' ? args.field : 'any'
     const caseSensitive = args.caseSensitive === true
     const needle = caseSensitive ? contains : contains.toLowerCase()
+    const mode = args.match === 'equals' || args.match === 'startsWith' ? args.match : 'contains'
 
     const stored = await ingestionRowsTable.toArray()
     const matches = stored.filter((row) => {
@@ -400,7 +402,11 @@ export const labelIngestionRowsByMatchTool: ToolDefinition = {
       if (confirmed && args.includeConfirmed !== true) return false
       if (typeof args.sourceId === 'number' && data.sourceId !== args.sourceId) return false
       const text = searchableText(data, field)
-      return (caseSensitive ? text : text.toLowerCase()).includes(needle)
+      const value = caseSensitive ? text : text.toLowerCase()
+      // equals and startsWith compare the field itself, not the row's whole text.
+      if (mode === 'equals') return value.trim() === needle
+      if (mode === 'startsWith') return value.trim().startsWith(needle)
+      return value.includes(needle)
     })
 
     const examples = matches.slice(0, 5).map((row) => ({ rowId: row.id, text: searchableText(row.data as IngestionRow, 'description').slice(0, 160), amount: (row.data as IngestionRow).mappedValues.amount, status: (row.data as IngestionRow).status }))

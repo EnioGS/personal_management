@@ -162,3 +162,20 @@ describe('a rule narrowed by where the row came from', () => {
     expect(applyLabelRules(bank, [cardRule], resolveWithSource).labels).toEqual({})
   })
 })
+
+describe('a rule about a short name', () => {
+  const leisure = rule({ id: 9, contains: 'of', match: 'equals', labels: { subsections: ['spending'] }, destinationTableId: undefined })
+
+  it('matches the whole value and nothing that merely contains it', () => {
+    expect(applyLabelRules(row({ mappedValues: { description: 'Of' } }), [leisure], resolve).labels).toMatchObject({ subsections: ['spending'] })
+    expect(applyLabelRules(row({ mappedValues: { description: 'Microsoft' } }), [leisure], resolve).labels).toEqual({})
+    expect(applyLabelRules(row({ mappedValues: { description: 'Of Bar e Restaurante' } }), [leisure], resolve).labels).toEqual({})
+  })
+
+  it('takes the beginning of a value when asked for that instead', () => {
+    const startsWith = rule({ id: 10, contains: 'of ', match: 'startsWith', labels: { subsections: ['spending'] }, destinationTableId: undefined })
+
+    expect(applyLabelRules(row({ mappedValues: { description: 'Of Bar e Restaurante' } }), [startsWith], resolve).labels).toMatchObject({ subsections: ['spending'] })
+    expect(applyLabelRules(row({ mappedValues: { description: 'Microsoft Store' } }), [startsWith], resolve).labels).toEqual({})
+  })
+})

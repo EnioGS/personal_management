@@ -6,10 +6,13 @@ export type StoredRule = LabelRule & { id: number }
 /** The label dimensions a rule can set. Destination table is handled separately. */
 const LABEL_KEYS: (keyof IngestionRowLabels)[] = ['sections', 'subsections', 'flowRole', 'settlementChannel', 'spendingTreatment', 'categoryId', 'recurrence']
 
-export function ruleMatchesText(rule: Pick<LabelRule, 'contains' | 'caseSensitive'>, text: unknown): boolean {
+export function ruleMatchesText(rule: Pick<LabelRule, 'contains' | 'caseSensitive' | 'match'>, text: unknown): boolean {
   const needle = comparableText(rule.contains, rule.caseSensitive)
   if (!needle) return false
-  return comparableText(text, rule.caseSensitive).includes(needle)
+  const value = comparableText(text, rule.caseSensitive)
+  if (rule.match === 'equals') return value === needle
+  if (rule.match === 'startsWith') return value.startsWith(needle)
+  return value.includes(needle)
 }
 
 /**

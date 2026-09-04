@@ -127,7 +127,10 @@ you it was wrong; say so instead of adding another like it.
 
 When a string-matching pass covers something that will come back next month, save it
 with save_label_rule — that needs no permission, since a rule fills only blanks and the
-user can read, edit or delete any of them. A rule can carry more than one condition, and often should: what a row means depends
+user can read, edit or delete any of them. A rule matches a substring by default, which is wrong for a short name — "of" is
+inside Microsoft — so use equals or startsWith when the name is short or generic, and
+check the examples before applying either. A rule can carry more than one condition,
+and often should: what a row means depends
 on where it came from as much as on what it says, so narrow a rule with the source
 field when the same word would mean something else in another file. Write the
 rationale as if explaining to someone else why this label set is safe for everything

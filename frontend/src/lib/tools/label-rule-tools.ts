@@ -32,7 +32,7 @@ export const listLabelRulesTool: ToolDefinition = {
     return JSON.stringify(rules.map(({ rule, stats }) => ({
       ruleId: rule.id,
       name: rule.name || rule.contains,
-      matches: { field: rule.field, contains: rule.contains, caseSensitive: rule.caseSensitive === true, and: rule.where ?? [] },
+      matches: { field: rule.field, contains: rule.contains, match: rule.match ?? 'contains', caseSensitive: rule.caseSensitive === true, and: rule.where ?? [] },
       labels: rule.labels,
       destinationTableId: rule.destinationTableId,
       rationale: rule.rationale,
@@ -51,6 +51,7 @@ export const saveLabelRuleTool: ToolDefinition = {
       name: { type: 'string', description: 'Short name for the rules list.' },
       field: { type: 'string', description: `Field the text is looked for in. Usually description. One of: ${INGESTION_QUERY_FIELDS.join(', ')}.` },
       contains: { type: 'string' },
+      match: { type: 'string', enum: ['contains', 'equals', 'startsWith'], description: 'How to compare. contains (default) is a substring, which is wrong for a short name — "of" is inside Microsoft. Use equals or startsWith for those.' },
       caseSensitive: { type: 'boolean' },
       where: {
         type: 'array',
@@ -60,6 +61,7 @@ export const saveLabelRuleTool: ToolDefinition = {
           properties: {
             field: { type: 'string', description: 'e.g. source, description, rawCategory, amount.' },
             contains: { type: 'string' },
+            match: { type: 'string', enum: ['contains', 'equals', 'startsWith'] },
             caseSensitive: { type: 'boolean' },
           },
           required: ['field', 'contains'],
@@ -88,11 +90,17 @@ export const saveLabelRuleTool: ToolDefinition = {
       name: typeof args.name === 'string' && args.name.trim() ? args.name.trim() : undefined,
       field: typeof args.field === 'string' && args.field ? args.field : 'description',
       contains: args.contains.trim(),
+      match: args.match === 'equals' || args.match === 'startsWith' ? args.match : undefined,
       caseSensitive: args.caseSensitive === true,
       where: Array.isArray(args.where)
         ? (args.where as Record<string, unknown>[])
           .filter((condition) => typeof condition.field === 'string' && typeof condition.contains === 'string' && condition.contains.trim())
-          .map((condition) => ({ field: String(condition.field), contains: String(condition.contains).trim(), caseSensitive: condition.caseSensitive === true }))
+          .map((condition) => ({
+            field: String(condition.field),
+            contains: String(condition.contains).trim(),
+            match: condition.match === 'equals' || condition.match === 'startsWith' ? (condition.match as 'equals' | 'startsWith') : undefined,
+            caseSensitive: condition.caseSensitive === true,
+          }))
         : undefined,
       labels,
       destinationTableId: typeof args.destinationTableId === 'number' ? args.destinationTableId : undefined,

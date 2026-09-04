@@ -290,6 +290,13 @@ export interface LabelRule {
   /** Which field the text is looked for in — 'description' unless stated. */
   field: string
   contains: string
+  /**
+   * How the text is compared. Substring by default, which is what most rules want —
+   * but a short merchant name is a substring of half the file ("of" is inside
+   * Microsoft), so a rule about one needs to say it means the whole value or the
+   * start of it.
+   */
+  match?: 'contains' | 'equals' | 'startsWith'
   caseSensitive?: boolean
   /**
    * Further conditions, all of which must hold. What a row means often depends on
@@ -297,7 +304,7 @@ export interface LabelRule {
    * card expense, the same word on a bank export is a Pix to a driver, and a rule that
    * can only look at one field cannot tell them apart.
    */
-  where?: { field: string; contains: string; caseSensitive?: boolean }[]
+  where?: { field: string; contains: string; match?: 'contains' | 'equals' | 'startsWith'; caseSensitive?: boolean }[]
   labels: IngestionRowLabels
   destinationTableId?: number
   /**
