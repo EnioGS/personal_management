@@ -23,8 +23,16 @@ arithmetic about a base that happened to be near zero, and unreadable.
 `capitalEvolution` walks from the first month with any row, accumulating every
 movement and every investment, and only then drops the points outside the
 selected range. Changing the filter to 24 months changes what is drawn, never
-where the accumulation started. Spending rows are copies of the movements that
-paid for them, so they are counted in the spending series and never in capital.
+where the accumulation started.
+
+**Movements and investments are the only inputs.** The movements are the whole
+story of the accounts, spending included — a card bill and a Pix both leave as
+movements, so what was spent is already netted off by summing a month's ins and
+outs. The dashboard's spending series is therefore the negative half of the
+movements, not the spending screen: those rows itemise bills the movements have
+already paid, and reading both would count every purchase twice. The spending
+screen still answers *what* the money was spent on (by card, by category); the
+movements answer *how much left*.
 
 Capital therefore measures **change since the data begins** — the accounts have
 no opening balance, because no statement carries one.

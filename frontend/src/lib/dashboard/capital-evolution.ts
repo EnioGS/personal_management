@@ -21,7 +21,7 @@ export interface CapitalEvolutionPoint {
   investments: number
   /** What the month itself netted across the accounts. Not cumulative. */
   income: number
-  /** What the month spent, as the positive quantity it is. Not cumulative. */
+  /** What left the accounts that month, as the positive quantity it is. Not cumulative. */
   spending: number
   [key: string]: string | number
 }
@@ -31,8 +31,6 @@ export interface CapitalSources {
   movements: CapitalEntry[]
   /** Rows on the investments screen: money moving into and out of holdings. */
   investments: CapitalEntry[]
-  /** Rows on the spending screens. These are copies of movements, so they never touch capital. */
-  spending: CapitalEntry[]
 }
 
 function monthStart(month: string): number {
@@ -44,10 +42,11 @@ function nextMonth(month: string): string {
   return monthKey(Date.UTC(year, monthNumber, 1))
 }
 
-function sumByMonth(entries: CapitalEntry[]): Map<string, number> {
+function sumByMonth(entries: CapitalEntry[], keep: (value: number) => boolean = () => true): Map<string, number> {
   const totals = new Map<string, number>()
   for (const entry of entries) {
     if (!Number.isFinite(entry.date)) continue
+    if (!keep(entry.value)) continue
     const month = monthKey(entry.date)
     totals.set(month, (totals.get(month) ?? 0) + entry.value)
   }
@@ -59,8 +58,13 @@ function sumByMonth(entries: CapitalEntry[]): Map<string, number> {
  *
  * Capital is everything of value held, so it is the running total of every movement and
  * every investment from the first month there is — each month's net added to the last
- * month's total. Spending is deliberately not part of it: a spending row is a copy of the
- * movement that paid for it, and counting both would spend the money twice.
+ * month's total.
+ *
+ * The movements are the whole story of the accounts, spending included: a card bill and a
+ * Pix both leave as movements, and what left is already netted off by summing a month's
+ * ins and outs. So spending here is read off the movements too — the negative half of the
+ * same rows — rather than off the spending screen, whose rows are the itemisation of bills
+ * the movements have already paid. Counting both would spend every purchase twice.
  *
  * The points are then cut to the selected window while the running total keeps the whole
  * history behind it, so a year's chart still starts from what was already there.
@@ -68,9 +72,9 @@ function sumByMonth(entries: CapitalEntry[]): Map<string, number> {
 export function capitalEvolution(sources: CapitalSources, range: DateRange): CapitalEvolutionPoint[] {
   const movements = sumByMonth(sources.movements)
   const investments = sumByMonth(sources.investments)
-  const spending = sumByMonth(sources.spending)
+  const outgoing = sumByMonth(sources.movements, (value) => value < 0)
 
-  const months = [...new Set([...movements.keys(), ...investments.keys(), ...spending.keys()])].sort()
+  const months = [...new Set([...movements.keys(), ...investments.keys()])].sort()
   const first = months[0]
   const last = months.at(-1)
   // Both ends came from real timestamps, so the walk below terminates; an unreadable date
@@ -97,7 +101,7 @@ export function capitalEvolution(sources: CapitalSources, range: DateRange): Cap
         investments: held,
         income: roundCurrency(income),
         // Spending is reported as the quantity that left, and the rows are negative.
-        spending: roundCurrency(-(spending.get(month) ?? 0)),
+        spending: roundCurrency(-(outgoing.get(month) ?? 0)),
       })
     }
     month = nextMonth(month)

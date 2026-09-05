@@ -61,11 +61,10 @@ export function OverviewPanel() {
   )
   const movementHistory = useDashboardEntries(historyFilters, MOVEMENTS_SCREEN)
   const investmentHistory = useDashboardEntries(historyFilters, INVESTMENTS_SCREEN)
-  const spendingHistory = useDashboardEntries(historyFilters, SPENDING_SCREEN)
 
   const capitalData = useMemo(
-    () => capitalEvolution({ movements: movementHistory, investments: investmentHistory, spending: spendingHistory }, selectedRange),
-    [movementHistory, investmentHistory, spendingHistory, selectedRange],
+    () => capitalEvolution({ movements: movementHistory, investments: investmentHistory }, selectedRange),
+    [movementHistory, investmentHistory, selectedRange],
   )
 
   const labels = useMemo(
