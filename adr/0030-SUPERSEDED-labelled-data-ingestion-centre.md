@@ -1,5 +1,11 @@
 # Labelled data ingestion centre with user-confirmed promotion
 
+> **Superseded by adr/0032.** The two-phase import — map a source, stage its rows into a
+> separate unlabelled worklist, then promote them — is gone: a file is now its own table
+> and its rows are labelled where they land. What this ADR records about keeping raw
+> values, about the user confirming every move, and about labels gating the dashboards
+> still holds.
+
 ## Status
 
 Accepted, refined by adr/0031 — which makes the Finance destination

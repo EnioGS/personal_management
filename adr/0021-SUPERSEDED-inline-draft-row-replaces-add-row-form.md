@@ -1,5 +1,10 @@
 # Inline draft row replaces the add-row form; denser table chrome
 
+> **Superseded by adr/0032.** Finance tables are not edited in place any more, so there
+> is no draft row to promote: data arrives through the ingestion centre and is corrected
+> by adding a row with the same `row_id` and marking the old one. The denser table chrome
+> this decision made room for stayed.
+
 ## Status
 
 Accepted.

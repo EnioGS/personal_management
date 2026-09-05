@@ -1,5 +1,10 @@
 # One label set decides where a row goes; category rules are removed
 
+> **Superseded by adr/0032.** The seven-label set is four, and a row is no longer confined
+> to a single destination: it is copied into one table per (section, screen) pair it names.
+> What this ADR records about labels being the only classification path, and about a
+> category being created simply by naming it, still holds.
+
 ## Status
 
 Accepted. Supersedes adr/0023 and refines adr/0030.

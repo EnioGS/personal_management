@@ -22,12 +22,10 @@ export interface SqliteTableSchema {
  * openable and queryable in DB Browser for SQLite, DBeaver, the `sqlite3` CLI, etc.,
  * not just a blob column wearing a SQL file extension. See adr/0028.
  *
- * `entries` is the one exception worth calling out: `Entry` rows are deliberately
- * dynamic (adr/0022 — the column set is fixed per `TableKind`, not per app), so this
- * lists every field any current `TableKind` schema uses (table-kinds.ts) as one wide,
- * mostly-NULL table rather than a normalized-per-kind design that would need its own
- * migration every time a table kind gains a field. Update this list alongside
- * table-kinds.ts when a kind introduces a genuinely new column.
+ * A source file's own columns are the one thing that cannot have a column each: every
+ * file has different ones. They travel as JSON in `values_json` on `source_rows`, with
+ * the file's header list beside them on `source_files` — the shape is per-file, so the
+ * export keeps it per-file rather than inventing a union of every column ever seen.
  */
 export const SQLITE_SCHEMAS: Record<DataTableKey, SqliteTableSchema> = {
   accounts: {

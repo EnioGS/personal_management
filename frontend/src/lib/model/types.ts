@@ -33,57 +33,8 @@ export interface Card {
   archived?: boolean
 }
 
-/**
- * What a table *is*, which fixes its columns. Instances are unlimited (one cardLedger
- * per credit card, say); the column sets are not, so CSV, charts and the assistant's
- * tools stay schema-driven. See table-kinds.ts.
- */
-export type TableKind = 'bankLedger' | 'cardLedger' | 'investmentLedger' | 'contributions' | 'dividends' | 'generic'
-
-/** Stored on investment table definitions so the two investment workspaces stay separate. */
+/** Which of the two lines an investment joins on the capital chart. */
 export type InvestmentClass = 'variableIncome' | 'fixedIncome'
-
-export interface TableDef {
-  /** Shown when there is no `nameKey`; the fallback for anything imported or legacy. */
-  name: string
-  /**
-   * i18next key for tables the app owns. One table belongs to one screen, so its name
-   * is that screen's name — and a name that is a stored string would stay in whatever
-   * language it was created in when the user switches.
-   */
-  nameKey?: string
-  kind: TableKind
-  /** Set for bankLedger — which account this table records. */
-  accountId?: number
-  /** Set for cardLedger — which card this table records. */
-  cardId?: number
-  /** Set for investmentLedger; intentionally metadata, not a visible row column. */
-  investmentClass?: InvestmentClass
-}
-
-/**
- * A canonical category. It is pure vocabulary: the semantic-category label on an
- * ingestion row names one of these, and typing a name that does not exist yet
- * creates it. There is no rule engine that derives a category from row text.
- */
-export interface Category {
-  name: string
-  /** Restricts where the category is offered; undefined means every table. */
-  scope?: TableKind
-  archived?: boolean
-}
-
-/** One row of user data. Every table's rows live in a single store, split by `tableId`. */
-export interface Entry {
-  /** Row id of the TableDef this entry belongs to. */
-  tableId: number
-  /** Soft-delete flag — see adr/0018. */
-  deleted?: boolean
-  /** Stable source-row fingerprint used by imports to make re-importing a statement idempotent. */
-  importKey?: string
-  /** Column values, keyed by the schema of the table's kind. */
-  [field: string]: unknown
-}
 
 /** A monthly spending target for one category — Orçamento compares this to actual spend. */
 export interface Budget {
@@ -98,98 +49,21 @@ export interface AllocationTarget {
 }
 
 
-export type IngestionSourceStatus = 'draftSource' | 'mapped' | 'staged' | 'archived'
-export type IngestionRowStatus =
-  | 'unlabelled'
-  | 'ready'
-  | 'promoted'
-  | 'reconciledExisting'
-  | 'invalid'
-  | 'promotionError'
-  /** Set aside as a duplicate or as noise: kept as provenance, never promoted. */
-  | 'discarded'
-
-/** Canonical values available above a raw source file's original column headers. */
+/**
+ * What one of a file's own columns can be said to mean.
+ *
+ * Deliberately short: these are the fields the app computes with. Everything else a
+ * file carries stays verbatim and is condensed into the observations column when the
+ * row is confirmed, so a narrow list costs nothing.
+ */
 export type IngestionTargetField =
   | 'date'
   | 'amount'
-  | 'description'
-  | 'rawCategory'
-  | 'direction'
-  | 'accountReference'
-  | 'cardReference'
   | 'asset'
   | 'quantity'
   | 'price'
   | 'investmentType'
   | 'investmentClass'
-  | 'note'
-  | 'destination'
-  | 'sections'
-  | 'screens'
-  | 'category'
-  | 'subcategory'
-
-/** An uploaded CSV retained locally and identified by its unmodified-byte fingerprint. */
-export interface IngestionSource {
-  originalFilename: string
-  sourceFingerprint: string
-  importedAt: number
-  /** Original CSV text. It is source provenance and is never rewritten by mappings. */
-  rawCsv: string
-  originalColumns: string[]
-  /** Virtual empty columns supplement sparse source files without changing rawCsv. */
-  supplementalColumns: string[]
-  /**
-   * What those virtual columns hold. `all` fills every row — which is how a file's own
-   * provenance gets into the data, e.g. a description column saying which statement a
-   * row came from — and `rows` overrides individual ones by index. The uploaded file
-   * is never touched; this is the app's own annotation of it.
-   */
-  supplementalValues?: Record<string, { all?: string; rows?: Record<string, string> }>
-  rowCount: number
-  status: IngestionSourceStatus
-  /** True only for the synthetic source that links pre-existing app entries. */
-  legacy?: boolean
-  /**
-   * Per-row verdicts on the file's own rows, keyed by row index: what the duplicate
-   * scan found, and what anyone decided about it. Kept on the source because a file's
-   * rows have no identity of their own until they are staged.
-   */
-  rowMarks?: Record<string, 'duplicate' | 'eliminate' | { mark: 'duplicate' | 'eliminate'; by: 'scan' | 'person' }>
-  /**
-   * Marks which one-off repair of the legacy queue has already run for this
-   * source, so a repair corrects historical data exactly once instead of
-   * discarding labels the user has assigned since.
-   */
-  repairVersion?: number
-}
-
-/** Maps one original or supplemental source column onto exactly one canonical field. */
-export interface IngestionColumnMapping {
-  sourceId: number
-  sourceColumn: string
-  targetField: IngestionTargetField
-  /** Reserved for a future parsing UI; mappings are lossless until then. */
-  parser?: string
-  isSupplemental?: boolean
-}
-
-/** Labels are sidecar data so all table schemas can share the same classification model. */
-export interface EntryLabels {
-  entryId: number
-  /**
-   * Where the row belongs, in the app's own terms: which sections, and which screens
-   * inside them. Stored as ids so a change of language cannot orphan a label, and
-   * multi-valued because one row can genuinely belong to more than one screen.
-   */
-  sections: string[]
-  screens: string[]
-  /** What it is, generically, and in detail. Free text; never blank, never invalid. */
-  category: string
-  subcategory: string
-  sourceIngestionRowId?: number
-}
 
 export interface IngestionRowLabels {
   sections?: string[]
@@ -199,59 +73,14 @@ export interface IngestionRowLabels {
 }
 
 /**
- * The literal values last typed in the ingestion worklist.  Labels retain only
- * valid canonical values, while these drafts let the UI keep and flag an
- * invalid value instead of silently discarding what the user entered.
- */
-export interface IngestionRowLabelValues {
-  sections?: string
-  screens?: string
-  category?: string
-  subcategory?: string
-}
-
-/** A lossless raw row plus its mapped values, labels and promotion lineage. */
-export interface IngestionRow {
-  sourceId: number
-  sourceRowIndex: number
-  sourceRowFingerprint: string
-  rawValues: Record<string, string>
-  mappedValues: Partial<Record<IngestionTargetField, unknown>>
-  labels: IngestionRowLabels
-  labelValues?: IngestionRowLabelValues
-  status: IngestionRowStatus
-  validationErrors: string[]
-  destinationTableId?: number
-  /** Present for a migration row linked to an already stored entry. */
-  existingEntryId?: number
-  /** Present after a newly staged row is promoted to an app entry. */
-  promotedEntryId?: number
-  /** Why the row was discarded, and by whom, so the decision can be reviewed. */
-  discardReason?: string
-  /** Rules that filled labels on this row, in the order they were applied. */
-  appliedRuleIds?: number[]
-  /**
-   * Stamped onto a row when its source file is removed after everything in it was
-   * dealt with, so a confirmed row can still say which file it came from once the
-   * source record is gone.
-   */
-  sourceFilename?: string
-  /**
-   * True when a confirmed row's labels or data have been edited but its promoted
-   * entry has not been rewritten yet. Reallocation — a user click, like promotion —
-   * applies the edit and clears this.
-   */
-  hasPendingChange?: boolean
-}
-
-/**
- * A standing decision: rows whose text matches get these labels the moment they are
- * staged, so what was worked out once is not worked out again on the next import.
+ * A standing decision: rows whose text matches get these labels the moment a file
+ * arrives, so what was worked out once is not worked out again on the next import.
  *
  * A rule fills only labels a row does not already have — a judgement made by hand or
  * by the assistant always outranks a standing rule — and it records itself on the row,
  * which is what lets the rule report honestly on how it has done.
  */
+
 /** Which stage a rule belongs to: files being worked on, or rows already confirmed. */
 export type RuleContext = 'source' | 'confirmed'
 
@@ -279,7 +108,6 @@ export interface LabelRule {
    */
   where?: { field: string; contains: string; match?: 'contains' | 'equals' | 'startsWith' | 'regex'; caseSensitive?: boolean }[]
   labels: IngestionRowLabels
-  destinationTableId?: number
   /**
    * Why this label set is safe for everything matching this text. Written by whoever
    * created the rule, edited freely afterwards: a rule nobody can justify later is a

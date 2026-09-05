@@ -35,7 +35,7 @@ Two things it optimizes for:
 │   │   │   ├── notes/         # notes.section.ts + panel/store/notes-db + locales/
 │   │   │   ├── finances/      # Movimentações / Gastos / Investimentos / Recorrentes
 │   │   │   ├── investments/   # shared investment analytics, ledgers, allocation components
-│   │   │   └── settings/      # appearance/general/assistant/accounts-cards/ingestion/tables panels
+│   │   │   └── settings/      # appearance/general/assistant/accounts-cards/ingestion panels
 │   │   ├── store/
 │   │   │   ├── ui-store.ts     # active section/item, secondary-bar mode (expanded/icons/hidden)
 │   │   │   ├── theme-store.ts  # light/dark/system theme
@@ -45,7 +45,7 @@ Two things it optimizes for:
 │   │   ├── locales/common/    # shared strings not owned by one section
 │   │   ├── lib/
 │   │   │   ├── local-store/              # generic Dexie-table + Zustand-store factories
-│   │   │   ├── model/                    # configurable records + ingestion sources/labels — see adr/0022 and adr/0030
+│   │   │   ├── model/                    # accounts/cards, source files, confirmed rows, rules — see adr/0022 and adr/0032
 │   │   │   ├── dashboard/                # date-range presets/resolution (lib side of components/dashboard/)
 │   │   │   ├── table-schema.ts           # column schema driving tables, CSV, and the draft-row inputs
 │   │   │   ├── csv.ts                    # CSV export/import + validation
@@ -138,121 +138,94 @@ Two things it optimizes for:
   section — it stays available regardless of which section/item is active.
 - Tools the assistant can call are a flat registry (`lib/tools/registry.ts`):
   adding one is a single new `ToolDefinition` file plus one array entry,
-  nothing else changes. Tools read the current table list from
-  `lib/tools/writable-tables.ts` fresh on every call rather than from a fixed
-  array, so a table created mid-conversation is visible to the very next call.
-- One export carries a whole setup, not only its rows: accounts, cards, tables,
-  entries, labels, ingestion sources and staged rows, standing rules, notes,
-  budgets, the assistant's prompts and its API keys, and the interface
-  preferences (theme, language) that live outside Dexie. Clearing the data is
-  narrower on purpose — it keeps the accounts, cards and tables, since the table
-  set is fixed and an account is configuration rather than a transaction.
-- Tables, accounts, cards and the category vocabulary are user data, not
-  compile-time constants (`lib/model/`, see adr/0022) — a `TableKind` fixes
-  a table's columns, but the number of tables, accounts and cards is
-  unbounded. The data ingestion centre's source provenance, mappings, staged
-  rows and label sidecars travel in the v5 export too, so
-  importing into a blank browser restores the whole setup.
-- Data enters Finance through Settings → Data ingestion centre (adr/0030,
-  adr/0031). The drop zone takes CSV files and exported `.db` databases alike — a
-  database is split into one dataset per user table it contains, so rows from
-  another vault or an old backup arrive unlabelled and go through the same door
-  as a bank statement, rather than being restored into a finance table (that is
-  still Vault → import, which replaces everything). CSV source columns are
-  mapped without rewriting the original file,
-  sparse sources may gain explicitly blank supplemental columns, and only
-  user-confirmed ready rows are written into a destination table. A row nobody
-  has labelled is not in a finance table at all — it waits in the worklist, so
-  every chart, KPI and position reads confirmed labels only. Labels are a single
-  Finance destination plus flow role, settlement channel, spending
-  expense/rebate treatment, recurrence, category and destination table. An
-  explicit label always beats a guess: description-based recurring/instalment
-  detection only runs over rows still labelled `undecided`.
-- The category vocabulary *is* the category labels (adr/0031, superseding
-  adr/0023): naming a category on a row creates it. There is no rule engine and
-  no Categories settings screen — one classification path, decided per row.
-- Confirmed rows stay editable: the ingestion centre's third dataset lists what
-  is already in a Finance table, relabelling one marks it for reallocation, and
-  *Confirm and reallocate rows* rewrites that entry in place — same entry id, new
-  destination and labels, every Finance screen following immediately. An edit
-  whose new destination cannot hold the row keeps its error and stays put.
+  nothing else changes. Reading is one SQL tool over the browser database, so a
+  table created mid-conversation is visible to the very next call without any
+  tool being told about it.
+- One export carries a whole setup, not only its rows: accounts, cards, the
+  uploaded files with their assignments, the rows still being worked on, the
+  confirmed rows, standing rules, notes, budgets, the assistant's prompts and its
+  API keys, and the interface preferences (theme, language) that live outside
+  Dexie. The export mirrors the database rather than a shape of its own, so the
+  `.db` is worth opening in a SQLite browser. Clearing the data is narrower on
+  purpose — it keeps the accounts and cards, which are configuration rather than
+  transactions.
+- Accounts and cards are user data, not compile-time constants (`lib/model/`,
+  see adr/0022): their number is unbounded. Everything else about the shape of the
+  data comes from the files themselves.
+- Data enters through Settings → Data ingestion centre, and there is **one phase**
+  to it (adr/0032, superseding adr/0030, adr/0031, adr/0018 and adr/0021). A dropped CSV becomes its
+  own table, keeping every column the file wrote, with `source_filename` in front
+  of them and four label columns after them. Only the file's own columns can be
+  assigned a meaning (date, amount, asset, quantity, price, investment type and
+  class); everything unassigned is condensed into one observations column when the
+  row is confirmed, so nothing is dropped and no column has to be invented.
+- Four labels, not seven: **sections** and **screens** say where a row belongs and
+  are validated against the app's own navigation — a screen only counts inside a
+  section the row names — while **category** and **subcategory** are free text,
+  one value each, starting at `outros`. Direction is not a label at all: the sign
+  of the amount says it, negative left and positive arrived.
+- Confirming a row **copies it into one table per (section, screen) pair it
+  names**, every copy carrying the same `row_id` — a hash of the row's contents
+  and a random seed, fixed for the row's life even if every value in it later
+  changes. The row leaves the file it came from, so a file empties as it is dealt
+  with. Anything counting across screens counts each `row_id` once.
+- A file's signs are made to agree with ours explicitly, and only after the rows
+  are labelled — the decision depends on where they are going. A file may be
+  inverted wholesale, or inverted by a condition on another column (`buy`/`sell`,
+  `debit`/`credit`); the value the file actually wrote is kept in the confirmed
+  row's observations, so a transformation is never invisible.
 - Dates and amounts are read the way statements write them, not the way a parser
   wishes they did: `15/08/2025` is day-first, `87,40` and `1.234,56` are numbers,
-  and whichever of `.` or `,` comes last is the decimal point. A stored verdict is
-  re-checked when the ingestion centre opens, so rows rejected by an older reading
-  of the data do not stay rejected until somebody edits them.
-- An uploaded file is triaged before it is staged: every row is scanned on arrival
-  and shows as ready, duplicate? or eliminate beside itself. A row counts as a
-  duplicate only when everything it actually carries matches a stored row —
-  columns the ingestion centre added are not evidence, blank or not. *Add to
-  imported known new values* takes only the unflagged rows; *Add to imported
-  unlabelled data* takes everything except eliminations, and asks first when
-  duplicates are unresolved. Staged rows leave the file's table, so it empties as
-  it is dealt with.
-- The same transaction arrives twice more often than expected, so duplicates are
-  detected by comparing only the fields two rows *both* have: a file missing a
-  column is still checked on the columns it does have, and a missing column is
-  never evidence that two rows differ. An identical fingerprint is proof, three
-  agreeing fields is strong, two agreeing with the third missing is worth a look.
-  A row judged a copy is discarded with a reason — set aside, still readable,
-  restorable, and never promotable — rather than deleted.
-- What was worked out once becomes a **standing labelling rule**: it matches text
-  in a field, fills only labels a row does not already have, runs by itself when
-  rows are staged, and carries a rationale saying why that label set is safe for
-  everything matching it. A rule may claim a row only when the user confirmed it
-  with the rule's own labels intact — computed from the rows every time rather
-  than tallied, so "overridden" honestly reports a rule that was wrong.
-- Confirmed rows can be read table by table: the Confirmed button carries an arrow
-  that lists the user's tables grouped the way the app is navigated — a heading per
-  section, a sub-heading per screen, and only the ones that own tables. Any column
-  also filters, by text or by a numeric range where leaving one side empty means
-  "above" or "below".
+  and whichever of `.` or `,` comes last is the decimal point.
+- Duplicate flagging is narrow on purpose: two identical rows *inside one file*
+  are two real transactions, so a row is only ever flagged against a row from a
+  **different** file, or when a newly uploaded file's name is very close to one
+  already imported (measured against the shorter name). A flag is advisory and
+  removes nothing.
+- **Marking for elimination** is a table-wide mode rather than a per-row control:
+  one checkbox above the table, then clicking a row toggles its mark, and clicking
+  anything that is not a row turns the mode off. A marked row is invisible to every
+  dashboard and still visible in its table — the single thing this app hides, and
+  what makes marking safe to hand out.
+- The user and the assistant have the same powers over the data, with exactly one
+  exception: both mark and unmark, and **only the user deletes**. Correcting a
+  confirmed row is never an in-place edit — the corrected row is added with the
+  same `row_id` and the old one is marked, which is what keeps the history
+  readable.
+- What was worked out once becomes a **standing labelling rule**, and rules belong
+  to one of two stages that never cross: a *source* rule runs as a file arrives, so
+  an import can land already labelled, and a *confirmed* rule fills in meaning on
+  rows already in a table. A rule matches by substring, `equals`, `startsWith` or
+  regex (validated when it is saved, not when it runs), stacks conditions that must
+  all hold, fills only labels a row does not already have, and carries a rationale
+  saying why those labels are right for everything matching it.
+- The assistant reads with SQL and writes through a small set of validating tools:
+  it assigns columns, sets the sign convention, labels rows one by one or by a
+  match, marks and unmarks, and confirms what is ready. Retiring a file along with
+  what is marked on it needs the user's word first. Its whole workflow knowledge is
+  one retrievable document (`read_ingestion_guide`), editable and resettable under
+  Settings → Assistant.
 - Tables sort from any column header (alphabetic or numeric, either direction,
-  chosen rather than sniffed) and render one page at a time, growing as the
-  container nears the bottom. The assistant asks the same questions through
-  count/group/query tools instead of paging a backlog it cannot filter.
+  chosen rather than sniffed), filter by text or by a numeric range where leaving
+  one side empty means "above" or "below", and render one page at a time, growing
+  as the container nears the bottom. The assistant asks the same questions in SQL
+  instead of paging a backlog it cannot filter.
 - The chat reports what it costs: tokens for the last message and the requests it
   took, the session total, and how full the model's context window is when that
   window can be looked up.
-- A source file whose rows have all been dealt with can be removed from the
-  Confirmed view: discarded duplicates count as dealt with, since by definition
-  they never reach a Finance table, while a row still waiting in the worklist
-  blocks removal. Confirmed rows survive with their raw values and are stamped
-  with the filename they came from, so provenance outlives the file.
-- A rule ("everything mentioning IOF is a card rebate") is applied with one
-  matched bulk call rather than row by row, and that call previews by default:
-  it returns the match count and examples, changes nothing, and only labels once
-  the user has confirmed the rule really describes those rows. A rule can hold
-  more than one condition, all of which must match: what a row means depends on
-  where it came from as much as on what it says, so "uber" on a card export and
-  "uber" on a bank export can be two rules that never fire on each other's files. Saving that rule for
-  future imports needs no permission — a rule fills only blanks, and every one is
-  readable, editable and removable in the panel — but deleting one does. Ready rows sort to
-  the top of the worklist, since they are what the confirmation button acts on.
-- Finance tables are read-only to the assistant: no tool writes to one. Every
-  change — adding data, correcting it, taking it out — happens in the ingestion
-  centre, so a row on a dashboard always has raw values and explicit labels behind
-  it. Discarding a confirmed row flags its entry, which restoring undoes.
-- Importing only the unflagged rows is the assistant's to run: nothing reaches a
-  Finance table and any row it moves can still be discarded. Importing the flagged
-  ones too — which retires the file — needs the user's word first.
-- The assistant can map columns, edit staged values, label rows and validate
-  them, but has no tool for the steps that move data (staging a mapped
-  source, promoting labelled rows); those are the user's clicks. Its whole
-  workflow knowledge is one retrievable document (`read_ingestion_guide`),
-  editable and resettable under Settings → Assistant.
 - Chart colors open on the brand's own hue, then the dataviz skill's
   remaining validated hues (adr/0024) — never a generated or cycled color
   past that fixed set, per the skill's accessibility rule. A color follows
   its entity (a category, an account) via a stable hash, not the entity's
   position in whatever is currently on screen, so filtering never repaints
   a survivor.
-- Finances' Movements dashboard is a real dashboard (adr/0025): one dropdown-based
-  context row (date range, account, card, category) scopes a KPI row and a
-  combined diverging in/out chart — not a single hardcoded chart.
-- Orçamento, Recorrentes, Posições, Proventos, Alocação, and a Settings ->
-  Tabelas listing every table across every section (adr/0026) all read from
-  data the model already had — a budget compares category spend already
+- Finances' Movements dashboard is a real dashboard (adr/0025): one context row
+  (date range, category) scopes a KPI row and a combined diverging in/out chart —
+  not a single hardcoded chart. Capital means everything of value held,
+  investments included, which is what *Current capital* and the capital line both
+  show.
+- Orçamento, Recorrentes, Posições, Proventos and Alocação (adr/0026) all read
+  from data the model already had — a budget compares category spend already
   computed elsewhere, positions/allocation share one weighted-average-price
   calculation (`lib/current-value.ts`), recurring detection is pattern
   matching over existing entries, not a declared schedule.
@@ -262,16 +235,9 @@ Two things it optimizes for:
   Settings → Assistant has a Save button: a connected key and an edited
   system prompt already persist themselves, with a reset button restoring
   the default prompt for anyone who'd rather not hand-edit it.
-- Nothing the assistant does to an existing row in a writable table is ever a
-  hard delete or in-place overwrite — a `deleted` soft-flag column marks rows
-  for removal (faded, not hidden, in the table UI) or the original of a
-  correction. Only the user can permanently purge flagged rows, via a
-  confirm-first button in each table.
-- Every table adds rows through an always-present, faded draft row at the
-  bottom instead of a separate add-row form — it promotes itself into a
-  real row once its required columns hold valid values, then resets. See
-  adr/0021, which also covers the denser table chrome (smaller text,
-  shorter header row) this made room for.
+- The dense table chrome (smaller text, shorter header row) comes from adr/0021,
+  written when tables still had an inline draft row; the row went with the editable
+  finance tables (adr/0032), the chrome stayed.
 - CI intentionally minimal: lint + test + build, frontend only for now.
 - Agent commits carry no AI attribution.
 - Dual deployment (Docker anywhere + GitHub Pages) from one build output.

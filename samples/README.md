@@ -2,8 +2,8 @@
 
 Four files that overlap on purpose. Each one carries a trap that a careless import
 would walk into, and together they exercise every path in the ingestion centre:
-column mapping, duplicate triage across files, labelling judgement, standing rules,
-and the two moves only the user can make.
+column assignment, duplicate flagging across files, labelling judgement, sign
+conventions, standing rules, and the one move only the user can make.
 
 Import them in the order below — the traps depend on it.
 
@@ -16,32 +16,39 @@ Import them in the order below — the traps depend on it.
 
 ## What each file should teach
 
-**01 — bank, August.** Ordinary rows plus three judgement calls:
-`Transferência para Conta Poupança` is a `transfer` between the user's own accounts
-(capital unchanged); `Pagamento de fatura` is an `outflow`, not a transfer, because
-card purchases never touched cash; the Pix to `MERCADO SAO JORGE` is `spending`, not a
-plain movement, even though it is a Pix.
+**01 — bank, August.** Ordinary rows plus three judgement calls, all now settled by
+the sign rather than by a label: the transfer to the user's own savings leaves one
+account negative and arrives somewhere positive, so capital is unchanged by
+arithmetic and neither side is hidden; `Pagamento de fatura` is money that left; and
+the Pix to `MERCADO SAO JORGE` belongs on the spending screen as well as movements,
+which is what confirming a row onto two screens is for.
 
 **02 — bank, September.** Rows 1–3 are byte-identical to the last three of file 01.
-They must be flagged `duplicate?` on upload, before any mapping is done. Importing
-everything would double the salary and the rent.
+They come from a *different* file, so they are exactly what duplicate flagging is
+still for. Importing everything would double the salary and the rent.
 
 **03 — card, August.** `IOF de compra internacional` is a charge; `Estorno de IOF` is
 its reversal. A blanket "IOF" rule gets one of them wrong, which is exactly the rule
-the guide warns against. `Estorno Livraria Cultura` is `spending` + `rebate`, not an
-inflow. `Curso de idiomas 3/12` is an instalment, not a subscription. And the total of
-this statement is the invoice paid in file 01 — related, but not a duplicate of it.
+the guide warns against. `Estorno Livraria Cultura` is a refund: same spending screen,
+opposite sign. A card export that writes purchases as positive is the case for
+inverting the whole file — decide that *after* the rows are labelled, and sample the
+spending table first. And the total of this statement is the invoice paid in file 01 —
+related, but not a duplicate of it.
 
 **04 — broker.** Needs `asset`, `quantity` and `price`, which no bank file has, so it
-proves the mapping is per-file. Rows 3 and 4 are identical: a repeat *within* one file,
-which only the within-batch check catches. The `Dividendos PETR4` row is income, not a
-buy.
+proves assignment is per-file. Rows 3 and 4 are identical — and *within one file* that
+is two real transactions, not a duplicate: nothing should flag them. The
+`Dividendos PETR4` row is income, not a buy.
 
 ## A run worth doing
 
-1. Drop all four at once. Ask for a duplicate report before mapping anything.
-2. Map each file; watch the broker file demand fields the bank files never had.
-3. `Import new values` on file 02 — the repeats stay behind. Then look at what is left.
-4. Label file 01, and ask for a standing rule for `Pagamento de fatura`.
-5. Import file 03 and check whether the rule fired on its own.
-6. Confirm a few rows, then relabel one and reallocate it.
+1. Drop all four at once. Ask what the assistant sees — it reads them with SQL.
+2. Assign each file's columns; watch the broker file need fields the bank files
+   never had.
+3. Label file 01's sections and screens, then decide its sign convention — in that
+   order, and after sampling where the rows are going.
+4. Ask for a standing source rule for `Pagamento de fatura`, then upload file 03 and
+   check whether it landed already labelled.
+5. `Import new values` on file 01 — what is ready moves, what is not stays.
+6. Mark a confirmed row for elimination, watch it leave the dashboards and stay in
+   its table, then unmark it. Deleting it is yours alone.

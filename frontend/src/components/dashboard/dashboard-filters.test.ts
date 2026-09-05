@@ -6,9 +6,6 @@ function filters(overrides: Partial<DashboardFilters> = {}): DashboardFilters {
     preset: 'thisYear',
     customFrom: '',
     customTo: '',
-    accountIds: [],
-    tableIds: [],
-    cardIds: [],
     categories: [],
     ...overrides,
   }

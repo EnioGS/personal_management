@@ -1,9 +1,9 @@
 # Soft-delete for anything the assistant removes or corrects
 
-> **Since adr/0031**: the assistant no longer edits or deletes table rows at all; it
-> works in the ingestion centre, where discarding a confirmed row flags its entry
-> exactly as this ADR describes. The soft-delete decision stands — it is what makes
-> discarding reversible — but the tools it was written for are gone.
+> **Superseded by adr/0032.** Rows are not soft-deleted any more: a row is *marked for
+> elimination*, which hides it from every dashboard and leaves it in its table, and only
+> the user removes marked rows — permanently. The reasoning below, that an agent's edit
+> must be reversible by a person, is what marking preserves.
 
 ## Status
 
