@@ -445,7 +445,10 @@ export function ChatPanel() {
                 aria-label={t('panel.attachButton')}
                 title={t('panel.attachButton')}
                 onClick={() => fileInputRef.current?.click()}
-                className="text-muted-foreground hover:text-foreground absolute right-2 bottom-1.5 rounded-sm p-0.5"
+                // Centred rather than pinned to the bottom: the clip only shows while
+                // the box is empty, so the box is one line tall and its middle is the
+                // only place the icon belongs.
+                className="text-muted-foreground hover:text-foreground absolute top-1/2 right-2 -translate-y-1/2 rounded-sm p-0.5"
               >
                 <Paperclip className="size-4" />
               </button>
