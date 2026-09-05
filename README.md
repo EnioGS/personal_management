@@ -219,6 +219,12 @@ Two things it optimizes for:
   confirmed row is never an in-place edit — the corrected row is added with the
   same `row_id` and the old one is marked, which is what keeps the history
   readable.
+- What a rule cannot express becomes a **classification note**: free text, written by the
+  user or the assistant, saying what a rule has no way to say — that an unrecognisable
+  merchant sells food, that one file's rows for a month were a rebalance, how a borderline
+  case should be treated. A note labels nothing by itself; it is appended to the ingestion
+  guide, which the assistant reads before touching an import, so an explanation given once
+  keeps working. Notes belong to a stage the way rules do, and sit below them in the panel.
 - What was worked out once becomes a **standing labelling rule**, and rules belong
   to one of two stages that never cross: a *source* rule runs as a file arrives, so
   an import can land already labelled, and a *confirmed* rule fills in meaning on

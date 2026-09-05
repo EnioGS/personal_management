@@ -139,6 +139,12 @@ A decision that will recur belongs in a rule. Rules live in one of two contexts 
 source stage or the confirmed tables — and never cross. A source rule can give rows their
 labels as the file arrives, so an import can land already placed.
 
+Below the rules are the **notes**: free text about this data, written by the user or by
+you, saying what a rule cannot — that a shop nobody would recognise sells food, that one
+file's March rows were a rebalance. They are appended to this guide, so you always have
+them; treat them as the user talking about their own data, and write one yourself
+whenever the user explains something you would otherwise have to ask about again.
+
 A rule matches a field by substring, or by \`equals\`, \`startsWith\` or \`regex\`; a short
 name needs one of the latter, since "of" is inside Microsoft. Conditions can be stacked,
 all of which must hold — which is how a rule is narrowed to one file through
