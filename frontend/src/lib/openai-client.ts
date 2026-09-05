@@ -21,7 +21,7 @@ export async function requestOpenAiChatMessage(
   messages: OpenRouterMessage[],
   tools?: OpenRouterTool[],
 ): Promise<OpenAiResponseMessage> {
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+  const send = (limitField: 'max_completion_tokens' | 'max_tokens') => fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${apiKey}`,
@@ -30,13 +30,22 @@ export async function requestOpenAiChatMessage(
     body: JSON.stringify({
       model,
       messages,
-      max_tokens: MAX_RESPONSE_TOKENS,
+      [limitField]: MAX_RESPONSE_TOKENS,
       ...(tools && tools.length > 0 ? { tools } : {}),
     }),
   })
 
+  // Newer models take `max_completion_tokens` and refuse `max_tokens`; older ones, and
+  // some OpenAI-compatible proxies, know only the old name. Ask with the current one and
+  // fall back on the specific refusal, rather than keeping a list of which is which.
+  let response = await send('max_completion_tokens')
+  let body = response.ok ? '' : await response.text().catch(() => '')
+  if (!response.ok && body.includes('max_completion_tokens')) {
+    response = await send('max_tokens')
+    body = response.ok ? '' : await response.text().catch(() => '')
+  }
+
   if (!response.ok) {
-    const body = await response.text().catch(() => '')
     throw new Error(`OpenAI request failed (${response.status}): ${body || response.statusText}`)
   }
 
