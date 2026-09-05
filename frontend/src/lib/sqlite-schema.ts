@@ -121,7 +121,9 @@ export const SQLITE_SCHEMAS: Record<DataTableKey, SqliteTableSchema> = {
       { column: 'labels', key: 'labels', type: 'json' },
       { column: 'rationale', key: 'rationale', type: 'text' },
       { column: 'created_by', key: 'createdBy', type: 'text' },
-      { column: 'created_at', key: 'createdAt', type: 'integer' },
+      // Not 'created_at': every table already has one of its own for the stored row, and
+      // two columns of one name is not a table SQLite will create.
+      { column: 'rule_created_at', key: 'createdAt', type: 'integer' },
     ],
   },
   ingestionAuditEvents: {

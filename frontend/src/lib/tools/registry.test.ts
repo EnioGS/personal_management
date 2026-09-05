@@ -10,31 +10,22 @@ describe('findTool', () => {
     expect(findTool('does_not_exist')).toBeUndefined()
   })
 
-  it('registers read, ingestion-classification, and append-only table-writing tools', () => {
-    expect(toolRegistry.map((t) => t.name)).toEqual([
+  it('registers exactly the tools of the one-phase model', () => {
+    expect(toolRegistry.map((tool) => tool.name)).toEqual([
       'read_text_file',
       'read_csv',
-      'read_table',
       'read_ingestion_guide',
       'list_label_options',
-      'list_ingestion_datasets',
-      'read_ingestion_table',
-      'read_ingestion_provenance',
-      'count_ingestion_rows',
-      'query_ingestion_rows',
-      'group_ingestion_rows',
-      'assign_ingestion_columns',
-      'add_ingestion_blank_column',
-      'fill_source_column',
-      'mark_source_rows',
-      'stage_ingestion_source',
-      'find_ingestion_duplicates',
-      'discard_ingestion_rows',
-      'suggest_ingestion_labels',
-      'update_ingestion_labels',
-      'label_ingestion_rows_by_match',
-      'update_ingestion_data_fields',
-      'validate_ingestion_rows',
+      'query_vault',
+      'assign_source_columns',
+      'set_sign_convention',
+      'set_labels',
+      'label_rows_by_match',
+      'mark_rows',
+      'new_row_id',
+      'add_confirmed_row',
+      'confirm_rows',
+      'drop_source_table',
       'list_label_rules',
       'save_label_rule',
       'apply_label_rules',
@@ -42,21 +33,32 @@ describe('findTool', () => {
     ])
   })
 
-  it('keeps promotion to the user and has no category-rule tools', () => {
-    expect(findTool('promote_ingestion_rows')).toBeUndefined()
-    expect(findTool('reallocate_ingestion_rows')).toBeUndefined()
-    expect(findTool('add_category')).toBeUndefined()
-    expect(findTool('update_category_rule')).toBeUndefined()
-    expect(findTool('delete_category_rule')).toBeUndefined()
-    expect(findTool('read_category_raw_values')).toBeUndefined()
+  it('keeps nothing from the two-phase model it replaced', () => {
+    for (const gone of [
+      'read_table', 'write_to_table', 'update_table_rows', 'delete_table_rows', 'restore_table_rows',
+      'list_ingestion_datasets', 'stage_ingestion_source', 'promote_ingestion_rows', 'discard_ingestion_rows',
+      'suggest_ingestion_labels', 'update_ingestion_labels', 'validate_ingestion_rows', 'add_category',
+    ]) {
+      expect(findTool(gone), gone).toBeUndefined()
+    }
+  })
+})
+
+describe('what the user can do and the assistant cannot', () => {
+  it('is deletion, and only deletion: the assistant marks and unmarks like the user does', () => {
+    expect(findTool('mark_rows')).toBeDefined()
+    expect(findTool('mark_rows')!.parameters).toMatchObject({ properties: { marked: { type: 'boolean' } } })
+    expect(toolRegistry.filter((tool) => /delete|remove|drop/.test(tool.name)).map((tool) => tool.name))
+      .toEqual(['drop_source_table', 'delete_label_rule'])
   })
 
-  it('cannot write to a finance table at all — every write goes through the ingestion centre', () => {
-    expect(findTool('write_to_table')).toBeUndefined()
-    expect(findTool('update_table_rows')).toBeUndefined()
-    expect(findTool('delete_table_rows')).toBeUndefined()
-    expect(findTool('restore_table_rows')).toBeUndefined()
-    expect(findTool('read_table')).toBeDefined()
+  it('guards the destructive things it can reach behind an explicit confirmation', () => {
+    for (const name of ['delete_label_rule', 'confirm_rows']) {
+      expect(findTool(name)!.parameters, name).toMatchObject({ properties: { confirmed: { type: 'boolean' } } })
+    }
+    // Dropping a source table needs no confirmation because it can only ever remove an
+    // empty one — the tool refuses a file that still holds rows.
+    expect(findTool('drop_source_table')!.description).toContain('has no rows left')
   })
 })
 

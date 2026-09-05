@@ -134,6 +134,45 @@ export const setLabelsTool: ToolDefinition = {
   },
 }
 
+export const labelRowsByMatchTool: ToolDefinition = {
+  name: 'label_rows_by_match',
+  description: "Labels every source row whose chosen field contains a piece of text, in one call. This is the one-off half of labelling: use it when a pattern is real but not worth keeping — save_label_rule is for one that will recur, and is what makes future imports land already labelled. It only fills rows that match; fields you leave out keep what they hold, and it reports how many rows it touched with a sample of what matched, so a match that was wider than you meant is visible immediately.",
+  parameters: {
+    type: 'object',
+    properties: {
+      sourceId: { type: 'number', description: 'Limit to one file. Omit to label across every file.' },
+      field: { type: 'string', description: "A column of the file, or 'source_filename'." },
+      contains: { type: 'string' },
+      caseSensitive: { type: 'boolean' },
+      sections: { type: 'string' },
+      screens: { type: 'string' },
+      category: { type: 'string' },
+      subcategory: { type: 'string' },
+    },
+    required: ['field', 'contains'],
+    additionalProperties: false,
+  },
+  execute: async (args, context) => {
+    if (typeof args.field !== 'string' || typeof args.contains !== 'string' || !args.contains.trim()) {
+      return 'Error: field and contains are required.'
+    }
+    const needle = args.caseSensitive === true ? args.contains : args.contains.toLowerCase()
+    const matched: { id: number; text: string }[] = []
+    for (const stored of await sourceRowsTable.toArray()) {
+      const row = stored.data as SourceRow
+      if (typeof args.sourceId === 'number' && row.sourceId !== args.sourceId) continue
+      const value = row.values[args.field]
+      if (typeof value !== 'string') continue
+      const haystack = args.caseSensitive === true ? value : value.toLowerCase()
+      if (haystack.includes(needle)) matched.push({ id: stored.id, text: value })
+    }
+    if (matched.length === 0) return JSON.stringify({ matched: 0, note: `Nothing in ${args.field} contains "${args.contains}".` })
+
+    const results = await labelSourceRows(matched.map((row) => row.id), args, context.translate)
+    return JSON.stringify({ matched: matched.length, sample: matched.slice(0, 5).map((row) => row.text), rows: results.slice(0, 5) })
+  },
+}
+
 export const markRowsTool: ToolDefinition = {
   name: 'mark_rows',
   description: "Marks rows for elimination, or unmarks them. A marked row disappears from every dashboard and stays in its table — the one thing this app hides, and what makes marking safe to use freely. It works on source rows and confirmed rows alike. You cannot delete anything: removing marked rows is the user's, and the only thing they can do that you cannot. To correct a confirmed row, add the corrected one with the same row_id and mark the old one here.",

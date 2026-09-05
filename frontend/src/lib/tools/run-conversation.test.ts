@@ -130,15 +130,15 @@ describe('runConversation', () => {
 
 describe('keeping the screens in step with the tools', () => {
   it('re-reads the local stores after a tool runs, so a change made by the assistant is on screen', async () => {
-    const { useCategoriesStore } = await import('@/lib/model/model-stores')
-    const { categoriesTable } = await import('@/lib/model/model-db')
+    const { useLabelRulesStore } = await import('@/lib/model/model-stores')
+    const { labelRulesTable } = await import('@/lib/model/model-db')
     const { findTool } = await import('./registry')
-    await useCategoriesStore.getState().refresh()
-    expect(useCategoriesStore.getState().items).toHaveLength(0)
+    await useLabelRulesStore.getState().refresh()
+    expect(useLabelRulesStore.getState().items).toHaveLength(0)
 
     // A tool that writes without going through the store — as every ingestion tool does.
     const write = vi.fn(async () => {
-      await categoriesTable.add({ createdAt: 1, data: { name: 'Mercado' } })
+      await labelRulesTable.add({ createdAt: 1, data: { context: 'source', field: 'description', contains: 'Mercado', labels: { category: 'mercado' }, rationale: 'x', createdBy: 'assistant', createdAt: 1 } })
       return 'written'
     })
     const original = findTool('read_text_file')!.execute
@@ -151,7 +151,7 @@ describe('keeping the screens in step with the tools', () => {
         .mockResolvedValueOnce(textMessage('done'))
       await runConversation({ apiKey: 'k', model: 'm', messages: baseMessages, context, requestFn })
 
-      expect(useCategoriesStore.getState().items.map((item) => item.name)).toEqual(['Mercado'])
+      expect(useLabelRulesStore.getState().items.map((item) => item.contains)).toEqual(['Mercado'])
     } finally {
       findTool('read_text_file')!.execute = original
     }

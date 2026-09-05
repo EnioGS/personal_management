@@ -105,7 +105,8 @@ export function categorySpendChanges(rows: FilteredEntry[]): CategorySpendChange
   for (const row of rows) {
     const target = monthKey(row.date) === latestMonth ? current : monthKey(row.date) === precedingMonth ? preceding : null
     if (!target) continue
-    target.set(row.category, (target.get(row.category) ?? 0) + row.amount)
+    // Magnitudes, like everything else this screen reports: spending rows are negative.
+    target.set(row.category, (target.get(row.category) ?? 0) - row.amount)
   }
 
   return [...new Set([...current.keys(), ...preceding.keys()])]

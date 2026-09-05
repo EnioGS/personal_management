@@ -4,13 +4,10 @@ import { assistantConfigTable } from '@/lib/assistant-config-db'
 import { assistantPromptsTable } from '@/lib/assistant-prompts-db'
 import {
   accountsTable,
-  categoriesTable,
-  entriesTable,
+  confirmedRowsTable,
   labelRulesTable,
-  ingestionColumnMappingsTable,
-  ingestionRowsTable,
-  ingestionSourcesTable,
-  tableDefsTable,
+  sourceFilesTable,
+  sourceRowsTable,
 } from '@/lib/model/model-db'
 import { notesTable } from '@/sections/notes/notes-db'
 import {
@@ -30,27 +27,33 @@ interface Fixture {
   marker: string
 }
 
-const entries = createLocalTable<Fixture>(entriesTable)
 const notes = createLocalTable<Fixture>(notesTable)
 
 function emptyTables(): DataExportFile['tables'] {
   return {
     accounts: [],
     cards: [],
-    tableDefs: [],
-    categories: [],
-    entries: [],
     budgets: [],
     allocationTargets: [],
-    ingestionSources: [],
-    ingestionColumnMappings: [],
-    ingestionRows: [],
-    entryLabels: [],
-    ingestionAuditEvents: [], labelRules: [], preferences: [],
+    sourceFiles: [],
+    sourceRows: [],
+    confirmedRows: [],
+    labelRules: [],
+    ingestionAuditEvents: [],
     notes: [],
     assistantPrompts: [],
     assistantConfig: [],
+    preferences: [],
   }
+}
+
+const sourceFile = {
+  originalFilename: 'nubank_2026-09.csv',
+  importedAt: 1,
+  rawCsv: 'Data,Valor\n01/09/2026,"-10,00"',
+  originalColumns: ['Data', 'Valor'],
+  assignments: { Data: 'date', Valor: 'amount' },
+  signConvention: { kind: 'asImported' },
 }
 
 describe('data-file', () => {
@@ -68,15 +71,15 @@ describe('data-file', () => {
 
   it('countAllRows sums rows across tables', async () => {
     await notes.add({ marker: 'x' })
-    await entries.add({ marker: 'y' })
+    await confirmedRowsTable.add({ createdAt: 1, data: { rowId: 'a', section: 'finances', screen: 'overview' } })
 
     expect(await countAllRows()).toBe(2)
   })
 
   it('round-trips export -> wipe -> import, preserving data across tables', async () => {
     const marker = crypto.randomUUID()
-    await entries.add({ marker })
     await notes.add({ marker })
+    await confirmedRowsTable.add({ createdAt: 1, data: { rowId: marker, section: 'finances', screen: 'overview', amount: -10 } })
 
     const exported = await exportData()
     expect(exported.version).toBe(DATA_EXPORT_VERSION)
@@ -86,67 +89,31 @@ describe('data-file', () => {
 
     await importData(exported)
 
-    expect((await entries.list()).some((r) => r.marker === marker)).toBe(true)
-    expect((await notes.list()).some((r) => r.marker === marker)).toBe(true)
+    expect((await notes.list()).some((row) => row.marker === marker)).toBe(true)
+    expect((await confirmedRowsTable.toArray())[0].data).toMatchObject({ rowId: marker, amount: -10 })
   })
 
   it('carries the configurable model, so an import restores the setup and not just rows', async () => {
-    await tableDefsTable.add({ createdAt: Date.now(), data: { name: 'Nubank', kind: 'cardLedger' } })
+    await accountsTable.add({ createdAt: Date.now(), data: { name: 'Nubank', kind: 'checking' } })
 
     const exported = await exportData()
     await wipeAllData()
     await importData(exported)
 
-    const restored = await tableDefsTable.toArray()
+    const restored = await accountsTable.toArray()
     expect(restored).toHaveLength(1)
     expect((restored[0].data as { name: string }).name).toBe('Nubank')
   })
 
-  it('round-trips the category vocabulary', async () => {
-    await categoriesTable.add({ createdAt: 1, data: { name: 'Recebida pelo Pix', scope: 'bankLedger', archived: false } })
-
-    const exported = await exportData()
-    expect(exported.tables.categories).toHaveLength(1)
-
-    await wipeAllData()
-    await importData(exported)
-
-    expect((await categoriesTable.toArray())[0].data).toEqual({
-      name: 'Recebida pelo Pix',
-      scope: 'bankLedger',
-      archived: false,
-    })
-  })
-
-  it('round-trips source provenance, mappings and staged labels', async () => {
-    const sourceId = await ingestionSourcesTable.add({
-      createdAt: 1,
-      data: {
-        originalFilename: 'nubank.csv',
-        sourceFingerprint: 'file-hash',
-        importedAt: 1,
-        rawCsv: 'Data,Valor\n2026-01-01,10',
-        originalColumns: ['Data', 'Valor'],
-        supplementalColumns: ['asset'],
-        rowCount: 1,
-        status: 'mapped',
-      },
-    })
-    await ingestionColumnMappingsTable.add({
+  it('round-trips a file, its rows and their labels — the whole of what is still being worked on', async () => {
+    const sourceId = await sourceFilesTable.add({ createdAt: 1, data: sourceFile })
+    await sourceRowsTable.add({
       createdAt: 2,
-      data: { sourceId, sourceColumn: 'Data', targetField: 'date' },
-    })
-    await ingestionRowsTable.add({
-      createdAt: 3,
       data: {
         sourceId,
-        sourceRowIndex: 0,
-        sourceRowFingerprint: 'row-hash',
-        rawValues: { Data: '2026-01-01', Valor: '10' },
-        mappedValues: { date: 1767225600000, amount: 10 },
-        labels: { sections: ['finances'], subsections: ['overview'], flowRole: 'inflow' },
-        status: 'unlabelled',
-        validationErrors: ['Choose a destination table.'],
+        rowId: 'a1b2',
+        values: { Data: '01/09/2026', Valor: '-10,00' },
+        labels: { sections: ['finances'], screens: ['spending'], category: 'mercado', subcategory: 'outros' },
       },
     })
 
@@ -154,11 +121,10 @@ describe('data-file', () => {
     await wipeAllData()
     await importData(exported)
 
-    expect(await ingestionSourcesTable.toArray()).toHaveLength(1)
-    expect(await ingestionColumnMappingsTable.toArray()).toHaveLength(1)
-    expect((await ingestionRowsTable.toArray())[0].data).toMatchObject({
-      rawValues: { Data: '2026-01-01', Valor: '10' },
-      labels: { sections: ['finances'], subsections: ['overview'], flowRole: 'inflow' },
+    expect((await sourceFilesTable.toArray())[0].data).toMatchObject({ originalFilename: 'nubank_2026-09.csv', assignments: { Valor: 'amount' } })
+    expect((await sourceRowsTable.toArray())[0].data).toMatchObject({
+      values: { Data: '01/09/2026', Valor: '-10,00' },
+      labels: { sections: ['finances'], screens: ['spending'], category: 'mercado' },
     })
   })
 
@@ -178,8 +144,10 @@ describe('data-file', () => {
       expect(() => parseDataExportFile(null)).toThrow()
     })
 
-    it('rejects the old encrypted (version 1) format and any unknown version', () => {
-      expect(() => parseDataExportFile({ ...valid, version: 1 })).toThrow()
+    it('rejects every version written before the one-phase model, saying why', () => {
+      for (const version of [1, 2, 3, 7]) {
+        expect(() => parseDataExportFile({ ...valid, version })).toThrow(/staged rows and table definitions/)
+      }
       expect(() => parseDataExportFile({ ...valid, version: 999 })).toThrow()
     })
 
@@ -188,101 +156,17 @@ describe('data-file', () => {
       expect(() => parseDataExportFile(withoutTables)).toThrow()
     })
 
-    it('rejects a v3 file missing the tables that define the model', () => {
-      const { entries: _entries, ...withoutEntries } = valid.tables
-      expect(() => parseDataExportFile({ ...valid, tables: withoutEntries })).toThrow()
-    })
-
-    it('fills in tables a file predates rather than rejecting it', () => {
+    it('fills in stores a file does not carry rather than rejecting it', () => {
       const parsed = parseDataExportFile({
         version: DATA_EXPORT_VERSION,
         exportedAt: Date.now(),
-        tables: { tableDefs: [], entries: [] },
+        tables: { confirmedRows: [] },
       })
 
-      expect(parsed.tables.categories).toEqual([])
+      expect(parsed.tables.sourceFiles).toEqual([])
       expect(parsed.tables.notes).toEqual([])
-      expect(parsed.tables.ingestionRows).toEqual([])
+      expect(parsed.tables.labelRules).toEqual([])
     })
-
-    it('adds an investment class when importing a pre-class investment table', () => {
-      const parsed = parseDataExportFile({
-        version: DATA_EXPORT_VERSION,
-        exportedAt: Date.now(),
-        tables: {
-          ...emptyTables(),
-          tableDefs: [{ id: 1, createdAt: 1, data: { name: 'Renda Fixa', kind: 'investmentLedger' } }],
-        },
-      })
-
-      expect(parsed.tables.tableDefs[0].data).toMatchObject({ investmentClass: 'fixedIncome' })
-    })
-  })
-
-  describe('v2 files', () => {
-    const v2 = {
-      version: 2,
-      exportedAt: 1_700_000_000_000,
-      tables: {
-        spending: [{ id: 1, createdAt: 10, data: { date: 1, category: 'Alimentação', amount: 5 } }],
-        income: [{ id: 1, createdAt: 20, data: { date: 2, source: 'Salário', amount: 900 } }],
-        variableIncome: [],
-        fixedIncome: [],
-        contributions: [],
-        notes: [{ id: 1, createdAt: 30, data: { text: 'hello' } }],
-        assistantPrompts: [],
-        assistantConfig: [],
-      },
-    }
-
-    it('upgrades to v3 rather than rejecting, turning each populated table into a definition', () => {
-      const parsed = parseDataExportFile(v2)
-
-      expect(parsed.version).toBe(DATA_EXPORT_VERSION)
-      expect(parsed.tables.tableDefs.map((t) => (t.data as { name: string }).name)).toEqual(['Gastos', 'Receitas'])
-      expect(parsed.tables.entries).toHaveLength(2)
-    })
-
-    it("renames income's source onto the shared category vocabulary", () => {
-      const parsed = parseDataExportFile(v2)
-      const incomeDef = parsed.tables.tableDefs.find((t) => (t.data as { name: string }).name === 'Receitas')!
-      const incomeEntry = parsed.tables.entries.find(
-        (e) => (e.data as { tableId: number }).tableId === incomeDef.id,
-      )!
-
-      expect(incomeEntry.data).toMatchObject({ category: 'Salário' })
-      expect(incomeEntry.data).not.toHaveProperty('source')
-    })
-
-    it('carries non-table data across untouched', () => {
-      const parsed = parseDataExportFile(v2)
-      expect(parsed.tables.notes).toHaveLength(1)
-    })
-
-    it('skips legacy tables that had no rows', () => {
-      const parsed = parseDataExportFile(v2)
-      const names = parsed.tables.tableDefs.map((t) => (t.data as { name: string }).name)
-      expect(names).not.toContain('Renda Variável')
-    })
-
-    it('imports end to end', async () => {
-      await importData(parseDataExportFile(v2))
-
-      expect(await tableDefsTable.count()).toBe(2)
-      expect(await entriesTable.count()).toBe(2)
-    })
-  })
-
-  it('upgrades a v3 export with no ingestion tables', () => {
-    const parsed = parseDataExportFile({
-      version: 3,
-      exportedAt: 1,
-      tables: { tableDefs: [], entries: [] },
-    })
-
-    expect(parsed.version).toBe(DATA_EXPORT_VERSION)
-    expect(parsed.tables.ingestionSources).toEqual([])
-    expect(parsed.tables.entryLabels).toEqual([])
   })
 })
 
@@ -292,7 +176,7 @@ describe('what an export carries, and what clearing keeps', () => {
   it('takes the whole setup with it — connections, prompts, rules and preferences included', async () => {
     await assistantConfigTable.add({ createdAt: 1, data: { provider: 'openrouter', apiKey: 'sk-or-secret', model: 'openai/gpt-5.6-luna', isActive: true } })
     await assistantPromptsTable.add({ createdAt: 1, data: { key: 'system', content: 'Be brief.' } })
-    await labelRulesTable.add({ createdAt: 1, data: { field: 'description', contains: 'fatura', labels: { flowRole: 'outflow' }, rationale: 'Paying the card bill.', createdBy: 'user', createdAt: 1 } })
+    await labelRulesTable.add({ createdAt: 1, data: { context: 'source', field: 'description', contains: 'fatura', labels: { category: 'cartão' }, rationale: 'Paying the card bill.', createdBy: 'user', createdAt: 1 } })
     localStorage.setItem('theme', 'dark')
     localStorage.setItem('locale', 'en')
 
@@ -312,48 +196,46 @@ describe('what an export carries, and what clearing keeps', () => {
     expect(localStorage.getItem('theme')).toBe('dark')
   })
 
-  it('keeps the accounts, cards and tables when the data is cleared', async () => {
-    const accountId = await accountsTable.add({ createdAt: 1, data: { name: 'Conta principal', kind: 'checking' } })
-    const tableId = await tableDefsTable.add({ createdAt: 1, data: { name: 'Extrato bancário', kind: 'bankLedger', accountId } })
-    await entriesTable.add({ createdAt: 2, data: { tableId, date: 1, amount: 10 } })
-    await ingestionRowsTable.add({ createdAt: 2, data: { sourceId: 1, sourceRowIndex: 0, sourceRowFingerprint: 'r', rawValues: {}, mappedValues: {}, labels: {}, status: 'unlabelled', validationErrors: [] } })
+  it('keeps the accounts and cards when the data is cleared, and nothing that came from a file', async () => {
+    await accountsTable.add({ createdAt: 1, data: { name: 'Conta principal', kind: 'checking' } })
+    const sourceId = await sourceFilesTable.add({ createdAt: 1, data: sourceFile })
+    await sourceRowsTable.add({ createdAt: 2, data: { sourceId, rowId: 'a', values: {}, labels: {} } })
+    await confirmedRowsTable.add({ createdAt: 2, data: { rowId: 'a', section: 'finances', screen: 'overview' } })
 
     await clearStoredData()
 
-    expect(await tableDefsTable.count()).toBe(1)
     expect(await accountsTable.count()).toBe(1)
-    expect(await entriesTable.count()).toBe(0)
-    expect(await ingestionRowsTable.count()).toBe(0)
+    expect(await sourceFilesTable.count()).toBe(0)
+    expect(await sourceRowsTable.count()).toBe(0)
+    expect(await confirmedRowsTable.count()).toBe(0)
   })
 })
 
 describe('importing a file this version did not write', () => {
   beforeEach(async () => { await wipeAllData() })
 
-  it('reports the stores it lacks and the ones it does not understand, and keeps extra tables', async () => {
+  it('reports the stores it lacks and the ones it does not understand, and names the files it carries', async () => {
     const file = {
       version: DATA_EXPORT_VERSION,
       exportedAt: 1,
       tables: {
-        tableDefs: [
-          { id: 1, createdAt: 1, data: { name: 'Movements', kind: 'bankLedger' } },
-          { id: 2, createdAt: 1, data: { name: 'Spending', kind: 'cardLedger' } },
-          { id: 3, createdAt: 1, data: { name: 'Investments', kind: 'investmentLedger' } },
-          { id: 4, createdAt: 1, data: { name: 'Um extra do usuário', kind: 'generic' } },
+        sourceFiles: [
+          { id: 1, createdAt: 1, data: { ...sourceFile, originalFilename: 'nubank.csv' } },
+          { id: 2, createdAt: 1, data: { ...sourceFile, originalFilename: 'itau.csv' } },
         ],
-        entries: [],
+        confirmedRows: [],
         somethingNewer: [{ id: 1, createdAt: 1, data: {} }],
       },
     } as unknown as DataExportFile
 
     const report = describeImport(file)
 
-    expect(report.extraTables).toEqual(['Um extra do usuário'])
+    expect(report.extraTables).toEqual(['nubank.csv', 'itau.csv'])
     expect(report.unknownStores).toEqual(['somethingNewer'])
     expect(report.absentStores).toContain('labelRules')
 
     await importData(file)
 
-    expect(await tableDefsTable.count()).toBe(4)
+    expect(await sourceFilesTable.count()).toBe(2)
   })
 })
