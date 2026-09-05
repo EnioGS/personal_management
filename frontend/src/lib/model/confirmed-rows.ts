@@ -50,7 +50,7 @@ export async function addConfirmedRow(section: string, screen: string): Promise<
 }
 
 /** The cells a person may edit in a confirmed table, and how each reads what was typed. */
-export const CONFIRMED_EDITABLE = ['date', 'value', 'class', 'category', 'subcategory', 'account', 'card', 'observations'] as const
+export const CONFIRMED_EDITABLE = ['date', 'value', 'amount', 'price', 'class', 'category', 'subcategory', 'account', 'card', 'observations'] as const
 export type ConfirmedEditableColumn = (typeof CONFIRMED_EDITABLE)[number]
 
 /**
@@ -68,7 +68,7 @@ export async function updateConfirmedRow(rowId: number, column: ConfirmedEditabl
 
   const patch: Partial<ConfirmedRow> =
     column === 'date' ? { date: parseDateValue(value) ?? undefined }
-    : column === 'value' ? { value: parseNumberValue(value) ?? undefined }
+    : column === 'value' || column === 'amount' || column === 'price' ? { [column]: parseNumberValue(value) ?? undefined }
     : column === 'observations' ? { observations: value }
     // Emptied means emptied, for all of them: an account or a card a row never had, and
     // a category nobody has decided on yet.

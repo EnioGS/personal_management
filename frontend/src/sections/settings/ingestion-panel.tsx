@@ -61,7 +61,7 @@ const LABEL_HINT: Record<LabelColumn, string> = {
   subcategory: 'free text',
 }
 
-const CONFIRMED_COLUMNS = ['row_id', 'section', 'screen', 'date', 'value', 'account', 'card', 'class', 'category', 'subcategory', 'observations'] as const
+const CONFIRMED_COLUMNS = ['row_id', 'section', 'screen', 'date', 'value', 'amount', 'price', 'account', 'card', 'class', 'category', 'subcategory', 'observations'] as const
 
 function confirmedTableKey(row: ConfirmedRow): string {
   return `${row.section}/${row.screen}`
@@ -680,12 +680,18 @@ const ConfirmedRowLine = memo(function ConfirmedRowLine({
         disabled={marking}
         onCommit={(value) => void onEdit(row, 'date', value)}
       />
-      <EditableCell
-        className="tabular-nums"
-        value={row.value === undefined ? '' : String(row.value)}
-        disabled={marking}
-        onCommit={(value) => void onEdit(row, 'value', value)}
-      />
+      {/* Money, then units, then what a unit was worth: the three numbers a row moves.
+          An investment row is the one that fills all three, and it could not be checked
+          from here while two of them were only in the export. */}
+      {(['value', 'amount', 'price'] as const).map((column) => (
+        <EditableCell
+          key={column}
+          className="tabular-nums"
+          value={row[column] === undefined ? '' : String(row[column])}
+          disabled={marking}
+          onCommit={(value) => void onEdit(row, column, value)}
+        />
+      ))}
       {(['account', 'card'] as const).map((column) => (
         <EditableCell
           key={column}
