@@ -75,18 +75,22 @@ export function colorForRank(rank: number): ThemedColor {
 }
 
 /**
- * The same colour, a step lighter — for the parts of a thing, which belong to it.
+ * The same colour, diluted a step further — for the parts of a thing, which belong to it.
  *
- * Shade rather than hue: the parts of one category are one family, and a new hue per part
- * would say they were unrelated. Capped well short of the surface so the last part of a
- * long list is still a colour and not a smudge.
+ * One hue, thinned: the parts of one category are one family, and a new hue per part would
+ * say they were unrelated. Thinned toward white in both themes, the way ink is thinned
+ * rather than the way a thing is shaded — mixing toward the dark theme's own background
+ * would read as a shadow cast over the later rows, which says something about depth that
+ * nothing here means.
+ *
+ * Capped well short of the paper so the last part of a long list is still a colour.
  */
 export function tintedColor(color: ThemedColor, step: number): ThemedColor {
   if (step <= 0) return color
-  const kept = Math.round(Math.max(0.45, 1 - step * 0.18) * 100)
+  const kept = `${Math.round(Math.max(0.4, 1 - step * 0.16) * 100)}%`
   return {
-    light: `color-mix(in oklab, ${color.light} ${kept}%, white)`,
-    dark: `color-mix(in oklab, ${color.dark} ${kept}%, black)`,
+    light: `color-mix(in oklab, ${color.light} ${kept}, white)`,
+    dark: `color-mix(in oklab, ${color.dark} ${kept}, white)`,
   }
 }
 
