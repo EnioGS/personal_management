@@ -5,7 +5,7 @@ import { MessageContent } from './message-content'
 import { ConversationBar } from './conversation-bar'
 import { readAttachedFile } from '@/lib/chat-attachments'
 import { cn } from '@/lib/utils'
-import { GRIP_WIDTH, MAX_PANEL_WIDTH, useChatPanelStore } from '@/store/chat-panel-store'
+import { GRIP_WIDTH, MAX_PANEL_WIDTH, MIN_PANEL_WIDTH, useChatPanelStore } from '@/store/chat-panel-store'
 import { useChatStore } from '@/store/chat-store'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -325,7 +325,12 @@ export function ChatPanel() {
       </div>
 
       <div
-        className="pointer-events-auto relative ml-10 flex h-full min-w-0 flex-1 flex-col border-l bg-sidebar shadow-lg"
+        // Narrower than the minimum, the panel is on its way to closed — releasing there
+        // snaps it shut — so the contents stop reflowing and are simply clipped by the box
+        // instead. Squeezing a composer and a message list into a width they will never be
+        // released at is work nobody sees and layout the user has to watch happen.
+        style={{ width: Math.max(liveWidth, MIN_PANEL_WIDTH) }}
+        className="pointer-events-auto relative ml-10 flex h-full shrink-0 flex-col border-l bg-sidebar shadow-lg"
         onClick={markInteracted}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
