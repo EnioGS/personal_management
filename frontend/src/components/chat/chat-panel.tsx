@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type ChangeEvent, type DragEvent, type PointerEvent } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ChangeEvent, type DragEvent, type PointerEvent } from 'react'
 import { GripVertical, Hourglass, Paperclip, SendHorizontal, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { MessageContent } from './message-content'
@@ -64,6 +64,9 @@ export function ChatPanel() {
   const scrollAreaRef = useRef<HTMLDivElement>(null)
   const composerRef = useRef<HTMLTextAreaElement>(null)
   const mirrorRef = useRef<HTMLDivElement>(null)
+  /** The message as it is now, for the measurements that outlive the render they were made in. */
+  const draftRef = useRef(draft)
+  draftRef.current = draft
 
   /**
    * How tall the message would be in a box of a given width.
@@ -74,7 +77,7 @@ export function ChatPanel() {
    * takes whatever width it is told, so the same question always gets the same answer —
    * which is what stops the box growing a line and giving it back a frame later.
    */
-  function heightAt(width: number): number {
+  const heightAt = useCallback((width: number): number => {
     const composer = composerRef.current
     const mirror = mirrorRef.current
     if (!composer || !mirror) return 0
@@ -84,12 +87,15 @@ export function ChatPanel() {
       mirror.style[property] = styles[property]
     }
     mirror.style.width = `${width}px`
+    // Read from a ref, not from the render that created this function: the resize
+    // observer holds on to it, and a measurement of the message as it was when the panel
+    // opened is a measurement of an empty box.
     // The zero-width space keeps a trailing newline — and an empty box — measurable.
-    mirror.textContent = `${draft}\u200b`
+    mirror.textContent = `${draftRef.current}\u200b`
     return mirror.scrollHeight
-  }
+  }, [])
 
-  function resizeComposer() {
+  const resizeComposer = useCallback(() => {
     const composer = composerRef.current
     if (!composer) return
     // Hand the width back to the layout before reading it: what is measured has to be the
@@ -122,7 +128,7 @@ export function ChatPanel() {
     if (target !== composer.clientWidth) composer.style.width = `${target}px`
     setIsOverflowing(wraps)
     setComposerHeight(height)
-  }
+  }, [heightAt])
 
   /**
    * Where Send is. In the row while the message fits on one line; outside the panel,
@@ -149,7 +155,7 @@ export function ChatPanel() {
   // screen is a height the user watches change.
   useLayoutEffect(() => {
     resizeComposer()
-  }, [draft, panelWidth, isSendFloating])
+  }, [draft, panelWidth, isSendFloating, resizeComposer])
 
   isFloatingRef.current = isSendFloating
 
@@ -176,7 +182,7 @@ export function ChatPanel() {
     })
     observer.observe(composer)
     return () => observer.disconnect()
-  }, [])
+  }, [resizeComposer])
 
   async function handleFilesSelected(files: FileList | File[]) {
     for (const file of Array.from(files)) {
