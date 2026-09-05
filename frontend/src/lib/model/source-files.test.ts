@@ -94,7 +94,7 @@ describe('confirming', () => {
   it('writes one copy per (section, screen) pair, all sharing the row id, and empties the file', async () => {
     const sourceId = await readyFile()
     const rows = await rowsOf(sourceId)
-    await label(rows[1].id, { sections: ['finances'], screens: ['overview', 'spending'], category: 'mercado', subcategory: 'outros' })
+    await label(rows[1].id, { sections: ['finances'], screens: ['overview', 'spending'], category: 'mercado', subcategory: 'outros', account: 'Banco A', card: 'Cartão X' })
 
     const result = await confirmSourceRows(sourceId, catalogue)
 
@@ -119,7 +119,7 @@ describe('confirming', () => {
   it('condenses every unassigned column into the observations, so nothing the file said is lost', async () => {
     const sourceId = await readyFile()
     const rows = await rowsOf(sourceId)
-    await label(rows[1].id, { sections: ['finances'], screens: ['spending'], category: 'mercado', subcategory: 'outros' })
+    await label(rows[1].id, { sections: ['finances'], screens: ['spending'], category: 'mercado', subcategory: 'outros', account: 'Banco A', card: 'Cartão X' })
 
     await confirmSourceRows(sourceId, catalogue)
 
@@ -137,7 +137,7 @@ describe('confirming', () => {
     const sourceId = await readyFile()
     await setSignConvention(sourceId, { kind: 'invertAll' })
     const rows = await rowsOf(sourceId)
-    await label(rows[0].id, { sections: ['finances'], screens: ['overview'], category: 'salário', subcategory: 'outros' })
+    await label(rows[0].id, { sections: ['finances'], screens: ['overview'], category: 'salário', subcategory: 'outros', account: 'Banco A', card: 'Cartão X' })
 
     // The rewrite lands in the data, so the table itself shows what will be confirmed.
     expect((await rowsOf(sourceId))[0].row).toMatchObject({ values: { Valor: '-3500' }, importedAmount: '3.500,00' })
@@ -163,7 +163,7 @@ describe('confirming', () => {
     await setSignConvention(sourceId, { kind: 'invertWhen', column: 'Tipo', values: ['D'] })
     expect((await rowsOf(sourceId)).map((entry) => entry.row.values.Valor)).toEqual(['3500', '-284.9'])
     for (const { id } of await rowsOf(sourceId)) {
-      await label(id, { sections: ['finances'], screens: ['overview'], category: 'outros', subcategory: 'outros' })
+      await label(id, { sections: ['finances'], screens: ['overview'], category: 'outros', subcategory: 'outros', account: 'Banco A', card: 'Cartão X' })
     }
 
     await confirmSourceRows(sourceId, catalogue)
@@ -175,7 +175,7 @@ describe('confirming', () => {
   it('only discards what is marked, and only retires the file, when explicitly told to', async () => {
     const sourceId = await readyFile()
     const rows = await rowsOf(sourceId)
-    await label(rows[0].id, { sections: ['finances'], screens: ['overview'], category: 'salário', subcategory: 'outros' })
+    await label(rows[0].id, { sections: ['finances'], screens: ['overview'], category: 'salário', subcategory: 'outros', account: 'Banco A', card: 'Cartão X' })
     await sourceRowsTable.update(rows[1].id, { data: { ...rows[1].row, markedForElimination: true } })
 
     expect(await confirmSourceRows(sourceId, catalogue)).toMatchObject({ confirmed: 1, discarded: 0, leftBehind: 1, removedFile: false })
@@ -217,7 +217,7 @@ describe('a file with nothing left in it', () => {
     const sourceId = await createSourceFile('one-row.csv', 'Data,Valor\n01/08/2026,-10')
     await assignSourceColumns(sourceId, { Data: 'date', Valor: 'amount' })
     const [only] = await rowsOf(sourceId)
-    await label(only.id, { sections: ['finances'], screens: ['overview'], category: 'outros', subcategory: 'outros' })
+    await label(only.id, { sections: ['finances'], screens: ['overview'], category: 'outros', subcategory: 'outros', account: 'Banco A', card: 'Cartão X' })
 
     expect(await confirmSourceRows(sourceId, catalogue)).toMatchObject({ confirmed: 1, removedFile: true })
     expect(await sourceFilesTable.count()).toBe(0)
@@ -322,12 +322,15 @@ describe('account and card, as labels', () => {
     expect((await confirmedRowsTable.toArray())[0].data).toMatchObject({ account: 'Banco A', card: 'Cartão X' })
   })
 
-  it('are optional: a row with neither is still ready to confirm', async () => {
+  it('are required: a row naming neither is not ready, however well it is placed', async () => {
     const sourceId = await createSourceFile('banco-agosto.csv', BANK_CSV)
-    const [first] = await rowsOf(sourceId)
+    const [first, second] = await rowsOf(sourceId)
     await label(first.id, { sections: ['finances'], screens: ['overview'], category: 'outros', subcategory: 'outros' })
+    await label(second.id, { sections: ['finances'], screens: ['overview'], category: 'outros', subcategory: 'outros', account: 'Banco A', card: 'Cartão X' })
 
-    expect((await planConfirmation(sourceId, catalogue)).ready).toEqual([first.id])
+    const plan = await planConfirmation(sourceId, catalogue)
+    expect(plan.incomplete).toEqual([first.id])
+    expect(plan.ready).toEqual([second.id])
   })
 })
 

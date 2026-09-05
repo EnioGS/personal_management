@@ -9,22 +9,26 @@ const catalogue: LabelCatalogue = {
   cards: [{ id: 'Cartão X', label: 'Cartão X' }],
 }
 
+const placed = { sections: ['finances'], screens: ['spending'], account: 'Banco A', card: 'Cartão X' }
+
 describe('what still stands between a row and a table', () => {
-  it('is placement, and only placement', () => {
-    expect(ingestionLabelErrors({ sections: ['finances'], screens: ['spending'] }, catalogue)).toEqual([])
-    expect(ingestionLabelErrors({}, catalogue)).toHaveLength(2)
+  it('is an account, a card, and where it belongs', () => {
+    expect(ingestionLabelErrors(placed, catalogue)).toEqual([])
+    expect(ingestionLabelErrors({}, catalogue)).toHaveLength(4)
+  })
+
+  it('says which of them is missing, one at a time', () => {
+    expect(ingestionLabelErrors({ ...placed, account: undefined }, catalogue).join(' ')).toContain('Name the account')
+    expect(ingestionLabelErrors({ ...placed, card: undefined }, catalogue).join(' ')).toContain('Name the card')
   })
 
   it('refuses a screen that belongs to a section the row does not name', () => {
-    const errors = ingestionLabelErrors({ sections: ['notes'], screens: ['spending'] }, catalogue)
+    const errors = ingestionLabelErrors({ ...placed, sections: ['notes'] }, catalogue)
     expect(errors.join(' ')).toContain('which this row does not name')
   })
 
-  it('refuses an account or a card nobody set up, and accepts having neither', () => {
-    expect(ingestionLabelErrors({ sections: ['finances'], screens: ['spending'] }, catalogue)).toEqual([])
-    expect(ingestionLabelErrors({ sections: ['finances'], screens: ['spending'], account: 'Banco A', card: 'Cartão X' }, catalogue)).toEqual([])
-
-    const errors = ingestionLabelErrors({ sections: ['finances'], screens: ['spending'], account: 'Banco Z' }, catalogue)
-    expect(errors.join(' ')).toContain('No account is called Banco Z')
+  it('refuses an account or a card nobody set up', () => {
+    expect(ingestionLabelErrors({ ...placed, account: 'Banco Z' }, catalogue).join(' ')).toContain('No account is called Banco Z')
+    expect(ingestionLabelErrors({ ...placed, card: 'Cartão Z' }, catalogue).join(' ')).toContain('No card is called Cartão Z')
   })
 })

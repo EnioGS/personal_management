@@ -164,11 +164,14 @@ Two things it optimizes for:
   assigned a meaning (date, amount, asset, quantity, price, investment type and
   class); everything unassigned is condensed into one observations column when the
   row is confirmed, so nothing is dropped and no column has to be invented.
-- Two more labels, both optional and both validated against Settings: **account** says
-  which account a row moved through and **card** which card it was billed to. They are
-  stored by name, so a table and a query read as words rather than as ids; renaming an
-  account renames the vocabulary and existing rows keep the name they were labelled with,
-  which is visible rather than silent.
+- Two of the six labels come from the user's own setup and are read first: **account**
+  says which account a row moved through and **card** which card it was billed to. Both
+  are required and validated against Settings → General, so a row cannot be confirmed
+  until it says where the money sat. They are stored by name, so a table and a query read
+  as words rather than as ids; renaming an account renames the vocabulary and existing
+  rows keep the name they were labelled with, which is visible rather than silent. The
+  assistant can register a missing account or card itself (`add_account`, `add_card`) —
+  and a card is always registered against an account, for it as much as for the user.
 - Four labels, not seven: **sections** and **screens** say where a row belongs and
   are validated against the app's own navigation as they are typed — a screen only
   counts inside a section the row names, and a value nothing is called stays in the

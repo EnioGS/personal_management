@@ -40,7 +40,8 @@ the observations column when the row is confirmed, which is where a description 
 ## The order of work
 
 1. **Assign the columns.** Date and amount are what the dashboards need; the rest matter
-   for investment rows.
+   for investment rows. Read which accounts and cards exist while you are here, and
+   register anything the file plainly belongs to that is missing.
 2. **Label the sections.** Which parts of the app this row belongs to.
 3. **Label the screens.** Which pages inside those sections. Both take several values.
 4. **Only then decide the sign.** The decision depends on where the rows are going, so it
@@ -61,10 +62,12 @@ Subcategory — free text, one value, the detail under the category. Also starts
 \`outros\`. Some words are reserved and read by the Recurring screen: assinatura,
 membership, parcelado and their obvious equivalents.
 
-Account and card — optional, one value each, and validated against what the user set up
-in Settings: they say which account a row moved through and which card it was billed to.
-Leave them empty when a row has no account or no card; a name nothing is set up under is
-refused rather than stored. list_label_options names the ones that exist.
+Account and card — required, one value each, and validated against what the user set up
+in Settings → General: they say which account a row moved through and which card it was
+billed to. A name nothing is set up under is refused rather than stored, and a row missing
+either of them is not confirmed. list_accounts_and_cards names the ones that exist;
+add_account and add_card register what is missing, and a card is always registered against
+an account, so the account comes first.
 
 ## Signs
 

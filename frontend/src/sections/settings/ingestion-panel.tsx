@@ -40,25 +40,22 @@ const UNASSIGNED = '__unassigned__'
 const NO_SELECTION = '__none__'
 
 /** The label columns every table carries, in the order they are read. */
-const LABEL_COLUMNS = ['sections', 'screens', 'category', 'subcategory', 'account', 'card'] as const
+const LABEL_COLUMNS = ['account', 'card', 'sections', 'screens', 'category', 'subcategory'] as const
 type LabelColumn = (typeof LABEL_COLUMNS)[number]
 
 /** The ones that are free text, never validated, and default rather than start empty. */
 const MEANING_COLUMNS = ['category', 'subcategory'] as const
 
-/** The ones that are optional: a row that names no account or card is not incomplete. */
-const OPTIONAL_COLUMNS = ['account', 'card'] as const
-
 const LABEL_HINT: Record<LabelColumn, string> = {
+  account: 'one of your accounts, by the name it was set up under',
+  card: 'one of your credit cards, by the name it was set up under',
   sections: "the app's sections — several allowed, separated by commas",
   screens: 'the screens inside those sections — several allowed',
   category: 'free text',
   subcategory: 'free text',
-  account: 'one of your accounts, by name — optional',
-  card: 'one of your credit cards, by name — optional',
 }
 
-const CONFIRMED_COLUMNS = ['row_id', 'date', 'amount', 'category', 'subcategory', 'account', 'card', 'observations', 'source_filename'] as const
+const CONFIRMED_COLUMNS = ['row_id', 'date', 'amount', 'account', 'card', 'category', 'subcategory', 'observations', 'source_filename'] as const
 
 function confirmedTableKey(row: ConfirmedRow): string {
   return `${row.section}/${row.screen}`
@@ -387,7 +384,7 @@ export function IngestionPanel() {
                 ))}
                 <th colSpan={LABEL_COLUMNS.length} className="px-2 py-1" />
               </tr>
-              <tr className="[&>th]:bg-muted/60">
+              <tr className="[&>th]:bg-muted">
                 <th className="p-2 text-left font-medium">{SOURCE_FILENAME_COLUMN}</th>
                 <th className="p-2 text-left font-medium">row_id</th>
                 <th className="p-2 text-left font-medium">duplicate?</th>
@@ -441,8 +438,9 @@ export function IngestionPanel() {
                     {LABEL_COLUMNS.map((column) => {
                       const key = `${row.id}:${column}`
                       const text = drafts[key] ?? labelText(row.labels, column, catalogue)
-                      const optional = MEANING_COLUMNS.includes(column as never) || OPTIONAL_COLUMNS.includes(column as never)
-                      const missing = optional ? false : (row.labels[column] ?? []).length === 0
+                      // Category and subcategory always hold something; everything else
+                      // is required, and says so until it does.
+                      const missing = MEANING_COLUMNS.includes(column as never) ? false : (row.labels[column] ?? []).length === 0
                       return (
                         <EditableCell
                           key={column}
@@ -488,7 +486,7 @@ export function IngestionPanel() {
         >
           <table className="w-full text-xs">
             <thead className="sticky top-0">
-              <tr className="[&>th]:bg-muted/60">
+              <tr className="[&>th]:bg-muted">
                 {CONFIRMED_COLUMNS.map((column) => (
                   <th key={column} className="p-2 text-left font-medium">
                     <span className="flex items-center gap-1">
@@ -523,9 +521,6 @@ export function IngestionPanel() {
                     disabled={marking}
                     onCommit={(value) => void editConfirmed(row, 'amount', value)}
                   />
-                  {(['category', 'subcategory'] as const).map((column) => (
-                    <EditableCell key={column} value={row[column]} disabled={marking} onCommit={(value) => void editConfirmed(row, column, value)} />
-                  ))}
                   {(['account', 'card'] as const).map((column) => (
                     <EditableCell
                       key={column}
@@ -539,6 +534,9 @@ export function IngestionPanel() {
                       }}
                       onCommit={(value) => void editConfirmed(row, column, value)}
                     />
+                  ))}
+                  {(['category', 'subcategory'] as const).map((column) => (
+                    <EditableCell key={column} value={row[column]} disabled={marking} onCommit={(value) => void editConfirmed(row, column, value)} />
                   ))}
                   <EditableCell
                     className="max-w-[28rem] truncate"

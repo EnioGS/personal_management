@@ -3,6 +3,7 @@ import { applyLabelRulesTool, deleteLabelRuleTool, listLabelRulesTool, saveLabel
 import { readCsvTool } from './read-csv'
 import { readIngestionGuideTool } from './guide-tool'
 import { readTextFileTool } from './read-text-file'
+import { addAccountTool, addCardTool, listAccountsAndCardsTool } from './settings-tools'
 import type { ToolDefinition } from './types'
 import {
   addConfirmedRowTool,
@@ -32,6 +33,9 @@ export const toolRegistry: ToolDefinition[] = [
   readCsvTool,
   readIngestionGuideTool,
   listLabelOptionsTool,
+  listAccountsAndCardsTool,
+  addAccountTool,
+  addCardTool,
   queryVaultTool,
   importAsSourceFileTool,
   assignSourceColumnsTool,

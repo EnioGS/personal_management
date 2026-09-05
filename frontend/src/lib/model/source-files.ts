@@ -2,7 +2,7 @@ import Papa from 'papaparse'
 import { parseDateValue } from '@/lib/parse-date'
 import { parseNumberValue } from '@/lib/parse-number'
 import { placementsOf, type LabelCatalogue } from './label-catalogue'
-import { DEFAULT_MEANING } from './ingestion'
+import { DEFAULT_MEANING, ingestionLabelErrors } from './ingestion'
 import { confirmedRowsTable, ingestionAuditEventsTable, sourceFilesTable, sourceRowsTable } from './model-db'
 import { newRowId } from './row-id'
 import { applySignConvention, shapeOfAmounts } from './sign-convention'
@@ -289,6 +289,11 @@ export function observationsFor(row: SourceRow, file: SourceFile, importedAmount
   return JSON.stringify(parts)
 }
 
+/** A row is ready when nothing is missing from it and its labels name somewhere to go. */
+function isReady(row: SourceRow, catalogue: LabelCatalogue): boolean {
+  return ingestionLabelErrors(row.labels, catalogue).length === 0 && placementsOf(row.labels, catalogue).length > 0
+}
+
 export interface ConfirmationPlan {
   ready: number[]
   incomplete: number[]
@@ -374,7 +379,7 @@ export async function planConfirmation(sourceId: number, catalogue: LabelCatalog
   for (const stored of rows) {
     const row = stored.data as SourceRow
     if (row.markedForElimination) { plan.marked.push(stored.id); continue }
-    if (placementsOf(row.labels, catalogue).length > 0) plan.ready.push(stored.id)
+    if (isReady(row, catalogue)) plan.ready.push(stored.id)
     else plan.incomplete.push(stored.id)
   }
   return plan
@@ -415,8 +420,8 @@ export async function confirmSourceRows(sourceId: number, catalogue: LabelCatalo
       else result.leftBehind += 1
       continue
     }
+    if (!isReady(row, catalogue)) { result.leftBehind += 1; continue }
     const placements = placementsOf(row.labels, catalogue)
-    if (placements.length === 0) { result.leftBehind += 1; continue }
 
     const amount = parseNumberValue(canonicalValue(row, file, 'amount'))
     const base = {
