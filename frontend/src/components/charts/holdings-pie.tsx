@@ -50,6 +50,11 @@ const LABEL_FLOOR = 0.04
  * composition is visible as shape and shade without a word of text. Hovering it says what
  * each one is. Naming them too would be four labels for two facts, and on a card this
  * size they would collide before they explained anything.
+ *
+ * Both rings are cut into separate pieces rather than drawn as continuous bands. A gap
+ * between slices is what makes a ring read as several things instead of one striped
+ * thing, and it does the work a dividing stroke used to do without borrowing the card's
+ * colour to do it.
  */
 export function HoldingsPie({ groups, valueFormatter, emptyLabel }: HoldingsPieProps) {
   const held = groups.filter((group) => group.value > 0)
@@ -79,10 +84,19 @@ export function HoldingsPie({ groups, valueFormatter, emptyLabel }: HoldingsPieP
 
   return (
     <ChartContainer config={config} className="aspect-auto h-full w-full">
-      <PieChart margin={{ top: 10, right: 76, bottom: 10, left: 76 }}>
+      <PieChart margin={{ top: 12, right: 88, bottom: 12, left: 88 }}>
         <ChartTooltip content={<ChartTooltipContent hideLabel nameKey="fillKey" />} />
         {/* Inside: what each class is made of, aligned under the arc it belongs to. */}
-        <Pie data={parts} dataKey="value" nameKey="fillKey" outerRadius="54%" strokeWidth={1} isAnimationActive={false}>
+        <Pie
+          data={parts}
+          dataKey="value"
+          nameKey="fillKey"
+          outerRadius="52%"
+          paddingAngle={2}
+          cornerRadius={2}
+          stroke="none"
+          isAnimationActive={false}
+        >
           {parts.map((child) => (
             <Cell key={child.key} fill={`var(--color-${child.fillKey})`} />
           ))}
@@ -92,9 +106,11 @@ export function HoldingsPie({ groups, valueFormatter, emptyLabel }: HoldingsPieP
           data={classes}
           dataKey="value"
           nameKey="fillKey"
-          innerRadius="58%"
+          innerRadius="59%"
           outerRadius="78%"
-          strokeWidth={1}
+          paddingAngle={2}
+          cornerRadius={2}
+          stroke="none"
           isAnimationActive={false}
           labelLine={LeaderLine}
           label={SliceLabel}
@@ -125,15 +141,15 @@ export function HoldingsPie({ groups, valueFormatter, emptyLabel }: HoldingsPieP
     const { cx, cy, midAngle, outerRadius, percent, payload } = props as LabelProps
     if (percent < LABEL_FLOOR) return null
 
-    const radius = outerRadius + 12
+    const radius = outerRadius + 14
     const x = cx + radius * Math.cos(-midAngle * RADIAN)
     const y = cy + radius * Math.sin(-midAngle * RADIAN)
     const onTheRight = x >= cx
 
     return (
-      <text x={x} y={y} textAnchor={onTheRight ? 'start' : 'end'} dominantBaseline="central" className="fill-foreground" fontSize={11}>
-        <tspan x={x} dy="-0.4em">{payload.label}</tspan>
-        <tspan x={x} dy="1.2em" className="fill-muted-foreground">{valueFormatter(payload.value ?? 0)}</tspan>
+      <text x={x} y={y} textAnchor={onTheRight ? 'start' : 'end'} dominantBaseline="central" className="fill-foreground" fontSize={13}>
+        <tspan x={x} dy="-0.4em" fontWeight={500}>{payload.label}</tspan>
+        <tspan x={x} dy="1.25em" fontSize={12} className="fill-muted-foreground tabular-nums">{valueFormatter(payload.value ?? 0)}</tspan>
       </text>
     )
   }
