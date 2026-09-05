@@ -1,6 +1,6 @@
 import { loadLabelCatalogue } from '@/lib/label-catalogue-source'
 import { describeVault, queryVault } from '@/lib/sql/query-vault'
-import { fillFromObservations, placeConfirmedRow, setConfirmedMeaning } from '@/lib/model/confirmed-rows'
+import { fillFromObservations, placeConfirmedRow, reviseConfirmedRows, setConfirmedMeaning, type ConfirmedRevision } from '@/lib/model/confirmed-rows'
 import { SOURCE_FILENAME_KEY, withObservation } from '@/lib/model/observations'
 import { DEFAULT_MEANING, ingestionLabelErrors } from '@/lib/model/ingestion'
 import { parsePlacementLabels, placementsOf, resolveAccountLabel, resolveCardLabel, resolveScreenLabel, resolveSectionLabel, withDerivedSections, type LabelCatalogue } from '@/lib/model/label-catalogue'
@@ -340,6 +340,54 @@ export const fillFromObservationsTool: ToolDefinition = {
     if (typeof args.screen === 'string' && !screen) return 'Error: no screen is called that.'
 
     return JSON.stringify(await fillFromObservations({ section, screen }, { date: dateKey, value: valueKey }))
+  },
+}
+
+export const reviseConfirmedRowsTool: ToolDefinition = {
+  name: 'revise_confirmed_rows',
+  description: "Corrects many confirmed rows at once, keeping the discipline that makes a correction readable: for every row it touches it adds the corrected row with the same row_id and marks the old one for elimination. Nothing is overwritten and nothing is deleted — a row already on a dashboard is evidence of what the user was told, and both versions stay, the old one invisible to every dashboard and still in its table. Pick the rows with selectIds, which is a SELECT returning an id column, or list them; name only the fields that change. Account and card must name something the user set up. Where a row belongs is not changed here — place_confirmed_rows moves a row between tables. A row that is already marked is skipped rather than superseded twice.",
+  parameters: {
+    type: 'object',
+    properties: {
+      rowIds: { type: 'array', items: { type: 'number' } },
+      selectIds: { type: 'string', description: 'One SELECT returning an id column, e.g. SELECT id FROM "confirmed__finances__spending" WHERE account = \'Conta principal\'.' },
+      account: { type: 'string' },
+      card: { type: 'string' },
+      category: { type: 'string' },
+      subcategory: { type: 'string' },
+      value: { type: 'number', description: 'Money that moved, signed.' },
+      reason: { type: 'string', description: 'Why, for the user. Not stored on the row.' },
+    },
+    additionalProperties: false,
+  },
+  execute: async (args, context) => {
+    const listed = Array.isArray(args.rowIds) ? args.rowIds.filter((id): id is number => typeof id === 'number') : []
+    let rowIds = listed
+    if (typeof args.selectIds === 'string' && args.selectIds.trim()) {
+      try { rowIds = [...listed, ...await idsFrom(args.selectIds)] }
+      catch (error) { return `Error: ${error instanceof Error ? error.message : 'that query could not run.'}` }
+    }
+    if (rowIds.length === 0) return 'Error: pass rowIds, or a selectIds query that returns some.'
+
+    const catalogue = await loadLabelCatalogue(context.translate)
+    const revision: ConfirmedRevision = {}
+    if (typeof args.account === 'string') {
+      const account = resolveAccountLabel(catalogue, args.account)
+      if (!account) return `Error: no account is called "${args.account}". Call list_accounts_and_cards, or add_account first.`
+      revision.account = account
+    }
+    if (typeof args.card === 'string') {
+      const card = resolveCardLabel(catalogue, args.card)
+      if (!card) return `Error: no card is called "${args.card}". Call list_accounts_and_cards, or add_card first.`
+      revision.card = card
+    }
+    if (typeof args.category === 'string') revision.category = args.category.trim() || DEFAULT_MEANING
+    if (typeof args.subcategory === 'string') revision.subcategory = args.subcategory.trim() || DEFAULT_MEANING
+    if (typeof args.value === 'number') revision.value = args.value
+
+    try {
+      return JSON.stringify({ ...await reviseConfirmedRows(rowIds, revision), changed: revision, reason: args.reason ?? null })
+    } catch (error) { return `Error: ${error instanceof Error ? error.message : 'those rows could not be revised.'}` }
   },
 }
 

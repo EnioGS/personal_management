@@ -28,6 +28,7 @@ describe('findTool', () => {
       'add_source_row',
       'set_source_values',
       'set_confirmed_meaning',
+      'revise_confirmed_rows',
       'place_confirmed_rows',
       'fill_from_observations',
       'mark_rows',

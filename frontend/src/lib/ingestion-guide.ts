@@ -126,7 +126,9 @@ way, which is what stops a copy being counted twice.
 ## Correcting, marking, deleting
 
 Never edit a confirmed row in place. Add a new row carrying **the same row_id** and mark
-the old one for elimination. A row marked for elimination disappears from every dashboard
+the old one for elimination. For many rows at once that is revise_confirmed_rows: it does
+exactly this for every row a query picks out, so correcting the account on three hundred
+rows is one call and still leaves both versions readable. A row marked for elimination disappears from every dashboard
 and stays in its table — the only thing this app hides, and what makes marking safe.
 
 Marking and unmarking are yours and the user's alike, one row at a time or by a query —

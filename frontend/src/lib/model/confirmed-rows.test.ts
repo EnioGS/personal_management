@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { wipeAllData } from '@/lib/data-file'
-import { addConfirmedRow, fillFromObservations, placeConfirmedRow, updateConfirmedRow } from './confirmed-rows'
+import { addConfirmedRow, fillFromObservations, placeConfirmedRow, reviseConfirmedRows, setConfirmedMeaning, updateConfirmedRow } from './confirmed-rows'
 import { confirmedRowsTable } from './model-db'
 import { sourceFilenameOf } from './observations'
 import type { ConfirmedRow } from './types'
@@ -105,5 +105,39 @@ describe('rows confirmed before their file said where the numbers were', () => {
     const rows = (await confirmedRowsTable.toArray()).map((row) => row.data as ConfirmedRow)
     expect(rows.find((row) => row.screen === 'movements')!.value).toBe(20)
     expect(rows.find((row) => row.screen === 'spending')!.value).toBeUndefined()
+  })
+})
+
+describe('revising confirmed rows in bulk', () => {
+  beforeEach(async () => { await wipeAllData() })
+
+  it('adds the corrected row and marks the old one, both keeping the one id', async () => {
+    const id = await addConfirmedRow('finances', 'spending')
+    await setConfirmedMeaning(id, { category: 'mercado' })
+    const { rowId } = await only()
+
+    expect(await reviseConfirmedRows([id], { account: 'Nubank - Main account' })).toMatchObject({ revised: 1 })
+
+    const rows = (await confirmedRowsTable.toArray()).map((row) => row.data as ConfirmedRow)
+    expect(rows).toHaveLength(2)
+    expect(new Set(rows.map((row) => row.rowId))).toEqual(new Set([rowId]))
+    const corrected = rows.find((row) => !row.markedForElimination)!
+    expect(corrected).toMatchObject({ account: 'Nubank - Main account', category: 'mercado' })
+    expect(rows.find((row) => row.markedForElimination)!.account).toBeUndefined()
+  })
+
+  it('leaves a row that is already marked alone rather than superseding it twice', async () => {
+    const id = await addConfirmedRow('finances', 'spending')
+    await reviseConfirmedRows([id], { account: 'Nubank - Main account' })
+    const marked = (await confirmedRowsTable.toArray()).find((row) => (row.data as ConfirmedRow).markedForElimination)!
+
+    expect(await reviseConfirmedRows([marked.id], { account: 'Another' })).toMatchObject({ revised: 0, skipped: 1 })
+    expect(await confirmedRowsTable.count()).toBe(2)
+  })
+
+  it('refuses a revision that changes nothing', async () => {
+    const id = await addConfirmedRow('finances', 'spending')
+
+    await expect(reviseConfirmedRows([id], {})).rejects.toThrow(/change something/)
   })
 })

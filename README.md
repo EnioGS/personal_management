@@ -226,6 +226,10 @@ Two things it optimizes for:
   anything that is not a row turns the mode off. A marked row is invisible to every
   dashboard and still visible in its table — the single thing this app hides, and
   what makes marking safe to hand out.
+- Correcting confirmed rows in bulk keeps the same discipline rather than escaping it:
+  `revise_confirmed_rows` adds the corrected row and marks the old one for every row a
+  query picks out, so a change of account across three hundred rows is one call and both
+  versions stay readable, sharing their `row_id`.
 - The user and the assistant have the same powers over the data, with exactly one
   exception: both mark and unmark, and **only the user deletes**. Correcting a
   confirmed row is never an in-place edit — the corrected row is added with the

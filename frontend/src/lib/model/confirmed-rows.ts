@@ -1,8 +1,9 @@
-import { refreshAllLocalStores } from '@/lib/local-store/create-local-list-store'
+import { refreshLocalStores } from '@/lib/local-store/create-local-list-store'
 import { parseDateValue } from '@/lib/parse-date'
 import { parseNumberValue } from '@/lib/parse-number'
 import { DEFAULT_MEANING } from './ingestion'
 import { SOURCE_FILENAME_KEY, readObservations } from './observations'
+import type { LocalRow } from '@/lib/local-store/create-local-table'
 import { confirmedRowsTable } from './model-db'
 import { newRowId } from './row-id'
 import type { ConfirmedRow } from './types'
@@ -21,7 +22,7 @@ export async function setConfirmedMeaning(rowId: number, meaning: Partial<Pick<C
   const stored = await confirmedRowsTable.get(rowId)
   if (!stored) throw new Error(`Confirmed row ${rowId} was not found.`)
   await confirmedRowsTable.update(rowId, { data: { ...(stored.data as ConfirmedRow), ...meaning } })
-  await refreshAllLocalStores()
+  await refreshLocalStores('confirmedRows')
 }
 
 /**
@@ -75,7 +76,7 @@ export async function updateConfirmedRow(rowId: number, column: ConfirmedEditabl
     : { [column]: value.trim() || DEFAULT_MEANING }
 
   await confirmedRowsTable.update(rowId, { data: { ...row, ...patch } })
-  await refreshAllLocalStores()
+  await refreshLocalStores('confirmedRows')
 }
 
 /**
@@ -98,7 +99,7 @@ export async function placeConfirmedRow(
 
   if (mode === 'copy') await confirmedRowsTable.add({ createdAt: Date.now(), data: { ...row, ...placement } })
   else await confirmedRowsTable.update(rowId, { data: { ...row, ...placement } })
-  await refreshAllLocalStores()
+  await refreshLocalStores('confirmedRows')
 }
 
 /**
@@ -137,6 +138,57 @@ export async function fillFromObservations(
     result.filled += 1
   }
 
-  await refreshAllLocalStores()
+  await refreshLocalStores('confirmedRows')
   return result
+}
+
+/** What a revision may change. Where a row belongs is not here: that is place_confirmed_rows. */
+export interface ConfirmedRevision {
+  account?: string
+  card?: string
+  category?: string
+  subcategory?: string
+  date?: number
+  value?: number
+  observations?: string
+}
+
+/**
+ * Rewrites confirmed rows the way this app rewrites anything: by adding the corrected row
+ * and marking the old one.
+ *
+ * A row already on a dashboard is evidence of what the user was told, so it is never
+ * quietly overwritten — the correction and what it corrects both stay, sharing a `row_id`,
+ * and the old one is invisible to every dashboard while remaining in its table. That
+ * discipline is what made a change of account across three hundred rows impractical by
+ * hand; doing it row by row here keeps the discipline and drops the tedium.
+ *
+ * A row already marked is left alone: it has been superseded once, and superseding it
+ * again would bury the correction under a copy of a copy.
+ */
+export async function reviseConfirmedRows(rowIds: number[], revision: ConfirmedRevision): Promise<{ revised: number; skipped: number }> {
+  const changes = Object.fromEntries(Object.entries(revision).filter(([, value]) => value !== undefined))
+  if (Object.keys(changes).length === 0) throw new Error('A revision has to change something.')
+
+  const now = Date.now()
+  const replacements: { createdAt: number; data: ConfirmedRow }[] = []
+  const superseded: LocalRow[] = []
+
+  for (const id of rowIds) {
+    const stored = await confirmedRowsTable.get(id)
+    const row = stored?.data as ConfirmedRow | undefined
+    if (!stored || !row || row.markedForElimination) continue
+
+    // The id is what ties the correction to what it corrects; everything else is the row
+    // as it was, with the changes on top.
+    replacements.push({ createdAt: now, data: { ...row, ...changes, confirmedAt: now } })
+    superseded.push({ ...stored, data: { ...row, markedForElimination: true } })
+  }
+
+  if (replacements.length > 0) {
+    await confirmedRowsTable.bulkAdd(replacements)
+    await confirmedRowsTable.bulkPut(superseded)
+    await refreshLocalStores('confirmedRows')
+  }
+  return { revised: replacements.length, skipped: rowIds.length - replacements.length }
 }
