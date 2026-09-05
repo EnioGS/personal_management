@@ -7,17 +7,19 @@ export const DEFAULT_MEANING = 'outros'
 /**
  * What a row still needs before it can be confirmed.
  *
- * Four things are required: which account the money moved through, which card it was
- * billed to, and where the row belongs — its sections and its screens. Category and
- * subcategory are never missing, since they default to `outros`, and never wrong, since
- * nothing validates free text. A screen is checked *within* the sections the row names,
- * because two sections may offer screens of the same name and the pair is what identifies
- * a table; an account and a card are checked against what the user set up in Settings.
+ * Three things are required: which account the money moved through, and where the row
+ * belongs — its sections and its screens. Every movement sat in an account, so a row that
+ * does not say which is genuinely incomplete; a card is different, because a Pix, a
+ * salary or a transfer never touched one, and empty is the true answer rather than a gap.
+ * Category and subcategory are never missing, since they default to `outros`, and never
+ * wrong, since nothing validates free text. A screen is checked *within* the sections the
+ * row names, because two sections may offer screens of the same name and the pair is what
+ * identifies a table; an account and a card, when given, are checked against what the
+ * user set up in Settings.
  */
 export function ingestionLabelErrors(labels: IngestionRowLabels, catalogue?: LabelCatalogue): string[] {
   const errors: string[] = []
   if (!labels.account?.trim()) errors.push('Name the account this row belongs to.')
-  if (!labels.card?.trim()) errors.push('Name the card this row belongs to.')
   if (!labels.sections?.length) errors.push('Name the section this row belongs to.')
   if (!labels.screens?.length) errors.push('Name the screen this row belongs to.')
   if (!catalogue) return errors

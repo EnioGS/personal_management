@@ -322,11 +322,12 @@ describe('account and card, as labels', () => {
     expect((await confirmedRowsTable.toArray())[0].data).toMatchObject({ account: 'Banco A', card: 'Cartão X' })
   })
 
-  it('are required: a row naming neither is not ready, however well it is placed', async () => {
+  it('hold a row back when it names no account, and let one through with no card', async () => {
     const sourceId = await createSourceFile('banco-agosto.csv', BANK_CSV)
     const [first, second] = await rowsOf(sourceId)
     await label(first.id, { sections: ['finances'], screens: ['overview'], category: 'outros', subcategory: 'outros' })
-    await label(second.id, { sections: ['finances'], screens: ['overview'], category: 'outros', subcategory: 'outros', account: 'Banco A', card: 'Cartão X' })
+    // No card, and that is a complete answer: this row never touched one.
+    await label(second.id, { sections: ['finances'], screens: ['overview'], category: 'outros', subcategory: 'outros', account: 'Banco A' })
 
     const plan = await planConfirmation(sourceId, catalogue)
     expect(plan.incomplete).toEqual([first.id])

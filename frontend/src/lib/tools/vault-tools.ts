@@ -177,7 +177,7 @@ export const setLabelsTool: ToolDefinition = {
       category: { type: 'string' },
       subcategory: { type: 'string' },
       account: { type: 'string', description: "One of the user's accounts, by name. Required before a row can be confirmed; add_account registers one that does not exist yet." },
-      card: { type: 'string', description: "One of the user's credit cards, by name. Required before a row can be confirmed; add_card registers one, against an account." },
+      card: { type: 'string', description: "One of the user's credit cards, by name. Optional — leave it out for a row no card was involved in. add_card registers one, against an account." },
     },
     required: ['rowIds'],
     additionalProperties: false,

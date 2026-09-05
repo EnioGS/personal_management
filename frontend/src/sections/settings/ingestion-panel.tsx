@@ -46,9 +46,12 @@ type LabelColumn = (typeof LABEL_COLUMNS)[number]
 /** The ones that are free text, never validated, and default rather than start empty. */
 const MEANING_COLUMNS = ['category', 'subcategory'] as const
 
+/** Card is the one placement label a row may honestly leave empty — not every row has one. */
+const OPTIONAL_COLUMNS = ['card'] as const
+
 const LABEL_HINT: Record<LabelColumn, string> = {
   account: 'one of your accounts, by the name it was set up under',
-  card: 'one of your credit cards, by the name it was set up under',
+  card: 'one of your credit cards — empty when the row never touched one',
   sections: "the app's sections — several allowed, separated by commas",
   screens: 'the screens inside those sections — several allowed',
   category: 'free text',
@@ -438,9 +441,10 @@ export function IngestionPanel() {
                     {LABEL_COLUMNS.map((column) => {
                       const key = `${row.id}:${column}`
                       const text = drafts[key] ?? labelText(row.labels, column, catalogue)
-                      // Category and subcategory always hold something; everything else
-                      // is required, and says so until it does.
-                      const missing = MEANING_COLUMNS.includes(column as never) ? false : (row.labels[column] ?? []).length === 0
+                      // Category and subcategory always hold something, and a card is
+                      // genuinely optional; the rest are required and say so until filled.
+                      const optional = MEANING_COLUMNS.includes(column as never) || OPTIONAL_COLUMNS.includes(column as never)
+                      const missing = optional ? false : (row.labels[column] ?? []).length === 0
                       return (
                         <EditableCell
                           key={column}

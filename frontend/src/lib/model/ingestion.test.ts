@@ -12,14 +12,14 @@ const catalogue: LabelCatalogue = {
 const placed = { sections: ['finances'], screens: ['spending'], account: 'Banco A', card: 'Cartão X' }
 
 describe('what still stands between a row and a table', () => {
-  it('is an account, a card, and where it belongs', () => {
+  it('is an account, and where it belongs', () => {
     expect(ingestionLabelErrors(placed, catalogue)).toEqual([])
-    expect(ingestionLabelErrors({}, catalogue)).toHaveLength(4)
+    expect(ingestionLabelErrors({}, catalogue)).toHaveLength(3)
   })
 
-  it('says which of them is missing, one at a time', () => {
+  it('is never a card: a Pix, a salary or a transfer never touched one', () => {
+    expect(ingestionLabelErrors({ ...placed, card: undefined }, catalogue)).toEqual([])
     expect(ingestionLabelErrors({ ...placed, account: undefined }, catalogue).join(' ')).toContain('Name the account')
-    expect(ingestionLabelErrors({ ...placed, card: undefined }, catalogue).join(' ')).toContain('Name the card')
   })
 
   it('refuses a screen that belongs to a section the row does not name', () => {

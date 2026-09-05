@@ -62,12 +62,17 @@ Subcategory — free text, one value, the detail under the category. Also starts
 \`outros\`. Some words are reserved and read by the Recurring screen: assinatura,
 membership, parcelado and their obvious equivalents.
 
-Account and card — required, one value each, and validated against what the user set up
-in Settings → General: they say which account a row moved through and which card it was
-billed to. A name nothing is set up under is refused rather than stored, and a row missing
-either of them is not confirmed. list_accounts_and_cards names the ones that exist;
-add_account and add_card register what is missing, and a card is always registered against
-an account, so the account comes first.
+Account — required, one value, validated against what the user set up in Settings →
+General. Every movement sat somewhere, so a row that does not say which account it moved
+through is incomplete and is not confirmed.
+
+Card — the same vocabulary, and optional. Fill it for a row billed to a card; leave it
+empty for one that never touched a card, which a Pix, a salary or a transfer never did.
+Empty is the true answer there, not a gap to fill.
+
+A name nothing is set up under is refused rather than stored. list_accounts_and_cards
+names the ones that exist; add_account and add_card register what is missing, and a card
+is always registered against an account, so the account comes first.
 
 ## Signs
 
