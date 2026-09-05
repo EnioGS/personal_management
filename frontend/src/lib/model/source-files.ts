@@ -192,7 +192,8 @@ export async function createSourceFile(
     data: {
       originalFilename,
       importedAt: Date.now(),
-      rawCsv,
+      // The text itself is not kept: every row of it is stored as a row, and holding the
+      // whole file as well meant re-reading it from the database on every refresh.
       originalColumns: parsed.columns,
       assignments: {},
       signConvention: { kind: 'asImported' },

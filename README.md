@@ -229,7 +229,11 @@ Two things it optimizes for:
 - Correcting confirmed rows in bulk keeps the same discipline rather than escaping it:
   `revise_confirmed_rows` adds the corrected row and marks the old one for every row a
   query picks out, so a change of account across three hundred rows is one call and both
-  versions stay readable, sharing their `row_id`.
+  versions stay readable, sharing their `row_id`. Only the fields named change, and an
+  empty card clears it — "no card" is what a bank row honestly holds.
+- A source file's own text is not kept once its rows are parsed out of it. It was stored
+  beside them and never read again, so every reload of the file list decoded every byte
+  of every file imported — which is what a vault with a few dozen files felt like.
 - The user and the assistant have the same powers over the data, with exactly one
   exception: both mark and unmark, and **only the user deletes**. Correcting a
   confirmed row is never an in-place edit — the corrected row is added with the

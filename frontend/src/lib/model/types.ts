@@ -167,7 +167,12 @@ export interface SourceFile {
   originalFilename: string
   importedAt: number
   /** The file as it arrived. Never rewritten. */
-  rawCsv: string
+  /**
+   * The file's text as uploaded. Only kept on files imported before it stopped being
+   * stored: the parsed rows hold everything it said, and re-reading a megabyte of text
+   * into memory on every refresh bought nothing.
+   */
+  rawCsv?: string
   originalColumns: string[]
   /** Original column -> canonical field. Only original columns may be assigned. */
   assignments: Record<string, IngestionTargetField>

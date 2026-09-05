@@ -111,6 +111,14 @@ export function IngestionPanel() {
   // Every table a screen could hold, whether or not anything is in it yet: a table with
   // no rows is still where rows for that screen go, and being unable to open it means
   // being unable to add the first one.
+  // Counted once, not once per file per render: filtering every row for each file is
+  // work proportional to files times rows, and it happens on every keystroke.
+  const rowsPerFile = useMemo(() => {
+    const counts = new Map<number, number>()
+    for (const row of sourceRows) counts.set(row.sourceId, (counts.get(row.sourceId) ?? 0) + 1)
+    return counts
+  }, [sourceRows])
+
   const confirmedTables = useMemo(() => {
     const fromApp = catalogue.screens.map((screen) => `${screen.sectionId}/${screen.id}`)
     const fromRows = confirmedRows.map(confirmedTableKey)
@@ -320,7 +328,7 @@ export function IngestionPanel() {
             )}
             {sourceFiles.map((file) => (
               <SelectItem key={file.id} value={`source:${file.id}`}>
-                {`${file.originalFilename} — ${sourceRows.filter((row) => row.sourceId === file.id).length} row(s)`}
+                {`${file.originalFilename} — ${rowsPerFile.get(file.id) ?? 0} row(s)`}
               </SelectItem>
             ))}
             {confirmedTables.map((table) => (

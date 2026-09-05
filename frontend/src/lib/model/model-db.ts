@@ -187,6 +187,19 @@ db.version(12).stores({}).upgrade(async (tx) => {
   })
 })
 
+/**
+ * Drops the uploaded text from files that still carry it.
+ *
+ * It was stored beside the rows parsed out of it and never read again — so every reload
+ * of the file list decoded every byte of every file imported, which is what made a vault
+ * with a few dozen files feel slow at rest.
+ */
+db.version(13).stores({}).upgrade(async (tx) => {
+  await tx.table('sourceFiles').toCollection().modify((row: { data?: { rawCsv?: string } }) => {
+    if (row.data) delete row.data.rawCsv
+  })
+})
+
 export const accountsTable = db.accounts
 export const cardsTable = db.cards
 export const budgetsTable = db.budgets

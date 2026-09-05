@@ -142,10 +142,16 @@ export async function fillFromObservations(
   return result
 }
 
-/** What a revision may change. Where a row belongs is not here: that is place_confirmed_rows. */
+/**
+ * What a revision may change. Where a row belongs is not here: that is
+ * place_confirmed_rows.
+ *
+ * `null` clears a field, which is not the same as leaving it out: a row wrongly labelled
+ * with a card needs the card gone, and "no card" is a real answer rather than an omission.
+ */
 export interface ConfirmedRevision {
   account?: string
-  card?: string
+  card?: string | null
   category?: string
   subcategory?: string
   date?: number
@@ -180,8 +186,13 @@ export async function reviseConfirmedRows(rowIds: number[], revision: ConfirmedR
     if (!stored || !row || row.markedForElimination) continue
 
     // The id is what ties the correction to what it corrects; everything else is the row
-    // as it was, with the changes on top.
-    replacements.push({ createdAt: now, data: { ...row, ...changes, confirmedAt: now } })
+    // as it was, with the changes on top — and a field revised to null is dropped, since
+    // a row that holds nothing there is what "no card" means.
+    const corrected = { ...row, ...changes, confirmedAt: now } as Record<string, unknown>
+    for (const [field, value] of Object.entries(changes)) {
+      if (value === null) delete corrected[field]
+    }
+    replacements.push({ createdAt: now, data: corrected as unknown as ConfirmedRow })
     superseded.push({ ...stored, data: { ...row, markedForElimination: true } })
   }
 

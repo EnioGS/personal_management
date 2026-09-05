@@ -141,3 +141,36 @@ describe('revising confirmed rows in bulk', () => {
     await expect(reviseConfirmedRows([id], {})).rejects.toThrow(/change something/)
   })
 })
+
+describe('clearing a label rather than changing it', () => {
+  beforeEach(async () => { await wipeAllData() })
+
+  it('drops the card from the corrected row when the revision says null', async () => {
+    const id = await addConfirmedRow('finances', 'movements')
+    await reviseConfirmedRows([id], { card: 'Cartão principal', account: 'Conta principal' })
+    const carrying = (await confirmedRowsTable.toArray()).find((row) => !(row.data as ConfirmedRow).markedForElimination)!
+
+    await reviseConfirmedRows([carrying.id], { card: null })
+
+    const current = (await confirmedRowsTable.toArray())
+      .map((row) => row.data as ConfirmedRow)
+      .filter((row) => !row.markedForElimination)
+    expect(current).toHaveLength(1)
+    expect(current[0].card).toBeUndefined()
+    // What it corrected is still there, saying what the row used to claim.
+    expect((await confirmedRowsTable.toArray()).some((row) => (row.data as ConfirmedRow).card === 'Cartão principal')).toBe(true)
+  })
+
+  it('leaves every field it was not given alone', async () => {
+    const id = await addConfirmedRow('finances', 'spending')
+    await updateConfirmedRow(id, 'value', '-284,90')
+    await updateConfirmedRow(id, 'date', '02/08/2026')
+
+    await reviseConfirmedRows([id], { account: 'Nubank - Main account' })
+
+    const corrected = (await confirmedRowsTable.toArray())
+      .map((row) => row.data as ConfirmedRow)
+      .find((row) => !row.markedForElimination)!
+    expect(corrected).toMatchObject({ value: -284.9, date: Date.UTC(2026, 7, 2), account: 'Nubank - Main account' })
+  })
+})
