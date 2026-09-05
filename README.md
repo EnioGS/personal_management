@@ -229,8 +229,10 @@ Two things it optimizes for:
 - Correcting confirmed rows in bulk keeps the same discipline rather than escaping it:
   `revise_confirmed_rows` adds the corrected row and marks the old one for every row a
   query picks out, so a change of account across three hundred rows is one call and both
-  versions stay readable, sharing their `row_id`. Only the fields named change, and an
-  empty card clears it — "no card" is what a bank row honestly holds.
+  versions stay readable, sharing their `row_id`. Only the fields named change, and
+  removing a card is a word of its own (`clearCard`) rather than an empty name — an empty
+  string is what a caller filling in every field writes, and it must not be able to strip
+  a card off rows that have one.
 - A source file's own text is not kept once its rows are parsed out of it. It was stored
   beside them and never read again, so every reload of the file list decoded every byte
   of every file imported — which is what a vault with a few dozen files felt like.

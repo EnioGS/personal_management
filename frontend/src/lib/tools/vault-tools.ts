@@ -149,9 +149,11 @@ async function labelSourceRows(rowIds: number[], values: Record<string, unknown>
 
     // An account or a card has to name one the user set up; anything else is refused
     // rather than stored, the same way a screen nobody has is refused.
-    // An empty string clears the label; anything else has to name one the user set up.
+    // Naming a card and clearing one are different acts, said differently: an empty
+    // string is what a caller filling in every field writes, and it changes nothing.
     const account = text('account') ? resolveAccountLabel(catalogue, text('account')!) : undefined
     const card = text('card') ? resolveCardLabel(catalogue, text('card')!) : undefined
+    const clearingCard = values.clearCard === true
     const unnamed = [
       ...(text('account') && !account ? [text('account')!] : []),
       ...(text('card') && !card ? [text('card')!] : []),
@@ -163,8 +165,8 @@ async function labelSourceRows(rowIds: number[], values: Record<string, unknown>
       ...(screens ? { screens: screens.values } : {}),
       ...(text('category') !== undefined ? { category: text('category') } : {}),
       ...(text('subcategory') !== undefined ? { subcategory: text('subcategory') } : {}),
-      ...(text('account') !== undefined ? { account } : {}),
-      ...(text('card') !== undefined ? { card } : {}),
+      ...(text('account')?.trim() ? { account } : {}),
+      ...(clearingCard ? { card: undefined } : text('card')?.trim() ? { card } : {}),
     }, catalogue)
 
     await sourceRowsTable.update(id, { data: { ...row, labels } satisfies SourceRow })
@@ -346,14 +348,15 @@ export const fillFromObservationsTool: ToolDefinition = {
 
 export const reviseConfirmedRowsTool: ToolDefinition = {
   name: 'revise_confirmed_rows',
-  description: "Corrects many confirmed rows at once, keeping the discipline that makes a correction readable: for every row it touches it adds the corrected row with the same row_id and marks the old one for elimination. Nothing is overwritten and nothing is deleted — a row already on a dashboard is evidence of what the user was told, and both versions stay, the old one invisible to every dashboard and still in its table. Pick the rows with selectIds, which is a SELECT returning an id column, or list them. Name only the fields that change; a field you do not pass is left exactly as it was. To clear a card rather than change it, pass an empty string: a row that never touched a card should hold nothing there. What a row moved cannot be changed here at all — money is corrected one row at a time with add_confirmed_row, because a wrong amount is a fact about one transaction and a tool that could rewrite three hundred of them at once would be one mistaken argument away from doing so. Account and card must name something the user set up. Where a row belongs is not changed here — place_confirmed_rows moves a row between tables. A row that is already marked is skipped rather than superseded twice.",
+  description: "Corrects many confirmed rows at once, keeping the discipline that makes a correction readable: for every row it touches it adds the corrected row with the same row_id and marks the old one for elimination. Nothing is overwritten and nothing is deleted — a row already on a dashboard is evidence of what the user was told, and both versions stay, the old one invisible to every dashboard and still in its table. Pick the rows with selectIds, which is a SELECT returning an id column, or list them. Name only the fields that change; a field you do not pass, or pass as an empty string, is left exactly as it was. Clearing a card is said out loud with clearCard: true — a row that never touched a card should hold nothing there, but stripping the card off rows that have one is not something a stray empty string should be able to do. What a row moved cannot be changed here at all — money is corrected one row at a time with add_confirmed_row, because a wrong amount is a fact about one transaction and a tool that could rewrite three hundred of them at once would be one mistaken argument away from doing so. Account and card must name something the user set up. Where a row belongs is not changed here — place_confirmed_rows moves a row between tables. A row that is already marked is skipped rather than superseded twice.",
   parameters: {
     type: 'object',
     properties: {
       rowIds: { type: 'array', items: { type: 'number' } },
       selectIds: { type: 'string', description: 'One SELECT returning an id column, e.g. SELECT id FROM "confirmed__finances__spending" WHERE account = \'Conta principal\'.' },
       account: { type: 'string' },
-      card: { type: 'string', description: "One of the user's cards, by name. An empty string clears it." },
+      card: { type: 'string', description: "One of the user's cards, by name. Leave it out to keep whatever each row has." },
+      clearCard: { type: 'boolean', description: 'Removes the card from every row selected. Say this only when you mean it: the rows that had one lose it.' },
       category: { type: 'string' },
       subcategory: { type: 'string' },
       reason: { type: 'string', description: 'Why, for the user. Not stored on the row.' },
@@ -376,15 +379,14 @@ export const reviseConfirmedRowsTool: ToolDefinition = {
       if (!account) return `Error: no account is called "${args.account}". Call list_accounts_and_cards, or add_account first.`
       revision.account = account
     }
-    if (typeof args.card === 'string') {
-      // Empty means "no card", which a bank row genuinely has; anything else has to name
-      // a card the user set up.
-      if (!args.card.trim()) revision.card = null
-      else {
-        const card = resolveCardLabel(catalogue, args.card)
-        if (!card) return `Error: no card is called "${args.card}". Call list_accounts_and_cards, or add_card first.`
-        revision.card = card
-      }
+    // Clearing is a separate word from naming. An empty string is what a caller filling
+    // in every field produces, and it must not be able to strip the card off rows that
+    // have one — the same way a stray value once rewrote three hundred amounts.
+    if (args.clearCard === true) revision.card = null
+    else if (typeof args.card === 'string' && args.card.trim()) {
+      const card = resolveCardLabel(catalogue, args.card)
+      if (!card) return `Error: no card is called "${args.card}". Call list_accounts_and_cards, or add_card first.`
+      revision.card = card
     }
     if (typeof args.category === 'string') revision.category = args.category.trim() || DEFAULT_MEANING
     if (typeof args.subcategory === 'string') revision.subcategory = args.subcategory.trim() || DEFAULT_MEANING

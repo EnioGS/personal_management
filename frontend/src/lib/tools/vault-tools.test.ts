@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { wipeAllData } from '@/lib/data-file'
-import { accountsTable, confirmedRowsTable, sourceRowsTable } from '@/lib/model/model-db'
+import { accountsTable, cardsTable, confirmedRowsTable, sourceRowsTable } from '@/lib/model/model-db'
 import { createSourceFile } from '@/lib/model/source-files'
 import { assignSourceColumnsTool, confirmRowsTool, setLabelsTool } from './vault-tools'
 import type { SourceRow } from '@/lib/model/types'
@@ -79,5 +79,44 @@ describe('marking by query', () => {
     const { markRowsTool } = await import('./vault-tools')
 
     expect(await markRowsTool.execute({ table: 'confirmed', selectIds: 'SELECT 1' }, context)).toContain('id column')
+  })
+})
+
+describe('clearing a card, said out loud', () => {
+  beforeEach(async () => { await wipeAllData() })
+
+  async function rowWithCard() {
+    await accountsTable.add({ createdAt: 1, data: { name: 'Conta principal', kind: 'checking' } })
+    await cardsTable.add({ createdAt: 1, data: { name: 'Cartão principal', accountId: 1 } })
+    const { addConfirmedRow } = await import('@/lib/model/confirmed-rows')
+    const { reviseConfirmedRowsTool } = await import('./vault-tools')
+    const id = await addConfirmedRow('finances', 'movements')
+    await reviseConfirmedRowsTool.execute({ rowIds: [id], card: 'Cartão principal' }, context)
+    return (await confirmedRowsTable.toArray()).find((row) => !(row.data as { markedForElimination?: boolean }).markedForElimination)!
+  }
+
+  it('leaves the card alone when the field arrives empty, which is what filling in every field looks like', async () => {
+    const { reviseConfirmedRowsTool } = await import('./vault-tools')
+    const carrying = await rowWithCard()
+
+    await reviseConfirmedRowsTool.execute({ rowIds: [carrying.id], account: 'Conta principal', card: '' }, context)
+
+    const current = (await confirmedRowsTable.toArray())
+      .map((row) => row.data as { card?: string; account?: string; markedForElimination?: boolean })
+      .filter((row) => !row.markedForElimination)
+    expect(current).toHaveLength(1)
+    expect(current[0]).toMatchObject({ card: 'Cartão principal', account: 'Conta principal' })
+  })
+
+  it('removes it when that is what was asked for', async () => {
+    const { reviseConfirmedRowsTool } = await import('./vault-tools')
+    const carrying = await rowWithCard()
+
+    await reviseConfirmedRowsTool.execute({ rowIds: [carrying.id], clearCard: true }, context)
+
+    const current = (await confirmedRowsTable.toArray())
+      .map((row) => row.data as { card?: string; markedForElimination?: boolean })
+      .filter((row) => !row.markedForElimination)
+    expect(current[0].card).toBeUndefined()
   })
 })
