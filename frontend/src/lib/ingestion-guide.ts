@@ -48,8 +48,8 @@ the observations column when the row is confirmed, which is where a description 
 
 ## The order of work
 
-1. **Assign the columns.** Date and amount are what the dashboards need; the rest matter
-   for investment rows. Read which accounts and cards exist while you are here, and
+1. **Assign the columns.** Date and value are what the dashboards need; amount, price and
+   the asset matter for investment rows. Read which accounts and cards exist while you are here, and
    register anything the file plainly belongs to that is missing.
 2. **Label the sections.** Which parts of the app this row belongs to.
 3. **Label the screens.** Which pages inside those sections. Both take several values.
@@ -90,18 +90,18 @@ disagrees is brought into line rather than annotated.
 
 Before deciding, **sample the destination tables** — read what signs the rows already
 there carry for the same kind of transaction. Calling query_vault with no statement
-reports, for every confirmed table, how many of its amounts are negative and how many are
+reports, for every confirmed table, how many of its values are negative and how many are
 positive; that count is the table's reference. Do that even when a convention is recorded
 somewhere: a recorded reference is a shortcut, not evidence.
 
 Two transformations exist:
 - **invert everything**, for a file that consistently means the opposite (a card export
   writing purchases as positive);
-- **invert by condition**, for a file whose amounts are all one sign and whose direction
+- **invert by condition**, for a file whose values are all one sign and whose direction
   lives in another column: buy/sell, received/sent, debit/credit.
 
-The transformation rewrites the amount column itself, so the source table shows the
-amount that will be confirmed rather than one value on screen and another underneath. The
+The transformation rewrites the value column itself, so the source table shows the number
+that will be confirmed rather than one on screen and another underneath. The
 value the file actually wrote is kept on the row and reaches the observations of every
 confirmed row, so a transformation is never invisible and can always be undone by setting
 the convention back. If the evidence does not settle it, ask the user.
@@ -124,7 +124,10 @@ Never edit a confirmed row in place. Add a new row carrying **the same row_id** 
 the old one for elimination. A row marked for elimination disappears from every dashboard
 and stays in its table — the only thing this app hides, and what makes marking safe.
 
-Marking and unmarking are yours and the user's alike. **Deleting is the user's alone.**
+Marking and unmarking are yours and the user's alike, one row at a time or by a query —
+mark_rows takes a SELECT returning ids, so "everything in this table with no date or no
+value" is one call rather than a list you have to assemble. **Deleting is the user's
+alone.**
 When you invent a row that came from nowhere, mint its id with the tool for that rather
 than reusing one.
 

@@ -166,8 +166,14 @@ export interface QueryResult {
 
 const MAX_ROWS = 200
 
-/** Runs one read statement. Anything that would write is refused before it runs. */
-export async function queryVault(statement: string): Promise<QueryResult> {
+/**
+ * Runs one read statement. Anything that would write is refused before it runs.
+ *
+ * `limit` raises the screenful a read returns, for a caller that is not reading: choosing
+ * which rows to act on is not the same as looking at them, and a set of ids should not be
+ * cut off at two hundred.
+ */
+export async function queryVault(statement: string, options: { limit?: number } = {}): Promise<QueryResult> {
   const trimmed = statement.trim().replace(/;+\s*$/, '')
   if (/;/.test(trimmed)) throw new Error('One statement at a time.')
   if (!/^(select|with)\b/i.test(trimmed)) throw new Error('Only SELECT (or WITH … SELECT) can be read here. Changes go through the writing tools.')
@@ -177,7 +183,8 @@ export async function queryVault(statement: string): Promise<QueryResult> {
     const result = snapshot.db.exec(trimmed)
     if (result.length === 0) return { columns: [], rows: [], rowCount: 0, truncated: false }
     const [{ columns, values }] = result
-    return { columns, rows: values.slice(0, MAX_ROWS), rowCount: values.length, truncated: values.length > MAX_ROWS }
+    const limit = options.limit ?? MAX_ROWS
+    return { columns, rows: values.slice(0, limit), rowCount: values.length, truncated: values.length > limit }
   } finally {
     snapshot.db.close()
   }

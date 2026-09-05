@@ -50,3 +50,34 @@ describe('confirming through the assistant', () => {
     expect(await confirmedRowsTable.count()).toBe(0)
   })
 })
+
+describe('marking by query', () => {
+  beforeEach(async () => { await wipeAllData() })
+
+  it('marks every row a SELECT picks out, not just the first screenful', async () => {
+    const { addConfirmedRow, updateConfirmedRow } = await import('@/lib/model/confirmed-rows')
+    const { markRowsTool } = await import('./vault-tools')
+    for (let index = 0; index < 3; index += 1) {
+      const id = await addConfirmedRow('finances', 'movements')
+      // Only the middle one is worth keeping: it has both numbers.
+      if (index === 1) { await updateConfirmedRow(id, 'date', '01/08/2026'); await updateConfirmedRow(id, 'value', '-10') }
+    }
+
+    const result = JSON.parse(await markRowsTool.execute({
+      table: 'confirmed',
+      selectIds: 'SELECT id FROM "confirmed__finances__movements" WHERE date IS NULL OR value IS NULL',
+      reason: 'no date or no value',
+    }, context))
+
+    expect(result).toMatchObject({ changed: 2, marked: true })
+    const rows = (await confirmedRowsTable.toArray()).map((row) => row.data as { markedForElimination?: boolean; value?: number })
+    expect(rows.filter((row) => row.markedForElimination)).toHaveLength(2)
+    expect(rows.find((row) => row.value === -10)!.markedForElimination).toBeUndefined()
+  })
+
+  it('refuses a query that returns no id to act on', async () => {
+    const { markRowsTool } = await import('./vault-tools')
+
+    expect(await markRowsTool.execute({ table: 'confirmed', selectIds: 'SELECT 1' }, context)).toContain('id column')
+  })
+})

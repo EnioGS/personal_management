@@ -24,7 +24,7 @@ import type { ToolDefinition } from './types'
 
 export const queryVaultTool: ToolDefinition = {
   name: 'query_vault',
-  description: "Runs one SELECT against the app's data and returns columns and rows. This is how you read anything: there is a table per uploaded file (source__<file>__<id>), a table per (section, screen) pair holding confirmed rows (confirmed__<section>__<screen>), and label_rules. Call it with no statement to get the schema — every table, its columns, how many rows it holds, and for a confirmed table how its amounts are signed today, which is the reference any sign decision is measured against. That is the right first call on unfamiliar data. Count and group here rather than reading rows you do not need; at most 200 rows come back and the total is always reported. Reading is all this does: changes go through the other tools.",
+  description: "Runs one SELECT against the app's data and returns columns and rows. This is how you read anything: there is a table per uploaded file (source__<file>__<id>), a table per (section, screen) pair holding confirmed rows (confirmed__<section>__<screen>), and label_rules. Call it with no statement to get the schema — every table, its columns, how many rows it holds, and for a confirmed table how its values are signed today, which is the reference any sign decision is measured against. That is the right first call on unfamiliar data. Count and group here rather than reading rows you do not need; at most 200 rows come back and the total is always reported. Reading is all this does: changes go through the other tools.",
   parameters: { type: 'object', properties: { statement: { type: 'string', description: 'One SELECT, or WITH … SELECT. Omit to describe the schema instead.' } }, additionalProperties: false },
   execute: async (args) => {
     if (typeof args.statement !== 'string' || !args.statement.trim()) {
@@ -99,7 +99,7 @@ export const assignSourceColumnsTool: ToolDefinition = {
 
 export const setSignConventionTool: ToolDefinition = {
   name: 'set_sign_convention',
-  description: "Makes a file's amounts mean what this app means: negative left, positive arrived. Decide this only after the rows are labelled, because it depends on where they are going — and sample those tables first with query_vault to see what signs comparable rows already carry, whatever convention anyone has recorded. invertAll suits a file that consistently means the opposite, such as a card export writing purchases as positive. invertWhen suits a file whose amounts are all one sign and whose direction lives in another column: name that column and the values that mean money leaving. The value the file wrote is kept in each row's observations, so nothing is lost. If the evidence does not settle it, ask the user rather than guessing.",
+  description: "Makes a file's values mean what this app means: negative left, positive arrived. It acts on the column assigned to value — the money that moved — and not on amount, which is units of a thing and has no direction. Decide this only after the rows are labelled, because it depends on where they are going, and sample those tables first with query_vault to see what signs comparable rows already carry, whatever convention anyone has recorded. invertAll suits a file that consistently means the opposite, such as a card export writing purchases as positive. invertWhen suits a file whose values are all one sign and whose direction lives in another column: name that column and the entries in it that mean money leaving. What the file wrote is kept in each row's observations, so nothing is lost. If the evidence does not settle it, ask the user rather than guessing.",
   parameters: {
     type: 'object',
     properties: {
@@ -258,7 +258,7 @@ export const addSourceRowTool: ToolDefinition = {
 
 export const setSourceValuesTool: ToolDefinition = {
   name: 'set_source_values',
-  description: "Corrects a source row's own values, by the file's column names. Use it where the file itself is wrong or unreadable — a date the export mangled, an amount split across columns — and not to express meaning: what a row *is* belongs in its labels, and a raw value rewritten to say something is a value nobody can check against the file any more. Editing the amount edits what the file said, and the file's sign convention is then re-applied to it. The user edits the same cells by double-clicking them.",
+  description: "Corrects a source row's own values, by the file's column names. Use it where the file itself is wrong or unreadable — a date the export mangled, a value split across columns — and not to express meaning: what a row *is* belongs in its labels, and a raw value rewritten to say something is a value nobody can check against the file any more. Editing the value edits what the file said, and the file's sign convention is then re-applied to it. The user edits the same cells by double-clicking them.",
   parameters: {
     type: 'object',
     properties: {
@@ -369,23 +369,48 @@ export const placeConfirmedRowsTool: ToolDefinition = {
   },
 }
 
+/**
+ * The ids a SELECT picks out.
+ *
+ * Reading is capped at a screenful, because a read is something to look at; choosing what
+ * to mark is not, and a rule like "everything with no date" is worth nothing if it stops
+ * at two hundred rows. The statement is validated the same way every other read is — it
+ * still cannot write — and only the ids it returns are used.
+ */
+async function idsFrom(statement: string): Promise<number[]> {
+  const result = await queryVault(statement, { limit: Number.MAX_SAFE_INTEGER })
+  const column = result.columns.findIndex((name) => name === 'id')
+  if (column === -1) throw new Error('that query has to return an id column.')
+  return result.rows.map((row) => Number(row[column])).filter((id) => Number.isInteger(id))
+}
+
 export const markRowsTool: ToolDefinition = {
   name: 'mark_rows',
-  description: "Marks rows for elimination, or unmarks them. A marked row disappears from every dashboard and stays in its table — the one thing this app hides, and what makes marking safe to use freely. It works on source rows and confirmed rows alike. You cannot delete anything: removing marked rows is the user's, and the only thing they can do that you cannot. To correct a confirmed row, add the corrected one with the same row_id and mark the old one here.",
+  description: "Marks rows for elimination, or unmarks them, either by id or by a query that picks them out. A marked row disappears from every dashboard and stays in its table — the one thing this app hides, and what makes marking safe to use freely. It works on source rows and confirmed rows alike. You cannot delete anything: removing marked rows is the user's, and the only thing they can do that you cannot. To correct a confirmed row, add the corrected one with the same row_id and mark the old one here.",
   parameters: {
     type: 'object',
     properties: {
       table: { type: 'string', enum: ['source', 'confirmed'] },
       rowIds: { type: 'array', items: { type: 'number' } },
+      selectIds: {
+        type: 'string',
+        description: "Instead of listing ids: one SELECT returning an id column, e.g. SELECT id FROM \"confirmed__finances__movements\" WHERE date IS NULL OR value IS NULL. Every row it returns is marked, however many — this is not capped at the 200 rows a read returns.",
+      },
       marked: { type: 'boolean', description: 'true marks (default); false unmarks.' },
       reason: { type: 'string' },
     },
-    required: ['table', 'rowIds'],
+    required: ['table'],
     additionalProperties: false,
   },
   execute: async (args) => {
-    const rowIds = Array.isArray(args.rowIds) ? args.rowIds.filter((id): id is number => typeof id === 'number') : []
-    if (rowIds.length === 0) return 'Error: rowIds are required.'
+    const listed = Array.isArray(args.rowIds) ? args.rowIds.filter((id): id is number => typeof id === 'number') : []
+    let rowIds = listed
+    if (typeof args.selectIds === 'string' && args.selectIds.trim()) {
+      try {
+        rowIds = [...listed, ...await idsFrom(args.selectIds)]
+      } catch (error) { return `Error: ${error instanceof Error ? error.message : 'that query could not run.'}` }
+    }
+    if (rowIds.length === 0) return 'Error: pass rowIds, or a selectIds query that returns some.'
     const marked = args.marked !== false
     const table = args.table === 'confirmed' ? confirmedRowsTable : sourceRowsTable
     let changed = 0
@@ -408,7 +433,7 @@ export const newRowIdTool: ToolDefinition = {
 
 export const addConfirmedRowTool: ToolDefinition = {
   name: 'add_confirmed_row',
-  description: "Adds a row directly to a confirmed table. Two uses, and no others: correcting a row — pass the row_id of the one you are replacing and mark that one for elimination — or recording something the files never carried. Never edit a row in place; the pair of an added row and a marked one is what keeps the history readable. Amounts are signed the way this app means: negative left, positive arrived.",
+  description: "Adds a row directly to a confirmed table. Two uses, and no others: correcting a row — pass the row_id of the one you are replacing and mark that one for elimination — or recording something the files never carried. Never edit a row in place; the pair of an added row and a marked one is what keeps the history readable. Money is a row's value, signed the way this app means it — negative left, positive arrived — while amount is units of a thing and price is what one unit was worth.",
   parameters: {
     type: 'object',
     properties: {
@@ -416,7 +441,10 @@ export const addConfirmedRowTool: ToolDefinition = {
       section: { type: 'string' },
       screen: { type: 'string' },
       date: { type: 'string', description: 'Any readable date; day-first is understood.' },
-      amount: { type: 'number' },
+      value: { type: 'number', description: 'Money that moved, signed: negative left, positive arrived.' },
+      amount: { type: 'number', description: 'Units of the asset, for an investment row. Not money.' },
+      price: { type: 'number', description: 'What one unit was worth.' },
+      asset: { type: 'string' },
       observations: { type: 'string' },
       category: { type: 'string' },
       subcategory: { type: 'string' },
@@ -439,7 +467,10 @@ export const addConfirmedRowTool: ToolDefinition = {
       screen,
       confirmedAt: Date.now(),
       date: parseDateValue(args.date) ?? undefined,
+      value: typeof args.value === 'number' ? args.value : undefined,
       amount: typeof args.amount === 'number' ? args.amount : undefined,
+      price: typeof args.price === 'number' ? args.price : undefined,
+      asset: typeof args.asset === 'string' && args.asset.trim() ? args.asset.trim() : undefined,
       // Where the row came from belongs in the observations with everything else a file
       // said; there is no column of its own repeating it.
       observations: withObservation(
