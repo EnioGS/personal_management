@@ -9,6 +9,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { UNLABELLED_LABEL } from './use-dashboard-entries'
 import { useConfirmedRowsStore } from '@/lib/model/model-stores'
 import type { DateRangePreset } from '@/lib/dashboard/date-range'
 import type { DashboardFilters } from './dashboard-filters'
@@ -47,7 +48,7 @@ export function FilterBar({
   // selector that builds a new array every call is never equal to the last one, and the
   // subscription re-renders forever.
   const rows = useConfirmedRowsStore((store) => store.items)
-  const categories = useMemo(() => [...new Set(rows.map((row) => row.category))].sort(), [rows])
+  const categories = useMemo(() => [...new Set(rows.map((row) => row.category.trim()))].sort(), [rows])
 
   return (
     <div className="flex flex-wrap items-center gap-1.5 border-b p-2">
@@ -81,7 +82,7 @@ export function FilterBar({
           <DropdownMenuContent align="start" className="max-h-72 overflow-auto text-xs">
             {categories.map((category) => (
               <DropdownMenuCheckboxItem key={category} checked={filters.categories.includes(category)} onCheckedChange={() => toggleCategory(category)}>
-                {category}
+                {category || UNLABELLED_LABEL}
               </DropdownMenuCheckboxItem>
             ))}
             {filters.categories.length > 0 && (

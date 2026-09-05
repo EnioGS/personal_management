@@ -10,7 +10,7 @@ import { RankedBarList } from '@/components/dashboard/ranked-bar-list'
 import { StatTile, type StatDelta } from '@/components/dashboard/stat-tile'
 import { FilterBar } from '@/components/dashboard/filter-bar'
 import { resolveFilterRange, useDashboardFilters, type DashboardFilters } from '@/components/dashboard/dashboard-filters'
-import { useDashboardEntries } from '@/components/dashboard/use-dashboard-entries'
+import { UNLABELLED_LABEL, useDashboardEntries } from '@/components/dashboard/use-dashboard-entries'
 import { formatDateLabel, formatMonthLabel, groupByKey } from '@/lib/aggregations'
 import { capitalEvolution, type CapitalEvolutionPoint, type InvestmentValueEntry } from '@/lib/dashboard/capital-evolution'
 import { asTransaction, isFixedIncome, useInvestmentRows } from '@/lib/model/investment-rows'
@@ -203,10 +203,10 @@ export function OverviewPanel() {
                       <tr key={i} className="border-b last:border-0">
                         <td className="text-muted-foreground overflow-hidden p-2 whitespace-nowrap">{formatDateLabel(entry.date)}</td>
                         <td className="overflow-hidden p-2 text-ellipsis whitespace-nowrap" title={entry.description}>
-                          {entry.description || entry.category}
+                          {entry.description || entry.category || UNLABELLED_LABEL}
                         </td>
                         <td className="p-2 text-center">
-                          <CategoryPill label={entry.category} wrap />
+                          <CategoryPill label={entry.category || UNLABELLED_LABEL} wrap />
                         </td>
                         <td
                           className={`p-2 text-right tabular-nums ${entry.value > 0 ? 'text-brand' : ''}`}

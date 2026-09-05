@@ -1,8 +1,18 @@
 import type { LabelCatalogue } from './label-catalogue'
 import type { IngestionRowLabels } from './types'
 
-/** What category and subcategory hold before anyone has said anything more precise. */
-export const DEFAULT_MEANING = 'outros'
+/**
+ * What category and subcategory hold before anyone has said anything: nothing.
+ *
+ * They used to start at `outros`, which read on every screen as a decision somebody had
+ * made — a category called "other" is a statement, and the app was making it on the
+ * user's behalf for every row of every import. An empty cell says what is true: nobody
+ * has looked at this yet.
+ */
+export const UNLABELLED = ''
+
+/** What that default used to be, still recognised as "nobody has said" wherever it survives. */
+export const LEGACY_DEFAULT_MEANING = 'outros'
 
 /**
  * What a row still needs before it can be confirmed.
@@ -11,8 +21,8 @@ export const DEFAULT_MEANING = 'outros'
  * belongs — its sections and its screens. Every movement sat in an account, so a row that
  * does not say which is genuinely incomplete; a card is different, because a Pix, a
  * salary or a transfer never touched one, and empty is the true answer rather than a gap.
- * Category and subcategory are never missing, since they default to `outros`, and never
- * wrong, since nothing validates free text. A screen is checked *within* the sections the
+ * Category and subcategory are never required — a row can be placed before it is
+ * understood — and never wrong, since nothing validates free text. A screen is checked *within* the sections the
  * row names, because two sections may offer screens of the same name and the pair is what
  * identifies a table; an account and a card, when given, are checked against what the
  * user set up in Settings.

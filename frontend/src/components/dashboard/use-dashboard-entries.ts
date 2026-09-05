@@ -76,6 +76,9 @@ export function filterConfirmedRows({ rows, filters, screen }: FilterParams): Fi
   return result
 }
 
+/** What a chart calls a row nobody has named: a dash, rather than a blank bar. */
+export const UNLABELLED_LABEL = '—'
+
 /**
  * What a row would call itself.
  *

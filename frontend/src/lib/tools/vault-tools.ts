@@ -2,7 +2,7 @@ import { loadLabelCatalogue } from '@/lib/label-catalogue-source'
 import { describeVault, queryVault } from '@/lib/sql/query-vault'
 import { fillFromObservations, placeConfirmedRow, reviseConfirmedRows, setConfirmedMeaning, type ConfirmedRevision } from '@/lib/model/confirmed-rows'
 import { SOURCE_FILENAME_KEY, withObservation } from '@/lib/model/observations'
-import { DEFAULT_MEANING, ingestionLabelErrors } from '@/lib/model/ingestion'
+import { ingestionLabelErrors } from '@/lib/model/ingestion'
 import { parsePlacementLabels, placementsOf, resolveAccountLabel, resolveCardLabel, resolveScreenLabel, resolveSectionLabel, withDerivedSections, type LabelCatalogue } from '@/lib/model/label-catalogue'
 import { confirmedRowsTable, sourceFilesTable, sourceRowsTable } from '@/lib/model/model-db'
 import { newRowId } from '@/lib/model/row-id'
@@ -178,7 +178,7 @@ async function labelSourceRows(rowIds: number[], values: Record<string, unknown>
 
 export const setLabelsTool: ToolDefinition = {
   name: 'set_labels',
-  description: "Sets labels on source rows by their id. Sections and screens take several values separated by commas and are checked against the app's own navigation — list_label_options says what exists, and a screen is only valid inside a section the row names. Category and subcategory are free text, one value each, and start at 'outros', which means nobody has said anything more precise. Account says which account the money moved through and is required before a row can be confirmed; card says which card it was billed to and is optional, since a Pix, a salary or a transfer touched none. Both must name something the user set up in Settings — list_accounts_and_cards has them, add_account and add_card make what is missing. Fields you leave out, or pass empty, keep what they hold; taking a card off a row is said with clearCard: true.",
+  description: "Sets labels on source rows by their id. Sections and screens take several values separated by commas and are checked against the app's own navigation — list_label_options says what exists, and a screen is only valid inside a section the row names. Category and subcategory are free text, one value each, and start empty, which means nobody has said what the row is yet. Account says which account the money moved through and is required before a row can be confirmed; card says which card it was billed to and is optional, since a Pix, a salary or a transfer touched none. Both must name something the user set up in Settings — list_accounts_and_cards has them, add_account and add_card make what is missing. Fields you leave out, or pass empty, keep what they hold; taking a card off a row is said with clearCard: true.",
   parameters: {
     type: 'object',
     properties: {
@@ -306,8 +306,8 @@ export const setConfirmedMeaningTool: ToolDefinition = {
     const rowIds = Array.isArray(args.rowIds) ? args.rowIds.filter((id): id is number => typeof id === 'number') : []
     if (rowIds.length === 0) return 'Error: rowIds are required.'
     const meaning = {
-      ...(typeof args.category === 'string' ? { category: args.category.trim() || DEFAULT_MEANING } : {}),
-      ...(typeof args.subcategory === 'string' ? { subcategory: args.subcategory.trim() || DEFAULT_MEANING } : {}),
+      ...(typeof args.category === 'string' ? { category: args.category.trim() } : {}),
+      ...(typeof args.subcategory === 'string' ? { subcategory: args.subcategory.trim() } : {}),
     }
     if (Object.keys(meaning).length === 0) return 'Error: pass a category, a subcategory, or both.'
     let changed = 0
@@ -388,8 +388,8 @@ export const reviseConfirmedRowsTool: ToolDefinition = {
       if (!card) return `Error: no card is called "${args.card}". Call list_accounts_and_cards, or add_card first.`
       revision.card = card
     }
-    if (typeof args.category === 'string') revision.category = args.category.trim() || DEFAULT_MEANING
-    if (typeof args.subcategory === 'string') revision.subcategory = args.subcategory.trim() || DEFAULT_MEANING
+    if (typeof args.category === 'string') revision.category = args.category.trim()
+    if (typeof args.subcategory === 'string') revision.subcategory = args.subcategory.trim()
 
     try {
       return JSON.stringify({ ...await reviseConfirmedRows(rowIds, revision), changed: revision, reason: args.reason ?? null })
@@ -538,8 +538,8 @@ export const addConfirmedRowTool: ToolDefinition = {
         SOURCE_FILENAME_KEY,
         typeof args.sourceFilename === 'string' && args.sourceFilename.trim() ? args.sourceFilename.trim() : 'added by the assistant',
       ),
-      category: typeof args.category === 'string' && args.category.trim() ? args.category.trim() : 'outros',
-      subcategory: typeof args.subcategory === 'string' && args.subcategory.trim() ? args.subcategory.trim() : 'outros',
+      category: typeof args.category === 'string' ? args.category.trim() : '',
+      subcategory: typeof args.subcategory === 'string' ? args.subcategory.trim() : '',
       account: typeof args.account === 'string' ? resolveAccountLabel(catalogue, args.account) : undefined,
       card: typeof args.card === 'string' ? resolveCardLabel(catalogue, args.card) : undefined,
     }

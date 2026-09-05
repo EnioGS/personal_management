@@ -17,7 +17,7 @@ describe('a row added by hand', () => {
     const row = await only()
 
     expect(id).toBeDefined()
-    expect(row).toMatchObject({ section: 'finances', screen: 'spending', category: 'outros', subcategory: 'outros' })
+    expect(row).toMatchObject({ section: 'finances', screen: 'spending', category: '', subcategory: '' })
     expect(row.rowId).toMatch(/^[0-9a-f]{16}$/)
   })
 
@@ -38,13 +38,13 @@ describe('editing a confirmed cell', () => {
     expect(await only()).toMatchObject({ date: Date.UTC(2025, 7, 15), value: -1234.56 })
   })
 
-  it('puts the default meaning back when a meaning cell is emptied', async () => {
+  it('empties a meaning cell rather than filling it with a word nobody chose', async () => {
     const id = await addConfirmedRow('finances', 'spending')
     await updateConfirmedRow(id, 'category', 'mercado')
     expect((await only()).category).toBe('mercado')
 
     await updateConfirmedRow(id, 'category', '   ')
-    expect((await only()).category).toBe('outros')
+    expect((await only()).category).toBe('')
   })
 })
 

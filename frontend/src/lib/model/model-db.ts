@@ -200,6 +200,33 @@ db.version(13).stores({}).upgrade(async (tx) => {
   })
 })
 
+/**
+ * Clears the `outros` that used to be a category's starting value.
+ *
+ * It was the app's word, not the user's: every imported row arrived saying it was "other"
+ * before anyone had looked, which reads on every screen as a decision somebody made. An
+ * empty category says the true thing — nobody has said yet — and a rule can fill it
+ * without arguing with a label. A row where somebody typed `outros` deliberately is
+ * indistinguishable from one where nothing happened, so both are cleared: what was never
+ * a judgement is not lost by being read as none.
+ */
+db.version(14).stores({}).upgrade(async (tx) => {
+  const clear = (value: unknown) => (value === 'outros' ? '' : value)
+
+  await tx.table('confirmedRows').toCollection().modify((row: { data?: Record<string, unknown> }) => {
+    if (!row.data) return
+    row.data.category = clear(row.data.category)
+    row.data.subcategory = clear(row.data.subcategory)
+  })
+
+  await tx.table('sourceRows').toCollection().modify((row: { data?: { labels?: Record<string, unknown> } }) => {
+    const labels = row.data?.labels
+    if (!labels) return
+    if (labels.category === 'outros') delete labels.category
+    if (labels.subcategory === 'outros') delete labels.subcategory
+  })
+})
+
 export const accountsTable = db.accounts
 export const cardsTable = db.cards
 export const budgetsTable = db.budgets

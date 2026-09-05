@@ -1,5 +1,10 @@
 import { monthKey } from '@/lib/aggregations'
-import type { FilteredEntry } from '@/components/dashboard/use-dashboard-entries'
+import { UNLABELLED_LABEL, type FilteredEntry } from '@/components/dashboard/use-dashboard-entries'
+
+/** A row nobody has categorised still has to be counted, and counted under something. */
+function categoryOf(row: FilteredEntry): string {
+  return row.category.trim() || UNLABELLED_LABEL
+}
 
 export interface MonthlySpend {
   month: string
@@ -47,11 +52,11 @@ export function averageSpendByCategory(rows: FilteredEntry[], selectedMonths: st
   for (const row of rows) {
     if (!isSpendingRow(row)) continue
     const month = monthKey(row.date)
-    const aggregate = totals.get(row.category) ?? { total: 0, recentTotal: 0 }
+    const aggregate = totals.get(categoryOf(row)) ?? { total: 0, recentTotal: 0 }
     const amount = -row.value
     aggregate.total += amount
     if (recentMonths.has(month)) aggregate.recentTotal += amount
-    totals.set(row.category, aggregate)
+    totals.set(categoryOf(row), aggregate)
   }
 
   return [...totals.entries()].map(([category, aggregate]) => {
@@ -106,7 +111,7 @@ export function categorySpendChanges(rows: FilteredEntry[]): CategorySpendChange
     const target = monthKey(row.date) === latestMonth ? current : monthKey(row.date) === precedingMonth ? preceding : null
     if (!target) continue
     // Magnitudes, like everything else this screen reports: spending rows are negative.
-    target.set(row.category, (target.get(row.category) ?? 0) - row.value)
+    target.set(categoryOf(row), (target.get(categoryOf(row)) ?? 0) - row.value)
   }
 
   return [...new Set([...current.keys(), ...preceding.keys()])]
@@ -121,7 +126,7 @@ export function categorySpendChanges(rows: FilteredEntry[]): CategorySpendChange
 export function frequentDescriptions(rows: FilteredEntry[]): DescriptionFrequency[] {
   const totals = new Map<string, DescriptionFrequency>()
   for (const row of rows) {
-    const label = row.description.trim() || row.category
+    const label = row.description.trim() || categoryOf(row)
     const aggregate = totals.get(label) ?? { label, count: 0, total: 0 }
     aggregate.count += 1
     aggregate.total -= row.value

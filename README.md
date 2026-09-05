@@ -193,8 +193,11 @@ Two things it optimizes for:
   are validated against the app's own navigation as they are typed — a screen only
   counts inside a section the row names, and a value nothing is called stays in the
   cell in red rather than being silently dropped — while **category** and
-  **subcategory** are free text, one value each, starting at `outros` and editable on
-  a confirmed row, since a row can be placed before it is understood. Direction is not
+  **subcategory** are free text, one value each, **starting empty** and editable on a
+  confirmed row, since a row can be placed before it is understood. They used to start at
+  `outros`, which read on every screen as a decision somebody had made — the app calling
+  a row "other" before anyone had looked at it. An empty cell asks to be looked at;
+  charts show a dash for one. Direction is not
   a label at all: the sign of the amount says it, negative left and positive arrived.
 - A confirmed row's section and screen are not a label beside it — they *are* which
   table it is in, and both are shown and editable there: change one and the row moves,

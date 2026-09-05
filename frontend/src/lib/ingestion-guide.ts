@@ -34,8 +34,8 @@ cannot be assigned, and every row of it would carry the whole line as a single v
 
 - \`source_filename\` on the left: which file the row came from. Not assignable.
 - The file's own columns, exactly as the file wrote them.
-- Six label columns on the right. Placement starts empty; category and subcategory start
-  at \`outros\`; account and card start empty and are optional.
+- Six label columns on the right. Everything starts empty: nothing about a row is claimed
+  before somebody claims it.
 
 Only the file's own columns can be assigned to a canonical field: **date**, **value**
 (the money that moved, signed — what Movements and Spending are made of), **amount** (how
@@ -69,11 +69,11 @@ when it names a section that exists right now: ${PROMPT_PLACEHOLDERS.sections}
 Screens — the pages inside them, validated *within* the sections the row names, because
 two sections may offer screens of the same name: ${PROMPT_PLACEHOLDERS.screens}
 
-Category — free text, one value, no validation. Starts at \`outros\`, which means nobody
-has said anything more precise yet.
+Category — free text, one value, no validation. Starts empty, which means nobody has said
+what the row is yet. Leave it empty rather than filling it with a word like "other": an
+empty cell asks to be looked at, and a category called "other" looks like an answer.
 
-Subcategory — free text, one value, the detail under the category. Also starts at
-\`outros\`. Some words are reserved and read by the Recurring screen: assinatura,
+Subcategory — free text, one value, the detail under the category. Also starts empty. Some words are reserved and read by the Recurring screen: assinatura,
 membership, parcelado and their obvious equivalents.
 
 Account — required, one value, validated against what the user set up in Settings →

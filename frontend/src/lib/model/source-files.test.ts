@@ -56,7 +56,8 @@ describe('a file arriving', () => {
     expect(file.originalColumns).toEqual(['Data', 'Descrição', 'Valor', 'Tipo'])
     expect(rows).toHaveLength(2)
     expect(rows[0].row.values).toMatchObject({ source_filename: 'banco-agosto.csv', Descrição: 'SALARIO' })
-    expect(rows[0].row.labels).toEqual({ category: 'outros', subcategory: 'outros' })
+    // Nothing starts labelled: the row says what the file said and no more.
+    expect(rows[0].row.labels).toEqual({})
   })
 
   it('gives two identical rows different ids, because a bank may report the same charge twice', async () => {
@@ -411,5 +412,26 @@ describe('text that separates its columns with something other than a comma', ()
 
     expect(((await sourceFilesTable.get(sourceId))!.data as SourceFile).originalColumns).toEqual(['Date', 'Asset', 'Value'])
     expect((await rowsOf(sourceId))[0].row.values.Asset).toBe('Tesouro Selic 2029 - resgate')
+  })
+})
+
+describe('what a row claims before anyone has looked at it', () => {
+  beforeEach(async () => { await wipeAllData() })
+
+  it('is nothing: an imported row carries no category and no subcategory', async () => {
+    const sourceId = await createSourceFile('banco-agosto.csv', BANK_CSV)
+
+    expect((await rowsOf(sourceId)).every((entry) => Object.keys(entry.row.labels).length === 0)).toBe(true)
+  })
+
+  it('and a row confirmed without one arrives with it empty, not with a word nobody chose', async () => {
+    const sourceId = await createSourceFile('banco-agosto.csv', BANK_CSV)
+    await assignSourceColumns(sourceId, { Data: 'date', Valor: 'value' })
+    const [first] = await rowsOf(sourceId)
+    await label(first.id, { sections: ['finances'], screens: ['overview'], account: 'Banco A' })
+
+    await confirmSourceRows(sourceId, catalogue)
+
+    expect((await confirmedRowsTable.toArray())[0].data).toMatchObject({ category: '', subcategory: '' })
   })
 })

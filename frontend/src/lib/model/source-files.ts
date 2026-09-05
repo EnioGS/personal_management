@@ -2,7 +2,7 @@ import Papa from 'papaparse'
 import { parseDateValue } from '@/lib/parse-date'
 import { parseNumberValue } from '@/lib/parse-number'
 import { placementsOf, type LabelCatalogue } from './label-catalogue'
-import { DEFAULT_MEANING, ingestionLabelErrors } from './ingestion'
+import { ingestionLabelErrors } from './ingestion'
 import { sourceFilenameOf } from './observations'
 import type { LocalRow } from '@/lib/local-store/create-local-table'
 import { confirmedRowsTable, ingestionAuditEventsTable, sourceFilesTable, sourceRowsTable } from './model-db'
@@ -209,9 +209,8 @@ export async function createSourceFile(
       sourceId,
       rowId: newRowId(values),
       values: { [SOURCE_FILENAME_COLUMN]: originalFilename, ...values },
-      // Placement starts empty because nobody has decided it; meaning starts at its
-      // default because "unspecified" is itself an answer for a category.
-      labels: { category: DEFAULT_MEANING, subcategory: DEFAULT_MEANING },
+      // Nothing starts labelled: a row arrives saying what the file said and no more.
+      labels: {},
     } satisfies SourceRow,
   })))
 
@@ -397,7 +396,7 @@ export async function addSourceRow(sourceId: number): Promise<number> {
       sourceId,
       rowId: newRowId({ ...values, addedAt: Date.now() }),
       values,
-      labels: { category: DEFAULT_MEANING, subcategory: DEFAULT_MEANING },
+      labels: {},
     } satisfies SourceRow,
   })
 }
@@ -509,8 +508,8 @@ export async function confirmSourceRows(sourceId: number, catalogue: LabelCatalo
       date: parseDateValue(canonicalValue(row, file, 'date')) ?? undefined,
       value: value ?? undefined,
       observations: observationsFor(row, file, row.importedValue),
-      category: row.labels.category?.trim() || DEFAULT_MEANING,
-      subcategory: row.labels.subcategory?.trim() || DEFAULT_MEANING,
+      category: row.labels.category?.trim() ?? '',
+      subcategory: row.labels.subcategory?.trim() ?? '',
       asset: canonicalValue(row, file, 'asset') || undefined,
       amount: parseNumberValue(canonicalValue(row, file, 'amount')) ?? undefined,
       price: parseNumberValue(canonicalValue(row, file, 'price')) ?? undefined,

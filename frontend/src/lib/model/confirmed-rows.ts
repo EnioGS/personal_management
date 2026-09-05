@@ -1,7 +1,7 @@
 import { refreshLocalStores } from '@/lib/local-store/create-local-list-store'
 import { parseDateValue } from '@/lib/parse-date'
 import { parseNumberValue } from '@/lib/parse-number'
-import { DEFAULT_MEANING } from './ingestion'
+
 import { SOURCE_FILENAME_KEY, readObservations } from './observations'
 import type { LocalRow } from '@/lib/local-store/create-local-table'
 import { confirmedRowsTable } from './model-db'
@@ -43,8 +43,8 @@ export async function addConfirmedRow(section: string, screen: string): Promise<
       confirmedAt: now,
       // Provenance goes where every row's provenance goes: into the condensed column.
       observations: JSON.stringify({ [SOURCE_FILENAME_KEY]: 'added by hand' }),
-      category: DEFAULT_MEANING,
-      subcategory: DEFAULT_MEANING,
+      category: '',
+      subcategory: '',
     } satisfies ConfirmedRow,
   })
 }
@@ -70,10 +70,10 @@ export async function updateConfirmedRow(rowId: number, column: ConfirmedEditabl
     column === 'date' ? { date: parseDateValue(value) ?? undefined }
     : column === 'value' ? { value: parseNumberValue(value) ?? undefined }
     : column === 'observations' ? { observations: value }
-    // An account or a card can genuinely be nothing — not every row has one — while a
-    // category emptied out means "nobody has said", which is what `outros` is for.
+    // Emptied means emptied, for all of them: an account or a card a row never had, and
+    // a category nobody has decided on yet.
     : column === 'account' || column === 'card' ? { [column]: value.trim() || undefined }
-    : { [column]: value.trim() || DEFAULT_MEANING }
+    : { [column]: value.trim() }
 
   await confirmedRowsTable.update(rowId, { data: { ...row, ...patch } })
   await refreshLocalStores('confirmedRows')

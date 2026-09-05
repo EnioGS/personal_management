@@ -1,3 +1,4 @@
+import { LEGACY_DEFAULT_MEANING } from './ingestion'
 import { comparableText } from './row-query'
 import type { IngestionRowLabels, LabelRule } from './types'
 
@@ -49,10 +50,10 @@ export interface RuleApplication {
  *
  * A rule fills only what is not there yet — a judgement made by hand or by the assistant
  * outranks a standing rule — and two rules matching the same row compose rather than
- * fight. Category and subcategory count as filled once they hold anything but their
- * default, so a rule may sharpen `outros` but never overwrite a real answer.
+ * fight. Category and subcategory count as filled once they hold anything at all, and an
+ * empty one — or the `outros` that used to stand for empty — is a blank a rule may fill.
  */
-export function applyLabelRules(labels: IngestionRowLabels, rules: StoredRule[], resolveField: (field: string) => unknown, defaultMeaning = 'outros'): RuleApplication {
+export function applyLabelRules(labels: IngestionRowLabels, rules: StoredRule[], resolveField: (field: string) => unknown, defaultMeaning = LEGACY_DEFAULT_MEANING): RuleApplication {
   const next: IngestionRowLabels = { ...labels }
   const appliedRuleIds: number[] = []
   const filled: RuleApplication['filled'] = []

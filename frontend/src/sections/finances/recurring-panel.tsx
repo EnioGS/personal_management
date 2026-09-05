@@ -5,7 +5,7 @@ import { DashboardCard } from '@/components/dashboard/dashboard-card'
 import { StatTile } from '@/components/dashboard/stat-tile'
 import { FilterBar } from '@/components/dashboard/filter-bar'
 import { useDashboardFilters } from '@/components/dashboard/dashboard-filters'
-import { useDashboardEntries } from '@/components/dashboard/use-dashboard-entries'
+import { UNLABELLED_LABEL, useDashboardEntries } from '@/components/dashboard/use-dashboard-entries'
 import { formatDateLabel, formatMonthLabel, monthKey } from '@/lib/aggregations'
 import { declaresRecurrence, detectRecurringEntries } from '@/lib/model/recurring'
 import { FinanceTableDrawer } from './finance-table-drawer'
@@ -92,7 +92,7 @@ export function RecurringPanel() {
                   {candidates.map((candidate) => (
                     <div key={`${candidate.category}-${candidate.averageAmount}`} className="grid grid-cols-[minmax(9rem,1fr)_minmax(10rem,1.3fr)_auto] items-center gap-3 p-3">
                       <div className="min-w-0">
-                        <CategoryPill label={candidate.category} />
+                        <CategoryPill label={candidate.category || UNLABELLED_LABEL} />
                         <p className="text-muted-foreground mt-1 text-xs">{t('finances:recurring.lastSeen', { date: formatDateLabel(candidate.lastDate) })}</p>
                       </div>
                       <MonthStrip months={stripMonths} activeMonths={candidate.months} />
@@ -117,7 +117,7 @@ export function RecurringPanel() {
                   {inactive.map((candidate) => (
                     <div key={`${candidate.category}-${candidate.averageAmount}`} className="flex items-center justify-between gap-3 p-3 text-xs">
                       <div className="min-w-0">
-                        <CategoryPill label={candidate.category} />
+                        <CategoryPill label={candidate.category || UNLABELLED_LABEL} />
                         <p className="text-muted-foreground mt-1">{t('finances:recurring.lastSeen', { date: formatDateLabel(candidate.lastDate) })}</p>
                       </div>
                       <span className="shrink-0 tabular-nums">{currency.format(candidate.averageAmount)}</span>
