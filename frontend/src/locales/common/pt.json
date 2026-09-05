@@ -83,7 +83,7 @@
     "netBalance": "Saldo líquido",
     "totalIn": "Total de entradas",
     "totalOut": "Total de saídas",
-    "cardSpend": "Gasto em cartões",
+    "spending": "Gastos",
     "inLabel": "Entrada",
     "outLabel": "Saída"
   },

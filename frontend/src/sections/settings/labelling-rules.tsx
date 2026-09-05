@@ -1,222 +1,90 @@
-import { useEffect, useMemo, useState } from 'react'
-import { useTranslation } from 'react-i18next'
-import { Plus, Trash2 } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
+import { Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
-import { applyLabelRulesToRows, deleteLabelRule, labelRulesWithStats, saveLabelRule, updateLabelRule } from '@/lib/model/label-rules-repository'
-import { FLOW_ROLES, labelValues, matchLabelValue, RECURRENCES, SETTLEMENT_CHANNELS, SPENDING_TREATMENTS } from '@/lib/model/label-vocabulary'
-import { parsePlacementLabels, resolveSectionLabel, resolveSubsectionLabel, subsectionLabelFor } from '@/lib/model/label-catalogue'
-import { buildLabelCatalogue } from '@/lib/label-catalogue-source'
+import { labelRulesWithStats } from '@/lib/model/label-rules-repository'
+import { deleteLabelRule } from '@/lib/model/label-rules-repository'
+import { useLabelRulesStore } from '@/lib/model/model-stores'
+import type { RuleContext } from '@/lib/model/types'
 import type { RuleStats, StoredRule } from '@/lib/model/label-rules'
-import { useCategoriesStore, useIngestionRowsStore, useTableDefsStore } from '@/lib/model/model-stores'
-import type { IngestionRowLabels, LabelRule } from '@/lib/model/types'
 
-interface RuleWithStats { rule: StoredRule; stats: RuleStats }
-
-const BLANK_DRAFT = { name: '', contains: '', andField: '', andContains: '', rationale: '', sections: '', subsections: '', flowRole: '', settlementChannel: '', spendingTreatment: '', recurrence: '', category: '', destinationTable: '' }
-
-/**
- * Standing rules, listed one line each. A rule is a decision that outlives the batch
- * it was written for, so the list leads with what it matches and what it sets, and the
- * detail dialog carries the rationale and the record of how the rule has actually
- * fared — including rows whose labels were changed before confirmation, which is the
- * number that says a rule is wrong.
- */
-export function LabellingRules({ onChanged }: { onChanged: () => Promise<void> | void }) {
-  const { t } = useTranslation()
-  const rowStore = useIngestionRowsStore((store) => store.items)
-  const categories = useCategoriesStore((store) => store.items)
-  const addCategory = useCategoriesStore((store) => store.addItem)
-  const tableDefs = useTableDefsStore((store) => store.items)
-  const [rules, setRules] = useState<RuleWithStats[]>([])
-  const [openRule, setOpenRule] = useState<RuleWithStats | null>(null)
-  const [draft, setDraft] = useState<typeof BLANK_DRAFT | null>(null)
-  const [message, setMessage] = useState<string | null>(null)
-
-  // Stats are computed from the rows, so the list refreshes whenever they change.
-  useEffect(() => { void labelRulesWithStats().then(setRules) }, [rowStore])
-
-  const tableByName = useMemo(() => new Map(tableDefs.map((table) => [table.name.trim().toLowerCase(), table.id])), [tableDefs])
-
-  async function reload() {
-    setRules(await labelRulesWithStats())
-    await onChanged()
-  }
-
-  async function saveDraft() {
-    if (!draft) return
-    if (!draft.contains.trim() || !draft.rationale.trim()) {
-      setMessage('A rule needs the text it matches and a rationale.')
-      return
-    }
-    const categoryName = draft.category.trim()
-    const existing = categories.find((category) => category.name.trim().toLowerCase() === categoryName.toLowerCase())
-    const categoryId = categoryName ? (existing?.id ?? (await addCategory({ name: categoryName }))) : undefined
-    const catalogue = buildLabelCatalogue((key) => String(t(key as never)))
-    const sections = parsePlacementLabels(draft.sections, (value) => resolveSectionLabel(catalogue, value))
-    const subsections = parsePlacementLabels(draft.subsections, (value) => resolveSubsectionLabel(catalogue, value))
-    if (sections.unknown.length > 0 || subsections.unknown.length > 0) {
-      setMessage(`No section or screen is called ${[...sections.unknown, ...subsections.unknown].join(', ')}.`)
-      return
-    }
-    const labels: IngestionRowLabels = {
-      ...(sections.values.length ? { sections: sections.values } : {}),
-      ...(subsections.values.length ? { subsections: subsections.values } : {}),
-      ...(matchLabelValue(FLOW_ROLES, draft.flowRole) ? { flowRole: matchLabelValue(FLOW_ROLES, draft.flowRole) } : {}),
-      ...(matchLabelValue(SETTLEMENT_CHANNELS, draft.settlementChannel) ? { settlementChannel: matchLabelValue(SETTLEMENT_CHANNELS, draft.settlementChannel) } : {}),
-      ...(matchLabelValue(SPENDING_TREATMENTS, draft.spendingTreatment) ? { spendingTreatment: matchLabelValue(SPENDING_TREATMENTS, draft.spendingTreatment) } : {}),
-      ...(matchLabelValue(RECURRENCES, draft.recurrence) ? { recurrence: matchLabelValue(RECURRENCES, draft.recurrence) } : {}),
-      ...(categoryId ? { categoryId } : {}),
-    }
-    const destinationTableId = tableByName.get(draft.destinationTable.trim().toLowerCase())
-    if (Object.keys(labels).length === 0 && destinationTableId === undefined) {
-      setMessage('A rule has to set at least one label or a destination table.')
-      return
-    }
-    const rule: LabelRule = {
-      name: draft.name.trim() || undefined,
-      field: 'description',
-      contains: draft.contains.trim(),
-      // One further condition is enough for the case that keeps coming up: the same
-      // word meaning different things depending on which file it arrived in.
-      where: draft.andField.trim() && draft.andContains.trim()
-        ? [{ field: draft.andField.trim(), contains: draft.andContains.trim() }]
-        : undefined,
-      labels,
-      destinationTableId,
-      rationale: draft.rationale.trim(),
-      createdBy: 'user',
-      createdAt: Date.now(),
-    }
-    await saveLabelRule(rule)
-    const applied = await applyLabelRulesToRows()
-    setDraft(null)
-    setMessage(`Rule saved. It filled ${applied.rowsTouched} waiting row(s); ${applied.becameReady} became ready.`)
-    await reload()
-  }
-
-  async function saveRationale(entry: RuleWithStats, rationale: string) {
-    const { id: _id, ...rule } = entry.rule
-    await updateLabelRule(entry.rule.id, { ...rule, rationale })
-    await reload()
-  }
-
-  async function removeRule(entry: RuleWithStats) {
-    await deleteLabelRule(entry.rule.id)
-    setOpenRule(null)
-    setMessage(`Removed "${entry.rule.name || entry.rule.contains}". The rows it labelled keep their labels.`)
-    await reload()
-  }
-
-  function summarise(rule: StoredRule): string {
-    const labels = [...(rule.labels.subsections ?? []).map((id) => subsectionLabelFor(buildLabelCatalogue((key) => String(t(key as never))), id)), rule.labels.flowRole, rule.labels.settlementChannel, rule.labels.spendingTreatment, rule.labels.recurrence].filter(Boolean)
-    const table = rule.destinationTableId ? tableDefs.find((candidate) => candidate.id === rule.destinationTableId)?.name : undefined
-    return [...labels, ...(table ? [table] : [])].join(' · ') || 'no labels'
-  }
-
-  return (
-    <section className="flex flex-col gap-2 rounded-md border p-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <h3 className="text-sm font-medium">Labelling rules</h3>
-          <p className="text-muted-foreground text-xs">A rule labels every future row whose description contains its text, filling only what a row does not already have.</p>
-        </div>
-        <Button type="button" size="xs" variant="outline" onClick={() => { setDraft(BLANK_DRAFT); setMessage(null) }}><Plus className="size-3" />Add a rule</Button>
-      </div>
-
-      {message && <p className="text-muted-foreground text-xs">{message}</p>}
-
-      {rules.length === 0 && !draft && <p className="text-muted-foreground text-xs">No rules yet. The assistant will offer to save one when it finds a pattern worth keeping, or you can write one here.</p>}
-
-      <div className="flex flex-col divide-y">
-        {rules.map((entry) => (
-          <button key={entry.rule.id} type="button" onClick={() => setOpenRule(entry)} className="hover:bg-muted/50 flex items-center justify-between gap-3 py-1.5 text-left text-xs">
-            <span className="min-w-0 flex-1 truncate">
-              <span className="font-medium">{entry.rule.name || entry.rule.contains}</span>
-              <span className="text-muted-foreground"> · contains "{entry.rule.contains}"{(entry.rule.where ?? []).map((condition) => ` and ${condition.field} contains "${condition.contains}"`).join('')} → {summarise(entry.rule)}</span>
-            </span>
-            <span className="text-muted-foreground shrink-0">{entry.stats.confirmedRespected} confirmed{entry.stats.overridden > 0 && ` · ${entry.stats.overridden} overridden`}</span>
-          </button>
-        ))}
-      </div>
-
-      {draft && (
-        <div className="flex flex-col gap-2 rounded-md border p-2 text-xs">
-          <div className="grid grid-cols-2 gap-2">
-            <Input value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} placeholder="Name (optional)" className="h-7 text-xs" />
-            <Input value={draft.contains} onChange={(event) => setDraft({ ...draft, contains: event.target.value })} placeholder="Description contains…" className="h-7 text-xs" />
-            <Input value={draft.andField} onChange={(event) => setDraft({ ...draft, andField: event.target.value })} placeholder="and field (e.g. source)" className="h-7 text-xs" />
-            <Input value={draft.andContains} onChange={(event) => setDraft({ ...draft, andContains: event.target.value })} placeholder="…contains" className="h-7 text-xs" />
-            <Input value={draft.sections} onChange={(event) => setDraft({ ...draft, sections: event.target.value })} placeholder="sections (comma-separated)" className="h-7 text-xs" />
-            <Input value={draft.subsections} onChange={(event) => setDraft({ ...draft, subsections: event.target.value })} placeholder="screens (comma-separated)" className="h-7 text-xs" />
-            <Input value={draft.flowRole} onChange={(event) => setDraft({ ...draft, flowRole: event.target.value })} placeholder={`flow role: ${labelValues(FLOW_ROLES).join(' | ')}`} className="h-7 text-xs" />
-            <Input value={draft.settlementChannel} onChange={(event) => setDraft({ ...draft, settlementChannel: event.target.value })} placeholder="settlement channel" className="h-7 text-xs" />
-            <Input value={draft.spendingTreatment} onChange={(event) => setDraft({ ...draft, spendingTreatment: event.target.value })} placeholder="spending treatment" className="h-7 text-xs" />
-            <Input value={draft.recurrence} onChange={(event) => setDraft({ ...draft, recurrence: event.target.value })} placeholder="recurrence" className="h-7 text-xs" />
-            <Input value={draft.category} onChange={(event) => setDraft({ ...draft, category: event.target.value })} placeholder="category (a new name creates it)" className="h-7 text-xs" />
-            <Input value={draft.destinationTable} onChange={(event) => setDraft({ ...draft, destinationTable: event.target.value })} placeholder="destination table" className="h-7 text-xs" />
-          </div>
-          <Textarea value={draft.rationale} onChange={(event) => setDraft({ ...draft, rationale: event.target.value })} placeholder="Why these labels are right for everything matching this text" className="h-20 resize-none text-xs" />
-          <div className="flex gap-2">
-            <Button type="button" size="xs" onClick={() => void saveDraft()}>Save rule</Button>
-            <Button type="button" size="xs" variant="ghost" onClick={() => setDraft(null)}>Cancel</Button>
-          </div>
-        </div>
-      )}
-
-      <Dialog open={!!openRule} onOpenChange={(open) => !open && setOpenRule(null)}>
-        <DialogContent className="max-h-[80vh] overflow-auto">
-          {openRule && (
-            <>
-              <DialogHeader>
-                <DialogTitle>{openRule.rule.name || openRule.rule.contains}</DialogTitle>
-                <DialogDescription>
-                  Matches {openRule.rule.field} containing "{openRule.rule.contains}"{(openRule.rule.where ?? []).map((condition) => `, and ${condition.field} containing "${condition.contains}"`).join('')} → {summarise(openRule.rule)}. Created by {openRule.rule.createdBy}.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="flex flex-col gap-3 text-xs">
-                <div className="grid grid-cols-3 gap-2 text-center">
-                  <Figure label="Filled by this rule" value={openRule.stats.applied} />
-                  <Figure label="Confirmed, labels intact" value={openRule.stats.confirmedRespected} />
-                  <Figure label="Changed before confirming" value={openRule.stats.overridden} />
-                </div>
-                <p className="text-muted-foreground">{openRule.stats.pending} row(s) it filled are still waiting to be confirmed.</p>
-                <div>
-                  <p className="mb-1 font-medium">Rationale</p>
-                  <Textarea
-                    key={openRule.rule.id}
-                    defaultValue={openRule.rule.rationale ?? ''}
-                    onBlur={(event) => void saveRationale(openRule, event.target.value)}
-                    placeholder="Why these labels are right for everything matching this text"
-                    className="h-28 resize-none text-xs"
-                  />
-                </div>
-                <div>
-                  <p className="mb-1 font-medium">Strings it matched ({openRule.stats.matchedStrings.length})</p>
-                  <ul className="text-muted-foreground max-h-40 overflow-auto">
-                    {openRule.stats.matchedStrings.map((text) => <li key={text} className="truncate" title={text}>{text}</li>)}
-                    {openRule.stats.matchedStrings.length === 0 && <li>Nothing yet — it will apply to rows imported from now on.</li>}
-                  </ul>
-                </div>
-                <div>
-                  <Button type="button" size="xs" variant="outline" onClick={() => void removeRule(openRule)}><Trash2 className="size-3" />Delete this rule</Button>
-                </div>
-              </div>
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
-    </section>
-  )
+const MATCH_LABEL: Record<NonNullable<StoredRule['match']>, string> = {
+  contains: 'contains',
+  equals: 'is exactly',
+  startsWith: 'starts with',
+  regex: 'matches',
 }
 
-function Figure({ label, value }: { label: string; value: number }) {
+function describeLabels(rule: StoredRule): string {
+  const parts: string[] = []
+  if (rule.labels.sections?.length) parts.push(`sections: ${rule.labels.sections.join(', ')}`)
+  if (rule.labels.screens?.length) parts.push(`screens: ${rule.labels.screens.join(', ')}`)
+  if (rule.labels.category) parts.push(`category: ${rule.labels.category}`)
+  if (rule.labels.subcategory) parts.push(`subcategory: ${rule.labels.subcategory}`)
+  return parts.join(' · ')
+}
+
+function describeConditions(rule: StoredRule): string {
+  return [rule, ...(rule.where ?? [])]
+    .map((condition) => `${condition.field} ${MATCH_LABEL[condition.match ?? 'contains']} "${condition.contains}"`)
+    .join(' and ')
+}
+
+/**
+ * The standing rules of one stage.
+ *
+ * A rule belongs to the stage it was written for and is never shown outside it: a rule
+ * that labels files as they arrive has nothing to say about rows already in a table, and
+ * showing both together is how somebody edits the wrong one.
+ */
+export function LabellingRules({ context }: { context: RuleContext }) {
+  const rules = useLabelRulesStore((store) => store.items)
+  const [withStats, setWithStats] = useState<{ rule: StoredRule; stats: RuleStats }[]>([])
+
+  const refresh = useCallback(async () => {
+    setWithStats(await labelRulesWithStats(context))
+  }, [context])
+
+  useEffect(() => { void refresh() }, [refresh, rules])
+
+  async function remove(id: number) {
+    await deleteLabelRule(id)
+    await refresh()
+  }
+
   return (
-    <div className="rounded-md border p-2">
-      <p className="text-lg font-medium">{value}</p>
-      <p className="text-muted-foreground">{label}</p>
+    <div className="flex flex-col gap-2">
+      <div>
+        <h3 className="text-sm font-medium">
+          {context === 'source' ? 'Rules applied as a file arrives' : 'Rules applied to confirmed rows'}
+        </h3>
+        <p className="text-muted-foreground text-xs">
+          A rule fills only what a row does not already say, so it never overwrites a decision. The assistant writes
+          these as it works; delete any that turn out wrong — the rows they already labelled keep their labels.
+        </p>
+      </div>
+
+      {withStats.length === 0 ? (
+        <p className="text-muted-foreground rounded-md border border-dashed p-3 text-xs">No rules for this stage yet.</p>
+      ) : (
+        <div className="divide-y rounded-md border">
+          {withStats.map(({ rule, stats }) => (
+            <div key={rule.id} className="flex items-start justify-between gap-3 p-3 text-xs">
+              <div className="min-w-0">
+                <p className="font-medium">{rule.name || rule.contains}</p>
+                <p className="text-muted-foreground">{describeConditions(rule)}</p>
+                <p>{describeLabels(rule)}</p>
+                {rule.rationale && <p className="text-muted-foreground mt-1 italic">{rule.rationale}</p>}
+                <p className="text-muted-foreground mt-1">
+                  {`by ${rule.createdBy} · ${stats.applied} labelled · ${stats.confirmedRespected} kept · ${stats.overridden} overridden`}
+                </p>
+              </div>
+              <Button type="button" size="xs" variant="ghost" onClick={() => void remove(rule.id)} aria-label="Delete rule">
+                <Trash2 className="size-3.5" />
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

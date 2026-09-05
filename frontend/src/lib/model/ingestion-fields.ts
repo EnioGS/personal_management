@@ -1,57 +1,34 @@
-import type { IngestionRow, TableDef } from './types'
+import { SOURCE_FILENAME_COLUMN } from './source-files'
+import type { ConfirmedRow, SourceRow } from './types'
 
 /**
- * One flat name for anything a question can be asked about a staged row, so a filter
+ * One flat name for anything a question can be asked about a row, so a rule or a filter
  * reads like the column it means rather than like the shape it is stored in.
  *
- * `description` looks at the mapped value and falls back to the raw one, because a
- * source that has not been mapped yet still has the text a rule needs to match.
- * `raw.<column>` and `mapped.<field>` address anything this list does not name.
+ * A source row's own columns are addressed by their real names — that is the point of
+ * keeping the file's columns intact — with the four labels alongside them.
  */
-export const INGESTION_QUERY_FIELDS = [
-  'date', 'amount', 'description', 'rawCategory', 'note', 'asset', 'quantity', 'price', 'investmentType', 'investmentClass', 'direction', 'destination',
-  'status', 'source', 'destinationTable', 'discardReason',
-  'sections', 'subsections', 'flowRole', 'settlementChannel', 'spendingTreatment', 'recurrence', 'category',
-] as const
+export const QUERY_FIELDS = ['source_filename', 'sections', 'screens', 'category', 'subcategory'] as const
 
-export interface IngestionFieldContext {
-  sourceNameById: Map<number, string>
-  tableNameById: Map<number, string>
-  categoryNameById: Map<number, string>
-}
-
-export function resolveIngestionField(row: IngestionRow, field: string, context: IngestionFieldContext): unknown {
-  if (field.startsWith('raw.')) return row.rawValues[field.slice(4)]
-  if (field.startsWith('mapped.')) return row.mappedValues[field.slice(7) as keyof IngestionRow['mappedValues']]
-  if (field.startsWith('label.')) return resolveIngestionField(row, field.slice(6), context)
-
+export function resolveSourceField(row: SourceRow, field: string): unknown {
   switch (field) {
-    case 'status': return row.status
-    case 'discardReason': return row.discardReason
-    case 'source': return context.sourceNameById.get(row.sourceId) ?? row.sourceFilename ?? ''
-    case 'destinationTable': return row.destinationTableId ? (context.tableNameById.get(row.destinationTableId) ?? '') : ''
-    case 'category': return row.labels.categoryId ? (context.categoryNameById.get(row.labels.categoryId) ?? '') : ''
     case 'sections': return (row.labels.sections ?? []).join(', ')
-    case 'subsections': return (row.labels.subsections ?? []).join(', ')
-    case 'flowRole': return row.labels.flowRole
-    case 'settlementChannel': return row.labels.settlementChannel
-    case 'spendingTreatment': return row.labels.spendingTreatment
-    case 'recurrence': return row.labels.recurrence
-    case 'description': return row.mappedValues.description ?? row.rawValues.description ?? ''
-    case 'rawCategory': return row.mappedValues.rawCategory ?? row.rawValues.category ?? ''
-    default: return row.mappedValues[field as keyof IngestionRow['mappedValues']] ?? row.rawValues[field]
+    case 'screens': return (row.labels.screens ?? []).join(', ')
+    case 'category': return row.labels.category ?? ''
+    case 'subcategory': return row.labels.subcategory ?? ''
+    case 'source': case SOURCE_FILENAME_COLUMN: return row.values[SOURCE_FILENAME_COLUMN] ?? ''
+    case 'marked_for_elimination': return row.markedForElimination ? 'yes' : 'no'
+    // Anything else is one of the file's own columns, under the name the file gave it.
+    default: return row.values[field]
   }
 }
 
-/** Builds the name lookups a resolver needs, once per query rather than once per row. */
-export function ingestionFieldContext(
-  sources: { id: number; data: unknown }[],
-  tables: { id: number; data: unknown }[],
-  categories: { id: number; data: unknown }[],
-): IngestionFieldContext {
-  return {
-    sourceNameById: new Map(sources.map((source) => [source.id, (source.data as { originalFilename: string }).originalFilename])),
-    tableNameById: new Map(tables.map((table) => [table.id, (table.data as TableDef).name])),
-    categoryNameById: new Map(categories.map((category) => [category.id, (category.data as { name: string }).name])),
+export function resolveConfirmedField(row: ConfirmedRow, field: string): unknown {
+  switch (field) {
+    case 'sections': case 'section': return row.section
+    case 'screens': case 'screen': return row.screen
+    case 'source': case SOURCE_FILENAME_COLUMN: return row.sourceFilename
+    case 'marked_for_elimination': return row.markedForElimination ? 'yes' : 'no'
+    default: return (row as unknown as Record<string, unknown>)[field]
   }
 }

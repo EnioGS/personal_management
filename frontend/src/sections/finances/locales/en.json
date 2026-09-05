@@ -22,12 +22,11 @@
     "startingPeriod": "vs. starting period",
     "whereItWent": "Where it went",
     "spendingCategories": "Spendings categories",
-    "accounts": "Accounts",
     "entries": "Entries",
     "previousPeriod": "vs. previous period",
     "noOutgoing": "No outgoing entries in this period yet.",
-    "noAccounts": "No accounts yet.",
-    "noEntries": "No entries in this period yet."
+    "noEntries": "No entries in this period yet.",
+    "bySource": "By source file"
   },
   "spending": {
     "totalSpent": "Total spent",

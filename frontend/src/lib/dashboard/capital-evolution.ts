@@ -6,12 +6,9 @@ const DAY_MS = 86_400_000
 
 export interface CapitalEntry {
   date: number
+  /** Signed: negative left an account, positive arrived in one. */
   amount: number
-  direction: 'in' | 'out'
-  cardId?: number
-  subsections?: string[]
-  flowRole?: string
-  spendingTreatment?: 'expense' | 'rebate' | 'notApplicable'
+  screen?: string
 }
 
 export interface CapitalEvolutionPoint {
@@ -24,7 +21,7 @@ export interface CapitalEvolutionPoint {
   fixedIncome: number
   /** Cash capital plus both investment classes — the user's total capital. */
   capital: number
-  cardSpend: number
+  spending: number
   [key: string]: string | number
 }
 
@@ -50,10 +47,10 @@ function nextMonth(month: string): string {
 }
 
 /**
- * Monthly closing capital from the complete matching history. Outgoing amounts are
- * subtracted explicitly because the stored ledgers use positive spend magnitudes;
- * negative refunds therefore correctly increase capital. Credit-card spend is a
- * second, positive-only monthly measure drawn on the same chart scale.
+ * Monthly closing capital from the complete matching history. Amounts are signed, so
+ * money leaving subtracts and a refund adds back by arithmetic. Spending — what the
+ * spending screens hold — is a second, positive-only monthly measure drawn on the same
+ * chart scale.
  */
 export function capitalEvolution(
   entries: CapitalEntry[],
@@ -62,23 +59,15 @@ export function capitalEvolution(
 ): CapitalEvolutionPoint[] {
   if (entries.length === 0 && investments.length === 0) return []
 
-  const byMonth = new Map<string, { capitalDelta: number; cardSpend: number }>()
+  const byMonth = new Map<string, { capitalDelta: number; spending: number }>()
   for (const entry of entries) {
     const month = monthKey(entry.date)
-    const bucket = byMonth.get(month) ?? { capitalDelta: 0, cardSpend: 0 }
-    // Card purchases are obligations, not cash movements: the money leaves when the
-    // invoice is paid, and that payment is its own bank row. Counting both would
-    // subtract the same purchase twice, so card rows only feed the red monthly bars.
-    // Spending is otherwise money that moved, and counts towards capital like any
-    // movement. A `transfer` moves between the user's own accounts, so it nets to
-    // zero across them and must not move total capital — paying someone else, or
-    // settling a card invoice, is an `outflow`, not a transfer.
-    const movesCapital = !entry.cardId && !entry.subsections?.includes('investments') && entry.flowRole !== 'transfer'
-    if (movesCapital) bucket.capitalDelta += entry.direction === 'in' ? entry.amount : -entry.amount
-    if (entry.cardId && entry.subsections?.includes('spending')) {
-      if (entry.spendingTreatment === 'rebate') bucket.cardSpend -= entry.amount
-      else if (entry.spendingTreatment === 'expense') bucket.cardSpend += entry.amount
-    }
+    const bucket = byMonth.get(month) ?? { capitalDelta: 0, spending: 0 }
+    // Capital is everything of value held, so every confirmed row moves it: money out of
+    // one account is negative there and positive wherever it arrived, and the pair nets
+    // to zero by arithmetic rather than by either side being hidden.
+    bucket.capitalDelta += entry.amount
+    if (entry.screen === 'spending') bucket.spending += -entry.amount
     byMonth.set(month, bucket)
   }
 
@@ -109,7 +98,7 @@ export function capitalEvolution(
   ])
 
   while (month <= last) {
-    const bucket = byMonth.get(month) ?? { capitalDelta: 0, cardSpend: 0 }
+    const bucket = byMonth.get(month) ?? { capitalDelta: 0, spending: 0 }
     cashCapital += bucket.capitalDelta
     for (const investmentClass of ['variableIncome', 'fixedIncome'] as const) {
       for (const transaction of investmentsByClass.get(investmentClass)!.get(month) ?? []) {
@@ -131,7 +120,7 @@ export function capitalEvolution(
     const start = monthStart(month)
     const end = Date.parse(`${nextMonth(month)}-01`) - DAY_MS
     if (end >= range.from && start <= range.to) {
-      points.push({ month, cashCapital, variableIncome, fixedIncome, capital, cardSpend: bucket.cardSpend })
+      points.push({ month, cashCapital, variableIncome, fixedIncome, capital, spending: bucket.spending })
     }
     month = nextMonth(month)
   }

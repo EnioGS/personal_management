@@ -1,4 +1,4 @@
-import { normalizeAmount } from './ingestion-duplicates'
+import { parseNumberValue } from '@/lib/parse-number'
 import { parseDateValue } from '@/lib/parse-date'
 
 /**
@@ -64,8 +64,8 @@ function matchesFilter<T>(row: T, filter: RowFilter, resolve: FieldResolver<T>):
     default: {
       // Numeric comparisons: a value that is not a number never satisfies them, rather
       // than being coerced to 0 and quietly passing "less than 10".
-      const left = normalizeAmount(raw)
-      const right = normalizeAmount(Array.isArray(filter.value) ? undefined : filter.value)
+      const left = parseNumberValue(raw)
+      const right = parseNumberValue(Array.isArray(filter.value) ? undefined : filter.value)
       if (left === null || right === null) return false
       if (filter.op === 'gt') return left > right
       if (filter.op === 'gte') return left >= right
@@ -81,7 +81,7 @@ function sortKey(value: unknown, type: SortType): string | number | null {
     const text = comparableText(value)
     return text === '' ? null : text
   }
-  return type === 'date' ? parseDateValue(value) : normalizeAmount(value)
+  return type === 'date' ? parseDateValue(value) : parseNumberValue(value)
 }
 
 export interface QueryResult<T> {

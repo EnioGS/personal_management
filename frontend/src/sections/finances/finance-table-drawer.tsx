@@ -1,5 +1,4 @@
 import type { ReactNode } from 'react'
-import type { TableKind } from '@/lib/model/types'
 
 /**
  * A Finance surface, full height.
@@ -9,9 +8,8 @@ import type { TableKind } from '@/lib/model/types'
  * ingestion centre, where a row arrives with its raw values intact and its labels
  * explicit, so a second way of writing into a finance table would be a way of putting
  * rows on a dashboard with neither. The wrapper stays because every panel is written
- * against it, and `kinds` stays in the signature for the same reason.
+ * against it.
  */
-export function FinanceTableDrawer({ kinds, children }: { id: string; kinds: TableKind[]; children: ReactNode }) {
-  void kinds
+export function FinanceTableDrawer({ children }: { id: string; children: ReactNode }) {
   return <div className="h-full overflow-auto p-4">{children}</div>
 }

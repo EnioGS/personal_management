@@ -24,7 +24,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { useAccountsStore, useCardsStore, useTableDefsStore } from '@/lib/model/model-stores'
+import { useAccountsStore, useCardsStore } from '@/lib/model/model-stores'
 import type { Account, AccountKind, Card } from '@/lib/model/types'
 
 const ACCOUNT_KINDS: AccountKind[] = ['checking', 'savings', 'cash', 'broker']
@@ -45,7 +45,6 @@ function AccountsSection() {
   const updateAccount = useAccountsStore((s) => s.updateItem)
   const deleteAccount = useAccountsStore((s) => s.deleteItem)
   const cards = useCardsStore((s) => s.items)
-  const tableDefs = useTableDefsStore((s) => s.items)
 
   const [dialogOpen, setDialogOpen] = useState(false)
   const [name, setName] = useState('')
@@ -59,7 +58,7 @@ function AccountsSection() {
   }
 
   function hasDependents(accountId: number) {
-    return cards.some((c) => c.accountId === accountId) || tableDefs.some((t) => t.accountId === accountId)
+    return cards.some((c) => c.accountId === accountId)
   }
 
   return (
@@ -200,7 +199,6 @@ function CardsSection() {
   const addCard = useCardsStore((s) => s.addItem)
   const updateCard = useCardsStore((s) => s.updateItem)
   const deleteCard = useCardsStore((s) => s.deleteItem)
-  const tableDefs = useTableDefsStore((s) => s.items)
 
   const [dialogOpen, setDialogOpen] = useState(false)
   const [name, setName] = useState('')
@@ -215,10 +213,6 @@ function CardsSection() {
 
   function accountName(id: number) {
     return accounts.find((a) => a.id === id)?.name ?? '—'
-  }
-
-  function hasDependents(cardId: number) {
-    return tableDefs.some((t) => t.cardId === cardId)
   }
 
   return (
@@ -329,8 +323,6 @@ function CardsSection() {
                       variant="ghost"
                       size="icon-xs"
                       aria-label={t('accountsCards.deleteCard')}
-                      disabled={hasDependents(card.id)}
-                      title={hasDependents(card.id) ? t('accountsCards.deleteBlockedHasDependents') : undefined}
                     >
                       <Trash2 className="size-3.5" />
                     </Button>

@@ -32,11 +32,11 @@ export interface CategoryMonthlyAverage {
 }
 
 /**
- * Credit-card categories, normalized to a monthly average so a 24-month view is
+ * Spending categories, normalized to a monthly average so a 24-month view is
  * comparable with a 12-month one. The trend compares the most recent quarter of
  * selected months with that full-period monthly average.
  */
-export function averageCardSpendByCategory(rows: FilteredEntry[], selectedMonths: string[]): CategoryMonthlyAverage[] {
+export function averageSpendByCategory(rows: FilteredEntry[], selectedMonths: string[]): CategoryMonthlyAverage[] {
   const months = [...new Set(selectedMonths)].sort()
   if (months.length === 0) return []
 
@@ -45,10 +45,10 @@ export function averageCardSpendByCategory(rows: FilteredEntry[], selectedMonths
   const totals = new Map<string, { total: number; recentTotal: number }>()
 
   for (const row of rows) {
-    if (!isSpendingRow(row) || row.cardId === undefined) continue
+    if (!isSpendingRow(row)) continue
     const month = monthKey(row.date)
     const aggregate = totals.get(row.category) ?? { total: 0, recentTotal: 0 }
-    const amount = row.spendingTreatment === 'rebate' ? -row.amount : row.amount
+    const amount = -row.amount
     aggregate.total += amount
     if (recentMonths.has(month)) aggregate.recentTotal += amount
     totals.set(row.category, aggregate)
@@ -61,21 +61,25 @@ export function averageCardSpendByCategory(rows: FilteredEntry[], selectedMonths
   })
 }
 
-/** Refunds and credits are not spending, even when their source table is a card ledger. */
+/** Every row confirmed onto a spending screen, refunds included — their sign undoes them. */
 export function outgoingSpending(rows: FilteredEntry[]): FilteredEntry[] {
   return rows.filter(isSpendingRow)
 }
 
-/** Only an explicitly labelled spending row counts, whichever table it came from. */
+/**
+ * A spending row is one confirmed onto a spending screen. Its sign says the rest: money
+ * out is spend, money back is a refund that subtracts from it.
+ */
 function isSpendingRow(row: FilteredEntry): boolean {
-  return row.subsections.includes('spending') && (row.spendingTreatment === 'expense' || row.spendingTreatment === 'rebate')
+  return row.screen === 'spending'
 }
 
 export function spendingByMonth(rows: FilteredEntry[]): MonthlySpend[] {
   const totals = new Map<string, number>()
   for (const row of rows) {
     const month = monthKey(row.date)
-    totals.set(month, (totals.get(month) ?? 0) + row.amount)
+    // Spend is reported as a positive quantity; the rows that make it up are negative.
+    totals.set(month, (totals.get(month) ?? 0) - row.amount)
   }
   return [...totals.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([month, amount]) => ({ month, amount }))
 }
@@ -119,7 +123,7 @@ export function frequentDescriptions(rows: FilteredEntry[]): DescriptionFrequenc
     const label = row.description.trim() || row.category
     const aggregate = totals.get(label) ?? { label, count: 0, total: 0 }
     aggregate.count += 1
-    aggregate.total += row.amount
+    aggregate.total -= row.amount
     totals.set(label, aggregate)
   }
   return [...totals.values()].sort((a, b) => b.count - a.count || b.total - a.total || a.label.localeCompare(b.label))

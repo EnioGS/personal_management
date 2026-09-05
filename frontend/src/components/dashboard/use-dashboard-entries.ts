@@ -1,119 +1,109 @@
 import { useMemo } from 'react'
 import type { StoredRow } from '@/lib/local-store/create-local-table'
-import { useAccountsStore, useCardsStore, useCategoriesStore, useEntriesStore, useEntryLabelsStore, useTableDefsStore } from '@/lib/model/model-stores'
-import type { Account, Card, Category, Entry, EntryLabels, FlowRole, RecurrenceLabel, SpendingTreatment, TableDef, TableKind } from '@/lib/model/types'
+import { useConfirmedRowsStore } from '@/lib/model/model-stores'
+import type { ConfirmedRow } from '@/lib/model/types'
 import { isWithinRange } from '@/lib/dashboard/date-range'
 import { resolveFilterRange, type DashboardFilters } from './dashboard-filters'
 
-/** Every kind that represents money moving — the scope of the Finances dashboard. */
-export const MONEY_KINDS: TableKind[] = ['bankLedger', 'generic', 'cardLedger']
-
 export interface FilteredEntry {
-  tableId: number
+  rowId: string
+  section: string
+  screen: string
   date: number
+  /** Signed the way the app means it: negative left, positive arrived. */
   amount: number
-  /** Real for bankLedger; generic/cardLedger spend has no direction field, so it counts as 'out'. */
-  direction: 'in' | 'out'
   category: string
-  /** bankLedger/cardLedger's own free-text description, or generic's note — whichever the kind has. */
+  subcategory: string
+  /** Everything the source file said that no column was assigned to. */
+  observations: string
+  /** The most description-like thing the file said — see `describeRow`. */
   description: string
-  accountId?: number
-  accountName?: string
-  cardId?: number
-  /** Screens this row was placed on, as ids: 'overview', 'spending', 'investments'. */
-  subsections: string[]
-  flowRole: FlowRole
-  spendingTreatment?: SpendingTreatment
-  recurrence?: RecurrenceLabel
+  sourceFilename: string
+  asset?: string
+  quantity?: number
+  price?: number
+  investmentType?: string
+  investmentClass?: string
 }
 
-interface FilterMoneyEntriesParams {
-  entries: StoredRow<Entry>[]
-  tableDefs: StoredRow<TableDef>[]
-  accounts: StoredRow<Account>[]
-  cards?: StoredRow<Card>[]
-  categories: StoredRow<Category>[]
-  entryLabels?: StoredRow<EntryLabels>[]
+interface FilterParams {
+  rows: StoredRow<ConfirmedRow>[]
   filters: DashboardFilters
+  /** Limits to one screen; omitted, every screen counts (which is what capital wants). */
+  screen?: string
 }
 
 /**
- * Applies every FilterBar dimension at once (date range, account, card, category) —
- * pulled out of the hook below so the filtering logic itself is plain, synchronous,
- * and testable without rendering anything.
+ * The confirmed rows a screen should draw.
+ *
+ * Two rules do all the work here. A row marked for elimination is invisible to every
+ * dashboard while staying in its table — the one place this app hides anything, and the
+ * reason marking is safe to hand out. And a row confirmed onto several screens exists
+ * once per screen, so anything counting across screens has to count each `rowId` once;
+ * `dedupeByRow` is what capital uses and a single screen does not need.
  */
-export function filterMoneyEntries({
-  entries,
-  tableDefs,
-  accounts,
-  cards = [],
-  categories,
-  entryLabels = [],
-  filters,
-}: FilterMoneyEntriesParams): FilteredEntry[] {
+export function filterConfirmedRows({ rows, filters, screen }: FilterParams): FilteredEntry[] {
   const range = resolveFilterRange(filters)
-  const accountsById = new Map(accounts.map((a) => [a.id, a]))
-  const cardsById = new Map(cards.map((card) => [card.id, card]))
-  const labelsByEntryId = new Map(entryLabels.map((labels) => [labels.entryId, labels]))
-  const tablesById = new Map(tableDefs.filter((t) => MONEY_KINDS.includes(t.kind)).map((t) => [t.id, t]))
-
   const result: FilteredEntry[] = []
-  for (const entry of entries) {
-    if (entry.deleted) continue
-    const table = tablesById.get(entry.tableId)
-    if (!table) continue
-    const accountId = table.accountId ?? (table.cardId ? cardsById.get(table.cardId)?.accountId : undefined)
-    if (filters.tableIds.length > 0 && !filters.tableIds.includes(table.id)) continue
-    if (filters.accountIds.length > 0 && (!accountId || !filters.accountIds.includes(accountId))) continue
-    if (filters.cardIds.length > 0 && (!table.cardId || !filters.cardIds.includes(table.cardId))) continue
 
-    const date = typeof entry.date === 'number' ? entry.date : null
-    if (date === null || !isWithinRange(date, range)) continue
-
-    const labels = labelsByEntryId.get(entry.id)
-    // A row is deliberately invisible to finance analytics until the user has
-    // confirmed its labels in the ingestion centre.  Legacy category rules are
-    // useful while labelling, but cannot be a second path into a dashboard.
-    if (!labels) continue
-    // A cancelled record is a reversal of something that never really happened;
-    // it must not reach any total, however it was originally imported.
-    if (labels.flowRole === 'cancelled') continue
-    const category = labels.categoryId ? categories.find((candidate) => candidate.id === labels.categoryId)?.name ?? 'Uncategorised' : 'Uncategorised'
-    if (filters.categories.length > 0 && !filters.categories.includes(category)) continue
+  for (const row of rows) {
+    if (row.markedForElimination) continue
+    if (screen && row.screen !== screen) continue
+    if (typeof row.date !== 'number' || !isWithinRange(row.date, range)) continue
+    if (filters.categories.length > 0 && !filters.categories.includes(row.category)) continue
 
     result.push({
-      tableId: table.id,
-      date,
-      amount: typeof entry.amount === 'number' ? entry.amount : 0,
-      // A transfer or an adjustment has no direction of its own in the label, so the
-      // row's own imported direction decides which way the money went — otherwise
-      // money *received* as a transfer would be drawn and summed as if it had left.
-      direction: labels.flowRole === 'inflow' ? 'in' : labels.flowRole === 'outflow' ? 'out' : entry.direction === 'in' ? 'in' : 'out',
-      category,
-      description: String(entry.description ?? entry.note ?? ''),
-      accountId,
-      accountName: accountId ? accountsById.get(accountId)?.name : undefined,
-      cardId: table.cardId,
-      subsections: labels.subsections ?? [],
-      flowRole: labels.flowRole,
-      spendingTreatment: labels.spendingTreatment,
-      recurrence: labels.recurrence,
+      rowId: row.rowId,
+      section: row.section,
+      screen: row.screen,
+      date: row.date,
+      amount: typeof row.amount === 'number' ? row.amount : 0,
+      category: row.category,
+      subcategory: row.subcategory,
+      observations: row.observations,
+      description: describeRow(row.observations),
+      sourceFilename: row.sourceFilename,
+      asset: row.asset,
+      quantity: row.quantity,
+      price: row.price,
+      investmentType: row.investmentType,
+      investmentClass: row.investmentClass,
     })
   }
   return result
 }
 
-/** Reactive wrapper around filterMoneyEntries — see that function for the actual logic. */
-export function useDashboardEntries(filters: DashboardFilters): FilteredEntry[] {
-  const tableDefs = useTableDefsStore((s) => s.items)
-  const entries = useEntriesStore((s) => s.items)
-  const accounts = useAccountsStore((s) => s.items)
-  const cards = useCardsStore((s) => s.items)
-  const categories = useCategoriesStore((s) => s.items)
-  const entryLabels = useEntryLabelsStore((s) => s.items)
+/**
+ * What a row would call itself.
+ *
+ * Nothing is assigned to a description any more: a file's own columns are assigned to
+ * the fields the app computes with, and everything else is kept verbatim in the
+ * observations. So the description is recovered rather than stored — the longest value
+ * in there that reads as words rather than as a number or a date, which in a bank
+ * statement is the merchant line and in anything else is the nearest thing to it.
+ */
+export function describeRow(observations: string): string {
+  let parsed: unknown
+  try { parsed = JSON.parse(observations) } catch { return observations.trim() }
+  if (!parsed || typeof parsed !== 'object') return observations.trim()
 
-  return useMemo(
-    () => filterMoneyEntries({ entries, tableDefs, accounts, cards, categories, entryLabels, filters }),
-    [entries, tableDefs, accounts, cards, categories, entryLabels, filters],
-  )
+  let best = ''
+  for (const [column, value] of Object.entries(parsed as Record<string, unknown>)) {
+    if (typeof value !== 'string' || column === 'amount_as_imported') continue
+    const text = value.trim()
+    if (!text || !/\p{L}{3}/u.test(text)) continue
+    if (text.length > best.length) best = text
+  }
+  return best
+}
+
+/** One entry per row, whatever number of screens it was confirmed onto. */
+export function dedupeByRow(entries: FilteredEntry[]): FilteredEntry[] {
+  const seen = new Set<string>()
+  return entries.filter((entry) => (seen.has(entry.rowId) ? false : (seen.add(entry.rowId), true)))
+}
+
+export function useDashboardEntries(filters: DashboardFilters, screen?: string): FilteredEntry[] {
+  const rows = useConfirmedRowsStore((store) => store.items)
+  return useMemo(() => filterConfirmedRows({ rows, filters, screen }), [rows, filters, screen])
 }

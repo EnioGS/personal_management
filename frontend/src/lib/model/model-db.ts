@@ -1,7 +1,5 @@
 import Dexie, { type EntityTable } from 'dexie'
 import type { LocalRow } from '@/lib/local-store/create-local-table'
-import { inferInvestmentClass } from './investment-class'
-import type { Entry, TableDef } from './types'
 
 /**
  * One database for the whole configurable model: the config entities plus every
@@ -15,17 +13,13 @@ import type { Entry, TableDef } from './types'
 const db = new Dexie('app-model-db') as Dexie & {
   accounts: EntityTable<LocalRow, 'id'>
   cards: EntityTable<LocalRow, 'id'>
-  tableDefs: EntityTable<LocalRow, 'id'>
-  categories: EntityTable<LocalRow, 'id'>
-  entries: EntityTable<LocalRow, 'id'>
   budgets: EntityTable<LocalRow, 'id'>
   allocationTargets: EntityTable<LocalRow, 'id'>
-  ingestionSources: EntityTable<LocalRow, 'id'>
-  ingestionColumnMappings: EntityTable<LocalRow, 'id'>
-  ingestionRows: EntityTable<LocalRow, 'id'>
-  entryLabels: EntityTable<LocalRow, 'id'>
   ingestionAuditEvents: EntityTable<LocalRow, 'id'>
   labelRules: EntityTable<LocalRow, 'id'>
+  sourceFiles: EntityTable<LocalRow, 'id'>
+  sourceRows: EntityTable<LocalRow, 'id'>
+  confirmedRows: EntityTable<LocalRow, 'id'>
 }
 
 db.version(1).stores({
@@ -58,12 +52,6 @@ db.version(3).stores({
   entries: '++id, createdAt',
   budgets: '++id, createdAt',
   allocationTargets: '++id, createdAt',
-}).upgrade(async (tx) => {
-  await tx.table('tableDefs').toCollection().modify((row: LocalRow) => {
-    const table = row.data as Partial<TableDef> | undefined
-    if (!table || table.kind !== 'investmentLedger' || table.investmentClass) return
-    row.data = { ...table, investmentClass: inferInvestmentClass(table.name) }
-  })
 })
 
 // Before `income` existed, separately paid investment interest had to be entered
@@ -79,13 +67,6 @@ db.version(4).stores({
   entries: '++id, createdAt',
   budgets: '++id, createdAt',
   allocationTargets: '++id, createdAt',
-}).upgrade(async (tx) => {
-  await tx.table('entries').toCollection().modify((row: LocalRow) => {
-    const entry = row.data as Partial<Entry> | undefined
-    const note = typeof entry?.note === 'string' ? entry.note : ''
-    if (entry?.type !== 'sell' || note.trim().toLocaleLowerCase('pt-BR') !== 'juros') return
-    row.data = { ...entry, type: 'income' }
-  })
 })
 
 // The ingestion centre keeps source provenance and classifications beside the
@@ -115,33 +96,37 @@ db.version(6).stores({ categoryRules: null })
 // `unknown` was a poor name for the recurrence parking value: it read as a fact
 // about the row rather than as "nobody decided yet". Rename it in place, in both
 // the confirmed label sidecars and the rows still waiting in the worklist.
-db.version(7).stores({}).upgrade(async (tx) => {
-  await tx.table('entryLabels').toCollection().modify((row: LocalRow) => {
-    const labels = row.data as { recurrence?: string } | undefined
-    if (labels?.recurrence === 'unknown') row.data = { ...labels, recurrence: 'undecided' }
-  })
-  await tx.table('ingestionRows').toCollection().modify((row: LocalRow) => {
-    const ingestionRow = row.data as { labels?: { recurrence?: string }; labelValues?: { recurrence?: string } } | undefined
-    if (!ingestionRow) return
-    const labels = ingestionRow.labels?.recurrence === 'unknown' ? { ...ingestionRow.labels, recurrence: 'undecided' } : ingestionRow.labels
-    const labelValues = ingestionRow.labelValues?.recurrence === 'unknown' ? { ...ingestionRow.labelValues, recurrence: 'undecided' } : ingestionRow.labelValues
-    row.data = { ...ingestionRow, labels, labelValues }
-  })
-})
+db.version(7).stores({})
 
 // Standing labelling rules: what was worked out for one import applies to the next.
 db.version(8).stores({ labelRules: '++id, createdAt' })
 
+/**
+ * The one-phase model: a file and its rows are worked on in place, and confirming copies
+ * a row into a table per (section, screen) pair it names. The stores it replaces —
+ * staged ingestion rows, column mappings, entries, their label sidecars, the table
+ * definitions and the category vocabulary — are dropped: everything they held is either
+ * in a source row, in a confirmed row, or was a restatement of one of them.
+ */
+db.version(9).stores({
+  sourceFiles: '++id, createdAt',
+  sourceRows: '++id, createdAt',
+  confirmedRows: '++id, createdAt',
+  ingestionSources: null,
+  ingestionColumnMappings: null,
+  ingestionRows: null,
+  entryLabels: null,
+  entries: null,
+  tableDefs: null,
+  categories: null,
+})
+
 export const accountsTable = db.accounts
 export const cardsTable = db.cards
-export const tableDefsTable = db.tableDefs
-export const categoriesTable = db.categories
-export const entriesTable = db.entries
 export const budgetsTable = db.budgets
 export const allocationTargetsTable = db.allocationTargets
-export const ingestionSourcesTable = db.ingestionSources
-export const ingestionColumnMappingsTable = db.ingestionColumnMappings
-export const ingestionRowsTable = db.ingestionRows
-export const entryLabelsTable = db.entryLabels
 export const ingestionAuditEventsTable = db.ingestionAuditEvents
 export const labelRulesTable = db.labelRules
+export const sourceFilesTable = db.sourceFiles
+export const sourceRowsTable = db.sourceRows
+export const confirmedRowsTable = db.confirmedRows

@@ -22,12 +22,11 @@
     "startingPeriod": "vs. início do período",
     "whereItWent": "Para onde foi",
     "spendingCategories": "Categorias de gastos",
-    "accounts": "Contas",
     "entries": "Lançamentos",
     "previousPeriod": "vs. período anterior",
     "noOutgoing": "Nenhuma saída neste período ainda.",
-    "noAccounts": "Nenhuma conta ainda.",
-    "noEntries": "Nenhum lançamento neste período ainda."
+    "noEntries": "Nenhum lançamento neste período ainda.",
+    "bySource": "Por arquivo de origem"
   },
   "spending": {
     "totalSpent": "Total gasto",

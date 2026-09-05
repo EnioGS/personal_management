@@ -98,25 +98,6 @@ export interface AllocationTarget {
 }
 
 
-/**
- * Economic direction, independent from the sign convention used by a source file.
- * `cancelled` marks a voided or reversed record that must not reach any total.
- */
-export type FlowRole = 'inflow' | 'outflow' | 'transfer' | 'adjustment' | 'cancelled'
-
-/** Where the event is settled; used to keep card, cash and investment effects distinct. */
-export type SettlementChannel = 'checkingAccount' | 'creditCard' | 'cash' | 'investment' | 'other'
-
-/** A spending record either adds to spend, offsets it, or is unrelated to spending. */
-export type SpendingTreatment = 'expense' | 'rebate' | 'notApplicable'
-
-/**
- * `installment` is distinct from `recurring`: a purchase split into a fixed number
- * of monthly charges ends, a subscription does not. `undecided` is the deliberate
- * parking value — a row can be fully labelled without anyone having judged this yet.
- */
-export type RecurrenceLabel = 'oneOff' | 'recurring' | 'installment' | 'undecided'
-
 export type IngestionSourceStatus = 'draftSource' | 'mapped' | 'staged' | 'archived'
 export type IngestionRowStatus =
   | 'unlabelled'
@@ -145,13 +126,9 @@ export type IngestionTargetField =
   | 'note'
   | 'destination'
   | 'sections'
-  | 'subsections'
-  | 'flowRole'
-  | 'settlementChannel'
-  | 'spendingTreatment'
-  | 'categoryId'
-  | 'recurrence'
-  | 'destinationTableId'
+  | 'screens'
+  | 'category'
+  | 'subcategory'
 
 /** An uploaded CSV retained locally and identified by its unmodified-byte fingerprint. */
 export interface IngestionSource {
@@ -207,23 +184,18 @@ export interface EntryLabels {
    * multi-valued because one row can genuinely belong to more than one screen.
    */
   sections: string[]
-  subsections: string[]
-  flowRole: FlowRole
-  settlementChannel: SettlementChannel
-  spendingTreatment: SpendingTreatment
-  categoryId?: number
-  recurrence: RecurrenceLabel
+  screens: string[]
+  /** What it is, generically, and in detail. Free text; never blank, never invalid. */
+  category: string
+  subcategory: string
   sourceIngestionRowId?: number
 }
 
 export interface IngestionRowLabels {
   sections?: string[]
-  subsections?: string[]
-  flowRole?: FlowRole
-  settlementChannel?: SettlementChannel
-  spendingTreatment?: SpendingTreatment
-  categoryId?: number
-  recurrence?: RecurrenceLabel
+  screens?: string[]
+  category?: string
+  subcategory?: string
 }
 
 /**
@@ -233,13 +205,9 @@ export interface IngestionRowLabels {
  */
 export interface IngestionRowLabelValues {
   sections?: string
-  subsections?: string
-  flowRole?: string
-  settlementChannel?: string
-  spendingTreatment?: string
+  screens?: string
   category?: string
-  recurrence?: string
-  destinationTable?: string
+  subcategory?: string
 }
 
 /** A lossless raw row plus its mapped values, labels and promotion lineage. */
@@ -284,7 +252,12 @@ export interface IngestionRow {
  * by the assistant always outranks a standing rule — and it records itself on the row,
  * which is what lets the rule report honestly on how it has done.
  */
+/** Which stage a rule belongs to: files being worked on, or rows already confirmed. */
+export type RuleContext = 'source' | 'confirmed'
+
 export interface LabelRule {
+  /** Where this rule runs. A rule never crosses from one stage to the other. */
+  context: RuleContext
   /** Short name for the list; falls back to the matched text when absent. */
   name?: string
   /** Which field the text is looked for in — 'description' unless stated. */
@@ -296,7 +269,7 @@ export interface LabelRule {
    * Microsoft), so a rule about one needs to say it means the whole value or the
    * start of it.
    */
-  match?: 'contains' | 'equals' | 'startsWith'
+  match?: 'contains' | 'equals' | 'startsWith' | 'regex'
   caseSensitive?: boolean
   /**
    * Further conditions, all of which must hold. What a row means often depends on
@@ -304,7 +277,7 @@ export interface LabelRule {
    * card expense, the same word on a bank export is a Pix to a driver, and a rule that
    * can only look at one field cannot tell them apart.
    */
-  where?: { field: string; contains: string; match?: 'contains' | 'equals' | 'startsWith'; caseSensitive?: boolean }[]
+  where?: { field: string; contains: string; match?: 'contains' | 'equals' | 'startsWith' | 'regex'; caseSensitive?: boolean }[]
   labels: IngestionRowLabels
   destinationTableId?: number
   /**
@@ -325,4 +298,73 @@ export interface IngestionAuditEvent {
   ingestionRowIds?: number[]
   entryIds?: number[]
   details?: Record<string, unknown>
+}
+
+/** How a source file's amount column relates to ours, once someone has worked it out. */
+export type SignConvention =
+  | { kind: 'asImported' }
+  /** Every amount means the opposite of what we mean by its sign. */
+  | { kind: 'invertAll' }
+  /**
+   * The file states direction in another column instead of in the sign: values matching
+   * `whenColumn` against `whenValues` are outflows, whatever sign they carry.
+   */
+  | { kind: 'invertWhen'; column: string; values: string[] }
+
+/** An uploaded file, kept whole, with what has been worked out about it. */
+export interface SourceFile {
+  originalFilename: string
+  importedAt: number
+  /** The file as it arrived. Never rewritten. */
+  rawCsv: string
+  originalColumns: string[]
+  /** Original column -> canonical field. Only original columns may be assigned. */
+  assignments: Record<string, IngestionTargetField>
+  signConvention: SignConvention
+  /** Which already-imported file this one looks like a repeat of, if any. */
+  looksLikeSourceId?: number
+}
+
+/**
+ * One row of a source file, as it is worked on.
+ *
+ * `values` holds the file's own columns verbatim, plus `source_filename`. Labels live
+ * beside them rather than inside, so a label can never collide with a column name.
+ */
+export interface SourceRow {
+  sourceId: number
+  /** Fixed at import and never changed, however much of the row later changes. */
+  rowId: string
+  values: Record<string, string>
+  labels: IngestionRowLabels
+  markedForElimination?: boolean
+  appliedRuleIds?: number[]
+}
+
+/**
+ * A confirmed row, in the table its labels chose.
+ *
+ * A row placed on several screens is copied once per (section, screen) pair, every copy
+ * carrying the same `rowId`. Copies are independent afterwards; the id is what relates
+ * them, and what a correction reuses.
+ */
+export interface ConfirmedRow {
+  rowId: string
+  section: string
+  screen: string
+  sourceFilename: string
+  confirmedAt: number
+  date?: number
+  /** Signed the way this app means it: negative leaves, positive arrives. */
+  amount?: number
+  /** Everything the file said that no column was assigned to, including what it came from. */
+  observations: string
+  category: string
+  subcategory: string
+  asset?: string
+  quantity?: number
+  price?: number
+  investmentType?: string
+  investmentClass?: string
+  markedForElimination?: boolean
 }

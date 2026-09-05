@@ -6,11 +6,7 @@ export interface DashboardFilters {
   /** yyyy-mm-dd, bound directly to the custom-range date inputs. */
   customFrom: string
   customTo: string
-  /** Empty means "every account" — an empty filter is not the same as "match nothing". */
-  accountIds: number[]
-  /** Empty means every ledger/table. Used where a screen has an active statement or card ledger. */
-  tableIds: number[]
-  cardIds: number[]
+  /** Empty means every category — an empty filter is not the same as "match nothing". */
   categories: string[]
 }
 
@@ -26,23 +22,14 @@ function defaultCustomBounds(): { from: string; to: string } {
 export function useDashboardFilters() {
   const [filters, setFilters] = useState<DashboardFilters>(() => {
     const { from, to } = defaultCustomBounds()
-    return { preset: DEFAULT_PRESET, customFrom: from, customTo: to, accountIds: [], tableIds: [], cardIds: [], categories: [] }
+    return { preset: DEFAULT_PRESET, customFrom: from, customTo: to, categories: [] }
   })
-
-  function toggle(list: number[], id: number): number[] {
-    return list.includes(id) ? list.filter((x) => x !== id) : [...list, id]
-  }
 
   return {
     filters,
     setPreset: (preset: DateRangePreset) => setFilters((f) => ({ ...f, preset })),
     setCustomFrom: (customFrom: string) => setFilters((f) => ({ ...f, customFrom, preset: 'custom' })),
     setCustomTo: (customTo: string) => setFilters((f) => ({ ...f, customTo, preset: 'custom' })),
-    selectAccount: (id: number | null) => setFilters((f) => ({ ...f, accountIds: id === null ? [] : [id] })),
-    selectTable: (id: number | null) => setFilters((f) => ({ ...f, tableIds: id === null ? [] : [id] })),
-    selectCard: (id: number | null) => setFilters((f) => ({ ...f, cardIds: id === null ? [] : [id] })),
-    toggleAccount: (id: number) => setFilters((f) => ({ ...f, accountIds: toggle(f.accountIds, id) })),
-    toggleCard: (id: number) => setFilters((f) => ({ ...f, cardIds: toggle(f.cardIds, id) })),
     toggleCategory: (name: string) =>
       setFilters((f) => ({
         ...f,

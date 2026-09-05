@@ -8,7 +8,7 @@ interface CapitalEvolutionChartProps<T extends Record<string, unknown>> {
   xFormatter: (value: string | number) => string
   valueFormatter: (value: number) => string
   capitalLabel: string
-  cardSpendLabel: string
+  spendingLabel: string
   variableIncomeLabel: string
   fixedIncomeLabel: string
 }
@@ -20,13 +20,13 @@ export function CapitalEvolutionChart<T extends Record<string, unknown>>({
   xFormatter,
   valueFormatter,
   capitalLabel,
-  cardSpendLabel,
+  spendingLabel,
   variableIncomeLabel,
   fixedIncomeLabel,
 }: CapitalEvolutionChartProps<T>) {
   const config: ChartConfig = {
     capital: { label: capitalLabel, theme: DOMAIN_COLOR.balance },
-    cardSpend: { label: cardSpendLabel, theme: DIVERGING_PAIR.negative },
+    spending: { label: spendingLabel, theme: DIVERGING_PAIR.negative },
     variableIncome: { label: variableIncomeLabel, theme: DOMAIN_COLOR.variableIncome },
     fixedIncome: { label: fixedIncomeLabel, theme: DOMAIN_COLOR.fixedIncome },
   }
@@ -40,7 +40,7 @@ export function CapitalEvolutionChart<T extends Record<string, unknown>>({
         <ChartTooltip
           content={<ChartTooltipContent formatter={(value, name) => [valueFormatter(value as number), name]} />}
         />
-        <Bar dataKey="cardSpend" name={cardSpendLabel} fill="var(--color-cardSpend)" barSize="33.3%" radius={[4, 4, 0, 0]} />
+        <Bar dataKey="spending" name={spendingLabel} fill="var(--color-spending)" barSize="33.3%" radius={[4, 4, 0, 0]} />
         <Line dataKey="capital" name={capitalLabel} type="monotone" stroke="var(--color-capital)" strokeWidth={2} dot={false} />
         <Line dataKey="variableIncome" name={variableIncomeLabel} type="monotone" stroke="var(--color-variableIncome)" strokeWidth={2} dot={false} />
         <Line dataKey="fixedIncome" name={fixedIncomeLabel} type="monotone" stroke="var(--color-fixedIncome)" strokeWidth={2} dot={false} />

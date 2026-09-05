@@ -12,7 +12,7 @@ import type { LabelCatalogue } from '@/lib/model/label-catalogue'
 export function buildLabelCatalogue(translate: (key: string) => string): LabelCatalogue {
   return {
     sections: sections.map((section) => ({ id: section.id, label: translate(section.labelKey) })),
-    subsections: sections.flatMap((section) =>
+    screens: sections.flatMap((section) =>
       section.items.map((item) => ({ id: item.id, sectionId: section.id, label: translate(item.labelKey) })),
     ),
   }

@@ -2,8 +2,8 @@ import { useTranslation } from 'react-i18next'
 import { AppPieChart } from '@/components/charts/pie-chart'
 import { colorForKey, MAX_CATEGORICAL_SERIES } from '@/components/charts/chart-colors'
 import { foldTopCategories } from '@/lib/aggregations'
-import { computePositions, type Transaction } from '@/lib/current-value'
-import { useEntriesOfKinds } from '@/lib/model/use-model-data'
+import { computePositions } from '@/lib/current-value'
+import { useInvestmentTransactions } from '@/lib/model/investment-rows'
 
 const currency = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
 const number = new Intl.NumberFormat('pt-BR')
@@ -15,9 +15,7 @@ const number = new Intl.NumberFormat('pt-BR')
  */
 export function PositionsPanel() {
   const { t } = useTranslation(['investments', 'common'])
-  const rows = useEntriesOfKinds(['investmentLedger'])
-  const transactions = rows as unknown as Transaction[]
-  const positions = computePositions(transactions)
+  const positions = computePositions(useInvestmentTransactions())
   const totalValue = positions.reduce((sum, p) => sum + p.currentValue, 0)
 
   const pieData = foldTopCategories(

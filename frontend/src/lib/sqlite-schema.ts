@@ -44,54 +44,16 @@ export const SQLITE_SCHEMAS: Record<DataTableKey, SqliteTableSchema> = {
     columns: [
       { column: 'name', key: 'name', type: 'text' },
       { column: 'account_id', key: 'accountId', type: 'integer' },
-      { column: 'card_limit', key: 'limit', type: 'real' },
+      { column: 'limit_amount', key: 'limit', type: 'real' },
       { column: 'closing_day', key: 'closingDay', type: 'integer' },
       { column: 'due_day', key: 'dueDay', type: 'integer' },
       { column: 'archived', key: 'archived', type: 'boolean' },
     ],
   },
-  tableDefs: {
-    sqlName: 'table_defs',
-    columns: [
-      { column: 'name', key: 'name', type: 'text' },
-      { column: 'kind', key: 'kind', type: 'text' },
-      { column: 'account_id', key: 'accountId', type: 'integer' },
-      { column: 'card_id', key: 'cardId', type: 'integer' },
-      { column: 'investment_class', key: 'investmentClass', type: 'text' },
-    ],
-  },
-  categories: {
-    sqlName: 'categories',
-    columns: [
-      { column: 'name', key: 'name', type: 'text' },
-      { column: 'scope', key: 'scope', type: 'text' },
-      { column: 'archived', key: 'archived', type: 'boolean' },
-    ],
-  },
-  entries: {
-    sqlName: 'entries',
-    columns: [
-      { column: 'table_id', key: 'tableId', type: 'integer' },
-      { column: 'deleted', key: 'deleted', type: 'boolean' },
-      { column: 'import_key', key: 'importKey', type: 'text' },
-      { column: 'date', key: 'date', type: 'integer' },
-      { column: 'direction', key: 'direction', type: 'text' },
-      { column: 'category', key: 'category', type: 'text' },
-      { column: 'investment_class', key: 'investmentClass', type: 'text' },
-      { column: 'description', key: 'description', type: 'text' },
-      { column: 'amount', key: 'amount', type: 'real' },
-      { column: 'asset', key: 'asset', type: 'text' },
-      { column: 'type', key: 'type', type: 'text' },
-      { column: 'quantity', key: 'quantity', type: 'real' },
-      { column: 'price', key: 'price', type: 'real' },
-      { column: 'note', key: 'note', type: 'text' },
-      { column: 'destination', key: 'destination', type: 'text' },
-    ],
-  },
   budgets: {
     sqlName: 'budgets',
     columns: [
-      { column: 'category_id', key: 'categoryId', type: 'integer' },
+      { column: 'category', key: 'category', type: 'text' },
       { column: 'monthly_amount', key: 'monthlyAmount', type: 'real' },
     ],
   },
@@ -102,76 +64,61 @@ export const SQLITE_SCHEMAS: Record<DataTableKey, SqliteTableSchema> = {
       { column: 'target_percent', key: 'targetPercent', type: 'real' },
     ],
   },
-  ingestionSources: {
-    sqlName: 'ingestion_sources',
+  sourceFiles: {
+    sqlName: 'source_files',
     columns: [
       { column: 'original_filename', key: 'originalFilename', type: 'text' },
-      { column: 'source_fingerprint', key: 'sourceFingerprint', type: 'text' },
       { column: 'imported_at', key: 'importedAt', type: 'integer' },
       { column: 'raw_csv', key: 'rawCsv', type: 'text' },
       { column: 'original_columns', key: 'originalColumns', type: 'json' },
-      { column: 'supplemental_columns', key: 'supplementalColumns', type: 'json' },
-      { column: 'row_count', key: 'rowCount', type: 'integer' },
-      { column: 'status', key: 'status', type: 'text' },
-      { column: 'legacy', key: 'legacy', type: 'boolean' },
+      { column: 'assignments', key: 'assignments', type: 'json' },
+      { column: 'sign_convention', key: 'signConvention', type: 'json' },
+      { column: 'looks_like_source_id', key: 'looksLikeSourceId', type: 'integer' },
     ],
   },
-  ingestionColumnMappings: {
-    sqlName: 'ingestion_column_mappings',
+  sourceRows: {
+    sqlName: 'source_rows',
     columns: [
       { column: 'source_id', key: 'sourceId', type: 'integer' },
-      { column: 'source_column', key: 'sourceColumn', type: 'text' },
-      { column: 'target_field', key: 'targetField', type: 'text' },
-      { column: 'parser', key: 'parser', type: 'text' },
-      { column: 'is_supplemental', key: 'isSupplemental', type: 'boolean' },
-    ],
-  },
-  ingestionRows: {
-    sqlName: 'ingestion_rows',
-    columns: [
-      { column: 'source_id', key: 'sourceId', type: 'integer' },
-      { column: 'source_row_index', key: 'sourceRowIndex', type: 'integer' },
-      { column: 'source_row_fingerprint', key: 'sourceRowFingerprint', type: 'text' },
-      { column: 'raw_values', key: 'rawValues', type: 'json' },
-      { column: 'mapped_values', key: 'mappedValues', type: 'json' },
+      { column: 'row_id', key: 'rowId', type: 'text' },
+      { column: 'values_json', key: 'values', type: 'json' },
       { column: 'labels', key: 'labels', type: 'json' },
-      { column: 'status', key: 'status', type: 'text' },
-      { column: 'validation_errors', key: 'validationErrors', type: 'json' },
-      { column: 'destination_table_id', key: 'destinationTableId', type: 'integer' },
-      { column: 'existing_entry_id', key: 'existingEntryId', type: 'integer' },
-      { column: 'promoted_entry_id', key: 'promotedEntryId', type: 'integer' },
+      { column: 'marked_for_elimination', key: 'markedForElimination', type: 'boolean' },
+      { column: 'applied_rule_ids', key: 'appliedRuleIds', type: 'json' },
     ],
   },
-  entryLabels: {
-    sqlName: 'entry_labels',
+  confirmedRows: {
+    sqlName: 'confirmed_rows',
     columns: [
-      { column: 'entry_id', key: 'entryId', type: 'integer' },
-      { column: 'sections', key: 'sections', type: 'json' },
-      { column: 'subsections', key: 'subsections', type: 'json' },
-      { column: 'flow_role', key: 'flowRole', type: 'text' },
-      { column: 'settlement_channel', key: 'settlementChannel', type: 'text' },
-      { column: 'spending_treatment', key: 'spendingTreatment', type: 'text' },
-      { column: 'category_id', key: 'categoryId', type: 'integer' },
-      { column: 'recurrence', key: 'recurrence', type: 'text' },
-      { column: 'source_ingestion_row_id', key: 'sourceIngestionRowId', type: 'integer' },
-    ],
-  },
-  preferences: {
-    sqlName: 'preferences',
-    columns: [
-      { column: 'key', key: 'key', type: 'text' },
-      { column: 'value', key: 'value', type: 'text' },
+      { column: 'row_id', key: 'rowId', type: 'text' },
+      { column: 'section', key: 'section', type: 'text' },
+      { column: 'screen', key: 'screen', type: 'text' },
+      { column: 'source_filename', key: 'sourceFilename', type: 'text' },
+      { column: 'confirmed_at', key: 'confirmedAt', type: 'integer' },
+      { column: 'date', key: 'date', type: 'integer' },
+      { column: 'amount', key: 'amount', type: 'real' },
+      { column: 'observations', key: 'observations', type: 'text' },
+      { column: 'category', key: 'category', type: 'text' },
+      { column: 'subcategory', key: 'subcategory', type: 'text' },
+      { column: 'asset', key: 'asset', type: 'text' },
+      { column: 'quantity', key: 'quantity', type: 'real' },
+      { column: 'price', key: 'price', type: 'real' },
+      { column: 'investment_type', key: 'investmentType', type: 'text' },
+      { column: 'investment_class', key: 'investmentClass', type: 'text' },
+      { column: 'marked_for_elimination', key: 'markedForElimination', type: 'boolean' },
     ],
   },
   labelRules: {
     sqlName: 'label_rules',
     columns: [
       { column: 'name', key: 'name', type: 'text' },
+      { column: 'context', key: 'context', type: 'text' },
       { column: 'field', key: 'field', type: 'text' },
       { column: 'contains', key: 'contains', type: 'text' },
+      { column: 'match_mode', key: 'match', type: 'text' },
       { column: 'case_sensitive', key: 'caseSensitive', type: 'boolean' },
+      { column: 'where_json', key: 'where', type: 'json' },
       { column: 'labels', key: 'labels', type: 'json' },
-      { column: 'destination_table_id', key: 'destinationTableId', type: 'integer' },
       { column: 'rationale', key: 'rationale', type: 'text' },
       { column: 'created_by', key: 'createdBy', type: 'text' },
       { column: 'created_at', key: 'createdAt', type: 'integer' },
@@ -183,14 +130,16 @@ export const SQLITE_SCHEMAS: Record<DataTableKey, SqliteTableSchema> = {
       { column: 'event', key: 'event', type: 'text' },
       { column: 'actor', key: 'actor', type: 'text' },
       { column: 'source_id', key: 'sourceId', type: 'integer' },
-      { column: 'ingestion_row_ids', key: 'ingestionRowIds', type: 'json' },
-      { column: 'entry_ids', key: 'entryIds', type: 'json' },
       { column: 'details', key: 'details', type: 'json' },
     ],
   },
   notes: {
     sqlName: 'notes',
-    columns: [{ column: 'text', key: 'text', type: 'text' }],
+    columns: [
+      { column: 'title', key: 'title', type: 'text' },
+      { column: 'body', key: 'body', type: 'text' },
+      { column: 'updated_at', key: 'updatedAt', type: 'integer' },
+    ],
   },
   assistantPrompts: {
     sqlName: 'assistant_prompts',
@@ -208,28 +157,13 @@ export const SQLITE_SCHEMAS: Record<DataTableKey, SqliteTableSchema> = {
       { column: 'is_active', key: 'isActive', type: 'boolean' },
     ],
   },
-}
-
-function encodeValue(value: unknown, type: SqliteColumnType): string | number | null {
-  if (value === undefined || value === null) return null
-  if (type === 'boolean') return value ? 1 : 0
-  if (type === 'integer' || type === 'real') return typeof value === 'number' ? value : Number(value)
-  if (type === 'json') return JSON.stringify(value)
-  return String(value)
-}
-
-function decodeValue(value: string | number | null, type: SqliteColumnType): unknown {
-  if (value === null || value === undefined) return undefined
-  if (type === 'boolean') return value === 1 || value === '1'
-  if (type === 'integer' || type === 'real') return typeof value === 'number' ? value : Number(value)
-  if (type === 'json') {
-    try {
-      return JSON.parse(String(value))
-    } catch {
-      return undefined
-    }
-  }
-  return String(value)
+  preferences: {
+    sqlName: 'preferences',
+    columns: [
+      { column: 'key', key: 'key', type: 'text' },
+      { column: 'value', key: 'value', type: 'text' },
+    ],
+  },
 }
 
 /** `id, created_at, <one column per field>` — the fixed column order every helper below assumes. */
@@ -275,4 +209,26 @@ export function sqlValuesToRow(schema: SqliteTableSchema, values: (string | numb
     if (decoded !== undefined) data[c.key] = decoded
   })
   return { id: Number(id), createdAt: Number(createdAt), data }
+}
+
+function encodeValue(value: unknown, type: SqliteColumnType): string | number | null {
+  if (value === undefined || value === null) return null
+  if (type === 'boolean') return value ? 1 : 0
+  if (type === 'integer' || type === 'real') return typeof value === 'number' ? value : Number(value)
+  if (type === 'json') return JSON.stringify(value)
+  return String(value)
+}
+
+function decodeValue(value: string | number | null, type: SqliteColumnType): unknown {
+  if (value === null || value === undefined) return undefined
+  if (type === 'boolean') return value === 1 || value === '1'
+  if (type === 'integer' || type === 'real') return typeof value === 'number' ? value : Number(value)
+  if (type === 'json') {
+    try {
+      return JSON.parse(String(value))
+    } catch {
+      return undefined
+    }
+  }
+  return String(value)
 }

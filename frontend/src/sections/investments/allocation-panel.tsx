@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Input } from '@/components/ui/input'
-import { computePositions, type Transaction } from '@/lib/current-value'
+import { computePositions } from '@/lib/current-value'
 import { useAllocationTargetsStore } from '@/lib/model/model-stores'
-import { useEntriesOfKinds } from '@/lib/model/use-model-data'
+import { useInvestmentTransactions } from '@/lib/model/investment-rows'
 import { cn } from '@/lib/utils'
 
 const currency = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
@@ -15,8 +15,7 @@ function formatPercent(value: number) {
 /** Target vs. actual portfolio share per asset, with the rebalancing delta highlighted. */
 export function AllocationPanel({ embedded = false }: { embedded?: boolean }) {
   const { t } = useTranslation(['investments', 'common'])
-  const rows = useEntriesOfKinds(['investmentLedger'])
-  const positions = computePositions(rows as unknown as Transaction[])
+  const positions = computePositions(useInvestmentTransactions())
   const totalValue = positions.reduce((sum, p) => sum + p.currentValue, 0)
 
   const targets = useAllocationTargetsStore((s) => s.items)

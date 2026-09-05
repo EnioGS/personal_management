@@ -29,20 +29,16 @@ function daysInMonth(month: string): number {
 /** Subscriptions and other repeating charges, detected from history rather than declared upfront. */
 export function RecurringPanel() {
   const { t } = useTranslation(['finances', 'common'])
-  const { filters, setPreset, setCustomFrom, setCustomTo, selectAccount, selectTable, selectCard, toggleCategory, clearCategories } =
-    useDashboardFilters()
+  const { filters, setPreset, setCustomFrom, setCustomTo, toggleCategory, clearCategories } = useDashboardFilters()
   const entries = useDashboardEntries(filters)
-  const outgoing = useMemo(() => entries.filter((entry) => entry.direction === 'out' && entry.amount > 0), [entries])
-  const candidates = useMemo(() => {
-    // An explicit recurrence label is authoritative even before three months of
-    // history exist. The detector still runs over everything else, so a repeating
-    // charge nobody labelled yet is still proposed here.
-    const declared = detectRecurringEntries(outgoing.filter((entry) => entry.recurrence === 'recurring'), 1)
-    // Guessing is only for rows nobody has judged: an explicit oneOff or
-    // installment label must not be overridden by a repeating description.
-    const detected = detectRecurringEntries(outgoing.filter((entry) => entry.recurrence === 'undecided'))
-    return [...new Map([...declared, ...detected].map((candidate) => [`${candidate.category}\u0000${Math.round(candidate.averageAmount)}`, candidate])).values()]
-  }, [outgoing])
+  // Money that left, as the magnitude that left: a recurring charge is a repeated size.
+  const outgoing = useMemo(
+    () => entries.filter((entry) => entry.amount < 0).map((entry) => ({ ...entry, amount: -entry.amount })),
+    [entries],
+  )
+  // Recurrence is no longer a label anyone applies, so it is entirely detected: what
+  // repeated month after month is what this screen is about.
+  const candidates = useMemo(() => detectRecurringEntries(outgoing), [outgoing])
   const monthlyTotal = candidates.reduce((total, candidate) => total + candidate.averageAmount, 0)
   const largest = candidates.reduce((largestAmount, candidate) => Math.max(largestAmount, candidate.averageAmount), 0)
   const latestMonth = outgoing.length > 0 ? monthKey(Math.max(...outgoing.map((entry) => entry.date))) : new Date().toISOString().slice(0, 7)
@@ -69,14 +65,11 @@ export function RecurringPanel() {
         setPreset={setPreset}
         setCustomFrom={setCustomFrom}
         setCustomTo={setCustomTo}
-        selectAccount={selectAccount}
-        selectTable={selectTable}
-        selectCard={selectCard}
         toggleCategory={toggleCategory}
         clearCategories={clearCategories}
       />
       <div className="min-h-0 flex-1">
-        <FinanceTableDrawer id="recurring" kinds={['bankLedger', 'cardLedger', 'generic']}>
+        <FinanceTableDrawer id="recurring">
           <div className="flex flex-col gap-3">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <StatTile label={t('finances:recurring.monthlyTotal')} value={currency.format(monthlyTotal)} indicatorColor="var(--brand)" />

@@ -1,66 +1,41 @@
 import type { OpenRouterTool } from '@/lib/openrouter'
-import {
-  assignIngestionColumnsTool,
-  addIngestionBlankColumnTool,
-  discardIngestionRowsTool,
-  countIngestionRowsTool,
-  fillSourceColumnTool,
-  findIngestionDuplicatesTool,
-  groupIngestionRowsTool,
-  labelIngestionRowsByMatchTool,
-  listIngestionDatasetsTool,
-  listLabelOptionsTool,
-  markSourceRowsTool,
-  readIngestionGuideTool,
-  readIngestionProvenanceTool,
-  readIngestionTableTool,
-  queryIngestionRowsTool,
-  stageIngestionSourceTool,
-  suggestIngestionLabelsTool,
-  updateIngestionLabelsTool,
-  updateIngestionDataFieldsTool,
-  validateIngestionRowsTool,
-} from './ingestion-tools'
 import { applyLabelRulesTool, deleteLabelRuleTool, listLabelRulesTool, saveLabelRuleTool } from './label-rule-tools'
 import { readCsvTool } from './read-csv'
-import { readTableTool } from './read-table'
+import { readIngestionGuideTool } from './guide-tool'
 import { readTextFileTool } from './read-text-file'
 import type { ToolDefinition } from './types'
-// Finance tables are read-only to the assistant. Every write — adding a row,
-// correcting one, taking one out — happens in the ingestion centre, where the row
-// keeps its raw values, its labels are explicit, and the moves that matter are the
-// user's own clicks. Writing straight to a table would be a second door into the
-// dashboards with none of that.
-//
-// Promoting labelled rows and reallocating confirmed ones stay user-only. Staging is
-// reachable, but only behind an explicit confirmation the user has given (see the
-// tool's own description).
+import {
+  addConfirmedRowTool,
+  assignSourceColumnsTool,
+  confirmRowsTool,
+  dropSourceTableTool,
+  listLabelOptionsTool,
+  markRowsTool,
+  newRowIdTool,
+  queryVaultTool,
+  setLabelsTool,
+  setSignConventionTool,
+} from './vault-tools'
+
+// Reading is SQL; writing is a small set of functions that validate. Deleting rows is
+// the user's alone — the assistant marks, and a marked row is invisible to every
+// dashboard while staying in its table, which is what makes that division safe.
 
 /** Adding a tool = write one ToolDefinition file + add it here. Nothing else changes. */
 export const toolRegistry: ToolDefinition[] = [
   readTextFileTool,
   readCsvTool,
-  readTableTool,
   readIngestionGuideTool,
   listLabelOptionsTool,
-  listIngestionDatasetsTool,
-  readIngestionTableTool,
-  readIngestionProvenanceTool,
-  countIngestionRowsTool,
-  queryIngestionRowsTool,
-  groupIngestionRowsTool,
-  assignIngestionColumnsTool,
-  addIngestionBlankColumnTool,
-  fillSourceColumnTool,
-  markSourceRowsTool,
-  stageIngestionSourceTool,
-  findIngestionDuplicatesTool,
-  discardIngestionRowsTool,
-  suggestIngestionLabelsTool,
-  updateIngestionLabelsTool,
-  labelIngestionRowsByMatchTool,
-  updateIngestionDataFieldsTool,
-  validateIngestionRowsTool,
+  queryVaultTool,
+  assignSourceColumnsTool,
+  setSignConventionTool,
+  setLabelsTool,
+  markRowsTool,
+  newRowIdTool,
+  addConfirmedRowTool,
+  confirmRowsTool,
+  dropSourceTableTool,
   listLabelRulesTool,
   saveLabelRuleTool,
   applyLabelRulesTool,

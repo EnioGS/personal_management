@@ -11,9 +11,9 @@ describe('capitalEvolution', () => {
     ], { from: Date.UTC(2026, 0, 1), to: Date.UTC(2026, 2, 31) })
 
     expect(points).toEqual([
-      { month: '2026-01', cashCapital: 70, variableIncome: 0, fixedIncome: 0, capital: 70, cardSpend: 0 },
-      { month: '2026-02', cashCapital: 70, variableIncome: 0, fixedIncome: 0, capital: 70, cardSpend: 0 },
-      { month: '2026-03', cashCapital: 70, variableIncome: 0, fixedIncome: 0, capital: 70, cardSpend: 15 },
+      { month: '2026-01', cashCapital: 70, variableIncome: 0, fixedIncome: 0, capital: 70, spending: 0 },
+      { month: '2026-02', cashCapital: 70, variableIncome: 0, fixedIncome: 0, capital: 70, spending: 0 },
+      { month: '2026-03', cashCapital: 70, variableIncome: 0, fixedIncome: 0, capital: 70, spending: 15 },
     ])
   })
 
@@ -23,7 +23,7 @@ describe('capitalEvolution', () => {
       { date: Date.UTC(2026, 0, 1), amount: 20, direction: 'out' },
     ], { from: Date.UTC(2026, 0, 1), to: Date.UTC(2026, 0, 31) })
 
-    expect(points).toEqual([{ month: '2026-01', cashCapital: 80, variableIncome: 0, fixedIncome: 0, capital: 80, cardSpend: 0 }])
+    expect(points).toEqual([{ month: '2026-01', cashCapital: 80, variableIncome: 0, fixedIncome: 0, capital: 80, spending: 0 }])
   })
 
   it('starts at the earliest month across cash and investments, and adds both investment values to capital', () => {
@@ -38,9 +38,9 @@ describe('capitalEvolution', () => {
     )
 
     expect(points).toEqual([
-      { month: '2026-01', cashCapital: 0, variableIncome: 50, fixedIncome: 0, capital: 50, cardSpend: 0 },
-      { month: '2026-02', cashCapital: 50, variableIncome: 50, fixedIncome: 0, capital: 100, cardSpend: 0 },
-      { month: '2026-03', cashCapital: 50, variableIncome: 56, fixedIncome: 200, capital: 306, cardSpend: 0 },
+      { month: '2026-01', cashCapital: 0, variableIncome: 50, fixedIncome: 0, capital: 50, spending: 0 },
+      { month: '2026-02', cashCapital: 50, variableIncome: 50, fixedIncome: 0, capital: 100, spending: 0 },
+      { month: '2026-03', cashCapital: 50, variableIncome: 56, fixedIncome: 200, capital: 306, spending: 0 },
     ])
   })
 
@@ -56,8 +56,8 @@ describe('capitalEvolution', () => {
     )
 
     expect(points).toEqual([
-      { month: '2026-01', cashCapital: 0, variableIncome: 100, fixedIncome: 0, capital: 100, cardSpend: 0 },
-      { month: '2026-02', cashCapital: 0, variableIncome: -20, fixedIncome: 0, capital: -20, cardSpend: 0 },
+      { month: '2026-01', cashCapital: 0, variableIncome: 100, fixedIncome: 0, capital: 100, spending: 0 },
+      { month: '2026-02', cashCapital: 0, variableIncome: -20, fixedIncome: 0, capital: -20, spending: 0 },
     ])
   })
 
@@ -101,7 +101,7 @@ describe('capitalEvolution', () => {
       ],
     )
 
-    expect(points).toEqual([{ month: '2026-01', cashCapital: 0, variableIncome: 0, fixedIncome: 100, capital: 100, cardSpend: 0 }])
+    expect(points).toEqual([{ month: '2026-01', cashCapital: 0, variableIncome: 0, fixedIncome: 100, capital: 100, spending: 0 }])
   })
 })
 
@@ -125,6 +125,6 @@ describe('what moves total capital', () => {
     ], range)
 
     expect(points[0].cashCapital).toBe(-110)
-    expect(points[0].cardSpend).toBe(110)
+    expect(points[0].spending).toBe(110)
   })
 })

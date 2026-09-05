@@ -14,14 +14,14 @@ import { buildLabelCatalogue } from '@/lib/label-catalogue-source'
  */
 export const PROMPT_PLACEHOLDERS = {
   sections: '{{sections}}',
-  subsections: '{{subsections}}',
+  screens: '{{screens}}',
 } as const
 
 export type PlaceholderName = keyof typeof PROMPT_PLACEHOLDERS
 
 /** Which placeholders each stored prompt must keep. Keyed by the prompt's own key. */
 export const REQUIRED_PLACEHOLDERS: Record<string, PlaceholderName[]> = {
-  ingestionGuide: ['sections', 'subsections'],
+  ingestionGuide: ['sections', 'screens'],
 }
 
 export function missingPlaceholders(promptKey: string, content: string): PlaceholderName[] {
@@ -47,10 +47,10 @@ export function renderPrompt(promptKey: string, content: string, translate: (key
 
   const catalogue = buildLabelCatalogue(translate)
   const sections = catalogue.sections.map((section) => `${section.id} (${section.label})`).join(', ')
-  const subsections = catalogue.subsections
+  const screens = catalogue.screens
     .map((item) => `${item.id} (${item.label}, in ${item.sectionId})`)
     .join(', ')
   return content
     .replaceAll(PROMPT_PLACEHOLDERS.sections, sections)
-    .replaceAll(PROMPT_PLACEHOLDERS.subsections, subsections)
+    .replaceAll(PROMPT_PLACEHOLDERS.screens, screens)
 }

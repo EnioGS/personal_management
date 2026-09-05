@@ -2,59 +2,50 @@ import { assistantConfigTable } from '@/lib/assistant-config-db'
 import { assistantPromptsTable } from '@/lib/assistant-prompts-db'
 import { refreshAllLocalStores } from '@/lib/local-store/create-local-list-store'
 import type { LocalRow } from '@/lib/local-store/create-local-table'
-import { inferInvestmentClass } from '@/lib/model/investment-class'
-import { buildModelFromLegacy, LEGACY_TABLE_KEYS, type LegacyTables } from '@/lib/model/legacy-migration'
 import {
   accountsTable,
   allocationTargetsTable,
   budgetsTable,
   cardsTable,
-  categoriesTable,
-  entryLabelsTable,
-  entriesTable,
+  confirmedRowsTable,
   ingestionAuditEventsTable,
-  ingestionColumnMappingsTable,
-  ingestionRowsTable,
-  ingestionSourcesTable,
   labelRulesTable,
-  tableDefsTable,
+  sourceFilesTable,
+  sourceRowsTable,
 } from '@/lib/model/model-db'
 import { preferencesTable } from '@/lib/preferences-table'
 import { notesTable } from '@/sections/notes/notes-db'
 
 /**
- * v1 was the encrypted (.pmvault) format — unreadable, rejected on import.
- * v2 was the five hardcoded tables; it still imports, upgraded on the way in.
- * v3 carries the configurable model: accounts, cards, table definitions and the
- * category vocabulary travel with the rows, so importing into a blank browser restores
- * the user's whole setup rather than a pile of untitled data. v4 also includes
- * ingestion sources, staged rows, label sidecars and their audit events. v5 drops
- * category rules: a row's category is a label set in the ingestion centre, so a rule
- * store no longer exists to round-trip. v6 adds standing labelling rules, and v7 the
- * interface preferences (theme, language) that live outside Dexie — so an export
- * restores a setup, not only its rows.
+ * v8 is the first export of the one-phase model, and the first that mirrors the
+ * database instead of a fixed list of stores. Earlier files describe a world of staged
+ * rows, entries and table definitions that no longer exists, and are refused with an
+ * explanation rather than half-restored.
  */
-export const DATA_EXPORT_VERSION = 7 as const
+export const DATA_EXPORT_VERSION = 8 as const
 export const DATA_FILE_NAME = 'personal-management-data.db'
 export const DATA_FILE_EXTENSION = '.db'
 /** Still accepted on import (see `data-panel.tsx`) — a backup made before adr/0028. */
 export const LEGACY_DATA_FILE_EXTENSION = '.pmdata'
 
 /** Everything that round-trips. Key order here is the order tables are cleared/restored. */
+/**
+ * Everything that round-trips, in the order tables are cleared and restored.
+ *
+ * The export mirrors the database rather than a fixed shape of its own: a source file
+ * and a confirmed table appear under their own names, so the `.db` is worth opening in
+ * a SQLite browser — which was the point of exporting SQLite at all.
+ */
 const TABLES = {
   accounts: accountsTable,
   cards: cardsTable,
-  tableDefs: tableDefsTable,
-  categories: categoriesTable,
-  entries: entriesTable,
   budgets: budgetsTable,
   allocationTargets: allocationTargetsTable,
-  ingestionSources: ingestionSourcesTable,
-  ingestionColumnMappings: ingestionColumnMappingsTable,
-  ingestionRows: ingestionRowsTable,
-  entryLabels: entryLabelsTable,
-  ingestionAuditEvents: ingestionAuditEventsTable,
+  sourceFiles: sourceFilesTable,
+  sourceRows: sourceRowsTable,
+  confirmedRows: confirmedRowsTable,
   labelRules: labelRulesTable,
+  ingestionAuditEvents: ingestionAuditEventsTable,
   notes: notesTable,
   assistantPrompts: assistantPromptsTable,
   assistantConfig: assistantConfigTable,
@@ -101,7 +92,7 @@ export async function wipeAllData(): Promise<void> {
  * set is fixed now, so wiping it only meant recreating the same six a moment later,
  * and an account is configuration, not a transaction.
  */
-const SETUP_TABLES: DataTableKey[] = ['accounts', 'cards', 'tableDefs', 'preferences']
+const SETUP_TABLES: DataTableKey[] = ['accounts', 'cards', 'preferences']
 
 /** Clears the data while keeping the setup. This is what the Vault's clear button does. */
 export async function clearStoredData(): Promise<void> {
@@ -121,123 +112,46 @@ export interface ImportReport {
 /**
  * What a file will and will not bring in, worked out before anything is written.
  *
- * A file from an older build simply lacks stores this one has, and a file from a newer
- * one carries stores it does not — neither is a reason to refuse it. The first are
- * restored empty; the second stay in the file, and the user is told rather than left
- * to discover it. Extra tables are the user's own and are kept as they are.
+ * A file from an older build simply lacks stores this one has; a file from a newer one
+ * carries stores it does not. Neither is a reason to refuse it: the first are restored
+ * empty, the second stay in the file and are named, so nothing disappears without being
+ * mentioned.
  */
 export function describeImport(file: DataExportFile, knownKeys: readonly string[] = TABLE_KEYS): ImportReport {
   const carried = Object.keys(file.tables ?? {})
-  const namedTables = (file.tables?.tableDefs ?? []).map((row) => (row.data as { name?: string })?.name ?? 'unnamed')
+  const sourceFiles = (file.tables?.sourceFiles ?? []).map((row) => (row.data as { originalFilename?: string })?.originalFilename ?? 'unnamed')
   return {
     absentStores: TABLE_KEYS.filter((key) => !carried.includes(key)),
     unknownStores: carried.filter((key) => !knownKeys.includes(key)),
-    extraTables: namedTables.slice(3),
+    extraTables: sourceFiles,
   }
 }
 
-/** Wipes all tables, then restores the imported rows — bulkPut preserves their original ids. */
+/**
+ * Replaces everything in this browser with what the file holds.
+ *
+ * A replace, not a merge: rows carry their own ids, so merging two exports would either
+ * collide on those ids or silently renumber rows that other rows point at. Stores the
+ * file does not carry end up empty, which is what "this is now that file" means.
+ */
 export async function importData(file: DataExportFile): Promise<ImportReport> {
   const report = describeImport(file)
-  await Promise.all(TABLE_KEYS.map((key) => TABLES[key].clear()))
-  await Promise.all(TABLE_KEYS.map((key) => TABLES[key].bulkPut(file.tables[key] ?? [])))
+  for (const key of TABLE_KEYS) {
+    const table = TABLES[key]
+    await table.clear()
+    const rows = file.tables[key] ?? []
+    if (rows.length > 0) await table.bulkPut(rows)
+  }
   await refreshAllLocalStores()
   return report
 }
 
-function asRows(value: unknown): LocalRow[] {
-  return Array.isArray(value) ? (value as LocalRow[]) : []
-}
-
-/** v3 exports predate stored investment classes; enrich them before restoring rows. */
-function withInvestmentClasses(rows: LocalRow[]): LocalRow[] {
-  return rows.map((row) => {
-    const table = row.data as Record<string, unknown> | undefined
-    if (!table || table.kind !== 'investmentLedger' || table.investmentClass) return row
-    return { ...row, data: { ...table, investmentClass: inferInvestmentClass(table.name) } }
-  })
-}
-
-function emptyIngestionTables() {
-  return {
-    ingestionSources: [] as LocalRow[],
-    ingestionColumnMappings: [] as LocalRow[],
-    ingestionRows: [] as LocalRow[],
-    entryLabels: [] as LocalRow[],
-    ingestionAuditEvents: [] as LocalRow[],
-    labelRules: [] as LocalRow[],
-    preferences: [] as LocalRow[],
-  }
-}
-
 /**
- * Rewrites a v2 file (five fixed tables) into the current shape, turning each populated
- * legacy table into a table definition plus tagged entries — the same mapping the
- * in-browser migration uses, so a file and a live database upgrade identically.
- */
-function upgradeV2(record: Record<string, unknown>): DataExportFile {
-  const tables = (record.tables ?? {}) as Record<string, unknown>
-  const legacy: LegacyTables = {}
-  for (const key of LEGACY_TABLE_KEYS) legacy[key] = asRows(tables[key])
-
-  const { tableDefs, entries } = buildModelFromLegacy(legacy)
-
-  return {
-    version: DATA_EXPORT_VERSION,
-    exportedAt: typeof record.exportedAt === 'number' ? record.exportedAt : Date.now(),
-    tables: {
-      accounts: [],
-      cards: [],
-      tableDefs,
-      categories: [],
-      entries,
-      budgets: [],
-      allocationTargets: [],
-      ...emptyIngestionTables(),
-      notes: asRows(tables.notes),
-      assistantPrompts: asRows(tables.assistantPrompts),
-      assistantConfig: asRows(tables.assistantConfig),
-    },
-  }
-}
-
-/** v3 had the configurable model but no source-ingestion or row-label stores. */
-function upgradeV3(record: Record<string, unknown>): DataExportFile {
-  const tables = record.tables as Record<string, unknown>
-  return {
-    version: DATA_EXPORT_VERSION,
-    exportedAt: typeof record.exportedAt === 'number' ? record.exportedAt : Date.now(),
-    tables: {
-      accounts: asRows(tables.accounts),
-      cards: asRows(tables.cards),
-      tableDefs: withInvestmentClasses(asRows(tables.tableDefs)),
-      categories: asRows(tables.categories),
-      entries: asRows(tables.entries),
-      budgets: asRows(tables.budgets),
-      allocationTargets: asRows(tables.allocationTargets),
-      ...emptyIngestionTables(),
-      notes: asRows(tables.notes),
-      assistantPrompts: asRows(tables.assistantPrompts),
-      assistantConfig: asRows(tables.assistantConfig),
-    },
-  }
-}
-
-/** v4 carries a categoryRules table this version dropped; v5 and v6 simply predate tables it has. */
-function upgradeV4(record: Record<string, unknown>): DataExportFile {
-  const tables = record.tables as Record<string, unknown>
-  return {
-    version: DATA_EXPORT_VERSION,
-    exportedAt: typeof record.exportedAt === 'number' ? record.exportedAt : Date.now(),
-    tables: Object.fromEntries(TABLE_KEYS.map((key) => [key, asRows(tables[key])])) as Record<DataTableKey, LocalRow[]>,
-  }
-}
-
-/**
- * Throws a descriptive Error if `value` isn't a well-formed export this app can read.
- * v2 and v3 files are accepted and upgraded; only the shape actually needed is
- * required, so a file written before an additive table existed still imports with
- * that table empty.
+ * Reads an export this app can restore.
+ *
+ * Files written before the one-phase model describe staged rows, entries and table
+ * definitions that no longer exist. Half-restoring one would leave a vault that looks
+ * populated and reads empty, so they are refused with the reason.
  */
 export function parseDataExportFile(value: unknown): DataExportFile {
   if (typeof value !== 'object' || value === null) throw new Error('Not a data export file.')
@@ -246,23 +160,18 @@ export function parseDataExportFile(value: unknown): DataExportFile {
   if (typeof record.exportedAt !== 'number' || typeof record.tables !== 'object' || record.tables === null) {
     throw new Error('Malformed data export file.')
   }
-
-  if (record.version === 2) return upgradeV2(record)
-  if (record.version === 3) return upgradeV3(record)
-  if (record.version === 4 || record.version === 5 || record.version === 6) return upgradeV4(record)
-
   if (record.version !== DATA_EXPORT_VERSION) {
-    throw new Error(`Unsupported data export version: ${String(record.version)}.`)
+    throw new Error(
+      `This file was written by version ${String(record.version)} of the data format, and this app reads version ${DATA_EXPORT_VERSION}. `
+      + 'Versions before 8 describe staged rows and table definitions the app no longer has.',
+    )
   }
 
   const tables = record.tables as Record<string, unknown>
-  // `entries` and `tableDefs` are what make a v3 file a v3 file; the rest may legitimately
-  // be absent in a file written by an older build of this same version.
-  for (const key of ['tableDefs', 'entries'] as const) {
-    if (!Array.isArray(tables[key])) throw new Error(`Malformed data export file: missing "${key}" table.`)
-  }
-
   const normalised = Object.fromEntries(TABLE_KEYS.map((key) => [key, asRows(tables[key])])) as DataExportFile['tables']
-  normalised.tableDefs = withInvestmentClasses(normalised.tableDefs)
   return { version: DATA_EXPORT_VERSION, exportedAt: record.exportedAt, tables: normalised }
+}
+
+function asRows(value: unknown): LocalRow[] {
+  return Array.isArray(value) ? (value as LocalRow[]) : []
 }

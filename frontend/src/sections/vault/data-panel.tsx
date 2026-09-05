@@ -23,7 +23,6 @@ import {
   clearStoredData,
 } from '@/lib/data-file'
 import { saveBinaryFile } from '@/lib/file-io'
-import { alignDefaultTables, seedDefaultTables } from '@/lib/model/seed-tables'
 import { buildSqliteFile, looksLikeSqlite, parseSqliteFile } from '@/lib/sqlite-export'
 
 type DialogState =
@@ -99,14 +98,9 @@ export function DataPanel() {
     }
 
     const report = await importData(parsed)
-    // A file that predates a screen simply has no table for it; one that comes from a
-    // newer build may carry more than this version understands. Both are imported for
-    // what they are, and what could not be brought in is said out loud.
-    await seedDefaultTables()
-    const alignment = await alignDefaultTables()
+    // What could not be brought in is said out loud rather than discovered later.
     const notes = [
-      alignment.created.length > 0 ? `Created ${alignment.created.join(', ')} — the file had no table for them.` : '',
-      report.extraTables.length > 0 ? `Kept ${report.extraTables.length} extra table(s): ${report.extraTables.join(', ')}.` : '',
+      report.extraTables.length > 0 ? `Restored ${report.extraTables.length} source file(s): ${report.extraTables.join(', ')}.` : '',
       report.unknownStores.length > 0 ? `This version does not know ${report.unknownStores.join(', ')}; that data stayed in the file.` : '',
     ].filter(Boolean)
     if (notes.length > 0) setDialog({ kind: 'error', message: notes.join(' ') })
@@ -117,7 +111,6 @@ export function DataPanel() {
     // Clearing the data means the rows. The accounts, cards and tables a person set up
     // stay, and the seed only fills in a table set that is somehow missing entirely.
     await clearStoredData()
-    await seedDefaultTables()
     await refreshCount()
   }
 

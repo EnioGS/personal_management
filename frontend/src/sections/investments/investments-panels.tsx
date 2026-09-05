@@ -9,16 +9,13 @@ import { RankedBarList } from '@/components/dashboard/ranked-bar-list'
 import { StatTile } from '@/components/dashboard/stat-tile'
 import { bucketByMonth, foldTopCategories, formatDateLabel, formatMonthLabel, runningPositionOverTime } from '@/lib/aggregations'
 import { computePositions, getCurrentValue, type Transaction } from '@/lib/current-value'
-import { useEntriesOfKinds } from '@/lib/model/use-model-data'
-import type { StoredRow } from '@/lib/local-store/create-local-table'
-import type { Entry } from '@/lib/model/types'
-import type { InvestmentClass } from '@/lib/model/types'
+import { asTransaction, isFixedIncome, isVariableIncome, useInvestmentRows } from '@/lib/model/investment-rows'
+import type { ConfirmedRow } from '@/lib/model/types'
 import { AllocationPanel } from './allocation-panel'
 
 export function OverviewPanel() {
   const { t } = useTranslation(['investments', 'common'])
-  const rows = useEntriesOfKinds(['investmentLedger'])
-  const visible = rows.filter((row) => !row.deleted) as unknown as Transaction[]
+  const visible = useInvestmentRows().map(asTransaction)
 
   const lineData = runningPositionOverTime(visible)
   const pieData = allocationPieData(visible, t('common:chart.other'))
@@ -45,26 +42,25 @@ export function OverviewPanel() {
  */
 export function InvestmentsPanel() {
   const { t } = useTranslation(['investments', 'common'])
-  const investmentRows = useEntriesOfKinds(['investmentLedger'])
-  // Contributions and dividends were tables of their own; they are the same ledger
-  // read two ways — money put in, and money the holdings paid out.
-  const contributionRows = investmentRows.filter((row) => row.type === 'buy').map(withInvestedAmount)
-  const dividendRows = investmentRows.filter((row) => row.type === 'income').map(withInvestedAmount)
-  const transactions = investmentRows.filter((row) => !row.deleted) as unknown as Transaction[]
+  const investmentRows = useInvestmentRows()
+  const transactions = useMemo(() => investmentRows.map(asTransaction), [investmentRows])
+  // Contributions and dividends are the same ledger read two ways — money put in, and
+  // money the holdings paid out.
+  const contributionRows = transactions.filter((row) => row.type === 'buy').map(withInvestedAmount)
+  const dividendRows = transactions.filter((row) => row.type === 'income').map(withInvestedAmount)
   const positions = useMemo(() => computePositions(transactions), [transactions])
   const totalValue = positions.reduce((sum, position) => sum + position.currentValue, 0)
-  // The class is a property of the investment, not of the table it lives in: one
-  // ledger holds both, and each row says which it is.
-  const classValue = (investmentClass: InvestmentClass) => computePositions(
-    investmentRows
-      .filter((row) => !row.deleted && row.investmentClass === investmentClass) as unknown as Transaction[],
-  ).reduce((sum, position) => sum + position.currentValue, 0)
-  const variableValue = classValue('variableIncome')
-  const fixedValue = classValue('fixedIncome')
-  const contributions = contributionRows.filter((row) => !row.deleted).reduce((sum, row) => sum + (typeof row.amount === 'number' ? row.amount : 0), 0)
-  const dividends = dividendRows.filter((row) => !row.deleted).reduce((sum, row) => sum + (typeof row.amount === 'number' ? row.amount : 0), 0)
-  const contributionData = bucketByMonth(contributionRows.filter((row) => !row.deleted), 'date', 'amount').map((row) => ({ month: row.month, amount: row.total }))
-  const dividendData = bucketByMonth(dividendRows.filter((row) => !row.deleted), 'date', 'amount').map((row) => ({ month: row.month, amount: row.total }))
+  // The class is a property of the investment, not of any table it lives in: the rows
+  // sit on one screen, and each says which class it is.
+  const classValue = (belongs: (row: (typeof investmentRows)[number]) => boolean) =>
+    computePositions(investmentRows.filter(belongs).map(asTransaction))
+      .reduce((sum, position) => sum + position.currentValue, 0)
+  const variableValue = classValue(isVariableIncome)
+  const fixedValue = classValue(isFixedIncome)
+  const contributions = contributionRows.reduce((sum, row) => sum + row.amount, 0)
+  const dividends = dividendRows.reduce((sum, row) => sum + row.amount, 0)
+  const contributionData = bucketByMonth(contributionRows, 'date', 'amount').map((row) => ({ month: row.month, amount: row.total }))
+  const dividendData = bucketByMonth(dividendRows, 'date', 'amount').map((row) => ({ month: row.month, amount: row.total }))
   const lineData = runningPositionOverTime(transactions)
   const allocation = allocationPieData(transactions, t('common:chart.other'))
   const positionItems = positions.map((position) => ({ key: position.asset, label: position.asset, value: position.currentValue }))
@@ -130,15 +126,14 @@ function allocationPieData(items: Transaction[], otherLabel: string) {
 function TransactionLedgerPanel({
   title,
   color,
-  investmentClass,
+  belongs,
 }: {
   title: string
   color: (typeof DOMAIN_COLOR)['variableIncome']
-  investmentClass: InvestmentClass
+  belongs: (row: ConfirmedRow) => boolean
 }) {
   const { t } = useTranslation('common')
-  const rows = useEntriesOfKinds(['investmentLedger']).filter((row) => row.investmentClass === investmentClass)
-  const visible = rows.filter((row) => !row.deleted) as unknown as Transaction[]
+  const visible = useInvestmentRows().filter(belongs).map(asTransaction)
 
   const lineData = runningPositionOverTime(visible)
   const pieData = allocationPieData(visible, t('chart.other'))
@@ -167,7 +162,7 @@ export function VariableIncomePanel() {
     <TransactionLedgerPanel
       title={t('items.variableIncome')}
       color={DOMAIN_COLOR.variableIncome}
-      investmentClass="variableIncome"
+      belongs={isVariableIncome}
     />
   )
 }
@@ -178,15 +173,14 @@ export function FixedIncomePanel() {
     <TransactionLedgerPanel
       title={t('items.fixedIncome')}
       color={DOMAIN_COLOR.fixedIncome}
-      investmentClass="fixedIncome"
+      belongs={isFixedIncome}
     />
   )
 }
 
 export function ContributionsPanel() {
   const { t } = useTranslation('investments')
-  const rows = useEntriesOfKinds(['investmentLedger'])
-  const visible = rows.filter((row) => !row.deleted && row.type === 'buy').map(withInvestedAmount)
+  const visible = useInvestmentRows().map(asTransaction).filter((row) => row.type === 'buy').map(withInvestedAmount)
 
   const barData = bucketByMonth(visible, 'date', 'amount').map((d) => ({ month: d.month, amount: d.total }))
 
@@ -209,8 +203,7 @@ export function ContributionsPanel() {
 
 export function DividendsPanel() {
   const { t } = useTranslation('investments')
-  const rows = useEntriesOfKinds(['investmentLedger'])
-  const visible = rows.filter((row) => !row.deleted && row.type === 'income').map(withInvestedAmount)
+  const visible = useInvestmentRows().map(asTransaction).filter((row) => row.type === 'income').map(withInvestedAmount)
 
   const barData = bucketByMonth(visible, 'date', 'amount').map((d) => ({ month: d.month, amount: d.total }))
 
@@ -232,8 +225,6 @@ export function DividendsPanel() {
 }
 
 /** An investment row states quantity and price; what it moved is their product. */
-function withInvestedAmount(row: StoredRow<Entry>): StoredRow<Entry> & { amount: number } {
-  const quantity = typeof row.quantity === 'number' ? row.quantity : 0
-  const price = typeof row.price === 'number' ? row.price : 0
-  return { ...row, amount: quantity * price }
+function withInvestedAmount(row: Transaction): Transaction & { amount: number } {
+  return { ...row, amount: row.quantity * row.price }
 }

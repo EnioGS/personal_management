@@ -1,120 +1,126 @@
 import { comparableText } from './row-query'
-import type { IngestionRow, IngestionRowLabels, LabelRule } from './types'
+import type { IngestionRowLabels, LabelRule } from './types'
 
 export type StoredRule = LabelRule & { id: number }
 
-/** The label dimensions a rule can set. Destination table is handled separately. */
-const LABEL_KEYS: (keyof IngestionRowLabels)[] = ['sections', 'subsections', 'flowRole', 'settlementChannel', 'spendingTreatment', 'categoryId', 'recurrence']
-
-export function ruleMatchesText(rule: Pick<LabelRule, 'contains' | 'caseSensitive' | 'match'>, text: unknown): boolean {
-  const needle = comparableText(rule.contains, rule.caseSensitive)
-  if (!needle) return false
-  const value = comparableText(text, rule.caseSensitive)
-  if (rule.match === 'equals') return value === needle
-  if (rule.match === 'startsWith') return value.startsWith(needle)
-  return value.includes(needle)
-}
+/** The labels a rule can set. Placement first, meaning second. */
+const LABEL_KEYS: (keyof IngestionRowLabels)[] = ['sections', 'screens', 'category', 'subcategory']
 
 /**
- * Whether a rule applies to a row: its own text condition, and every further one.
- * All must hold — a rule narrowed by where it came from should not fire on a file it
- * was never meant for.
+ * Whether one condition holds.
+ *
+ * Substring is the default because most merchants are distinctive. A short name is not:
+ * "of" is inside Microsoft, so `equals` and `startsWith` exist, and `regex` for the cases
+ * where a bank writes the same thing five ways.
  */
-export function ruleMatchesRow(rule: LabelRule, row: IngestionRow, resolveField: (row: IngestionRow, field: string) => unknown): boolean {
-  if (!ruleMatchesText(rule, resolveField(row, rule.field || 'description'))) return false
-  return (rule.where ?? []).every((condition) => ruleMatchesText(condition, resolveField(row, condition.field || 'description')))
+export function conditionHolds(condition: Pick<LabelRule, 'contains' | 'caseSensitive' | 'match'>, text: unknown): boolean {
+  const needle = condition.contains?.trim()
+  if (!needle) return false
+  if (condition.match === 'regex') {
+    try {
+      return new RegExp(needle, condition.caseSensitive ? '' : 'i').test(String(text ?? ''))
+    } catch {
+      // An unusable pattern matches nothing rather than throwing mid-import; saving one
+      // is refused earlier, where the user can see why.
+      return false
+    }
+  }
+  const value = comparableText(text, condition.caseSensitive)
+  const wanted = comparableText(needle, condition.caseSensitive)
+  if (condition.match === 'equals') return value === wanted
+  if (condition.match === 'startsWith') return value.startsWith(wanted)
+  return value.includes(wanted)
+}
+
+/** Whether a rule applies: its own condition, and every further one. All must hold. */
+export function ruleApplies(rule: LabelRule, resolveField: (field: string) => unknown): boolean {
+  if (!conditionHolds(rule, resolveField(rule.field || 'description'))) return false
+  return (rule.where ?? []).every((condition) => conditionHolds(condition, resolveField(condition.field || 'description')))
 }
 
 export interface RuleApplication {
   labels: IngestionRowLabels
-  destinationTableId?: number
   appliedRuleIds: number[]
-  /** What each rule actually filled, for reporting back. */
   filled: { ruleId: number; fields: string[] }[]
 }
 
 /**
- * Applies standing rules to one row.
+ * Applies standing rules to one row's labels.
  *
- * A rule fills only what the row does not already have. A judgement made by hand or
- * by the assistant outranks a standing rule, and two rules matching the same row
- * compose rather than fight: the first to match a field owns it, the next fills what
- * is still empty. Nothing is overwritten, so applying rules again is harmless.
+ * A rule fills only what is not there yet — a judgement made by hand or by the assistant
+ * outranks a standing rule — and two rules matching the same row compose rather than
+ * fight. Category and subcategory count as filled once they hold anything but their
+ * default, so a rule may sharpen `outros` but never overwrite a real answer.
  */
-export function applyLabelRules(row: IngestionRow, rules: StoredRule[], resolveField: (row: IngestionRow, field: string) => unknown): RuleApplication {
-  const labels: IngestionRowLabels = { ...row.labels }
-  let destinationTableId = row.destinationTableId
-  const appliedRuleIds = [...(row.appliedRuleIds ?? [])]
+export function applyLabelRules(labels: IngestionRowLabels, rules: StoredRule[], resolveField: (field: string) => unknown, defaultMeaning = 'outros'): RuleApplication {
+  const next: IngestionRowLabels = { ...labels }
+  const appliedRuleIds: number[] = []
   const filled: RuleApplication['filled'] = []
 
+  const isEmpty = (key: keyof IngestionRowLabels) => {
+    const held = next[key]
+    if (Array.isArray(held)) return held.length === 0
+    if (typeof held === 'string') return held.trim() === '' || held.trim() === defaultMeaning
+    return held === undefined
+  }
+
   for (const rule of rules) {
-    if (!ruleMatchesRow(rule, row, resolveField)) continue
+    if (!ruleApplies(rule, resolveField)) continue
     const fields: string[] = []
     for (const key of LABEL_KEYS) {
       const value = rule.labels[key]
-      const held = labels[key]
-      if (value === undefined || (Array.isArray(held) ? held.length > 0 : held !== undefined)) continue
-      Object.assign(labels, { [key]: value })
+      if (value === undefined || !isEmpty(key)) continue
+      Object.assign(next, { [key]: value })
       fields.push(key)
-    }
-    if (rule.destinationTableId !== undefined && destinationTableId === undefined) {
-      destinationTableId = rule.destinationTableId
-      fields.push('destinationTableId')
     }
     if (fields.length === 0) continue
     filled.push({ ruleId: rule.id, fields })
     if (!appliedRuleIds.includes(rule.id)) appliedRuleIds.push(rule.id)
   }
 
-  return { labels, destinationTableId, appliedRuleIds, filled }
+  return { labels: next, appliedRuleIds, filled }
 }
 
 export interface RuleStats {
-  /** Rows the rule filled something on and that still exist. */
   applied: number
-  /** Rows the user confirmed with every label this rule set still intact. */
   confirmedRespected: number
-  /** Confirmed rows where one of the rule's own labels was changed before confirmation. */
   overridden: number
-  /** Rows still waiting, carrying this rule's labels. */
   pending: number
-  /** The distinct source texts this rule actually matched. */
   matchedStrings: string[]
 }
 
-function ruleStillHolds(rule: LabelRule, row: IngestionRow): boolean {
-  for (const key of LABEL_KEYS) {
-    const value = rule.labels[key]
-    if (value === undefined) continue
-    const held = row.labels[key]
-    // A multi-valued label still holds as long as everything the rule set is there.
-    if (Array.isArray(value)) {
-      if (!Array.isArray(held) || !value.every((entry) => held.includes(entry))) return false
-    } else if (held !== value) return false
-  }
-  return rule.destinationTableId === undefined || row.destinationTableId === rule.destinationTableId
+export interface RuleSubject {
+  labels: IngestionRowLabels
+  appliedRuleIds?: number[]
+  confirmed: boolean
+  text: (field: string) => unknown
 }
 
 /**
- * What a rule can honestly claim.
- *
- * A row counts for a rule only when the user confirmed it *and* every label the rule
- * set still holds the value the rule gave it. Labels the rule never set are free to be
- * filled in by hand — the rule claims what it decided, not the whole row. Counted from
- * the rows every time rather than kept as a tally, so it cannot drift from the truth.
+ * What a rule can honestly claim: rows it filled, and of those, the ones confirmed with
+ * its labels still intact. Counted from the rows every time rather than kept as a tally,
+ * so it cannot drift from the truth.
  */
-export function ruleStats(rule: StoredRule, rows: IngestionRow[], resolveField: (row: IngestionRow, field: string) => unknown): RuleStats {
+export function ruleStats(rule: StoredRule, subjects: RuleSubject[]): RuleStats {
   const stats: RuleStats = { applied: 0, confirmedRespected: 0, overridden: 0, pending: 0, matchedStrings: [] }
   const strings = new Set<string>()
 
-  for (const row of rows) {
-    if (!row.appliedRuleIds?.includes(rule.id)) continue
+  for (const subject of subjects) {
+    const claimed = subject.appliedRuleIds?.includes(rule.id)
+    const matches = ruleApplies(rule, subject.text)
+    if (!claimed && !matches) continue
     stats.applied += 1
-    const text = String(resolveField(row, rule.field || 'description') ?? '').trim()
+    const text = String(subject.text(rule.field || 'description') ?? '').trim()
     if (text) strings.add(text)
-    const confirmed = row.status === 'promoted' || row.status === 'reconciledExisting'
-    if (!confirmed) stats.pending += 1
-    else if (ruleStillHolds(rule, row)) stats.confirmedRespected += 1
+
+    const holds = LABEL_KEYS.every((key) => {
+      const value = rule.labels[key]
+      if (value === undefined) return true
+      const held = subject.labels[key]
+      return Array.isArray(value) ? Array.isArray(held) && value.every((entry) => held.includes(entry)) : held === value
+    })
+    if (!subject.confirmed) stats.pending += 1
+    else if (holds) stats.confirmedRespected += 1
     else stats.overridden += 1
   }
 
