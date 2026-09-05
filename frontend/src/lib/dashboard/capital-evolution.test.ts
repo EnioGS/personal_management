@@ -1,147 +1,64 @@
 import { describe, expect, it } from 'vitest'
-import { capitalEvolution } from './capital-evolution'
+import { capitalEvolution, type CapitalEntry } from './capital-evolution'
+
+const range = { from: Date.UTC(2026, 0, 1), to: Date.UTC(2026, 2, 31) }
+const on = (month: number, day: number, value: number): CapitalEntry => ({ date: Date.UTC(2026, month, day), value })
 
 describe('capitalEvolution', () => {
-  it('carries the running capital across months while grouping spending separately', () => {
-    const points = capitalEvolution([
-      { date: Date.UTC(2026, 0, 5), value: 100 },
-      { date: Date.UTC(2026, 0, 8), value: -30 },
-      { date: Date.UTC(2026, 2, 2), value: -20, screen: 'spending' },
-      { date: Date.UTC(2026, 2, 5), value: 5, screen: 'spending' },
-    ], { from: Date.UTC(2026, 0, 1), to: Date.UTC(2026, 2, 31) })
+  it('carries the running total across months, and reports each month on its own', () => {
+    const points = capitalEvolution({
+      movements: [on(0, 5, 100), on(0, 8, -30), on(2, 2, -20)],
+      investments: [],
+      spending: [on(2, 2, -20)],
+    }, range)
 
     expect(points).toEqual([
-      { month: '2026-01', cashCapital: 70, variableIncome: 0, fixedIncome: 0, capital: 70, spending: 0 },
-      { month: '2026-02', cashCapital: 70, variableIncome: 0, fixedIncome: 0, capital: 70, spending: 0 },
-      // Spending moves capital as well as its own measure: a purchase is money that left.
-      { month: '2026-03', cashCapital: 55, variableIncome: 0, fixedIncome: 0, capital: 55, spending: 15 },
+      { month: '2026-01', capital: 70, investments: 0, income: 70, spending: 0 },
+      { month: '2026-02', capital: 70, investments: 0, income: 0, spending: 0 },
+      { month: '2026-03', capital: 50, investments: 0, income: -20, spending: 20 },
     ])
   })
 
-  it('uses history before the displayed range to calculate the correct opening capital', () => {
-    const points = capitalEvolution([
-      { date: Date.UTC(2025, 11, 1), value: 100 },
-      { date: Date.UTC(2026, 0, 1), value: -20 },
-    ], { from: Date.UTC(2026, 0, 1), to: Date.UTC(2026, 0, 31) })
+  it('leaves capital alone for a spending row, which is a copy of the movement that paid it', () => {
+    const purchase = on(0, 5, -284.9)
+    const points = capitalEvolution({ movements: [purchase], investments: [], spending: [purchase] }, range)
 
-    expect(points).toEqual([{ month: '2026-01', cashCapital: 80, variableIncome: 0, fixedIncome: 0, capital: 80, spending: 0 }])
+    expect(points[0]).toMatchObject({ capital: -284.9, spending: 284.9 })
   })
 
-  it('starts at the earliest month across cash and investments, and adds both investment values to capital', () => {
-    const points = capitalEvolution(
-      [{ date: Date.UTC(2026, 1, 4), value: 50 }],
-      { from: Date.UTC(2026, 0, 1), to: Date.UTC(2026, 2, 31) },
-      [
-        { date: Date.UTC(2026, 0, 8), asset: 'PETR4', type: 'buy', quantity: 10, price: 5, investmentClass: 'variableIncome' },
-        { date: Date.UTC(2026, 2, 5), asset: 'CDB', type: 'buy', quantity: 2, price: 100, investmentClass: 'fixedIncome' },
-        { date: Date.UTC(2026, 2, 20), asset: 'PETR4', type: 'buy', quantity: 1, price: 6, investmentClass: 'variableIncome' },
-      ],
-    )
+  it('counts what went into holdings as capital, and as investments', () => {
+    const points = capitalEvolution({
+      movements: [on(0, 5, 1000), on(1, 1, -500)],
+      investments: [on(1, 1, 500)],
+      spending: [],
+    }, range)
 
-    expect(points).toEqual([
-      { month: '2026-01', cashCapital: 0, variableIncome: 50, fixedIncome: 0, capital: 50, spending: 0 },
-      { month: '2026-02', cashCapital: 50, variableIncome: 50, fixedIncome: 0, capital: 100, spending: 0 },
-      { month: '2026-03', cashCapital: 50, variableIncome: 56, fixedIncome: 200, capital: 306, spending: 0 },
-    ])
+    // Buying an investment moves money rather than losing it: capital is unchanged. The
+    // walk runs to the last month with anything in it, which is February here.
+    expect(points.map((point) => [point.capital, point.investments])).toEqual([[1000, 0], [1000, 500]])
   })
 
-  it('adds purchases, subtracts sales by their recorded values, and ignores deleted rows in either investment class', () => {
-    const points = capitalEvolution(
-      [],
-      { from: Date.UTC(2026, 0, 1), to: Date.UTC(2026, 2, 31) },
-      [
-        { date: Date.UTC(2026, 0, 5), asset: 'ETF', type: 'buy', quantity: 2, price: 50, investmentClass: 'variableIncome' },
-        { date: Date.UTC(2026, 1, 5), asset: 'ETF', type: 'sell', quantity: 2, price: 60, investmentClass: 'variableIncome' },
-        { date: Date.UTC(2026, 0, 5), asset: 'CDB', type: 'buy', quantity: 1, price: 100, investmentClass: 'fixedIncome', deleted: true },
-      ],
-    )
+  it('uses history before the window to open at the right number', () => {
+    const points = capitalEvolution({
+      movements: [{ date: Date.UTC(2025, 11, 1), value: 100 }, on(0, 1, -20)],
+      investments: [],
+      spending: [],
+    }, { from: Date.UTC(2026, 0, 1), to: Date.UTC(2026, 0, 31) })
 
-    expect(points).toEqual([
-      { month: '2026-01', cashCapital: 0, variableIncome: 100, fixedIncome: 0, capital: 100, spending: 0 },
-      { month: '2026-02', cashCapital: 0, variableIncome: -20, fixedIncome: 0, capital: -20, spending: 0 },
-    ])
+    expect(points).toEqual([{ month: '2026-01', capital: 80, investments: 0, income: -20, spending: 0 }])
   })
 
-  it('returns a fully redeemed fixed-income history to zero from its transaction values', () => {
-    const transactions = [
-      ['2023-08-01', 'buy', 7111.42],
-      ['2023-08-14', 'sell', 1606.33],
-      ['2023-08-18', 'sell', 1276.08],
-      ['2023-09-01', 'sell', 3859.22],
-      ['2025-06-03', 'buy', 7226.08],
-      ['2025-08-26', 'buy', 2086.64],
-      ['2025-12-08', 'sell', 1574.91],
-      ['2026-01-13', 'sell', 355.79],
-      ['2026-02-02', 'sell', 4071.35],
-      ['2026-02-04', 'sell', 1586.09],
-      ['2026-02-04', 'sell', 2094.37],
-    ] as const
-    const points = capitalEvolution(
-      [],
-      { from: Date.UTC(2023, 7, 1), to: Date.UTC(2026, 1, 28) },
-      transactions.map(([date, type, price], index) => ({
-        date: Date.parse(date),
-        asset: `Tesouro ${index}`,
-        type,
-        quantity: 1,
-        price,
-        investmentClass: 'fixedIncome' as const,
-      })),
-    )
-
-    expect(points.at(-1)).toMatchObject({ fixedIncome: 0, capital: 0 })
+  it('says nothing when there is nothing, rather than a row of zeroes', () => {
+    expect(capitalEvolution({ movements: [], investments: [], spending: [] }, range)).toEqual([])
   })
 
-  it('keeps separately paid investment income out of the invested-capital balance', () => {
-    const points = capitalEvolution(
-      [],
-      { from: Date.UTC(2026, 0, 1), to: Date.UTC(2026, 0, 31) },
-      [
-        { date: Date.UTC(2026, 0, 1), asset: 'CDB', type: 'buy', quantity: 1, price: 100, investmentClass: 'fixedIncome' },
-        { date: Date.UTC(2026, 0, 2), asset: 'CDB', type: 'income', quantity: 1, price: 15, investmentClass: 'fixedIncome' },
-      ],
-    )
+  it('leaves out a date nothing could read, which would otherwise never be walked to', () => {
+    const points = capitalEvolution({
+      movements: [on(0, 5, 100), { date: Number.NaN, value: -50 }],
+      investments: [],
+      spending: [],
+    }, range)
 
-    expect(points).toEqual([{ month: '2026-01', cashCapital: 0, variableIncome: 0, fixedIncome: 100, capital: 100, spending: 0 }])
-  })
-})
-
-describe('a date nothing could read', () => {
-  it('is left out rather than walked to, which would never finish', () => {
-    const points = capitalEvolution([
-      { date: Date.UTC(2026, 0, 5), value: 100 },
-      { date: Number.NaN, value: -50 },
-    ], { from: Date.UTC(2026, 0, 1), to: Date.UTC(2026, 0, 31) })
-
-    expect(points).toEqual([{ month: '2026-01', cashCapital: 100, variableIncome: 0, fixedIncome: 0, capital: 100, spending: 0 }])
-  })
-
-  it('is left out of the investment lines too', () => {
-    expect(capitalEvolution([], { from: 0, to: Date.now() }, [
-      { date: Number.NaN, asset: 'X', type: 'buy', quantity: 1, price: 10, investmentClass: 'fixedIncome' },
-    ])).toEqual([])
-  })
-})
-
-describe('what moves total capital', () => {
-  const range = { from: Date.UTC(2026, 0, 1), to: Date.UTC(2026, 0, 31) }
-
-  it("leaves capital untouched for a transfer between the user's own accounts — by arithmetic, not by hiding either side", () => {
-    const points = capitalEvolution([
-      { date: Date.UTC(2026, 0, 5), value: 100, screen: 'overview' },
-      { date: Date.UTC(2026, 0, 6), value: -40, screen: 'overview' },
-      { date: Date.UTC(2026, 0, 7), value: 40, screen: 'overview' },
-    ], range)
-
-    expect(points[0].cashCapital).toBe(100)
-  })
-
-  it('counts a purchase against spending and against capital, each once', () => {
-    const points = capitalEvolution([
-      { date: Date.UTC(2026, 0, 3), value: -110, screen: 'spending' },
-    ], range)
-
-    expect(points[0].cashCapital).toBe(-110)
-    expect(points[0].spending).toBe(110)
+    expect(points).toEqual([{ month: '2026-01', capital: 100, investments: 0, income: 100, spending: 0 }])
   })
 })

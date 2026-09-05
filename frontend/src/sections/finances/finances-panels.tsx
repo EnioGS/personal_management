@@ -12,8 +12,17 @@ import { FilterBar } from '@/components/dashboard/filter-bar'
 import { resolveFilterRange, useDashboardFilters, type DashboardFilters } from '@/components/dashboard/dashboard-filters'
 import { UNLABELLED_LABEL, useDashboardEntries } from '@/components/dashboard/use-dashboard-entries'
 import { formatDateLabel, formatMonthLabel, groupByKey } from '@/lib/aggregations'
-import { capitalEvolution, type CapitalEvolutionPoint, type InvestmentValueEntry } from '@/lib/dashboard/capital-evolution'
-import { asTransaction, isFixedIncome, useInvestmentRows } from '@/lib/model/investment-rows'
+import { capitalEvolution, type CapitalEvolutionPoint } from '@/lib/dashboard/capital-evolution'
+import {
+  balanceByAccount,
+  incomeByCategory,
+  largestMovements,
+  monthlyAverages,
+  monthlyFlow,
+  monthsOfRunway,
+  savingsRate,
+  spendByCard,
+} from '@/lib/dashboard/movements-analytics'
 import { averageSpendByCategory, categorySpendChanges, frequentDescriptions, outgoingSpending, spendingByMonth } from './spending-analytics'
 import { FinanceTableDrawer } from './finance-table-drawer'
 
@@ -28,73 +37,79 @@ function delta(current: number, previous: number, goodDirection: 'up' | 'down', 
   return { value: (current - previous) / Math.abs(previous), goodDirection, label }
 }
 
-type CapitalMetric = 'capital' | 'fixedIncome' | 'variableIncome' | 'spending'
+type CapitalMetric = 'capital' | 'investments' | 'income' | 'spending'
 
-/** The selected period defines the comparison; the compact tile only draws its latest six months. */
+/** How many months a tile's own line draws. The card is a glance; the chart below is the history. */
+const TILE_MONTHS = 4
+
+/** The screens the Movements dashboard reads. Spending rows are copies of movements. */
+const MOVEMENTS_SCREEN = 'movements'
+const SPENDING_SCREEN = 'spending'
+const INVESTMENTS_SCREEN = 'investments'
+
+/** The selected period defines the comparison; the tile draws only its last few months. */
 function capitalMetric(points: CapitalEvolutionPoint[], metric: CapitalMetric, goodDirection: 'up' | 'down', label: string) {
-  const values = points.map((point) => point[metric])
+  const values = points.map((point) => point[metric] as number)
   const current = values.at(-1) ?? 0
   const starting = values[0] ?? 0
   return {
     current,
-    sparkline: values.slice(-6),
+    sparkline: values.slice(-TILE_MONTHS),
     delta: delta(current, starting, goodDirection, label),
   }
 }
 
+/**
+ * The Movements dashboard: how the money is doing, in the order it matters.
+ *
+ * What is held and what a month does with it comes first, above the fold; the shape of it
+ * over time next; and the detail — where it sits, what it comes from, what it goes to —
+ * below, for whoever scrolls. Everything answers for the period on the bar above.
+ */
 export function OverviewPanel() {
   const { t } = useTranslation(['finances', 'common', 'investments'])
   const { filters, setPreset, setCustomFrom, setCustomTo, toggleCategory, clearCategories } = useDashboardFilters()
-  const rows = useDashboardEntries(filters)
   const selectedRange = useMemo(() => resolveFilterRange(filters), [filters])
-  const investmentRows = useInvestmentRows()
 
-  // Capital must begin at the first matching entry, not at the start of the
-  // selected window. The displayed points remain scoped to that window, while the
-  // running total retains the complete prior history that establishes their value.
-  const capitalHistoryFilters: DashboardFilters = useMemo(
+  const movements = useDashboardEntries(filters, MOVEMENTS_SCREEN)
+  const spending = useDashboardEntries(filters, SPENDING_SCREEN)
+
+  // Capital must begin at the first row there is, not at the start of the selected
+  // window: the points are cut to the window, the running total behind them is not.
+  const historyFilters: DashboardFilters = useMemo(
     () => ({ ...filters, preset: 'custom', customFrom: '', customTo: '' }),
     [filters],
   )
-  const capitalHistoryRows = useDashboardEntries(capitalHistoryFilters)
-  const investmentHistory = useMemo<InvestmentValueEntry[]>(
-    () => investmentRows.map((row) => {
-      const transaction = asTransaction(row)
-      // A row on the investments screen is an investment; the class is only which of
-      // the two lines it joins, and an investment nobody called fixed is variable.
-      return { ...transaction, investmentClass: isFixedIncome(row) ? 'fixedIncome' : 'variableIncome' }
-    }),
-    [investmentRows],
-  )
+  const movementHistory = useDashboardEntries(historyFilters, MOVEMENTS_SCREEN)
+  const investmentHistory = useDashboardEntries(historyFilters, INVESTMENTS_SCREEN)
+  const spendingHistory = useDashboardEntries(historyFilters, SPENDING_SCREEN)
+
   const capitalData = useMemo(
-    () => capitalEvolution(capitalHistoryRows, selectedRange, investmentHistory),
-    [capitalHistoryRows, selectedRange, investmentHistory],
+    () => capitalEvolution({ movements: movementHistory, investments: investmentHistory, spending: spendingHistory }, selectedRange),
+    [movementHistory, investmentHistory, spendingHistory, selectedRange],
   )
 
   const comparisonLabel = t('finances:overview.startingPeriod')
-  const currentCapital = useMemo(() => capitalMetric(capitalData, 'capital', 'up', comparisonLabel), [capitalData, comparisonLabel])
-  const fixedIncome = useMemo(() => capitalMetric(capitalData, 'fixedIncome', 'up', comparisonLabel), [capitalData, comparisonLabel])
-  const variableIncome = useMemo(() => capitalMetric(capitalData, 'variableIncome', 'up', comparisonLabel), [capitalData, comparisonLabel])
-  const spending = useMemo(() => capitalMetric(capitalData, 'spending', 'down', comparisonLabel), [capitalData, comparisonLabel])
+  const capital = useMemo(() => capitalMetric(capitalData, 'capital', 'up', comparisonLabel), [capitalData, comparisonLabel])
+  const investments = useMemo(() => capitalMetric(capitalData, 'investments', 'up', comparisonLabel), [capitalData, comparisonLabel])
+  const income = useMemo(() => capitalMetric(capitalData, 'income', 'up', comparisonLabel), [capitalData, comparisonLabel])
+  const spent = useMemo(() => capitalMetric(capitalData, 'spending', 'down', comparisonLabel), [capitalData, comparisonLabel])
 
-  const categoryAverages = useMemo(
-    () => averageSpendByCategory(rows, capitalData.map((point) => point.month)),
-    [capitalData, rows],
+  const flow = useMemo(() => monthlyFlow(movements), [movements])
+  const averages = useMemo(() => monthlyAverages(flow), [flow])
+  const saved = useMemo(() => savingsRate(movements), [movements])
+  const runway = useMemo(
+    () => monthsOfRunway(capital.current, capitalData.map((point) => point.spending)),
+    [capital, capitalData],
   )
-
-  // Where the money sits is now told by where it came from: each imported file is a
-  // statement, and its rows net to what that statement leaves behind.
-  const balancesBySource = useMemo(() => {
-    const totals = new Map<string, number>()
-    for (const entry of capitalHistoryRows) {
-      totals.set(entry.sourceFilename, (totals.get(entry.sourceFilename) ?? 0) + entry.value)
-    }
-    return [...totals.entries()].map(([filename, value]) => ({ key: filename, label: filename, value }))
-  }, [capitalHistoryRows])
-
-  // Every entry in the selected period, not just the most recent — the card scrolls
-  // instead of truncating (see DashboardCard's fixed height + overflow-auto body).
-  const periodEntries = useMemo(() => [...rows].sort((a, b) => b.date - a.date), [rows])
+  const accounts = useMemo(() => balanceByAccount(movements), [movements])
+  const incomeSources = useMemo(() => incomeByCategory(movements), [movements])
+  const cards = useMemo(() => spendByCard(spending), [spending])
+  const biggest = useMemo(() => largestMovements(movements), [movements])
+  const spendingCategories = useMemo(
+    () => averageSpendByCategory(spending, capitalData.map((point) => point.month)),
+    [capitalData, spending],
+  )
 
   return (
     <div className="flex h-full flex-col">
@@ -112,31 +127,31 @@ export function OverviewPanel() {
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <StatTile
               label={t('finances:overview.currentCapital')}
-              value={currency.format(currentCapital.current)}
+              value={currency.format(capital.current)}
               indicatorColor={DOMAIN_COLOR.balance.light}
-              delta={currentCapital.delta}
-              sparkline={currentCapital.sparkline}
+              delta={capital.delta}
+              sparkline={capital.sparkline}
             />
             <StatTile
-              label={t('investments:items.fixedIncome')}
-              value={currency.format(fixedIncome.current)}
-              indicatorColor={DOMAIN_COLOR.fixedIncome.light}
-              delta={fixedIncome.delta}
-              sparkline={fixedIncome.sparkline}
-            />
-            <StatTile
-              label={t('investments:items.variableIncome')}
-              value={currency.format(variableIncome.current)}
-              indicatorColor={DOMAIN_COLOR.variableIncome.light}
-              delta={variableIncome.delta}
-              sparkline={variableIncome.sparkline}
+              label={t('finances:overview.netMonthlyIncome')}
+              value={currency.format(income.current)}
+              indicatorColor={DOMAIN_COLOR.contributions.light}
+              delta={income.delta}
+              sparkline={income.sparkline}
             />
             <StatTile
               label={t('common:dashboard.spending')}
-              value={currency.format(spending.current)}
+              value={currency.format(spent.current)}
               indicatorColor={DIVERGING_PAIR.negative.light}
-              delta={spending.delta}
-              sparkline={spending.sparkline}
+              delta={spent.delta}
+              sparkline={spent.sparkline}
+            />
+            <StatTile
+              label={t('finances:overview.investments')}
+              value={currency.format(investments.current)}
+              indicatorColor={DOMAIN_COLOR.variableIncome.light}
+              delta={investments.delta}
+              sparkline={investments.sparkline}
             />
           </div>
 
@@ -156,15 +171,14 @@ export function OverviewPanel() {
                   valueFormatter={(value) => currency.format(value)}
                   capitalLabel={t('finances:overview.capitalEvolution')}
                   spendingLabel={t('common:dashboard.spending')}
-                  variableIncomeLabel={t('investments:items.variableIncome')}
-                  fixedIncomeLabel={t('investments:items.fixedIncome')}
+                  investmentsLabel={t('finances:overview.investments')}
                 />
               )}
             </DashboardCard>
 
             <DashboardCard title={t('finances:overview.spendingCategories')} className="h-[320px]">
               <RankedBarList
-                items={categoryAverages}
+                items={spendingCategories}
                 valueFormatter={(v) => currency.format(v)}
                 emptyLabel={t('finances:spending.noSpending')}
                 variant="underlined"
@@ -172,58 +186,109 @@ export function OverviewPanel() {
             </DashboardCard>
           </div>
 
+          {/* Below the fold: the same period, read three ways — what the months look
+              like, where the money sits, and which rows account for most of it. */}
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
-            <DashboardCard title={t('finances:overview.bySource')} className="h-[260px] lg:col-span-1">
+            <DashboardCard title={t('finances:overview.inAndOut')} className="h-[300px] lg:col-span-2" bodyClassName="p-2">
+              {flow.length === 0 ? (
+                <p className="text-muted-foreground flex h-full items-center justify-center text-xs">{t('finances:overview.noEntries')}</p>
+              ) : (
+                <DivergingBarChart
+                  data={flow}
+                  xKey="month"
+                  positiveKey="incoming"
+                  negativeKey="outgoing"
+                  positiveLabel={t('finances:overview.arrived')}
+                  negativeLabel={t('finances:overview.left')}
+                  positiveColor={DOMAIN_COLOR.balance}
+                  negativeColor={DIVERGING_PAIR.negative}
+                  xFormatter={formatMonthLabel}
+                  valueFormatter={(value) => currency.format(value)}
+                />
+              )}
+            </DashboardCard>
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-1">
+              <StatTile
+                label={t('finances:overview.savingsRate')}
+                value={saved === null ? '—' : `${Math.round(saved * 100)}%`}
+                indicatorColor={DOMAIN_COLOR.contributions.light}
+              />
+              <StatTile
+                label={t('finances:overview.runway')}
+                value={runway === null ? '—' : t('finances:overview.runwayMonths', { count: Math.round(runway) })}
+                indicatorColor={DOMAIN_COLOR.balance.light}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+            <DashboardCard title={t('finances:overview.accounts')} className="h-[260px]">
               <RankedBarList
-                items={balancesBySource}
+                items={accounts}
                 valueFormatter={(v) => currency.format(v)}
                 emptyLabel={t('finances:overview.noEntries')}
               />
             </DashboardCard>
 
-            <DashboardCard
-              title={t('finances:overview.entries')}
-              className="h-[260px] lg:col-span-2"
-              bodyClassName="overflow-auto p-0"
-            >
-              {periodEntries.length === 0 ? (
-                <p className="text-muted-foreground flex h-full items-center justify-center text-xs">
-                  {t('finances:overview.noEntries')}
-                </p>
+            <DashboardCard title={t('finances:overview.incomeSources')} className="h-[260px]">
+              <RankedBarList
+                items={incomeSources}
+                valueFormatter={(v) => currency.format(v)}
+                emptyLabel={t('finances:overview.noEntries')}
+              />
+            </DashboardCard>
+
+            <DashboardCard title={t('finances:overview.byCard')} className="h-[260px]">
+              <RankedBarList
+                items={cards}
+                valueFormatter={(v) => currency.format(v)}
+                emptyLabel={t('finances:overview.noCardSpend')}
+              />
+            </DashboardCard>
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+            <DashboardCard title={t('finances:overview.averageMonth')} className="h-[260px]" bodyClassName="p-3">
+              <div className="flex h-full flex-col justify-center gap-3">
+                <AverageLine label={t('finances:overview.arrived')} value={currency.format(averages.incoming)} />
+                <AverageLine label={t('finances:overview.left')} value={currency.format(averages.outgoing)} />
+                <AverageLine label={t('finances:overview.netMonthlyIncome')} value={currency.format(averages.net)} strong />
+              </div>
+            </DashboardCard>
+
+            <DashboardCard title={t('finances:overview.largestMovements')} className="h-[260px] lg:col-span-2" bodyClassName="overflow-auto p-0">
+              {biggest.length === 0 ? (
+                <p className="text-muted-foreground flex h-full items-center justify-center text-xs">{t('finances:overview.noEntries')}</p>
               ) : (
-                <table className="w-full table-fixed text-xs">
-                  <colgroup>
-                    <col className="w-14" />
-                    <col />
-                    <col className="w-[400px]" />
-                    <col className="w-24" />
-                  </colgroup>
-                  <tbody>
-                    {periodEntries.map((entry, i) => (
-                      <tr key={i} className="border-b last:border-0">
-                        <td className="text-muted-foreground overflow-hidden p-2 whitespace-nowrap">{formatDateLabel(entry.date)}</td>
-                        <td className="overflow-hidden p-2 text-ellipsis whitespace-nowrap" title={entry.description}>
-                          {entry.description || entry.category || UNLABELLED_LABEL}
-                        </td>
-                        <td className="p-2 text-center">
-                          <CategoryPill label={entry.category || UNLABELLED_LABEL} wrap />
-                        </td>
-                        <td
-                          className={`p-2 text-right tabular-nums ${entry.value > 0 ? 'text-brand' : ''}`}
-                        >
-                          {entry.value > 0 ? '+' : '-'}
-                          {currency.format(Math.abs(entry.value))}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <div className="divide-y">
+                  {biggest.map((entry) => (
+                    <div key={entry.rowId + entry.date} className="flex items-center justify-between gap-3 px-3 py-2 text-xs">
+                      <span className="text-muted-foreground w-14 shrink-0">{formatDateLabel(entry.date)}</span>
+                      <span className="min-w-0 flex-1 truncate" title={entry.description}>{entry.description || entry.category || UNLABELLED_LABEL}</span>
+                      <CategoryPill label={entry.category || UNLABELLED_LABEL} />
+                      <span className={`w-28 shrink-0 text-right tabular-nums ${entry.value > 0 ? 'text-brand' : ''}`}>
+                        {entry.value > 0 ? '+' : '-'}{currency.format(Math.abs(entry.value))}
+                      </span>
+                    </div>
+                  ))}
+                </div>
               )}
             </DashboardCard>
           </div>
         </div>
         </FinanceTableDrawer>
       </div>
+    </div>
+  )
+}
+
+/** One line of the average-month card: what it is, and how much. */
+function AverageLine({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
+  return (
+    <div className="flex items-baseline justify-between gap-3">
+      <span className="text-muted-foreground text-xs">{label}</span>
+      <span className={`tabular-nums ${strong ? 'text-lg font-semibold' : 'text-sm'}`}>{value}</span>
     </div>
   )
 }

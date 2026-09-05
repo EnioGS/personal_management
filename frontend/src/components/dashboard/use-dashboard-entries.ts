@@ -15,6 +15,9 @@ export interface FilteredEntry {
   value: number
   category: string
   subcategory: string
+  /** Which account the money moved through, and which card it was billed to. */
+  account?: string
+  card?: string
   /** Everything the source file said that no column was assigned to. */
   observations: string
   /** Which file the row came from — read out of the observations, where it is kept. */
@@ -63,6 +66,8 @@ export function filterConfirmedRows({ rows, filters, screen }: FilterParams): Fi
       value: typeof row.value === 'number' ? row.value : 0,
       category: row.category,
       subcategory: row.subcategory,
+      account: row.account,
+      card: row.card,
       observations: row.observations,
       description: describeRow(row.observations),
       sourceFilename: sourceFilenameOf(row.observations),

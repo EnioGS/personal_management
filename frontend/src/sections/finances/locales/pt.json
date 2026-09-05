@@ -26,7 +26,21 @@
     "previousPeriod": "vs. período anterior",
     "noOutgoing": "Nenhuma saída neste período ainda.",
     "noEntries": "Nenhum lançamento neste período ainda.",
-    "bySource": "Por arquivo de origem"
+    "bySource": "Por arquivo de origem",
+    "netMonthlyIncome": "Saldo do mês",
+    "investments": "Investimentos",
+    "inAndOut": "Entradas e saídas por mês",
+    "arrived": "Entrou",
+    "left": "Saiu",
+    "savingsRate": "Guardado do que entrou",
+    "runway": "O capital cobre",
+    "runwayMonths": "{{count}} meses de gastos",
+    "accounts": "Por conta",
+    "incomeSources": "De onde veio o dinheiro",
+    "byCard": "Por cartão",
+    "noCardSpend": "Nada foi lançado em cartão aqui.",
+    "averageMonth": "Um mês médio",
+    "largestMovements": "Maiores movimentações"
   },
   "spending": {
     "totalSpent": "Total gasto",

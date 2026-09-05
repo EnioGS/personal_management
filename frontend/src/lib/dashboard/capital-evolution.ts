@@ -1,39 +1,38 @@
 import { monthKey } from '@/lib/aggregations'
-import type { InvestmentClass } from '@/lib/model/types'
 import type { DateRange } from './date-range'
 
 const DAY_MS = 86_400_000
 
+/** One confirmed row, reduced to what a month's arithmetic needs. */
 export interface CapitalEntry {
   date: number
-  /** Money that moved, signed: negative left an account, positive arrived in one. */
+  /** Money that moved, signed: negative left, positive arrived. */
   value: number
-  screen?: string
 }
 
 export interface CapitalEvolutionPoint {
   month: string
-  /** Cash movement accumulated from the earliest matching money entry. */
-  cashCapital: number
-  /** Cumulative Variable Income applications less redemptions. */
-  variableIncome: number
-  /** Cumulative Fixed Income applications less redemptions. */
-  fixedIncome: number
-  /** Cash capital plus both investment classes — the user's total capital. */
+  /**
+   * Everything held, accumulated from the first month there is: every movement and every
+   * investment, each month's net added to the last month's total.
+   */
   capital: number
+  /** The same running total for investments alone — what is held rather than spent. */
+  investments: number
+  /** What the month itself netted across the accounts. Not cumulative. */
+  income: number
+  /** What the month spent, as the positive quantity it is. Not cumulative. */
   spending: number
   [key: string]: string | number
 }
 
-export interface InvestmentValueEntry {
-  date: number
-  asset: string
-  type: 'buy' | 'sell' | 'income'
-  quantity: number
-  price: number
-  investmentClass: InvestmentClass
-  /** Kept here as a second guard for callers that pass model rows directly. */
-  deleted?: boolean
+export interface CapitalSources {
+  /** Rows on the movements screen: money entering and leaving the accounts. */
+  movements: CapitalEntry[]
+  /** Rows on the investments screen: money moving into and out of holdings. */
+  investments: CapitalEntry[]
+  /** Rows on the spending screens. These are copies of movements, so they never touch capital. */
+  spending: CapitalEntry[]
 }
 
 function monthStart(month: string): number {
@@ -42,89 +41,64 @@ function monthStart(month: string): number {
 
 function nextMonth(month: string): string {
   const [year, monthNumber] = month.split('-').map(Number)
-  const date = new Date(Date.UTC(year, monthNumber, 1))
-  return monthKey(date.getTime())
+  return monthKey(Date.UTC(year, monthNumber, 1))
 }
 
-/**
- * Monthly closing capital from the complete matching history. Amounts are signed, so
- * money leaving subtracts and a refund adds back by arithmetic. Spending — what the
- * spending screens hold — is a second, positive-only monthly measure drawn on the same
- * chart scale.
- */
-export function capitalEvolution(
-  entries: CapitalEntry[],
-  range: DateRange,
-  investments: InvestmentValueEntry[] = [],
-): CapitalEvolutionPoint[] {
-  if (entries.length === 0 && investments.length === 0) return []
-
-  const byMonth = new Map<string, { capitalDelta: number; spending: number }>()
+function sumByMonth(entries: CapitalEntry[]): Map<string, number> {
+  const totals = new Map<string, number>()
   for (const entry of entries) {
     if (!Number.isFinite(entry.date)) continue
     const month = monthKey(entry.date)
-    const bucket = byMonth.get(month) ?? { capitalDelta: 0, spending: 0 }
-    // Capital is everything of value held, so every confirmed row moves it: money out of
-    // one account is negative there and positive wherever it arrived, and the pair nets
-    // to zero by arithmetic rather than by either side being hidden.
-    bucket.capitalDelta += entry.value
-    if (entry.screen === 'spending') bucket.spending += -entry.value
-    byMonth.set(month, bucket)
+    totals.set(month, (totals.get(month) ?? 0) + entry.value)
   }
+  return totals
+}
 
-  const investmentsByClass = new Map<InvestmentClass, Map<string, InvestmentValueEntry[]>>([
-    ['variableIncome', new Map()],
-    ['fixedIncome', new Map()],
-  ])
-  for (const investment of investments) {
-    if (investment.deleted || !Number.isFinite(investment.date)) continue
-    const month = monthKey(investment.date)
-    const byInvestmentMonth = investmentsByClass.get(investment.investmentClass)!
-    byInvestmentMonth.set(month, [...(byInvestmentMonth.get(month) ?? []), investment])
-  }
+/**
+ * Month by month, what was held and what moved.
+ *
+ * Capital is everything of value held, so it is the running total of every movement and
+ * every investment from the first month there is — each month's net added to the last
+ * month's total. Spending is deliberately not part of it: a spending row is a copy of the
+ * movement that paid for it, and counting both would spend the money twice.
+ *
+ * The points are then cut to the selected window while the running total keeps the whole
+ * history behind it, so a year's chart still starts from what was already there.
+ */
+export function capitalEvolution(sources: CapitalSources, range: DateRange): CapitalEvolutionPoint[] {
+  const movements = sumByMonth(sources.movements)
+  const investments = sumByMonth(sources.investments)
+  const spending = sumByMonth(sources.spending)
 
-  const months = [...new Set([
-    ...byMonth.keys(),
-    ...investmentsByClass.get('variableIncome')!.keys(),
-    ...investmentsByClass.get('fixedIncome')!.keys(),
-  ])].sort()
+  const months = [...new Set([...movements.keys(), ...investments.keys(), ...spending.keys()])].sort()
   const first = months[0]
-  const last = months.at(-1)!
-  // Both ends came from real timestamps, so the walk below terminates; an unparseable
-  // date would sort past every month and loop forever.
+  const last = months.at(-1)
+  // Both ends came from real timestamps, so the walk below terminates; an unreadable date
+  // would sort past every month and never be reached.
   if (!first || !last) return []
+
   const points: CapitalEvolutionPoint[] = []
   let month = first
-  let cashCapital = 0
-  const investedCapital = new Map<InvestmentClass, number>([
-    ['variableIncome', 0],
-    ['fixedIncome', 0],
-  ])
+  let capital = 0
+  let held = 0
 
   while (month <= last) {
-    const bucket = byMonth.get(month) ?? { capitalDelta: 0, spending: 0 }
-    cashCapital += bucket.capitalDelta
-    for (const investmentClass of ['variableIncome', 'fixedIncome'] as const) {
-      for (const transaction of investmentsByClass.get(investmentClass)!.get(month) ?? []) {
-        // Capital evolution is a cash-flow view, not a live-price portfolio valuation:
-        // applications add their recorded value and redemptions remove it. This keeps
-        // a fully redeemed portfolio at zero even when historic bond unit quantities
-        // are unavailable or were entered as a simple "1" per operation.
-        const valueDelta = transaction.quantity * transaction.price
-        const signedValue = transaction.type === 'buy' ? valueDelta : transaction.type === 'sell' ? -valueDelta : 0
-        investedCapital.set(
-          investmentClass,
-          roundCurrency((investedCapital.get(investmentClass) ?? 0) + signedValue),
-        )
-      }
-    }
-    const variableIncome = investedCapital.get('variableIncome') ?? 0
-    const fixedIncome = investedCapital.get('fixedIncome') ?? 0
-    const capital = cashCapital + variableIncome + fixedIncome
+    const income = movements.get(month) ?? 0
+    const invested = investments.get(month) ?? 0
+    capital = roundCurrency(capital + income + invested)
+    held = roundCurrency(held + invested)
+
     const start = monthStart(month)
     const end = Date.parse(`${nextMonth(month)}-01`) - DAY_MS
     if (end >= range.from && start <= range.to) {
-      points.push({ month, cashCapital, variableIncome, fixedIncome, capital, spending: bucket.spending })
+      points.push({
+        month,
+        capital,
+        investments: held,
+        income: roundCurrency(income),
+        // Spending is reported as the quantity that left, and the rows are negative.
+        spending: roundCurrency(-(spending.get(month) ?? 0)),
+      })
     }
     month = nextMonth(month)
   }
@@ -132,7 +106,7 @@ export function capitalEvolution(
   return points
 }
 
-/** Investment transaction values are currency amounts; avoid carrying binary-float dust into later months. */
+/** Currency amounts; avoid carrying binary-float dust into later months. */
 function roundCurrency(value: number): number {
   return Math.round((value + Number.EPSILON) * 100) / 100
 }

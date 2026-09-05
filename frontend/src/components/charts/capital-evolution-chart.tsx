@@ -9,11 +9,10 @@ interface CapitalEvolutionChartProps<T extends Record<string, unknown>> {
   valueFormatter: (value: number) => string
   capitalLabel: string
   spendingLabel: string
-  variableIncomeLabel: string
-  fixedIncomeLabel: string
+  investmentsLabel: string
 }
 
-/** Capital closing value as a line, with same-scale credit-card spending bars beneath it. */
+/** Capital and what is held, as lines, with the month's spending as bars on the same scale. */
 export function CapitalEvolutionChart<T extends Record<string, unknown>>({
   data,
   xKey,
@@ -21,14 +20,15 @@ export function CapitalEvolutionChart<T extends Record<string, unknown>>({
   valueFormatter,
   capitalLabel,
   spendingLabel,
-  variableIncomeLabel,
-  fixedIncomeLabel,
+  investmentsLabel,
 }: CapitalEvolutionChartProps<T>) {
+  // One line for what is held, not two: fixed and variable were a distinction about the
+  // holdings, not about the capital they add up to, and drawing them apart here made the
+  // chart argue with the tile above it.
   const config: ChartConfig = {
     capital: { label: capitalLabel, theme: DOMAIN_COLOR.balance },
     spending: { label: spendingLabel, theme: DIVERGING_PAIR.negative },
-    variableIncome: { label: variableIncomeLabel, theme: DOMAIN_COLOR.variableIncome },
-    fixedIncome: { label: fixedIncomeLabel, theme: DOMAIN_COLOR.fixedIncome },
+    investments: { label: investmentsLabel, theme: DOMAIN_COLOR.variableIncome },
   }
 
   return (
@@ -42,8 +42,7 @@ export function CapitalEvolutionChart<T extends Record<string, unknown>>({
         />
         <Bar dataKey="spending" name={spendingLabel} fill="var(--color-spending)" barSize="33.3%" radius={[4, 4, 0, 0]} />
         <Line dataKey="capital" name={capitalLabel} type="monotone" stroke="var(--color-capital)" strokeWidth={2} dot={false} />
-        <Line dataKey="variableIncome" name={variableIncomeLabel} type="monotone" stroke="var(--color-variableIncome)" strokeWidth={2} dot={false} />
-        <Line dataKey="fixedIncome" name={fixedIncomeLabel} type="monotone" stroke="var(--color-fixedIncome)" strokeWidth={2} dot={false} />
+        <Line dataKey="investments" name={investmentsLabel} type="monotone" stroke="var(--color-investments)" strokeWidth={2} dot={false} />
         <ChartLegend content={<ChartLegendContent />} />
       </ComposedChart>
     </ChartContainer>

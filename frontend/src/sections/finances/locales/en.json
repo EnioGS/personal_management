@@ -26,7 +26,21 @@
     "previousPeriod": "vs. previous period",
     "noOutgoing": "No outgoing entries in this period yet.",
     "noEntries": "No entries in this period yet.",
-    "bySource": "By source file"
+    "bySource": "By source file",
+    "netMonthlyIncome": "Net monthly income",
+    "investments": "Investments",
+    "inAndOut": "In and out, by month",
+    "arrived": "Arrived",
+    "left": "Left",
+    "savingsRate": "Kept of what arrived",
+    "runway": "Capital covers",
+    "runwayMonths": "{{count}} months of spending",
+    "accounts": "By account",
+    "incomeSources": "Where money came from",
+    "byCard": "By card",
+    "noCardSpend": "Nothing billed to a card here.",
+    "averageMonth": "An average month",
+    "largestMovements": "Largest movements"
   },
   "spending": {
     "totalSpent": "Total spent",
