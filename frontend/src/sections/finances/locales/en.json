@@ -41,7 +41,10 @@
     "accountsAndCards": "By account and card",
     "medianMonth": "Median month",
     "bestMonth": "Best month",
-    "worstMonth": "Worst month"
+    "worstMonth": "Worst month",
+    "whatCapitalIsKeptAs": "What capital is kept as",
+    "cashReserve": "Cash reserve",
+    "unclassifiedHoldings": "Unclassified holdings"
   },
   "spending": {
     "totalSpent": "Total spent",

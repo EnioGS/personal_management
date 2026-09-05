@@ -104,9 +104,24 @@ export function outgoingSpending(rows: FilteredEntry[]): FilteredEntry[] {
 /**
  * A spending row is one confirmed onto a spending screen. Its sign says the rest: money
  * out is spend, money back is a refund that subtracts from it.
+ *
+ * With one exception, which is not a refund at all: the line that settles the card's
+ * bill. It arrives on the statement as a credit the size of everything above it, and the
+ * same event is already in the bank as the payment that left the account. Counted here it
+ * cancels the purchases it paid for — a screen of real spending netting to nothing — and
+ * lands under whatever the payment was labelled, which is why "income" and "transfer"
+ * showed up among the categories. Refunds, IOF returned, and credit adjustments are left
+ * alone: those really do give money back on something bought.
  */
 function isSpendingRow(row: FilteredEntry): boolean {
-  return row.screen === 'spending'
+  return row.screen === 'spending' && !isBillPayment(row)
+}
+
+/** "Pagamento recebido", however the statement spells it. */
+const BILL_PAYMENT = /pagamento\s+recebido/i
+
+export function isBillPayment(row: FilteredEntry): boolean {
+  return row.value > 0 && BILL_PAYMENT.test(row.description)
 }
 
 export function spendingByMonth(rows: FilteredEntry[]): MonthlySpend[] {

@@ -67,6 +67,14 @@ as confetti, and a ramp running the same direction as the areas lets colour and
 size agree. Movements keeps its ranked list, in the taller space freed by
 retiring the two one-number tiles beside the cash flow.
 
+**A card's bill payment is not spending.** The credit that settles a statement
+arrives on the card's own file the size of everything above it, and the same
+event is already in the bank as the payment that left the account. Counted on a
+spending screen it cancels the purchases it paid for and lands under whatever
+label the payment carried, so `isSpendingRow` excludes it — matched by a
+positive value and a "Pagamento recebido" description. Refunds, IOF returned
+and credit adjustments stay: those give money back on something bought.
+
 ## Consequences
 
 - A tile needs three months of data to show both comparisons and two to show

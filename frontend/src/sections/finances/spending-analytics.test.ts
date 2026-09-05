@@ -107,6 +107,24 @@ describe('spending analytics', () => {
   })
 })
 
+describe('the line that settles the card bill', () => {
+  const rows = [
+    entry({ category: 'food', value: -100, date: Date.UTC(2026, 0, 1) }),
+    // The credit that pays the statement off: the same event as the bank's own payment.
+    entry({ category: 'transfer', description: 'Pagamento recebido - 3.373,68', value: 3373.68, date: Date.UTC(2026, 0, 2) }),
+    // A real refund on a real purchase, which does belong here.
+    entry({ category: 'food', description: 'Estorno de "Mercado"', value: 30, date: Date.UTC(2026, 0, 3) }),
+  ]
+
+  it('is not spending, and does not bring its label into the categories', () => {
+    expect(averageSpendByCategory(rows, ['2026-01']).map((category) => [category.label, category.value])).toEqual([['food', 70]])
+  })
+
+  it('is kept out of the rows the spending screens count', () => {
+    expect(outgoingSpending(rows)).toHaveLength(2)
+  })
+})
+
 describe('a purchase paid straight from the bank', () => {
   it('counts on Spending as well as Movements, because it was confirmed onto both', () => {
     const pix = entry({

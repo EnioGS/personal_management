@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { AppBarChart } from '@/components/charts/bar-chart'
 import { CapitalEvolutionChart } from '@/components/charts/capital-evolution-chart'
 import { CategoryTreemap } from '@/components/charts/category-treemap'
+import { AppPieChart } from '@/components/charts/pie-chart'
 import { DIVERGING_PAIR, DOMAIN_COLOR } from '@/components/charts/chart-colors'
 import { DivergingBarChart } from '@/components/charts/diverging-bar-chart'
 import { CategoryPill } from '@/components/dashboard/category-pill'
@@ -16,6 +17,7 @@ import { UNLABELLED_LABEL, useDashboardEntries } from '@/components/dashboard/us
 import { formatDateLabel, formatMonthLabel, groupByKey } from '@/lib/aggregations'
 import { capitalEvolution } from '@/lib/dashboard/capital-evolution'
 import { capitalMetric } from '@/lib/dashboard/capital-metric'
+import { holdingsSplit } from '@/lib/dashboard/holdings-split'
 import {
   accountsWithCards,
   incomeByCategory,
@@ -85,6 +87,20 @@ export function OverviewPanel() {
   const accounts = useMemo(() => accountsWithCards(movements, spending), [movements, spending])
   const incomeSources = useMemo(() => incomeByCategory(movements), [movements])
   const biggest = useMemo(() => largestMovements(movements), [movements])
+  const split = useMemo(() => holdingsSplit(capital.current, investmentHistory), [capital, investmentHistory])
+  const capitalSlices = useMemo(
+    () => [
+      { key: 'cash', label: t('finances:overview.cashReserve'), value: split.cash, color: DOMAIN_COLOR.balance },
+      { key: 'fixedIncome', label: t('investments:items.fixedIncome'), value: split.fixedIncome, color: DOMAIN_COLOR.fixedIncome },
+      { key: 'variableIncome', label: t('investments:items.variableIncome'), value: split.variableIncome, color: DOMAIN_COLOR.variableIncome },
+      // Only when there is any: a slice for money nobody has classed is a prompt to class
+      // it, and an empty one would be a prompt to do nothing.
+      ...(split.unclassified > 0
+        ? [{ key: 'unclassified', label: t('finances:overview.unclassifiedHoldings'), value: split.unclassified, color: DOMAIN_COLOR.contributions }]
+        : []),
+    ].filter((slice) => slice.value > 0),
+    [split, t],
+  )
   const spendingCategories = useMemo(
     () => averageSpendByCategory(spending, capitalData.map((point) => point.month)),
     [capitalData, spending],
@@ -177,14 +193,24 @@ export function OverviewPanel() {
               </DashboardCard>
             </div>
 
-            <DashboardCard title={t('finances:overview.spendingCategories')} className="h-[420px] lg:h-[632px]">
-              <RankedBarList
-                items={spendingCategories}
-                valueFormatter={(v) => currency.format(v)}
-                emptyLabel={t('finances:spending.noSpending')}
-                variant="underlined"
-              />
-            </DashboardCard>
+            <div className="flex flex-col gap-3">
+              <DashboardCard title={t('finances:overview.spendingCategories')} className="h-[320px]">
+                <RankedBarList
+                  items={spendingCategories}
+                  valueFormatter={(v) => currency.format(v)}
+                  emptyLabel={t('finances:spending.noSpending')}
+                  variant="underlined"
+                />
+              </DashboardCard>
+
+              <DashboardCard title={t('finances:overview.whatCapitalIsKeptAs')} className="h-[300px]" bodyClassName="p-2">
+                {capitalSlices.length === 0 ? (
+                  <p className="text-muted-foreground flex h-full items-center justify-center text-xs">{t('finances:overview.noEntries')}</p>
+                ) : (
+                  <AppPieChart data={capitalSlices} />
+                )}
+              </DashboardCard>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">

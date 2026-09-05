@@ -44,13 +44,19 @@ function investmentKind(row: ConfirmedRow): Transaction['type'] {
   return 'buy'
 }
 
+/** What the class tests need, which a confirmed row and a dashboard entry both carry. */
+interface ClassifiableRow {
+  investmentClass?: string
+  subcategory: string
+}
+
 /** True when the row's class text names fixed income, whatever language it was written in. */
-export function isFixedIncome(row: ConfirmedRow): boolean {
+export function isFixedIncome(row: ClassifiableRow): boolean {
   const text = `${row.investmentClass ?? ''} ${row.subcategory}`.toLowerCase()
   return text.includes('fixed') || text.includes('fixa') || text.includes('renda fixa')
 }
 
-export function isVariableIncome(row: ConfirmedRow): boolean {
+export function isVariableIncome(row: ClassifiableRow): boolean {
   const text = `${row.investmentClass ?? ''} ${row.subcategory}`.toLowerCase()
   return text.includes('variable') || text.includes('variável') || text.includes('variavel')
 }
