@@ -89,7 +89,11 @@ export function chartSafeKey(key: string): string {
  */
 export const DIVERGING_PAIR = {
   positive: { light: '#2a78d6', dark: '#3987e5' }, // in / above baseline
-  negative: { light: '#c0392b', dark: '#e0574a' }, // out / below baseline
+  // Out / below the baseline, in wine rather than in brick: money leaving is the one
+  // thing on these charts that should read as grave. The dark half is the lightest wine
+  // that still clears 3:1 against the card behind it (#c94a60, 3.0) — go deeper and the
+  // bars start dissolving into the surface they sit on.
+  negative: { light: '#8c2233', dark: '#c94a60' },
 } as const
 
 /** Fixed per-domain identity colors, reused everywhere that series appears (Overview + its own leaf chart). */
