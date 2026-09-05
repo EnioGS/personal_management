@@ -9,9 +9,17 @@ export interface OpenRouterTool {
   function: { name: string; description: string; parameters: object }
 }
 
+/**
+ * A message's content when it is more than words: the shape both the OpenAI and
+ * OpenRouter chat APIs take for an image sent alongside text.
+ */
+export type MessageContentPart =
+  | { type: 'text'; text: string }
+  | { type: 'image_url'; image_url: { url: string } }
+
 export interface OpenRouterMessage {
   role: 'system' | 'user' | 'assistant' | 'tool'
-  content: string | null
+  content: string | MessageContentPart[] | null
   tool_calls?: OpenRouterToolCall[]
   tool_call_id?: string
 }

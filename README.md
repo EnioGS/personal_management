@@ -27,7 +27,8 @@ Two things it optimizes for:
 │   │   │   ├── dashboard/     # filter bar, stat tile (two deltas + sparkline), dashboard card,
 │   │   │   │                  # ranked and nested bar lists,
 │   │   │   │                  # category pill (Finances Overview and beyond)
-│   │   │   ├── chat/          # global chat panel (mounted at app root, not a section)
+│   │   │   ├── chat/          # global chat panel (mounted at app root, not a section);
+│   │   │   │                  # attachments are text files for the tools, images for the model
 │   │   │   └── layout/        # activity-bar / secondary-bar / app-shell / chart-table-panel
 │   │   ├── sections/          # feature registry — the extensibility mechanism
 │   │   │   ├── types.ts

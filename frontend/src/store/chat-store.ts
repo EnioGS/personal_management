@@ -4,7 +4,7 @@ import { requestOpenAiChatMessage } from '@/lib/openai-client'
 import { DEV_API_KEY, useAssistantConfigStore, type AssistantConfig } from '@/lib/assistant-config'
 import { defaultModelForProvider } from '@/lib/assistant-models'
 import { DEFAULT_SYSTEM_PROMPT, SYSTEM_PROMPT_KEY, enableAppendOnlyTableWrites, useAssistantPromptsStore } from '@/lib/assistant-prompts'
-import { formatAttachmentsForPrompt, type ChatAttachment } from '@/lib/chat-attachments'
+import { formatAttachmentsForPrompt, isImageAttachment, type ChatAttachment } from '@/lib/chat-attachments'
 import type { OpenRouterMessage } from '@/lib/openrouter'
 import { toolsForRequest } from '@/lib/tools/registry'
 import { runConversation, type ConversationStatus } from '@/lib/tools/run-conversation'
@@ -26,11 +26,28 @@ export interface ChatMessage {
   id: string
   role: 'user' | 'assistant'
   content: string
+  /**
+   * Images sent with this message, as `data:` URLs.
+   *
+   * They live on the message rather than on the composer's attachment list because that
+   * is where they belong once sent: a follow-up question about a chart needs the chart
+   * still in context, and a message is what the history is rebuilt from.
+   */
+  images?: { name: string; dataUrl: string }[]
   isError?: boolean
   model?: string
 }
 
 export type ChatStatus = { type: 'idle' } | ConversationStatus
+
+/** A message with images is content parts; one without stays the plain string it was. */
+function withImages(content: string, images: ChatMessage['images']): OpenRouterMessage['content'] {
+  if (!images || images.length === 0) return content
+  return [
+    { type: 'text' as const, text: content },
+    ...images.map((image) => ({ type: 'image_url' as const, image_url: { url: image.dataUrl } })),
+  ]
+}
 
 /** What the conversation has cost so far, and how much of the model's window it fills. */
 export interface ChatUsage {
@@ -149,10 +166,14 @@ export const useChatStore = create<ChatState>((set, get) => {
       }
       const attachments = get().attachments
 
+      // The turn being sent is the tail of the history: its bubbles carry whatever images
+      // were attached to them, and the model gets the words of all of them as one turn
+      // with every image alongside.
+      const turn = history.slice(Math.max(0, history.length - texts.length))
       const apiMessages: OpenRouterMessage[] = [
         { role: 'system', content: systemPrompt + formatAttachmentsForPrompt(attachments) },
-        ...priorMessages.map((m) => ({ role: m.role, content: m.content }) as OpenRouterMessage),
-        { role: 'user', content: texts.join('\n\n') },
+        ...priorMessages.map((m) => ({ role: m.role, content: withImages(m.content, m.images) }) as OpenRouterMessage),
+        { role: 'user', content: withImages(texts.join('\n\n'), turn.flatMap((message) => message.images ?? [])) },
       ]
 
       const requestFn = connection.provider === 'openai' ? requestOpenAiChatMessage : requestChatMessage
@@ -241,7 +262,17 @@ export const useChatStore = create<ChatState>((set, get) => {
   title: UNTITLED,
 
   sendMessage: async (text) => {
-    const userMessage: ChatMessage = { id: crypto.randomUUID(), role: 'user', content: text }
+    // The images on the composer are part of the message being written, so they go onto
+    // it and leave the composer; the text files stay, since a tool reads those on request
+    // and may need them again next turn.
+    const images = get().attachments.filter(isImageAttachment)
+    const userMessage: ChatMessage = {
+      id: crypto.randomUUID(),
+      role: 'user',
+      content: text,
+      ...(images.length > 0 ? { images: images.map((image) => ({ name: image.name, dataUrl: image.content })) } : {}),
+    }
+    if (images.length > 0) set({ attachments: get().attachments.filter((attachment) => !isImageAttachment(attachment)) })
     set({ messages: [...get().messages, userMessage] })
     // Saved the moment it is sent, not when the reply lands: a message that cost the user
     // thought should survive a reply that never arrives.

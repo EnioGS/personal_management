@@ -3,7 +3,7 @@ import { GripVertical, Hourglass, Paperclip, SendHorizontal, X } from 'lucide-re
 import { useTranslation } from 'react-i18next'
 import { MessageContent } from './message-content'
 import { ConversationBar } from './conversation-bar'
-import { readAttachedFile } from '@/lib/chat-attachments'
+import { ACCEPTED_ATTACHMENTS, readAttachedFile } from '@/lib/chat-attachments'
 import { cn } from '@/lib/utils'
 import { GRIP_WIDTH, MAX_PANEL_WIDTH, MIN_PANEL_WIDTH, useChatPanelStore } from '@/store/chat-panel-store'
 import { useChatStore, type ChatMessage } from '@/store/chat-store'
@@ -409,6 +409,10 @@ export function ChatPanel() {
                 key={attachment.id}
                 className="bg-muted flex items-center gap-1 rounded-full py-1 pr-1 pl-2.5 text-xs"
               >
+                {/* An image says what it is faster than its filename does. */}
+                {attachment.kind === 'image' && (
+                  <img src={attachment.content} alt="" className="-ml-1.5 size-5 rounded-full object-cover" />
+                )}
                 {attachment.name}
                 <button
                   type="button"
@@ -453,7 +457,7 @@ export function ChatPanel() {
           <input
             ref={fileInputRef}
             type="file"
-            accept=".txt,.md,.csv"
+            accept={ACCEPTED_ATTACHMENTS}
             multiple
             className="hidden"
             onChange={handleFileInputChange}
@@ -552,6 +556,13 @@ const MessageBubble = memo(function MessageBubble({ message }: { message: ChatMe
         )}
       >
         <MessageContent content={message.content} tone={message.role} />
+        {message.images && message.images.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-2">
+            {message.images.map((image) => (
+              <img key={image.dataUrl.slice(-24)} src={image.dataUrl} alt={image.name} title={image.name} className="max-h-40 rounded" />
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )

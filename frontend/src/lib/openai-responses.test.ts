@@ -80,3 +80,31 @@ describe('reading the reply back', () => {
     expect(body.tools[0]).toMatchObject({ type: 'function', name: 'query_vault' })
   })
 })
+
+describe('an image in a message', () => {
+  it('is renamed to what this API calls it, and carries its data URL directly', () => {
+    const input = toResponsesInput([
+      {
+        role: 'user',
+        content: [
+          { type: 'text', text: 'what does this show?' },
+          { type: 'image_url', image_url: { url: 'data:image/png;base64,AAA' } },
+        ],
+      },
+    ])
+
+    expect(input).toEqual([
+      {
+        role: 'user',
+        content: [
+          { type: 'input_text', text: 'what does this show?' },
+          { type: 'input_image', image_url: 'data:image/png;base64,AAA' },
+        ],
+      },
+    ])
+  })
+
+  it('leaves a message of plain words a plain string', () => {
+    expect(toResponsesInput([{ role: 'user', content: 'hello' }])).toEqual([{ role: 'user', content: 'hello' }])
+  })
+})

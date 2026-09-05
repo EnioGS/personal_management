@@ -32,13 +32,29 @@ export function toResponsesInput(messages: OpenRouterMessage[]): unknown[] {
       continue
     }
 
-    if (message.content) input.push({ role: message.role, content: message.content })
+    if (message.content) input.push({ role: message.role, content: toResponsesContent(message.content, message.role) })
     for (const call of message.tool_calls ?? []) {
       input.push({ type: 'function_call', call_id: call.id, name: call.function.name, arguments: call.function.arguments })
     }
   }
 
   return input
+}
+
+/**
+ * Content in the shape this API wants it.
+ *
+ * Words stay a plain string, which is what nearly every message is. Parts are renamed:
+ * chat completions calls them `text` and `image_url`, the responses API calls the same
+ * two things `input_text` and `input_image`, and an image carries its data URL directly
+ * rather than wrapped in an object.
+ */
+function toResponsesContent(content: NonNullable<OpenRouterMessage['content']>, role: string): unknown {
+  if (typeof content === 'string') return content
+  const partType = role === 'assistant' ? 'output_text' : 'input_text'
+  return content.map((part) =>
+    part.type === 'text' ? { type: partType, text: part.text } : { type: 'input_image', image_url: part.image_url.url },
+  )
 }
 
 /** Tools declared flat here, rather than nested under `function` as chat completions wants. */

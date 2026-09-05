@@ -40,7 +40,7 @@ describe('readAttachedFile', () => {
   it('rejects unsupported extensions', async () => {
     const result = await readAttachedFile(makeFile('data.json', '{}'))
     expect('error' in result).toBe(true)
-    if ('error' in result) expect(result.error).toContain('only .txt, .md, and .csv files')
+    if ('error' in result) expect(result.error).toContain('only .txt, .md, .csv and images')
   })
 
   it('rejects files over the size cap', async () => {
@@ -68,5 +68,25 @@ describe('formatAttachmentsForPrompt', () => {
     expect(result).toContain('def-456')
     expect(result).toContain('readme.md')
     expect(result).toContain('text/markdown')
+  })
+})
+
+describe('images', () => {
+  const png = () => new File([new Uint8Array([137, 80, 78, 71])], 'grafico.png', { type: 'image/png' })
+
+  it('reads an image as a data URL, which is what a message carries it as', async () => {
+    const result = await readAttachedFile(png())
+    expect(result).toMatchObject({ attachment: { name: 'grafico.png', type: 'image/png', kind: 'image' } })
+    expect('attachment' in result && result.attachment.content.startsWith('data:image/png;base64,')).toBe(true)
+  })
+
+  it('refuses a kind nobody can read', async () => {
+    expect(await readAttachedFile(new File(['x'], 'planilha.xlsx'))).toMatchObject({ error: expect.stringContaining('xlsx') })
+  })
+
+  it('leaves images out of the prompt listing, the model seeing them already', async () => {
+    const result = await readAttachedFile(png())
+    if (!('attachment' in result)) throw new Error('expected an attachment')
+    expect(formatAttachmentsForPrompt([result.attachment])).toBe('')
   })
 })
