@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ChangeEvent, type DragEvent, type PointerEvent } from 'react'
+import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState, type ChangeEvent, type DragEvent, type PointerEvent } from 'react'
 import { GripVertical, Hourglass, Paperclip, SendHorizontal, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { MessageContent } from './message-content'
@@ -6,7 +6,7 @@ import { ConversationBar } from './conversation-bar'
 import { readAttachedFile } from '@/lib/chat-attachments'
 import { cn } from '@/lib/utils'
 import { GRIP_WIDTH, MAX_PANEL_WIDTH, MIN_PANEL_WIDTH, useChatPanelStore } from '@/store/chat-panel-store'
-import { useChatStore } from '@/store/chat-store'
+import { useChatStore, type ChatMessage } from '@/store/chat-store'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Textarea } from '@/components/ui/textarea'
@@ -382,31 +382,7 @@ export function ChatPanel() {
           <ScrollArea className="h-full">
             <div className="flex flex-col gap-2 p-3">
               {messages.length === 0 && <p className="text-muted-foreground text-sm">{t('panel.emptyState')}</p>}
-              {messages.map((message) => (
-                <div
-                  key={message.id}
-                  className={cn(
-                    'flex max-w-[85%] min-w-0 flex-col gap-0.5',
-                    message.role === 'user' ? 'self-end items-end' : 'self-start items-start',
-                  )}
-                >
-                  {message.role === 'assistant' && !message.isError && message.model && (
-                    <span className="text-muted-foreground px-1 text-[10px]">{message.model}</span>
-                  )}
-                  <div
-                    className={cn(
-                      'max-w-full min-w-0 rounded-md px-3 py-2 text-sm break-words',
-                      message.isError
-                        ? 'bg-destructive/10 text-destructive'
-                        : message.role === 'user'
-                          ? 'bg-brand text-brand-foreground'
-                          : 'bg-muted',
-                    )}
-                  >
-                    <MessageContent content={message.content} tone={message.role} />
-                  </div>
-                </div>
-              ))}
+              {messages.map((message) => <MessageBubble key={message.id} message={message} />)}
               {isSending && (
                 <div className="text-muted-foreground flex max-w-[85%] items-center gap-2 self-start rounded-md bg-muted px-3 py-2 text-sm">
                   <Hourglass className="size-4 animate-spin" />
@@ -546,6 +522,40 @@ export function ChatPanel() {
     </>
   )
 }
+
+/**
+ * One message, memoised.
+ *
+ * The panel re-renders on every keystroke in the composer — that is what typing is — and
+ * without this every message in the conversation would be re-rendered with it, Markdown
+ * and all. A message that has been sent never changes, so it never needs redrawing.
+ */
+const MessageBubble = memo(function MessageBubble({ message }: { message: ChatMessage }) {
+  return (
+    <div
+      className={cn(
+        'flex max-w-[85%] min-w-0 flex-col gap-0.5',
+        message.role === 'user' ? 'self-end items-end' : 'self-start items-start',
+      )}
+    >
+      {message.role === 'assistant' && !message.isError && message.model && (
+        <span className="text-muted-foreground px-1 text-[10px]">{message.model}</span>
+      )}
+      <div
+        className={cn(
+          'max-w-full min-w-0 rounded-md px-3 py-2 text-sm break-words',
+          message.isError
+            ? 'bg-destructive/10 text-destructive'
+            : message.role === 'user'
+              ? 'bg-brand text-brand-foreground'
+              : 'bg-muted',
+        )}
+      >
+        <MessageContent content={message.content} tone={message.role} />
+      </div>
+    </div>
+  )
+})
 
 /**
  * Model prices run to millionths of a dollar a token, so a session can genuinely cost

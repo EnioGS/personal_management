@@ -1,4 +1,5 @@
-import ReactMarkdown from 'react-markdown'
+import { memo, useMemo } from 'react'
+import ReactMarkdown, { type Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { cn } from '@/lib/utils'
 
@@ -15,16 +16,14 @@ import { cn } from '@/lib/utils'
  * well as on the muted assistant background — so type sizes come from the bubble, and
  * only structure comes from the Markdown.
  */
-export function MessageContent({ content, tone }: { content: string; tone: 'user' | 'assistant' }) {
+function MessageContentView({ content, tone }: { content: string; tone: 'user' | 'assistant' }) {
   // On the accent-coloured user bubble every part has to inherit that foreground;
   // borders and code backgrounds lean on the current colour instead of the palette.
   const subtle = tone === 'user' ? 'border-current/25 bg-current/10' : 'border-border bg-background/60'
 
-  return (
-    <div className="flex flex-col gap-2 text-sm break-words">
-      <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
-        components={{
+  // Built once per tone rather than per render: a new object here is a new set of
+  // components for the renderer to reconcile against, every time.
+  const components = useMemo((): Components => ({
           p: ({ children }) => <p className="whitespace-pre-wrap">{children}</p>,
           h1: ({ children }) => <p className="mt-1 text-base font-semibold">{children}</p>,
           h2: ({ children }) => <p className="mt-1 font-semibold">{children}</p>,
@@ -60,12 +59,25 @@ export function MessageContent({ content, tone }: { content: string; tone: 'user
           thead: ({ children }) => <thead className={cn('border-b', subtle.split(' ')[0])}>{children}</thead>,
           th: ({ children }) => <th className="px-1.5 py-1 text-left font-medium">{children}</th>,
           td: ({ children }) => <td className={cn('border-t px-1.5 py-1 align-top', subtle.split(' ')[0])}>{children}</td>,
-          input: ({ checked, type }) =>
-            type === 'checkbox' ? <input type="checkbox" checked={checked} readOnly className="mr-1 align-middle" /> : null,
-        }}
-      >
+    input: ({ checked, type }) =>
+      type === 'checkbox' ? <input type="checkbox" checked={checked} readOnly className="mr-1 align-middle" /> : null,
+  }), [subtle])
+
+  return (
+    <div className="flex flex-col gap-2 text-sm break-words">
+      <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
         {content}
       </ReactMarkdown>
     </div>
   )
 }
+
+/**
+ * Memoised, because rendering Markdown means parsing it.
+ *
+ * Every keystroke in the composer re-renders the panel around these, and without this
+ * each message would be parsed again on every one — a conversation of twenty answers is
+ * twenty documents rebuilt per character typed, which is felt as the typing itself being
+ * slow.
+ */
+export const MessageContent = memo(MessageContentView)
