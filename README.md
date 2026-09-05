@@ -22,7 +22,7 @@ Two things it optimizes for:
 │   ├── src/
 │   │   ├── components/
 │   │   │   ├── ui/            # shadcn/ui primitives (button, resizable, table, chart, dropdown-menu, ...)
-│   │   │   ├── charts/        # thin Recharts wrappers (line/bar/pie/diverging-bar) + the shared color palette
+│   │   │   ├── charts/        # thin Recharts wrappers (line/bar/pie/diverging-bar/treemap) + the shared color palette
 │   │   │   ├── data-table/    # table workspace (selector + "+ Nova tabela") with an inline draft row + CSV
 │   │   │   ├── dashboard/     # filter bar, stat tile (two deltas + sparkline), dashboard card,
 │   │   │   │                  # ranked and nested bar lists,

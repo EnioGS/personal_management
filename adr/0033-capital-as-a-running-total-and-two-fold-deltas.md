@@ -56,6 +56,14 @@ positive and the ratio is at most ten times over — a base of zero, of the
 opposite sign, or near enough to zero to yield hundreds of percent, describes
 the base rather than the change, and is left off rather than shown.
 
+**Spending categories are a treemap, not a list.** Area carries the ranking, so
+forty categories fit where a list scrolled, and each box is coloured by the
+entity it names (`colorForKey`, past eight slots colours repeat — the ordering
+is the ranking, not the hue). Precision is the trade: a box says its name, then
+its value, then its comparison arrow, each only once it is big enough to hold
+them legibly. It took the space of the two smallest tiles, which said one
+uncontextualised number each.
+
 ## Consequences
 
 - A tile needs three months of data to show both comparisons and two to show

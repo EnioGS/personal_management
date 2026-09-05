@@ -30,9 +30,6 @@
     "investments": "Investimentos",
     "arrived": "Entrou",
     "left": "Saiu",
-    "savingsRate": "Guardado do que entrou",
-    "runway": "O capital cobre",
-    "runwayMonths": "{{count}} meses de gastos",
     "incomeSources": "De onde veio o dinheiro",
     "noCardSpend": "Nada foi lançado em cartão aqui.",
     "averageMonth": "Um mês médio",
@@ -42,13 +39,10 @@
     "cashFlow": "Fluxo de caixa",
     "netCashFlow": "Líquido",
     "accountsAndCards": "Por conta e cartão",
-    "vsYourAverage": "vs. sua média",
-    "runwayFormula": "{{capital}} ÷ {{spending}} por mês",
     "medianMonth": "Mês mediano",
     "bestMonth": "Melhor mês",
     "worstMonth": "Pior mês",
-    "savingsRateMonths_one": "em {{count}} mês com entradas",
-    "savingsRateMonths_other": "em {{count}} meses com entradas"
+    "categoriesFootnote": "Média por mês; a seta compara o trimestre mais recente do período com essa média."
   },
   "spending": {
     "totalSpent": "Total gasto",

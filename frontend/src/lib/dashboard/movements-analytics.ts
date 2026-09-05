@@ -40,19 +40,6 @@ export function monthlyFlow(rows: FilteredEntry[]): MonthlyFlow[] {
   return [...months.values()].sort((left, right) => left.month.localeCompare(right.month))
 }
 
-/**
- * The share of what arrived that was not spent again, over the whole period.
- *
- * Null rather than zero when nothing arrived: a rate of nothing is not a rate of 0%, and
- * a screen that says 0% invites a conclusion nobody can draw.
- */
-export function savingsRate(rows: FilteredEntry[]): number | null {
-  const incoming = rows.filter((row) => row.value > 0).reduce((sum, row) => sum + row.value, 0)
-  if (incoming === 0) return null
-  const outgoing = rows.filter((row) => row.value < 0).reduce((sum, row) => sum - row.value, 0)
-  return (incoming - outgoing) / incoming
-}
-
 /** What money came in for, by category — the other half of the spending breakdown. */
 export function incomeByCategory(rows: FilteredEntry[]): RankedItem[] {
   const totals = new Map<string, number>()
@@ -103,31 +90,6 @@ export function accountsWithCards(movements: FilteredEntry[], spending: Filtered
 /** The rows worth looking at first: the largest movements either way, deep enough to scroll. */
 export function largestMovements(rows: FilteredEntry[], limit = 400): FilteredEntry[] {
   return [...rows].sort((left, right) => Math.abs(right.value) - Math.abs(left.value)).slice(0, limit)
-}
-
-/**
- * How long what is held would cover what is spent, at the rate of the period shown.
- *
- * Null when nothing was spent — dividing by no spending says "forever", which is true and
- * useless — and negative capital answers zero rather than a negative number of months.
- * The two numbers behind the answer come back with it: a lone "3 months" is unarguable
- * in a way that "R$ 9.000 ÷ R$ 3.000 a month" is not.
- */
-export function monthsOfRunway(capital: number, spendingByMonth: number[]): { months: number; capital: number; monthlySpending: number } | null {
-  const months = spendingByMonth.filter((month) => month > 0)
-  if (months.length === 0) return null
-  const average = months.reduce((sum, month) => sum + month, 0) / months.length
-  return { months: Math.max(0, capital) / average, capital, monthlySpending: average }
-}
-
-/**
- * What was kept, month by month.
- *
- * A month nothing arrived in has no rate — not a rate of zero — so it is left out rather
- * than drawn as a collapse. The tile's own number still reads the whole period.
- */
-export function savingsRateByMonth(flow: MonthlyFlow[]): { month: string; rate: number }[] {
-  return flow.filter((month) => month.incoming > 0).map((month) => ({ month: month.month, rate: month.net / month.incoming }))
 }
 
 /**

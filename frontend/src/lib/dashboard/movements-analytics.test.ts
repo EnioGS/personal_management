@@ -7,9 +7,6 @@ import {
   monthlyAverages,
   monthlyFlow,
   monthlySpread,
-  monthsOfRunway,
-  savingsRate,
-  savingsRateByMonth,
 } from './movements-analytics'
 
 function entry(overrides: Partial<FilteredEntry>): FilteredEntry {
@@ -49,28 +46,6 @@ describe('what a month brought in and took out', () => {
   })
 })
 
-describe('what was kept of what arrived', () => {
-  it('is the share of income that did not leave again', () => {
-    expect(savingsRate([entry({ value: 1000 }), entry({ value: -250 })])).toBeCloseTo(0.75)
-  })
-
-  it('is nothing at all when nothing arrived, rather than zero', () => {
-    expect(savingsRate([entry({ value: -250 })])).toBeNull()
-    expect(savingsRate([])).toBeNull()
-  })
-})
-
-describe('how long the capital lasts', () => {
-  it('divides it by what a month with spending in it spends', () => {
-    expect(monthsOfRunway(3000, [1000, 0, 500])?.months).toBeCloseTo(4)
-  })
-
-  it('says nothing when nothing was spent, and never a negative number of months', () => {
-    expect(monthsOfRunway(3000, [0, 0])).toBeNull()
-    expect(monthsOfRunway(-500, [100])?.months).toBe(0)
-  })
-})
-
 describe('where money came from', () => {
   it('counts only what arrived', () => {
     expect(incomeByCategory([
@@ -97,10 +72,6 @@ describe('the months an average hides', () => {
 
   it('says nothing about no months at all', () => {
     expect(monthlySpread([])).toEqual({ median: 0, best: null, worst: null })
-  })
-
-  it('rates only the months something arrived in, a month without income having no rate', () => {
-    expect(savingsRateByMonth(flow)).toEqual([{ month: '2026-06', rate: 1 }, { month: '2026-08', rate: 1 }])
   })
 })
 

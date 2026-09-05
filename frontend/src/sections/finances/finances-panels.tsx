@@ -2,13 +2,14 @@ import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { AppBarChart } from '@/components/charts/bar-chart'
 import { CapitalEvolutionChart } from '@/components/charts/capital-evolution-chart'
+import { CategoryTreemap } from '@/components/charts/category-treemap'
 import { DIVERGING_PAIR, DOMAIN_COLOR } from '@/components/charts/chart-colors'
 import { DivergingBarChart } from '@/components/charts/diverging-bar-chart'
 import { CategoryPill } from '@/components/dashboard/category-pill'
 import { DashboardCard } from '@/components/dashboard/dashboard-card'
 import { NestedBarList } from '@/components/dashboard/nested-bar-list'
 import { RankedBarList } from '@/components/dashboard/ranked-bar-list'
-import { StatTile, type StatDelta } from '@/components/dashboard/stat-tile'
+import { StatTile } from '@/components/dashboard/stat-tile'
 import { FilterBar } from '@/components/dashboard/filter-bar'
 import { resolveFilterRange, useDashboardFilters, type DashboardFilters } from '@/components/dashboard/dashboard-filters'
 import { UNLABELLED_LABEL, useDashboardEntries } from '@/components/dashboard/use-dashboard-entries'
@@ -22,9 +23,6 @@ import {
   monthlyAverages,
   monthlyFlow,
   monthlySpread,
-  monthsOfRunway,
-  savingsRate,
-  savingsRateByMonth,
 } from '@/lib/dashboard/movements-analytics'
 import { averageSpendByCategory, categorySpendChanges, frequentDescriptions, outgoingSpending, spendingByMonth } from './spending-analytics'
 import { FinanceTableDrawer } from './finance-table-drawer'
@@ -83,13 +81,7 @@ export function OverviewPanel() {
 
   const flow = useMemo(() => monthlyFlow(movements), [movements])
   const averages = useMemo(() => monthlyAverages(flow), [flow])
-  const saved = useMemo(() => savingsRate(movements), [movements])
-  const savedByMonth = useMemo(() => savingsRateByMonth(flow), [flow])
   const spread = useMemo(() => monthlySpread(flow), [flow])
-  const runway = useMemo(
-    () => monthsOfRunway(capital.current, capitalData.map((point) => point.spending)),
-    [capital, capitalData],
-  )
   const accounts = useMemo(() => accountsWithCards(movements, spending), [movements, spending])
   const incomeSources = useMemo(() => incomeByCategory(movements), [movements])
   const biggest = useMemo(() => largestMovements(movements), [movements])
@@ -142,86 +134,61 @@ export function OverviewPanel() {
             />
           </div>
 
-          <div className="grid grid-cols-3 gap-3">
-            <DashboardCard
-              title={t('finances:overview.capitalEvolution')}
-              className="col-span-2 h-[320px]"
-              bodyClassName="p-2"
-            >
-              {capitalData.length === 0 ? (
-                <p className="text-muted-foreground flex h-full items-center justify-center text-xs">{t('finances:overview.noEntries')}</p>
-              ) : (
-                <CapitalEvolutionChart
-                  data={capitalData}
-                  xKey="month"
-                  xFormatter={formatMonthLabel}
-                  valueFormatter={(value) => currency.format(value)}
-                  capitalLabel={t('finances:overview.capitalEvolution')}
-                  spendingLabel={t('common:dashboard.spending')}
-                  investmentsLabel={t('finances:overview.investments')}
-                />
-              )}
-            </DashboardCard>
+          {/* The two charts stack on the left; the categories run the full height beside
+              them, where a treemap has room to be read. */}
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+            <div className="flex flex-col gap-3 lg:col-span-2">
+              <DashboardCard title={t('finances:overview.capitalEvolution')} className="h-[320px]" bodyClassName="p-2">
+                {capitalData.length === 0 ? (
+                  <p className="text-muted-foreground flex h-full items-center justify-center text-xs">{t('finances:overview.noEntries')}</p>
+                ) : (
+                  <CapitalEvolutionChart
+                    data={capitalData}
+                    xKey="month"
+                    xFormatter={formatMonthLabel}
+                    valueFormatter={(value) => currency.format(value)}
+                    capitalLabel={t('finances:overview.capitalEvolution')}
+                    spendingLabel={t('common:dashboard.spending')}
+                    investmentsLabel={t('finances:overview.investments')}
+                  />
+                )}
+              </DashboardCard>
 
-            <DashboardCard title={t('finances:overview.spendingCategories')} className="h-[320px]">
-              <RankedBarList
+              <DashboardCard title={t('finances:overview.cashFlow')} className="h-[300px]" bodyClassName="p-2">
+                {flow.length === 0 ? (
+                  <p className="text-muted-foreground flex h-full items-center justify-center text-xs">{t('finances:overview.noEntries')}</p>
+                ) : (
+                  <DivergingBarChart
+                    data={flow}
+                    xKey="month"
+                    positiveKey="incoming"
+                    negativeKey="outgoing"
+                    positiveLabel={t('finances:overview.arrived')}
+                    negativeLabel={t('finances:overview.left')}
+                    netKey="net"
+                    netLabel={t('finances:overview.netCashFlow')}
+                    positiveColor={DOMAIN_COLOR.balance}
+                    negativeColor={DIVERGING_PAIR.negative}
+                    netColor={DOMAIN_COLOR.contributions}
+                    xFormatter={formatMonthLabel}
+                    valueFormatter={(value) => currency.format(value)}
+                  />
+                )}
+              </DashboardCard>
+            </div>
+
+            <DashboardCard
+              title={t('finances:overview.spendingCategories')}
+              className="h-[420px] lg:h-[632px]"
+              bodyClassName="p-2"
+              footnote={t('finances:overview.categoriesFootnote')}
+            >
+              <CategoryTreemap
                 items={spendingCategories}
                 valueFormatter={(v) => currency.format(v)}
                 emptyLabel={t('finances:spending.noSpending')}
-                variant="underlined"
               />
             </DashboardCard>
-          </div>
-
-          {/* Below the fold: the same period, read three ways — what the months look
-              like, where the money sits, and which rows account for most of it. */}
-          <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
-            <DashboardCard title={t('finances:overview.cashFlow')} className="h-[300px] lg:col-span-2" bodyClassName="p-2">
-              {flow.length === 0 ? (
-                <p className="text-muted-foreground flex h-full items-center justify-center text-xs">{t('finances:overview.noEntries')}</p>
-              ) : (
-                <DivergingBarChart
-                  data={flow}
-                  xKey="month"
-                  positiveKey="incoming"
-                  negativeKey="outgoing"
-                  positiveLabel={t('finances:overview.arrived')}
-                  negativeLabel={t('finances:overview.left')}
-                  netKey="net"
-                  netLabel={t('finances:overview.netCashFlow')}
-                  positiveColor={DOMAIN_COLOR.balance}
-                  negativeColor={DIVERGING_PAIR.negative}
-                  netColor={DOMAIN_COLOR.contributions}
-                  xFormatter={formatMonthLabel}
-                  valueFormatter={(value) => currency.format(value)}
-                />
-              )}
-            </DashboardCard>
-
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-1">
-              <StatTile
-                label={t('finances:overview.savingsRate')}
-                value={saved === null ? '—' : formatRate(saved)}
-                indicatorColor={DOMAIN_COLOR.contributions.light}
-                footnote={savedByMonth.length > 0 ? t('finances:overview.savingsRateMonths', { count: savedByMonth.length }) : undefined}
-                deltas={savingsDelta(saved, savedByMonth, t('finances:overview.vsYourAverage'))}
-                sparkline={savedByMonth.map((month) => month.rate)}
-              />
-              <StatTile
-                label={t('finances:overview.runway')}
-                value={runway === null ? '—' : t('finances:overview.runwayMonths', { count: Math.round(runway.months) })}
-                indicatorColor={DOMAIN_COLOR.balance.light}
-                tone={runway === null ? 'default' : runway.months >= COMFORTABLE_RUNWAY ? 'positive' : runway.months < THIN_RUNWAY ? 'negative' : 'default'}
-                footnote={
-                  runway === null
-                    ? undefined
-                    : t('finances:overview.runwayFormula', {
-                        capital: currency.format(Math.max(0, runway.capital)),
-                        spending: currency.format(runway.monthlySpending),
-                      })
-                }
-              />
-            </div>
           </div>
 
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
@@ -289,31 +256,6 @@ export function OverviewPanel() {
       </div>
     </div>
   )
-}
-
-/** Six months of outflow covered is the usual advice; under three is the usual warning. */
-const COMFORTABLE_RUNWAY = 6
-const THIN_RUNWAY = 3
-
-const formatRate = (rate: number) => `${Math.round(rate * 100)}%`
-
-/**
- * How the last month kept up with the period's own rate.
- *
- * A rate against a rate is a difference in percentage points, not a percentage of a
- * percentage — 30% against 20% is ten points better, and calling it "50% more" would be
- * arithmetic nobody asked for.
- */
-function savingsDelta(overall: number | null, months: { rate: number }[], label: string): StatDelta[] {
-  const last = months.at(-1)
-  if (overall === null || !last || months.length < 2) return []
-  const points = Math.round((last.rate - overall) * 100)
-  return [{
-    change: `${Math.abs(points)} p.p.`,
-    direction: points === 0 ? 'flat' : points > 0 ? 'up' : 'down',
-    goodDirection: 'up',
-    label,
-  }]
 }
 
 /** One line of the average-month card: what it is, and how much. */

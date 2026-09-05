@@ -21,8 +21,6 @@ interface StatTileProps {
   indicatorColor?: string
   tone?: 'default' | 'positive' | 'negative'
   icon?: ReactNode
-  /** The arithmetic behind the number, in the tile's own words — shown under everything else. */
-  footnote?: string
   /** Comparisons under the number, in reading order: the nearest one first. */
   deltas?: StatDelta[]
   /** Recent period values, oldest first — rendered as a trend line, not a chart. */
@@ -40,7 +38,7 @@ const ARROW = { up: '▲', down: '▼', flat: '=' } as const
  * current value": a stat tile, not a one-bar chart. Several of these in a row is a
  * KPI row (see PLAN.md §3.4 and dashboard-filters usage in finances-panels.tsx).
  */
-export function StatTile({ label, value, indicatorColor, tone = 'default', icon, footnote, deltas, sparkline }: StatTileProps) {
+export function StatTile({ label, value, indicatorColor, tone = 'default', icon, deltas, sparkline }: StatTileProps) {
   return (
     <div className="bg-card flex flex-1 flex-col gap-1 rounded-lg border p-3">
       <div className="text-muted-foreground flex items-center gap-1.5 text-[10px] font-medium tracking-wide uppercase">
@@ -57,7 +55,6 @@ export function StatTile({ label, value, indicatorColor, tone = 'default', icon,
       >
         {value}
       </p>
-      {footnote && <p className="text-muted-foreground text-[11px] leading-tight">{footnote}</p>}
       {deltas && deltas.length > 0 && (
         <div className="flex flex-col gap-0.5 text-[11px] leading-tight">
           {deltas.map((delta) => (
