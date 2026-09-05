@@ -82,9 +82,27 @@ describe('spending analytics', () => {
       entry({ screen: 'overview', category: 'Not spending', value: -900, date: Date.UTC(2026, 3, 4) }),
     ]
 
-    expect(averageSpendByCategory(rows, ['2026-01', '2026-02', '2026-03', '2026-04'])).toEqual([
+    expect(averageSpendByCategory(rows, ['2026-01', '2026-02', '2026-03', '2026-04'])).toMatchObject([
       { key: 'Food', label: 'Food', value: 87.5, comparison: 1.8571428571428572 },
       { key: 'Travel', label: 'Travel', value: 100, comparison: 3 },
+    ])
+  })
+
+  it('breaks each category into the subcategories under it, biggest first', () => {
+    const rows = [
+      entry({ category: 'Food', subcategory: 'restaurant', value: -300, date: Date.UTC(2026, 0, 1) }),
+      entry({ category: 'Food', subcategory: 'market', value: -100, date: Date.UTC(2026, 0, 2) }),
+      entry({ category: 'Food', subcategory: 'restaurant', value: -100, date: Date.UTC(2026, 0, 3) }),
+      // Nothing said what this one was for; it is still food, and still has to land somewhere.
+      entry({ category: 'Food', subcategory: '', value: -40, date: Date.UTC(2026, 0, 4) }),
+    ]
+
+    const [food] = averageSpendByCategory(rows, ['2026-01', '2026-02'])
+    expect(food.value).toBe(270)
+    expect(food.children?.map((child) => [child.label, child.value])).toEqual([
+      ['restaurant', 200],
+      ['market', 50],
+      ['—', 20],
     ])
   })
 })

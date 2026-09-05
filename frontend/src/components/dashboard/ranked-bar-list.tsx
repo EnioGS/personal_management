@@ -1,5 +1,7 @@
-import type { CSSProperties } from 'react'
+import { useState, type CSSProperties } from 'react'
+import { ChevronRight } from 'lucide-react'
 import { colorForKey } from '@/components/charts/chart-colors'
+import { cn } from '@/lib/utils'
 
 export interface RankedBarItem {
   key: string
@@ -7,6 +9,8 @@ export interface RankedBarItem {
   value: number
   /** Change against a contextual comparison window, expressed as a fraction. */
   comparison?: number
+  /** What this one is made of — revealed by clicking it, in the roomier variant. */
+  children?: RankedBarItem[]
 }
 
 interface RankedBarListProps {
@@ -36,34 +40,10 @@ export function RankedBarList({ items, valueFormatter, emptyLabel, variant = 'in
   return (
     <div className={variant === 'underlined' ? 'flex h-full flex-col gap-3 overflow-y-auto pr-2' : 'flex h-full flex-col gap-2.5 overflow-y-auto'}>
       {sorted.map((item) => {
+        if (variant === 'underlined') return <UnderlinedRow key={item.key} item={item} max={max} valueFormatter={valueFormatter} />
+
         const color = colorForKey(item.key)
         const share = total > 0 ? (item.value / total) * 100 : 0
-        const comparison = item.comparison
-        const comparisonClass = comparison === undefined || comparison === 0
-          ? 'text-muted-foreground'
-          : comparison < 0 ? 'text-brand' : 'text-destructive'
-        const comparisonLabel = comparison === undefined
-          ? '—'
-          : `${comparison >= 0 ? '▲' : '▼'} ${Number.isFinite(comparison) ? `${(Math.abs(comparison) * 100).toFixed(1)}%` : '∞%'}`
-
-        if (variant === 'underlined') {
-          return (
-            <div key={item.key} className="grid grid-cols-[minmax(0,1fr)_5rem_3.5rem] items-start gap-x-2 text-xs">
-              <div className="min-w-0">
-                <span className="block break-words leading-4" title={item.label}>{item.label || '—'}</span>
-                <div className="bg-muted mt-1 h-[3px] overflow-hidden rounded-full">
-                  <div
-                    className="entity-fill h-full rounded-full"
-                    style={{ width: `${(Math.max(item.value, 0) / max) * 100}%`, '--entity-light': color.light, '--entity-dark': color.dark } as CSSProperties}
-                  />
-                </div>
-              </div>
-              <span className="pt-0.5 text-right tabular-nums">{valueFormatter(item.value)}</span>
-              <span className={`mr-[5px] pt-0.5 text-right tabular-nums whitespace-nowrap ${comparisonClass}`}>{comparisonLabel}</span>
-            </div>
-          )
-        }
-
         return (
           <div key={item.key} className="flex items-center gap-2 text-xs">
             <span className="w-24 shrink-0 truncate" title={item.label}>
@@ -80,6 +60,75 @@ export function RankedBarList({ items, valueFormatter, emptyLabel, variant = 'in
           </div>
         )
       })}
+    </div>
+  )
+}
+
+function formatComparison(comparison: number | undefined): { label: string; className: string } {
+  if (comparison === undefined || comparison === 0) return { label: comparison === undefined ? '—' : '▲ 0.0%', className: 'text-muted-foreground' }
+  return {
+    label: `${comparison >= 0 ? '▲' : '▼'} ${Number.isFinite(comparison) ? `${(Math.abs(comparison) * 100).toFixed(1)}%` : '∞%'}`,
+    className: comparison < 0 ? 'text-brand' : 'text-destructive',
+  }
+}
+
+/**
+ * A row of the roomier variant, and whatever it is made of.
+ *
+ * The breakdown is folded away rather than absent: a category is the question most of
+ * the time, and its subcategories are the follow-up. Opening one indents its parts
+ * under it and scales their bars against the parent, so the widths read as shares of
+ * what was clicked rather than of the panel.
+ */
+function UnderlinedRow({ item, max, valueFormatter, depth = 0 }: {
+  item: RankedBarItem
+  max: number
+  valueFormatter: (value: number) => string
+  depth?: number
+}) {
+  const [open, setOpen] = useState(false)
+  const color = colorForKey(item.key)
+  const comparison = formatComparison(item.comparison)
+  const children = item.children ?? []
+  const childMax = Math.max(...children.map((child) => Math.max(child.value, 0)), 1)
+
+  const row = (
+    <div className="grid grid-cols-[minmax(0,1fr)_5rem_3.5rem] items-start gap-x-2 text-xs">
+      <div className="min-w-0">
+        <span className="flex items-center gap-1 leading-4">
+          {children.length > 0 && (
+            <ChevronRight className={cn('size-3 shrink-0 transition-transform', open && 'rotate-90')} aria-hidden />
+          )}
+          <span className="min-w-0 break-words" title={item.label}>{item.label || '—'}</span>
+        </span>
+        <div className="bg-muted mt-1 h-[3px] overflow-hidden rounded-full">
+          <div
+            className="entity-fill h-full rounded-full"
+            style={{ width: `${(Math.max(item.value, 0) / max) * 100}%`, '--entity-light': color.light, '--entity-dark': color.dark } as CSSProperties}
+          />
+        </div>
+      </div>
+      <span className="pt-0.5 text-right tabular-nums">{valueFormatter(item.value)}</span>
+      <span className={`mr-[5px] pt-0.5 text-right tabular-nums whitespace-nowrap ${comparison.className}`}>{comparison.label}</span>
+    </div>
+  )
+
+  return (
+    <div className={depth > 0 ? 'text-muted-foreground' : undefined}>
+      {children.length > 0 ? (
+        <button type="button" className="w-full cursor-pointer text-left" aria-expanded={open} onClick={() => setOpen(!open)}>
+          {row}
+        </button>
+      ) : (
+        row
+      )}
+      {open && children.length > 0 && (
+        <div className="mt-3 flex flex-col gap-3 border-l pl-3">
+          {children.map((child) => (
+            <UnderlinedRow key={child.key} item={child} max={childMax} valueFormatter={valueFormatter} depth={depth + 1} />
+          ))}
+        </div>
+      )}
     </div>
   )
 }

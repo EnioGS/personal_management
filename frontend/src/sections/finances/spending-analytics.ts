@@ -6,6 +6,11 @@ function categoryOf(row: FilteredEntry): string {
   return row.category.trim() || UNLABELLED_LABEL
 }
 
+/** The same for the detail under it, which starts empty far more often than a category does. */
+function subcategoryOf(row: FilteredEntry): string {
+  return row.subcategory.trim() || UNLABELLED_LABEL
+}
+
 export interface MonthlySpend {
   month: string
   amount: number
@@ -34,6 +39,8 @@ export interface CategoryMonthlyAverage {
   value: number
   /** Latest-quarter monthly average compared with the full selected-period average. */
   comparison: number
+  /** The same figures for the subcategories inside it, biggest first. */
+  children?: CategoryMonthlyAverage[]
 }
 
 /**
@@ -47,23 +54,46 @@ export function averageSpendByCategory(rows: FilteredEntry[], selectedMonths: st
 
   const recentMonthCount = Math.max(1, Math.floor(months.length / 4))
   const recentMonths = new Set(months.slice(-recentMonthCount))
-  const totals = new Map<string, { total: number; recentTotal: number }>()
+  const totals = new Map<string, Aggregate>()
 
   for (const row of rows) {
     if (!isSpendingRow(row)) continue
-    const month = monthKey(row.date)
-    const aggregate = totals.get(categoryOf(row)) ?? { total: 0, recentTotal: 0 }
+    const recent = recentMonths.has(monthKey(row.date))
     const amount = -row.value
-    aggregate.total += amount
-    if (recentMonths.has(month)) aggregate.recentTotal += amount
-    totals.set(categoryOf(row), aggregate)
+    const category = add(totals, categoryOf(row), amount, recent)
+    add(category.children, subcategoryOf(row), amount, recent)
   }
 
-  return [...totals.entries()].map(([category, aggregate]) => {
-    const value = aggregate.total / months.length
-    const recentAverage = aggregate.recentTotal / recentMonthCount
-    return { key: category, label: category, value, comparison: (recentAverage - value) / value }
-  })
+  const averaged = (entries: Map<string, Aggregate>): CategoryMonthlyAverage[] =>
+    [...entries.entries()]
+      .map(([label, aggregate]) => {
+        const value = aggregate.total / months.length
+        const recentAverage = aggregate.recentTotal / recentMonthCount
+        return {
+          key: label,
+          label,
+          value,
+          comparison: (recentAverage - value) / value,
+          children: aggregate.children.size > 0 ? averaged(aggregate.children).sort((left, right) => right.value - left.value) : undefined,
+        }
+      })
+
+  return averaged(totals)
+}
+
+interface Aggregate {
+  total: number
+  recentTotal: number
+  children: Map<string, Aggregate>
+}
+
+/** Adds an amount to a bucket, creating it the first time anything lands there. */
+function add(buckets: Map<string, Aggregate>, key: string, amount: number, recent: boolean): Aggregate {
+  const aggregate = buckets.get(key) ?? { total: 0, recentTotal: 0, children: new Map<string, Aggregate>() }
+  aggregate.total += amount
+  if (recent) aggregate.recentTotal += amount
+  buckets.set(key, aggregate)
+  return aggregate
 }
 
 /** Every row confirmed onto a spending screen, refunds included — their sign undoes them. */
