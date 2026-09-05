@@ -41,7 +41,14 @@
     "vsMonth": "vs. {{month}}",
     "cashFlow": "Fluxo de caixa",
     "netCashFlow": "Líquido",
-    "accountsAndCards": "Por conta e cartão"
+    "accountsAndCards": "Por conta e cartão",
+    "vsYourAverage": "vs. sua média",
+    "runwayFormula": "{{capital}} ÷ {{spending}} por mês",
+    "medianMonth": "Mês mediano",
+    "bestMonth": "Melhor mês",
+    "worstMonth": "Pior mês",
+    "savingsRateMonths_one": "em {{count}} mês com entradas",
+    "savingsRateMonths_other": "em {{count}} meses com entradas"
   },
   "spending": {
     "totalSpent": "Total gasto",

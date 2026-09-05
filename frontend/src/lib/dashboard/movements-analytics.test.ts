@@ -6,8 +6,10 @@ import {
   largestMovements,
   monthlyAverages,
   monthlyFlow,
+  monthlySpread,
   monthsOfRunway,
   savingsRate,
+  savingsRateByMonth,
 } from './movements-analytics'
 
 function entry(overrides: Partial<FilteredEntry>): FilteredEntry {
@@ -60,12 +62,12 @@ describe('what was kept of what arrived', () => {
 
 describe('how long the capital lasts', () => {
   it('divides it by what a month with spending in it spends', () => {
-    expect(monthsOfRunway(3000, [1000, 0, 500])).toBeCloseTo(4)
+    expect(monthsOfRunway(3000, [1000, 0, 500])?.months).toBeCloseTo(4)
   })
 
   it('says nothing when nothing was spent, and never a negative number of months', () => {
     expect(monthsOfRunway(3000, [0, 0])).toBeNull()
-    expect(monthsOfRunway(-500, [100])).toBe(0)
+    expect(monthsOfRunway(-500, [100])?.months).toBe(0)
   })
 })
 
@@ -75,6 +77,30 @@ describe('where money came from', () => {
       entry({ category: 'salário', value: 5000 }),
       entry({ category: 'mercado', value: -300 }),
     ])).toEqual([{ key: 'salário', label: 'salário', value: 5000 }])
+  })
+})
+
+describe('the months an average hides', () => {
+  const flow = monthlyFlow([
+    entry({ date: Date.UTC(2026, 5, 1), value: 1000 }),
+    entry({ date: Date.UTC(2026, 6, 1), value: -400 }),
+    entry({ date: Date.UTC(2026, 7, 1), value: 200 }),
+  ])
+
+  it('reports the middle month, the best and the worst', () => {
+    expect(monthlySpread(flow)).toMatchObject({ median: 200, best: { month: '2026-06' }, worst: { month: '2026-07' } })
+  })
+
+  it('averages the two middle months when there is no middle one', () => {
+    expect(monthlySpread(flow.slice(0, 2)).median).toBe(300)
+  })
+
+  it('says nothing about no months at all', () => {
+    expect(monthlySpread([])).toEqual({ median: 0, best: null, worst: null })
+  })
+
+  it('rates only the months something arrived in, a month without income having no rate', () => {
+    expect(savingsRateByMonth(flow)).toEqual([{ month: '2026-06', rate: 1 }, { month: '2026-08', rate: 1 }])
   })
 })
 

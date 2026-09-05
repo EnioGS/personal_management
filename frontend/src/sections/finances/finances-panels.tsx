@@ -8,7 +8,7 @@ import { CategoryPill } from '@/components/dashboard/category-pill'
 import { DashboardCard } from '@/components/dashboard/dashboard-card'
 import { NestedBarList } from '@/components/dashboard/nested-bar-list'
 import { RankedBarList } from '@/components/dashboard/ranked-bar-list'
-import { StatTile } from '@/components/dashboard/stat-tile'
+import { StatTile, type StatDelta } from '@/components/dashboard/stat-tile'
 import { FilterBar } from '@/components/dashboard/filter-bar'
 import { resolveFilterRange, useDashboardFilters, type DashboardFilters } from '@/components/dashboard/dashboard-filters'
 import { UNLABELLED_LABEL, useDashboardEntries } from '@/components/dashboard/use-dashboard-entries'
@@ -21,8 +21,10 @@ import {
   largestMovements,
   monthlyAverages,
   monthlyFlow,
+  monthlySpread,
   monthsOfRunway,
   savingsRate,
+  savingsRateByMonth,
 } from '@/lib/dashboard/movements-analytics'
 import { averageSpendByCategory, categorySpendChanges, frequentDescriptions, outgoingSpending, spendingByMonth } from './spending-analytics'
 import { FinanceTableDrawer } from './finance-table-drawer'
@@ -82,6 +84,8 @@ export function OverviewPanel() {
   const flow = useMemo(() => monthlyFlow(movements), [movements])
   const averages = useMemo(() => monthlyAverages(flow), [flow])
   const saved = useMemo(() => savingsRate(movements), [movements])
+  const savedByMonth = useMemo(() => savingsRateByMonth(flow), [flow])
+  const spread = useMemo(() => monthlySpread(flow), [flow])
   const runway = useMemo(
     () => monthsOfRunway(capital.current, capitalData.map((point) => point.spending)),
     [capital, capitalData],
@@ -197,13 +201,25 @@ export function OverviewPanel() {
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-1">
               <StatTile
                 label={t('finances:overview.savingsRate')}
-                value={saved === null ? '—' : `${Math.round(saved * 100)}%`}
+                value={saved === null ? '—' : formatRate(saved)}
                 indicatorColor={DOMAIN_COLOR.contributions.light}
+                footnote={savedByMonth.length > 0 ? t('finances:overview.savingsRateMonths', { count: savedByMonth.length }) : undefined}
+                deltas={savingsDelta(saved, savedByMonth, t('finances:overview.vsYourAverage'))}
+                sparkline={savedByMonth.map((month) => month.rate)}
               />
               <StatTile
                 label={t('finances:overview.runway')}
-                value={runway === null ? '—' : t('finances:overview.runwayMonths', { count: Math.round(runway) })}
+                value={runway === null ? '—' : t('finances:overview.runwayMonths', { count: Math.round(runway.months) })}
                 indicatorColor={DOMAIN_COLOR.balance.light}
+                tone={runway === null ? 'default' : runway.months >= COMFORTABLE_RUNWAY ? 'positive' : runway.months < THIN_RUNWAY ? 'negative' : 'default'}
+                footnote={
+                  runway === null
+                    ? undefined
+                    : t('finances:overview.runwayFormula', {
+                        capital: currency.format(Math.max(0, runway.capital)),
+                        spending: currency.format(runway.monthlySpending),
+                      })
+                }
               />
             </div>
           </div>
@@ -233,7 +249,19 @@ export function OverviewPanel() {
               <div className="flex h-full flex-col justify-center gap-3">
                 <AverageLine label={t('finances:overview.arrived')} value={currency.format(averages.incoming)} />
                 <AverageLine label={t('finances:overview.left')} value={currency.format(averages.outgoing)} />
-                <AverageLine label={t('finances:overview.netMonthlyIncome')} value={currency.format(averages.net)} strong />
+                <AverageLine label={t('finances:overview.netCashFlow')} value={currency.format(averages.net)} strong />
+                {/* An average is one month nobody had; these are three that happened. */}
+                <div className="mt-1 flex flex-col gap-3 border-t pt-3">
+                  <AverageLine label={t('finances:overview.medianMonth')} value={currency.format(spread.median)} />
+                  <AverageLine
+                    label={t('finances:overview.bestMonth')}
+                    value={spread.best ? `${currency.format(spread.best.net)}  ·  ${formatMonthLabel(spread.best.month)}` : '—'}
+                  />
+                  <AverageLine
+                    label={t('finances:overview.worstMonth')}
+                    value={spread.worst ? `${currency.format(spread.worst.net)}  ·  ${formatMonthLabel(spread.worst.month)}` : '—'}
+                  />
+                </div>
               </div>
             </DashboardCard>
 
@@ -244,7 +272,7 @@ export function OverviewPanel() {
                 <div className="divide-y">
                   {biggest.map((entry) => (
                     <div key={entry.rowId + entry.date} className="flex items-center justify-between gap-3 px-3 py-2 text-xs">
-                      <span className="text-muted-foreground w-14 shrink-0">{formatDateLabel(entry.date)}</span>
+                      <span className="text-muted-foreground w-20 shrink-0 whitespace-nowrap">{formatDateLabel(entry.date)}</span>
                       <span className="min-w-0 flex-1 truncate" title={entry.description}>{entry.description || entry.category || UNLABELLED_LABEL}</span>
                       <CategoryPill label={entry.category || UNLABELLED_LABEL} />
                       <span className={`w-28 shrink-0 text-right tabular-nums ${entry.value > 0 ? 'text-brand' : ''}`}>
@@ -261,6 +289,31 @@ export function OverviewPanel() {
       </div>
     </div>
   )
+}
+
+/** Six months of outflow covered is the usual advice; under three is the usual warning. */
+const COMFORTABLE_RUNWAY = 6
+const THIN_RUNWAY = 3
+
+const formatRate = (rate: number) => `${Math.round(rate * 100)}%`
+
+/**
+ * How the last month kept up with the period's own rate.
+ *
+ * A rate against a rate is a difference in percentage points, not a percentage of a
+ * percentage — 30% against 20% is ten points better, and calling it "50% more" would be
+ * arithmetic nobody asked for.
+ */
+function savingsDelta(overall: number | null, months: { rate: number }[], label: string): StatDelta[] {
+  const last = months.at(-1)
+  if (overall === null || !last || months.length < 2) return []
+  const points = Math.round((last.rate - overall) * 100)
+  return [{
+    change: `${Math.abs(points)} p.p.`,
+    direction: points === 0 ? 'flat' : points > 0 ? 'up' : 'down',
+    goodDirection: 'up',
+    label,
+  }]
 }
 
 /** One line of the average-month card: what it is, and how much. */

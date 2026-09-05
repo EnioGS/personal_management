@@ -100,8 +100,8 @@ export function accountsWithCards(movements: FilteredEntry[], spending: Filtered
     .sort((left, right) => right.value - left.value)
 }
 
-/** The rows worth looking at first: the largest movements either way, most of them. */
-export function largestMovements(rows: FilteredEntry[], limit = 40): FilteredEntry[] {
+/** The rows worth looking at first: the largest movements either way, deep enough to scroll. */
+export function largestMovements(rows: FilteredEntry[], limit = 400): FilteredEntry[] {
   return [...rows].sort((left, right) => Math.abs(right.value) - Math.abs(left.value)).slice(0, limit)
 }
 
@@ -110,12 +110,45 @@ export function largestMovements(rows: FilteredEntry[], limit = 40): FilteredEnt
  *
  * Null when nothing was spent — dividing by no spending says "forever", which is true and
  * useless — and negative capital answers zero rather than a negative number of months.
+ * The two numbers behind the answer come back with it: a lone "3 months" is unarguable
+ * in a way that "R$ 9.000 ÷ R$ 3.000 a month" is not.
  */
-export function monthsOfRunway(capital: number, spendingByMonth: number[]): number | null {
+export function monthsOfRunway(capital: number, spendingByMonth: number[]): { months: number; capital: number; monthlySpending: number } | null {
   const months = spendingByMonth.filter((month) => month > 0)
   if (months.length === 0) return null
   const average = months.reduce((sum, month) => sum + month, 0) / months.length
-  return Math.max(0, capital) / average
+  return { months: Math.max(0, capital) / average, capital, monthlySpending: average }
+}
+
+/**
+ * What was kept, month by month.
+ *
+ * A month nothing arrived in has no rate — not a rate of zero — so it is left out rather
+ * than drawn as a collapse. The tile's own number still reads the whole period.
+ */
+export function savingsRateByMonth(flow: MonthlyFlow[]): { month: string; rate: number }[] {
+  return flow.filter((month) => month.incoming > 0).map((month) => ({ month: month.month, rate: month.net / month.incoming }))
+}
+
+/**
+ * The months an average hides: the middle one, the best and the worst.
+ *
+ * One holiday month drags a mean away from every month actually lived; the median says
+ * what a normal month was, and the two extremes say how far from normal it gets.
+ */
+export function monthlySpread(flow: MonthlyFlow[]): {
+  median: number
+  best: MonthlyFlow | null
+  worst: MonthlyFlow | null
+} {
+  if (flow.length === 0) return { median: 0, best: null, worst: null }
+  const sorted = [...flow].sort((left, right) => left.net - right.net)
+  const middle = Math.floor(sorted.length / 2)
+  return {
+    median: sorted.length % 2 === 1 ? sorted[middle].net : (sorted[middle - 1].net + sorted[middle].net) / 2,
+    best: sorted.at(-1) ?? null,
+    worst: sorted[0] ?? null,
+  }
 }
 
 /** The average of what a month brought in and what it took out, over the period shown. */
