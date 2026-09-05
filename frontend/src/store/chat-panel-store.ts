@@ -5,7 +5,7 @@ const MIN_PANEL_WIDTH = 260
 /** Maximum panel width (roughly 1/2 viewport on desktop). */
 const MAX_PANEL_WIDTH = 768
 /** Width of the draggable grip on the left of the panel — always visible, even at width 0. */
-const GRIP_WIDTH = 28
+const GRIP_WIDTH = 20
 
 interface ChatPanelState {
   /** Content width in pixels, not counting the grip. 0 = closed, showing only the grip. */

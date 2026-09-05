@@ -107,10 +107,14 @@ export function IngestionPanel() {
   )
   const { marking, setMarking, rowProps } = useMarkMode()
 
-  const confirmedTables = useMemo(
-    () => [...new Set(confirmedRows.map(confirmedTableKey))].sort(),
-    [confirmedRows],
-  )
+  // Every table a screen could hold, whether or not anything is in it yet: a table with
+  // no rows is still where rows for that screen go, and being unable to open it means
+  // being unable to add the first one.
+  const confirmedTables = useMemo(() => {
+    const fromApp = catalogue.screens.map((screen) => `${screen.sectionId}/${screen.id}`)
+    const fromRows = confirmedRows.map(confirmedTableKey)
+    return [...new Set([...fromApp, ...fromRows])].sort()
+  }, [catalogue, confirmedRows])
   const selectedFile = sourceFiles.find((file) => `source:${file.id}` === selected)
   const selectedConfirmed = selected.startsWith('confirmed:') ? selected.slice('confirmed:'.length) : null
 

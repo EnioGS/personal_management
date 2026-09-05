@@ -41,6 +41,7 @@ describe('findTool', () => {
       'list_classification_notes',
       'add_classification_note',
       'delete_classification_note',
+      'set_conversation_title',
     ])
   })
 

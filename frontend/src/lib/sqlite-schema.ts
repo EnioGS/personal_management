@@ -153,6 +153,14 @@ export const SQLITE_SCHEMAS: Record<DataTableKey, SqliteTableSchema> = {
       { column: 'updated_at', key: 'updatedAt', type: 'integer' },
     ],
   },
+  conversations: {
+    sqlName: 'conversations',
+    columns: [
+      { column: 'title', key: 'title', type: 'text' },
+      { column: 'messages', key: 'messages', type: 'json' },
+      { column: 'updated_at', key: 'updatedAt', type: 'integer' },
+    ],
+  },
   assistantPrompts: {
     sqlName: 'assistant_prompts',
     columns: [

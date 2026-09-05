@@ -10,6 +10,15 @@ import { toolsForRequest } from '@/lib/tools/registry'
 import { runConversation, type ConversationStatus } from '@/lib/tools/run-conversation'
 import { toolContext } from '@/lib/tools/tool-context'
 import { modelFactsFor } from '@/lib/model-context-window'
+import { refreshAllLocalStores } from '@/lib/local-store/create-local-list-store'
+import {
+  UNTITLED,
+  deleteConversation,
+  listConversations,
+  readConversation,
+  renameConversation,
+  saveConversation,
+} from '@/lib/chat/conversations'
 import { useChatPanelStore } from './chat-panel-store'
 
 export interface ChatMessage {
@@ -47,11 +56,43 @@ interface ChatState {
   isSending: boolean
   status: ChatStatus
   usage: ChatUsage
+  /** The conversation being written to, or null before its first message is sent. */
+  conversationId: number | null
+  title: string
   sendMessage: (text: string) => Promise<void>
   clearMessages: () => void
+  /** Starts a fresh conversation. Nothing is discarded: the current one is already saved. */
+  newConversation: () => void
+  openConversation: (id: number) => Promise<void>
+  removeConversation: (id: number) => Promise<void>
+  /** Loads the conversation last written to, which is what a reload should come back to. */
+  restoreLastConversation: () => Promise<void>
+  setTitle: (title: string) => Promise<void>
   addAttachment: (attachment: ChatAttachment) => void
   removeAttachment: (id: string) => void
   pushError: (text: string) => void
+}
+
+/**
+ * Names the conversation from what it opened with.
+ *
+ * A separate one-shot request with no tools and no history: the title is for the list on
+ * the user's screen, not something the assistant has to carry in context for the rest of
+ * the conversation. A failure here is silent — an untitled conversation is a small loss,
+ * and refusing to send the actual message over it would be a large one.
+ */
+async function titleFor(connection: AssistantConfig, opening: string): Promise<string | null> {
+  try {
+    const requestFn = connection.provider === 'openai' ? requestOpenAiChatMessage : requestChatMessage
+    const reply = await requestFn(connection.apiKey, connection.model, [
+      { role: 'system', content: 'Name this conversation in at most five words. Reply with the name alone: no quotes, no punctuation at the end, no explanation. Use the language the message is written in.' },
+      { role: 'user', content: opening.slice(0, 500) },
+    ])
+    const title = (reply.content ?? '').trim().replace(/^["']|["']$/g, '').slice(0, 60)
+    return title || null
+  } catch {
+    return null
+  }
 }
 
 /**
@@ -72,11 +113,16 @@ export const useChatStore = create<ChatState>((set, get) => ({
   isSending: false,
   status: { type: 'idle' },
   usage: { lastMessageTokens: 0, lastMessageRounds: 0, sessionTokens: 0, contextTokens: 0, contextWindow: null, sessionCost: null, lastMessageCost: null },
+  conversationId: null,
+  title: UNTITLED,
 
   sendMessage: async (text) => {
     const userMessage: ChatMessage = { id: crypto.randomUUID(), role: 'user', content: text }
     const priorMessages = get().messages
     set({ messages: [...priorMessages, userMessage], isSending: true, status: { type: 'waiting' } })
+    // Saved the moment it is sent, not when the reply lands: a message that cost the user
+    // thought should survive a reply that never arrives.
+    await persist(set, get)
 
     try {
       const connection = activeConnection()
@@ -144,10 +190,17 @@ export const useChatStore = create<ChatState>((set, get) => ({
         model: connection.model,
       }
       set({ messages: [...get().messages, assistantMessage], isSending: false, status: { type: 'idle' } })
+      await persist(set, get)
+      // A conversation nobody has named takes its name from what it opened with, once.
+      if (get().title === UNTITLED) {
+        const named = await titleFor(connection, text)
+        if (named) await get().setTitle(named)
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Something went wrong talking to the assistant.'
       const errorMessage: ChatMessage = { id: crypto.randomUUID(), role: 'assistant', content: message, isError: true }
       set({ messages: [...get().messages, errorMessage], isSending: false, status: { type: 'idle' } })
+      await persist(set, get)
     }
 
     if (useChatPanelStore.getState().panelWidth === 0) useChatPanelStore.getState().markUnread()
@@ -156,9 +209,45 @@ export const useChatStore = create<ChatState>((set, get) => ({
   clearMessages: () => set({
     messages: [],
     attachments: [],
+    conversationId: null,
+    title: UNTITLED,
     // The window survives a cleared conversation; what it cost does not.
     usage: { ...get().usage, lastMessageTokens: 0, lastMessageRounds: 0, sessionTokens: 0, contextTokens: 0, sessionCost: null, lastMessageCost: null },
   }),
+
+  newConversation: () => get().clearMessages(),
+
+  openConversation: async (id) => {
+    const conversation = await readConversation(id)
+    if (!conversation) return
+    set({
+      conversationId: conversation.id,
+      title: conversation.title,
+      messages: conversation.messages,
+      attachments: [],
+      status: { type: 'idle' },
+      usage: { ...get().usage, lastMessageTokens: 0, lastMessageRounds: 0, sessionTokens: 0, contextTokens: 0, sessionCost: null, lastMessageCost: null },
+    })
+  },
+
+  removeConversation: async (id) => {
+    await deleteConversation(id)
+    // Deleting the one on screen leaves a blank conversation rather than someone else's.
+    if (get().conversationId === id) get().clearMessages()
+  },
+
+  restoreLastConversation: async () => {
+    if (get().messages.length > 0) return
+    const [latest] = await listConversations()
+    if (latest) await get().openConversation(latest.id)
+  },
+
+  setTitle: async (title) => {
+    const trimmed = title.trim() || UNTITLED
+    set({ title: trimmed })
+    const id = get().conversationId
+    if (id !== null) await renameConversation(id, trimmed)
+  },
   addAttachment: (attachment) => set({ attachments: [...get().attachments, attachment] }),
   removeAttachment: (id) => set({ attachments: get().attachments.filter((a) => a.id !== id) }),
   pushError: (text) => {
@@ -166,3 +255,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
     set({ messages: [...get().messages, errorMessage] })
   },
 }))
+
+/** Writes the conversation as it now stands, remembering the id a first save mints. */
+async function persist(set: (partial: Partial<ChatState>) => void, get: () => ChatState) {
+  const { conversationId, title, messages } = get()
+  const id = await saveConversation(conversationId, { title, messages })
+  if (id !== conversationId) set({ conversationId: id })
+  await refreshAllLocalStores()
+}

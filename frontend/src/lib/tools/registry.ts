@@ -2,6 +2,7 @@ import type { OpenRouterTool } from '@/lib/openrouter'
 import { applyLabelRulesTool, deleteLabelRuleTool, listLabelRulesTool, saveLabelRuleTool } from './label-rule-tools'
 import { readCsvTool } from './read-csv'
 import { readIngestionGuideTool } from './guide-tool'
+import { setConversationTitleTool } from './conversation-tools'
 import { addClassificationNoteTool, deleteClassificationNoteTool, listClassificationNotesTool } from './note-tools'
 import { readTextFileTool } from './read-text-file'
 import { addAccountTool, addCardTool, listAccountsAndCardsTool } from './settings-tools'
@@ -60,6 +61,7 @@ export const toolRegistry: ToolDefinition[] = [
   listClassificationNotesTool,
   addClassificationNoteTool,
   deleteClassificationNoteTool,
+  setConversationTitleTool,
 ]
 
 export function findTool(name: string): ToolDefinition | undefined {

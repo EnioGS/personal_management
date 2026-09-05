@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, type ChangeEvent, type DragEvent, type PointerEvent } from 'react'
-import { GripVertical, Hourglass, Paperclip, SendHorizontal, Trash2, X } from 'lucide-react'
+import { GripVertical, Hourglass, Paperclip, SendHorizontal, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { MessageContent } from './message-content'
+import { ConversationBar } from './conversation-bar'
 import { readAttachedFile } from '@/lib/chat-attachments'
 import { cn } from '@/lib/utils'
 import { GRIP_WIDTH, MAX_PANEL_WIDTH, useChatPanelStore } from '@/store/chat-panel-store'
@@ -30,7 +31,7 @@ export function ChatPanel() {
   const isSending = useChatStore((s) => s.isSending)
   const status = useChatStore((s) => s.status)
   const sendMessage = useChatStore((s) => s.sendMessage)
-  const clearMessages = useChatStore((s) => s.clearMessages)
+  const restoreLastConversation = useChatStore((s) => s.restoreLastConversation)
   const attachments = useChatStore((s) => s.attachments)
   const addAttachment = useChatStore((s) => s.addAttachment)
   const removeAttachment = useChatStore((s) => s.removeAttachment)
@@ -40,6 +41,12 @@ export function ChatPanel() {
   const [draft, setDraft] = useState('')
   /** Anything typed hands the composer the whole width until it is sent or cleared. */
   const isComposing = draft.trim().length > 0
+  /**
+   * True once the message no longer fits on one line. Send then leaves the row entirely
+   * — it becomes a round button outside the panel — and the composer takes the full
+   * width, which is what a message long enough to wrap actually needs.
+   */
+  const [isOverflowing, setIsOverflowing] = useState(false)
   const [dragOffset, setDragOffset] = useState<number | null>(null)
   const [isDraggingFileOver, setIsDraggingFileOver] = useState(false)
   const dragStartX = useRef(0)
@@ -61,8 +68,10 @@ export function ChatPanel() {
 
     // Reset before measuring so deleting text immediately shrinks the composer again.
     composer.style.height = 'auto'
-    composer.style.height = `${Math.min(composer.scrollHeight, maxHeight)}px`
-    composer.style.overflowY = composer.scrollHeight > maxHeight ? 'auto' : 'hidden'
+    const wanted = composer.scrollHeight
+    composer.style.height = `${Math.min(wanted, maxHeight)}px`
+    composer.style.overflowY = wanted > maxHeight ? 'auto' : 'hidden'
+    setIsOverflowing(wanted > lineHeight + verticalPadding + verticalBorder + 1)
   }
 
   useEffect(() => {
@@ -78,6 +87,12 @@ export function ChatPanel() {
   useEffect(() => {
     resizeComposer()
   }, [draft])
+
+  // The conversation comes back by itself: nothing was ever saved by hand, so nothing
+  // should have to be reopened by hand either.
+  useEffect(() => {
+    void restoreLastConversation()
+  }, [restoreLastConversation])
 
   // The panel is mounted while closed, where the composer is a few pixels wide and
   // its placeholder wraps into many lines — measuring there would open the panel with
@@ -187,6 +202,26 @@ export function ChatPanel() {
       )}
       style={{ width: GRIP_WIDTH + liveWidth }}
     >
+      {/* Outside the panel, and staying there: a message written into a panel that is
+          then closed still has somewhere to go, faded but present, and sending it brings
+          the button home. */}
+      <button
+        type="button"
+        aria-label={t('panel.send')}
+        title={t('panel.send')}
+        onClick={submitDraft}
+        className={cn(
+          'bg-primary text-primary-foreground pointer-events-auto absolute bottom-4 left-0 z-20 flex size-10 items-center justify-center rounded-full shadow-lg',
+          'transition-[opacity,transform,scale] duration-200 ease-out',
+          isOverflowing || (panelWidth === 0 && isComposing)
+            ? 'scale-100 opacity-100'
+            : 'pointer-events-none scale-50 opacity-0',
+          panelWidth === 0 && 'opacity-60',
+        )}
+      >
+        <SendHorizontal className="size-4" />
+      </button>
+
       <div
         role="button"
         tabIndex={0}
@@ -202,7 +237,7 @@ export function ChatPanel() {
           togglePanel()
         }}
         className={cn(
-          'pointer-events-auto absolute top-1/2 left-0 z-10 flex h-32 w-7 -translate-y-1/2 cursor-grab touch-none items-center justify-center rounded-l-md border border-r-0 select-none active:cursor-grabbing',
+          'pointer-events-auto absolute top-1/2 left-0 z-10 flex h-8 w-5 -translate-y-1/2 cursor-grab touch-none items-center justify-center rounded-l-md border border-r-0 select-none active:cursor-grabbing',
           hasUnread ? 'bg-brand' : 'bg-border',
         )}
       >
@@ -210,7 +245,7 @@ export function ChatPanel() {
       </div>
 
       <div
-        className="pointer-events-auto relative ml-7 flex h-full min-w-0 flex-1 flex-col border-l bg-sidebar shadow-lg"
+        className="pointer-events-auto relative ml-5 flex h-full min-w-0 flex-1 flex-col border-l bg-sidebar shadow-lg"
         onClick={markInteracted}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
@@ -221,6 +256,8 @@ export function ChatPanel() {
             {t('panel.dropHint')}
           </div>
         )}
+
+        <ConversationBar />
 
         <div ref={scrollAreaRef} className="min-h-0 flex-1">
           <ScrollArea className="h-full">
@@ -314,67 +351,55 @@ export function ChatPanel() {
           <input
             ref={fileInputRef}
             type="file"
-            accept=".txt,.md"
+            accept=".txt,.md,.csv"
             multiple
             className="hidden"
             onChange={handleFileInputChange}
           />
-          {/* Attaching and clearing belong to an empty composer: once there is a
-              message being written, the width is worth more than two buttons that
-              are not part of writing it. Files can still be dragged onto the panel. */}
-          {!isComposing && (
-            <>
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                aria-label={t('panel.attachButton')}
-                onClick={() => fileInputRef.current?.click()}
-                className="shrink-0"
-              >
-                <Paperclip className="size-4" />
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                aria-label={t('panel.clearHistory')}
-                disabled={messages.length === 0}
-                onClick={() => clearMessages()}
-                className="shrink-0"
-              >
-                <Trash2 className="size-4" />
-              </Button>
-            </>
+          {/* Send sits at the left of the row until the message outgrows one line, and
+              then leaves the row altogether — see the floating button below, which is the
+              same action in the place a wrapped message leaves for it. */}
+          {!isOverflowing && (
+            <Button
+              type="submit"
+              disabled={!draft.trim() || isSending}
+              size={isComposing ? 'icon' : 'default'}
+              aria-label={t('panel.send')}
+              title={t('panel.send')}
+              className="shrink-0"
+            >
+              {isComposing ? <SendHorizontal className="size-4" /> : t('panel.send')}
+            </Button>
           )}
-          <Textarea
-            ref={composerRef}
-            rows={1}
-            placeholder={t('panel.inputPlaceholder')}
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault()
-                submitDraft()
-              }
-            }}
-            disabled={isSending}
-            className="[field-sizing:fixed] min-h-0 resize-none overflow-y-hidden leading-5"
-          />
-          {/* Send cannot go away, so it gives its width back instead: the label at
-              rest, where it is the affordance that says what this box does, and an
-              icon square once there is something to send. */}
-          <Button
-            type="submit"
-            disabled={!draft.trim() || isSending}
-            size={isComposing ? 'icon' : 'default'}
-            aria-label={t('panel.send')}
-            title={t('panel.send')}
-            className="shrink-0"
-          >
-            {isComposing ? <SendHorizontal className="size-4" /> : t('panel.send')}
-          </Button>
+
+          {/* The clip lives inside the box it acts on, in the placeholder's own colour:
+              attaching a file is part of writing the message, not a control beside it. */}
+          <div className="relative min-w-0 flex-1">
+            <Textarea
+              ref={composerRef}
+              rows={1}
+              placeholder={t('panel.inputPlaceholder')}
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault()
+                  submitDraft()
+                }
+              }}
+              disabled={isSending}
+              className="[field-sizing:fixed] min-h-0 resize-none overflow-y-hidden pr-9 leading-5"
+            />
+            <button
+              type="button"
+              aria-label={t('panel.attachButton')}
+              title={t('panel.attachButton')}
+              onClick={() => fileInputRef.current?.click()}
+              className="text-muted-foreground hover:text-foreground absolute right-2 bottom-1.5 rounded-sm p-0.5"
+            >
+              <Paperclip className="size-4" />
+            </button>
+          </div>
         </form>
       </div>
     </div>

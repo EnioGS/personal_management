@@ -15,6 +15,10 @@
     "usageContext": "context {{tokens}} / {{window}} ({{percent}}%)",
     "usageContextUnknown": "context {{tokens}} tokens — window unknown for this model",
     "usageCost": "{{cost}} spent",
-    "usageCostLast": "last message: {{cost}}"
+    "usageCostLast": "last message: {{cost}}",
+    "newConversation": "New conversation",
+    "conversations": "Conversations",
+    "noConversations": "Nothing here yet.",
+    "deleteConversation": "Delete this conversation"
   }
 }
