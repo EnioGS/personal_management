@@ -165,6 +165,15 @@ export const SQLITE_SCHEMAS: Record<DataTableKey, SqliteTableSchema> = {
       { column: 'updated_at', key: 'updatedAt', type: 'integer' },
     ],
   },
+  usageTotals: {
+    sqlName: 'usage_totals',
+    columns: [
+      { column: 'tokens', key: 'tokens', type: 'integer' },
+      { column: 'requests', key: 'requests', type: 'integer' },
+      { column: 'cost', key: 'cost', type: 'real' },
+      { column: 'messages', key: 'messages', type: 'integer' },
+    ],
+  },
   assistantPrompts: {
     sqlName: 'assistant_prompts',
     columns: [

@@ -20,6 +20,10 @@
     "conversations": "Conversas",
     "noConversations": "Nada aqui ainda.",
     "deleteConversation": "Excluir esta conversa",
-    "queued": "{{count}} na fila"
+    "queued": "{{count}} na fila",
+    "spending": "Quanto isto custou",
+    "spendingDescription": "Tokens e custo por conversa.",
+    "spendingSaved": "Conversas guardadas",
+    "spendingEver": "Desde o início ({{messages}} mensagens, {{requests}} requisições)"
   }
 }

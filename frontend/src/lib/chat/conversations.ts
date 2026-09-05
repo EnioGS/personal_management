@@ -5,11 +5,23 @@ import { conversationsTable } from './conversations-db'
 /** What a conversation is called before anyone — or the assistant — has named it. */
 export const UNTITLED = 'untitled'
 
+/** What a conversation cost, kept with it so reopening one continues its own count. */
+export interface ConversationUsage {
+  tokens: number
+  requests: number
+  cost: number | null
+  /** The prompt size of its last request: what the next one would start from. */
+  contextTokens: number
+  contextWindow: number | null
+  model?: string
+}
+
 export interface Conversation {
   title: string
   messages: ChatMessage[]
   /** When the last message was written, which is what "the last conversation" means. */
   updatedAt: number
+  usage?: ConversationUsage
 }
 
 export type StoredConversation = Conversation & { id: number }

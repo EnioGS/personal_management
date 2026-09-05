@@ -6,7 +6,7 @@ import { buildSqliteFile, looksLikeSqlite, parseSqliteFile } from './sqlite-expo
 
 function exportFile(): DataExportFile {
   const empty = {
-    accounts: [], cards: [], budgets: [], allocationTargets: [], labelRules: [], classificationNotes: [], conversations: [],
+    accounts: [], cards: [], budgets: [], allocationTargets: [], labelRules: [], classificationNotes: [], conversations: [], usageTotals: [],
     ingestionAuditEvents: [], notes: [], assistantPrompts: [], assistantConfig: [], preferences: [],
   }
   return {

@@ -286,9 +286,14 @@ Two things it optimizes for:
   under the pointer so a list of names does not read as a list of delete buttons. A
   conversation names itself from its opening message through a one-shot request the
   assistant never carries in context, and renames on request (`set_conversation_title`).
-- The chat reports what it costs: tokens for the last message and the requests it
-  took, the session total, and how full the model's context window is when that
-  window can be looked up.
+- The chat reports what it costs: tokens for the last message and the requests it took,
+  the conversation's total, and how full the model's context window is when that window
+  can be looked up. That total is **saved with the conversation**, so reopening one
+  continues its own count rather than claiming it cost nothing, and the coins icon in the
+  chat's bar lists every conversation's tokens and cost with two sums under it — what the
+  conversations still here have cost, and what has been spent since the beginning, which
+  keeps counting for conversations that were deleted, because deleting one does not
+  unspend it. Both travel in the export.
 - Chart colors open on the brand's own hue, then the dataviz skill's
   remaining validated hues (adr/0024) — never a generated or cycled color
   past that fixed set, per the skill's accessibility rule. A color follows

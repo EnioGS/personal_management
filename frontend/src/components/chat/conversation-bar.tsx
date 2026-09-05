@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
-import { History, MessageSquarePlus, Trash2 } from 'lucide-react'
+import { Coins, History, MessageSquarePlus, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { listConversations, type StoredConversation } from '@/lib/chat/conversations'
+import { readUsageTotals, type UsageTotals } from '@/lib/chat/usage-ledger'
 import { useChatStore } from '@/store/chat-store'
 import { cn } from '@/lib/utils'
 
@@ -23,9 +24,15 @@ export function ConversationBar() {
   const openConversation = useChatStore((store) => store.openConversation)
   const removeConversation = useChatStore((store) => store.removeConversation)
   const [conversations, setConversations] = useState<StoredConversation[]>([])
+  const [totals, setTotals] = useState<UsageTotals | null>(null)
 
   const refresh = useCallback(async () => {
     setConversations(await listConversations())
+  }, [])
+
+  const refreshTotals = useCallback(async () => {
+    setConversations(await listConversations())
+    setTotals(await readUsageTotals())
   }, [])
 
   // Opened, not watched: the list is read when it is asked for, and again after a
@@ -44,6 +51,49 @@ export function ConversationBar() {
       >
         <MessageSquarePlus className="size-4" />
       </Button>
+
+      <DropdownMenu onOpenChange={(open) => { if (open) void refreshTotals() }}>
+        <DropdownMenuTrigger asChild>
+          <Button type="button" variant="ghost" aria-label={t('panel.spending')} title={t('panel.spending')} className="size-9 p-0">
+            <Coins className="size-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="max-h-80 w-80 overflow-auto p-2 text-xs">
+          <p className="text-muted-foreground mb-2">{t('panel.spendingDescription')}</p>
+          {conversations.length === 0 ? (
+            <p className="text-muted-foreground">{t('panel.noConversations')}</p>
+          ) : (
+            <div className="divide-y">
+              {conversations.map((conversation) => (
+                <div key={conversation.id} className="flex items-baseline justify-between gap-3 py-1.5">
+                  <span className="min-w-0 truncate">{conversation.title}</span>
+                  <span className="text-muted-foreground shrink-0 tabular-nums">
+                    {`${(conversation.usage?.tokens ?? 0).toLocaleString()} · ${formatCost(conversation.usage?.cost ?? 0)}`}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Two totals, because they answer different questions: what the conversations
+              still here have cost, and what has been spent altogether — the second keeps
+              counting what deleted conversations spent, since deleting one does not
+              unspend it. */}
+          <div className="mt-2 flex items-baseline justify-between gap-3 border-t pt-2 font-medium">
+            <span>{t('panel.spendingSaved')}</span>
+            <span className="tabular-nums">
+              {`${conversations.reduce((sum, one) => sum + (one.usage?.tokens ?? 0), 0).toLocaleString()} · `}
+              {formatCost(conversations.reduce((sum, one) => sum + (one.usage?.cost ?? 0), 0))}
+            </span>
+          </div>
+          {totals && (
+            <div className="text-muted-foreground flex items-baseline justify-between gap-3 pt-1">
+              <span>{t('panel.spendingEver', { messages: totals.messages, requests: totals.requests })}</span>
+              <span className="tabular-nums">{`${totals.tokens.toLocaleString()} · ${formatCost(totals.cost)}`}</span>
+            </div>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
 
       <DropdownMenu onOpenChange={(open) => { if (open) void refresh() }}>
         <DropdownMenuTrigger asChild>
@@ -86,4 +136,13 @@ export function ConversationBar() {
       </DropdownMenu>
     </div>
   )
+}
+
+/**
+ * Model prices run to millionths of a dollar a token, so a conversation can genuinely
+ * cost a fraction of a cent — four decimals until it is worth rounding, since "$0.00"
+ * would say the wrong thing about a number that is not zero.
+ */
+function formatCost(cost: number): string {
+  return cost >= 0.01 ? `$${cost.toFixed(2)}` : `$${cost.toFixed(4)}`
 }

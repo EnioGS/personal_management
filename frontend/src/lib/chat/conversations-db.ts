@@ -10,8 +10,19 @@ import type { LocalRow } from '@/lib/local-store/create-local-table'
  */
 const db = new Dexie('app-chat-db') as Dexie & {
   conversations: EntityTable<LocalRow, 'id'>
+  usageTotals: EntityTable<LocalRow, 'id'>
 }
 
 db.version(1).stores({ conversations: '++id, createdAt' })
 
+/**
+ * What every request has cost, kept apart from the conversations.
+ *
+ * A conversation carries its own usage, but deleting one would take the record of what it
+ * spent with it — and money spent is not undone by deleting the evidence. This is the
+ * running total since the beginning, which nothing but wiping the vault resets.
+ */
+db.version(2).stores({ usageTotals: '++id, createdAt' })
+
 export const conversationsTable = db.conversations
+export const usageTotalsTable = db.usageTotals

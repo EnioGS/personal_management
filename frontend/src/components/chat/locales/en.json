@@ -20,6 +20,10 @@
     "conversations": "Conversations",
     "noConversations": "Nothing here yet.",
     "deleteConversation": "Delete this conversation",
-    "queued": "{{count}} queued"
+    "queued": "{{count}} queued",
+    "spending": "What this has cost",
+    "spendingDescription": "Tokens and cost per conversation.",
+    "spendingSaved": "Conversations kept",
+    "spendingEver": "Since the beginning ({{messages}} messages, {{requests}} requests)"
   }
 }

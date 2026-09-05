@@ -43,6 +43,7 @@ function emptyTables(): DataExportFile['tables'] {
     ingestionAuditEvents: [],
     notes: [],
     conversations: [],
+    usageTotals: [],
     assistantPrompts: [],
     assistantConfig: [],
     preferences: [],

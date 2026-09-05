@@ -11,6 +11,7 @@ import { runConversation, type ConversationStatus } from '@/lib/tools/run-conver
 import { toolContext } from '@/lib/tools/tool-context'
 import { modelFactsFor } from '@/lib/model-context-window'
 import { refreshAllLocalStores } from '@/lib/local-store/create-local-list-store'
+import { recordUsage } from '@/lib/chat/usage-ledger'
 import {
   UNTITLED,
   deleteConversation,
@@ -198,6 +199,10 @@ export const useChatStore = create<ChatState>((set, get) => {
       }
       set({ messages: [...get().messages, assistantMessage], isSending: false, status: { type: 'idle' } })
       await persist(set, get)
+      // Counted once the exchange is over, and kept where deleting the conversation
+      // cannot reach: what was spent was spent.
+      const spent = get().usage
+      await recordUsage({ tokens: spent.lastMessageTokens, requests: spent.lastMessageRounds, cost: spent.lastMessageCost })
       // A conversation nobody has named takes its name from what it opened with, once.
       if (get().title === UNTITLED) {
         const named = await titleFor(connection, texts[0])
@@ -269,7 +274,19 @@ export const useChatStore = create<ChatState>((set, get) => {
       attachments: [],
       queued: [],
       status: { type: 'idle' },
-      usage: { ...get().usage, lastMessageTokens: 0, lastMessageRounds: 0, sessionTokens: 0, contextTokens: 0, sessionCost: null, lastMessageCost: null },
+      // Its own totals come back with it; what the last message cost does not, because
+      // that message was sent in another sitting.
+      usage: {
+        ...get().usage,
+        lastMessageTokens: 0,
+        lastMessageRounds: 0,
+        lastMessageCost: null,
+        sessionTokens: conversation.usage?.tokens ?? 0,
+        sessionCost: conversation.usage?.cost ?? null,
+        contextTokens: conversation.usage?.contextTokens ?? 0,
+        contextWindow: conversation.usage?.contextWindow ?? get().usage.contextWindow,
+        model: conversation.usage?.model ?? get().usage.model,
+      },
     })
   },
 
@@ -302,8 +319,21 @@ export const useChatStore = create<ChatState>((set, get) => {
 
 /** Writes the conversation as it now stands, remembering the id a first save mints. */
 async function persist(set: (partial: Partial<ChatState>) => void, get: () => ChatState) {
-  const { conversationId, title, messages } = get()
-  const id = await saveConversation(conversationId, { title, messages })
+  const { conversationId, title, messages, usage } = get()
+  const id = await saveConversation(conversationId, {
+    title,
+    messages,
+    // What it has cost so far travels with it: a conversation reopened tomorrow should
+    // not claim to have cost nothing.
+    usage: {
+      tokens: usage.sessionTokens,
+      requests: usage.lastMessageRounds,
+      cost: usage.sessionCost,
+      contextTokens: usage.contextTokens,
+      contextWindow: usage.contextWindow,
+      model: usage.model,
+    },
+  })
   if (id !== conversationId) set({ conversationId: id })
   await refreshAllLocalStores()
 }
