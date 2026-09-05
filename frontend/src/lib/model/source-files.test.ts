@@ -179,6 +179,46 @@ describe('confirming', () => {
   })
 })
 
+describe('text that is not a .csv', () => {
+  beforeEach(async () => { await wipeAllData() })
+
+  it('reads a markdown pipe table as the table it is', async () => {
+    const sourceId = await createSourceFile('extrato.md', [
+      '| Data | Valor |',
+      '| --- | --- |',
+      '| 01/08/2026 | -10,00 |',
+    ].join('\n'))
+
+    const file = (await sourceFilesTable.get(sourceId))!.data as SourceFile
+    expect(file.originalColumns).toEqual(['Data', 'Valor'])
+    expect((await rowsOf(sourceId))[0].row.values).toMatchObject({ Data: '01/08/2026', Valor: '-10,00' })
+  })
+
+  it('detects the separator rather than demanding a comma', async () => {
+    const sourceId = await createSourceFile('extrato.txt', 'Data;Valor\n01/08/2026;-10,00')
+
+    expect(((await sourceFilesTable.get(sourceId))!.data as SourceFile).originalColumns).toEqual(['Data', 'Valor'])
+  })
+
+  it('refuses text with nothing that reads as a header', async () => {
+    await expect(createSourceFile('notes.md', '   ')).rejects.toThrow(/header row/)
+  })
+})
+
+describe('a file with nothing left in it', () => {
+  beforeEach(async () => { await wipeAllData() })
+
+  it('is retired once its last row has been confirmed', async () => {
+    const sourceId = await createSourceFile('one-row.csv', 'Data,Valor\n01/08/2026,-10')
+    await assignSourceColumns(sourceId, { Data: 'date', Valor: 'amount' })
+    const [only] = await rowsOf(sourceId)
+    await label(only.id, { sections: ['finances'], screens: ['overview'], category: 'outros', subcategory: 'outros' })
+
+    expect(await confirmSourceRows(sourceId, catalogue)).toMatchObject({ confirmed: 1, removedFile: true })
+    expect(await sourceFilesTable.count()).toBe(0)
+  })
+})
+
 describe('what counts as a duplicate', () => {
   beforeEach(async () => { await wipeAllData() })
 

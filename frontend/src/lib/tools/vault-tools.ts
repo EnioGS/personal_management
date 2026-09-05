@@ -5,11 +5,13 @@ import { DEFAULT_MEANING, ingestionLabelErrors } from '@/lib/model/ingestion'
 import { parsePlacementLabels, resolveScreenLabel, resolveSectionLabel, withDerivedSections } from '@/lib/model/label-catalogue'
 import { confirmedRowsTable, sourceFilesTable, sourceRowsTable } from '@/lib/model/model-db'
 import { newRowId } from '@/lib/model/row-id'
+import { applyLabelRulesToRows } from '@/lib/model/label-rules-repository'
 import {
   ASSIGNABLE_FIELDS,
   amountShapeOf,
   assignSourceColumns,
   confirmSourceRows,
+  createSourceFile,
   planConfirmation,
   setSignConvention,
 } from '@/lib/model/source-files'
@@ -28,6 +30,43 @@ export const queryVaultTool: ToolDefinition = {
       return JSON.stringify(await queryVault(args.statement))
     } catch (error) { return `Error: ${error instanceof Error ? error.message : 'that query could not run.'}` }
   },
+}
+
+export const importAsSourceFileTool: ToolDefinition = {
+  name: 'import_as_source_file',
+  description: "Turns text into a new source file, exactly as if it had been dropped on the ingestion centre — it appears in the file list and is worked on the same way. Use it for data that arrives as text rather than as a CSV upload: a .txt or .md the user attached, a table pasted into the message, a statement copied out of a PDF. Pass the text with a header row; commas, semicolons and tabs are all detected, and a markdown pipe table is read as a table. Give it a filename that says where the data came from, since that filename is stamped on every row and is what duplicate checking compares. Nothing is confirmed by this: the rows arrive unlabelled, standing source rules run over them, and the ordinary flow follows.",
+  parameters: {
+    type: 'object',
+    properties: {
+      filename: { type: 'string', description: 'What to call it, e.g. "nubank-2026-09.csv". A name that says where it came from.' },
+      content: { type: 'string', description: 'The text itself: a header row and the rows under it.' },
+    },
+    required: ['filename', 'content'],
+    additionalProperties: false,
+  },
+  execute: async (args, context) => {
+    if (typeof args.filename !== 'string' || !args.filename.trim()) return 'Error: a filename is required — every row is stamped with it.'
+    if (typeof args.content !== 'string' || !args.content.trim()) return 'Error: content is required.'
+    try {
+      const sourceId = await createSourceFile(args.filename.trim(), args.content)
+      const file = await sourceFileById(sourceId)
+      const applied = await applyLabelRulesToRows('source', context.translate)
+      const rows = (await sourceRowsTable.toArray()).filter((row) => (row.data as SourceRow).sourceId === sourceId).length
+      return JSON.stringify({
+        sourceId,
+        filename: file?.originalFilename,
+        columns: file?.originalColumns,
+        rows,
+        labelledByRules: applied.rowsTouched,
+        looksLikeSourceId: file?.looksLikeSourceId ?? null,
+      })
+    } catch (error) { return `Error: ${error instanceof Error ? error.message : 'that text could not be read as a table.'}` }
+  },
+}
+
+async function sourceFileById(sourceId: number): Promise<SourceFile | undefined> {
+  const stored = await sourceFilesTable.get(sourceId)
+  return stored?.data as SourceFile | undefined
 }
 
 export const assignSourceColumnsTool: ToolDefinition = {

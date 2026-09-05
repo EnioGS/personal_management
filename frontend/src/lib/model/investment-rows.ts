@@ -23,7 +23,7 @@ export function asTransaction(row: ConfirmedRow): Transaction {
   const amount = typeof row.amount === 'number' ? Math.abs(row.amount) : 0
   const price = typeof row.price === 'number' ? Math.abs(row.price) : quantity > 0 ? amount / quantity : amount
   return {
-    date: typeof row.date === 'number' ? row.date : 0,
+    date: Number.isFinite(row.date) ? (row.date as number) : 0,
     asset: row.asset ?? row.category,
     type: investmentKind(row),
     quantity: quantity > 0 ? quantity : amount > 0 && price > 0 ? amount / price : 0,

@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent, type ReactNode, type UIEvent } from 'react'
 import { useTranslation } from 'react-i18next'
-import { FilePlus2, Trash2, Upload } from 'lucide-react'
+import { CircleSlash2, FilePlus2, Trash2, Upload } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -118,18 +118,28 @@ export function IngestionPanel() {
   )
 
   async function importFiles(files: File[]) {
-    const csvFiles = files.filter((file) => file.name.toLowerCase().endsWith('.csv'))
-    if (csvFiles.length === 0) { setMessage('Only .csv files can be imported here.'); return }
+    // A table is a table whatever the extension says: a .txt of semicolon-separated rows
+    // and a .md holding a pipe table are both read here.
+    const readable = files.filter((file) => /\.(csv|txt|md)$/i.test(file.name))
+    if (readable.length === 0) { setMessage('Import a .csv, .txt or .md file — anything holding a header row and rows under it.'); return }
     let firstId: number | null = null
-    for (const file of csvFiles) {
-      const id = await createSourceFile(file.name, await file.text())
-      firstId ??= id
+    const failed: string[] = []
+    for (const file of readable) {
+      try {
+        const id = await createSourceFile(file.name, await file.text())
+        firstId ??= id
+      } catch (error) {
+        failed.push(`${file.name}: ${error instanceof Error ? error.message : 'could not be read'}`)
+      }
     }
     // Source rules run at upload, which is what lets a file land already labelled.
     const applied = await applyLabelRulesToRows('source', (key) => String(t(key as never)))
     await refreshAllLocalStores()
     if (firstId !== null) setSelected(`source:${firstId}`)
-    setMessage(`Imported ${csvFiles.length} file(s); ${applied.rowsTouched} row(s) labelled by standing rules.`)
+    setMessage([
+      `Imported ${readable.length - failed.length} file(s); ${applied.rowsTouched} row(s) labelled by standing rules.`,
+      ...failed,
+    ].join(' '))
   }
 
   function handleFileInput(event: ChangeEvent<HTMLInputElement>) {
@@ -252,24 +262,11 @@ export function IngestionPanel() {
           </SelectContent>
         </Select>
 
-        <input ref={fileInput} type="file" accept=".csv" multiple className="hidden" onChange={handleFileInput} />
+        <input ref={fileInput} type="file" accept=".csv,.txt,.md" multiple className="hidden" onChange={handleFileInput} />
         <Button type="button" size="xs" variant="outline" onClick={() => fileInput.current?.click()}>
-          <Upload className="mr-1 size-3.5" /> Import a CSV
+          <Upload className="mr-1 size-3.5" /> Import a file
         </Button>
 
-        <label className="flex items-center gap-1.5 text-xs" data-mark-toggle>
-          <input type="checkbox" checked={marking} onChange={(event) => setMarking(event.target.checked)} />
-          Mark for elimination
-        </label>
-        <Button
-          type="button"
-          size="xs"
-          variant="ghost"
-          className="text-destructive"
-          onClick={() => void removeMarked(selectedFile ? 'source' : 'confirmed')}
-        >
-          <Trash2 className="mr-1 size-3.5" /> Delete marked lines
-        </Button>
       </div>
 
       {selectedFile && (
@@ -292,13 +289,6 @@ export function IngestionPanel() {
               {`(${amountShape.shape.min} … ${amountShape.shape.max})`}
             </span>
           )}
-          <span className="grow" />
-          <Button type="button" size="xs" onClick={() => void confirm(false)}>
-            <FilePlus2 className="mr-1 size-3.5" /> Import new values
-          </Button>
-          <Button type="button" size="xs" variant="destructive" onClick={() => void confirm(true)}>
-            Import and discard
-          </Button>
         </div>
       )}
 
@@ -311,39 +301,61 @@ export function IngestionPanel() {
       {message && <p className="bg-muted rounded-md p-2 text-xs">{message}</p>}
 
       {selectedFile && (
-        <div className="min-h-0 flex-1 overflow-auto rounded-md border" onScroll={sourceWindow.onScroll}>
+        <TableFrame
+          marking={marking}
+          onToggleMarking={() => setMarking(!marking)}
+          onDeleteMarked={() => void removeMarked('source')}
+          markedCount={fileRows.filter((row) => row.markedForElimination).length}
+          summary={`${sourceWindow.shown} of ${sourceWindow.total} row(s)`}
+          onScroll={sourceWindow.onScroll}
+          actions={
+            <>
+              <Button type="button" size="xs" variant="outline" onClick={() => void confirm(false)}>
+                <FilePlus2 className="mr-1 size-3.5" /> Import new values
+              </Button>
+              <Button type="button" size="xs" variant="outline" onClick={() => void confirm(true)}>
+                Import and discard
+              </Button>
+            </>
+          }
+        >
           <table className="w-full text-xs">
             <thead className="bg-muted/60 sticky top-0">
+              {/* Assignment sits on a line of its own above the names: it is a statement
+                  about the column, not part of what the column is called. */}
+              <tr>
+                <th colSpan={3} className="px-2 pt-2" />
+                {selectedFile.originalColumns.map((column) => (
+                  <th key={column} className="px-2 pt-2 text-left font-normal">
+                    <Select value={selectedFile.assignments[column] ?? UNASSIGNED} onValueChange={(value) => void assign(column, value)}>
+                      <SelectTrigger className="h-6 w-36 text-[10px]"><SelectValue /></SelectTrigger>
+                      <SelectContent className="text-xs">
+                        <SelectItem value={UNASSIGNED}>— unassigned —</SelectItem>
+                        {ASSIGNABLE_FIELDS.map((field) => <SelectItem key={field} value={field}>{field}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </th>
+                ))}
+                <th colSpan={LABEL_COLUMNS.length} className="px-2 pt-2" />
+              </tr>
               <tr>
                 <th className="p-2 text-left font-medium">{SOURCE_FILENAME_COLUMN}</th>
                 <th className="p-2 text-left font-medium">row_id</th>
                 <th className="p-2 text-left font-medium">duplicate?</th>
                 {selectedFile.originalColumns.map((column) => (
                   <th key={column} className="p-2 text-left font-medium">
-                    <div className="flex flex-col gap-1">
-                      <Select value={selectedFile.assignments[column] ?? UNASSIGNED} onValueChange={(value) => void assign(column, value)}>
-                        <SelectTrigger className="h-6 w-36 text-[10px]"><SelectValue /></SelectTrigger>
-                        <SelectContent className="text-xs">
-                          <SelectItem value={UNASSIGNED}>— observations —</SelectItem>
-                          {ASSIGNABLE_FIELDS.map((field) => <SelectItem key={field} value={field}>{field}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                      <span className="flex items-center gap-1">
-                        {column}
-                        <ColumnSortMenu field={column} label={column} sort={sort} onSort={setSort} />
-                        <ColumnFilterMenu field={column} label={column} filters={filters} onChange={setFilters} />
-                      </span>
-                    </div>
-                  </th>
-                ))}
-                {LABEL_COLUMNS.map((column) => (
-                  <th key={column} className="p-2 text-left font-medium">
                     <span className="flex items-center gap-1">
-                      {column}
                       <ColumnSortMenu field={column} label={column} sort={sort} onSort={setSort} />
                       <ColumnFilterMenu field={column} label={column} filters={filters} onChange={setFilters} />
                     </span>
-                    <span className="text-muted-foreground block font-normal">{LABEL_HINT[column]}</span>
+                  </th>
+                ))}
+                {LABEL_COLUMNS.map((column) => (
+                  <th key={column} className="p-2 text-left font-medium" title={LABEL_HINT[column]}>
+                    <span className="flex items-center gap-1">
+                      <ColumnSortMenu field={column} label={column} sort={sort} onSort={setSort} />
+                      <ColumnFilterMenu field={column} label={column} filters={filters} onChange={setFilters} />
+                    </span>
                   </th>
                 ))}
               </tr>
@@ -405,19 +417,24 @@ export function IngestionPanel() {
               })}
             </tbody>
           </table>
-          <p className="text-muted-foreground p-2">{`${sourceWindow.shown} of ${sourceWindow.total} row(s)`}</p>
-        </div>
+        </TableFrame>
       )}
 
       {selectedConfirmed && (
-        <div className="min-h-0 flex-1 overflow-auto rounded-md border" onScroll={confirmedWindow.onScroll}>
+        <TableFrame
+          marking={marking}
+          onToggleMarking={() => setMarking(!marking)}
+          onDeleteMarked={() => void removeMarked('confirmed')}
+          markedCount={tableRows.filter((row) => row.markedForElimination).length}
+          summary={`${confirmedWindow.shown} of ${confirmedWindow.total} row(s)`}
+          onScroll={confirmedWindow.onScroll}
+        >
           <table className="w-full text-xs">
             <thead className="bg-muted/60 sticky top-0">
               <tr>
                 {CONFIRMED_COLUMNS.map((column) => (
                   <th key={column} className="p-2 text-left font-medium">
                     <span className="flex items-center gap-1">
-                      {column}
                       <ColumnSortMenu field={confirmedField(column)} label={column} sort={sort} onSort={setSort} />
                       <ColumnFilterMenu field={confirmedField(column)} label={column} filters={filters} onChange={setFilters} />
                     </span>
@@ -454,13 +471,77 @@ export function IngestionPanel() {
               ))}
             </tbody>
           </table>
-          <p className="text-muted-foreground p-2">{`${confirmedWindow.shown} of ${confirmedWindow.total} row(s)`}</p>
-        </div>
+        </TableFrame>
       )}
 
-      {/* §1.6.1: the rules of a stage are shown only while a table of that stage is selected. */}
-      {selectedFile && <LabellingRules context="source" />}
-      {selectedConfirmed && <LabellingRules context="confirmed" />}
+      {/* §1.6.1: the rules of a stage are shown only while a table of that stage is
+          selected — set apart below the table, because it is a different subject. */}
+      {(selectedFile || selectedConfirmed) && (
+        <div className="mt-8 border-t pt-6">
+          {selectedFile && <LabellingRules context="source" />}
+          {selectedConfirmed && <LabellingRules context="confirmed" />}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/**
+ * A table and the controls that belong to it.
+ *
+ * Marking rows and deleting the marked ones are part of a table, not of the page: they
+ * act on these rows and nothing else, so they sit against its edges — above it and below
+ * it, since a table long enough to scroll would otherwise leave them off screen. The
+ * marking button stays pressed while the mode is on, which is the only honest way to show
+ * a mode that changes what a click does.
+ */
+function TableFrame({
+  marking,
+  onToggleMarking,
+  onDeleteMarked,
+  markedCount,
+  summary,
+  onScroll,
+  actions,
+  children,
+}: {
+  marking: boolean
+  onToggleMarking: () => void
+  onDeleteMarked: () => void
+  markedCount: number
+  summary: string
+  onScroll: (event: UIEvent<HTMLElement>) => void
+  actions?: ReactNode
+  children: ReactNode
+}) {
+  const controls = (
+    <>
+      <Button
+        type="button"
+        size="xs"
+        variant={marking ? 'secondary' : 'ghost'}
+        aria-pressed={marking}
+        data-mark-toggle
+        className={cn(marking && 'ring-ring ring-1')}
+        onClick={onToggleMarking}
+      >
+        <CircleSlash2 className="mr-1 size-3.5" /> Mark for elimination
+      </Button>
+      <Button type="button" size="xs" variant="ghost" className="text-destructive" onClick={onDeleteMarked}>
+        <Trash2 className="mr-1 size-3.5" /> {markedCount > 0 ? `Delete ${markedCount} marked line(s)` : 'Delete marked lines'}
+      </Button>
+    </>
+  )
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col rounded-md border">
+      <div className="bg-muted/40 flex flex-wrap items-center justify-end gap-1 border-b px-2 py-1">{controls}</div>
+      <div className="min-h-0 flex-1 overflow-auto" onScroll={onScroll}>{children}</div>
+      <div className="bg-muted/40 flex flex-wrap items-center justify-end gap-1 border-t px-2 py-1">
+        <span className="text-muted-foreground mr-auto text-xs">{summary}</span>
+        {controls}
+        {actions}
+      </div>
     </div>
   )
 }

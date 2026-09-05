@@ -17,6 +17,14 @@ Everything the dashboards show comes from confirmed rows. A file's rows are work
 the file's own table and move into confirmed tables when they are ready. There is one
 phase, not two: assigning columns and labelling happen side by side, on the same rows.
 
+## Getting data in
+
+A file the user drops — .csv, .txt or .md — becomes a source table by itself. Text that
+reaches you instead, as an attachment or pasted into the message, becomes one through
+import_as_source_file: give it a filename saying where it came from, since that name is
+stamped on every row and is what duplicate checking compares. Separators are detected, and
+a markdown pipe table is read as a table.
+
 ## What a source table holds
 
 - \`source_filename\` on the left: which file the row came from. Not assignable.

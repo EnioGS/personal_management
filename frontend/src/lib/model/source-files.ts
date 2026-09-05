@@ -14,11 +14,39 @@ export const SOURCE_FILENAME_COLUMN = 'source_filename'
 /** Canonical fields a source column can be assigned to. Placement is a label, not a column. */
 export const ASSIGNABLE_FIELDS: IngestionTargetField[] = ['date', 'amount', 'asset', 'quantity', 'price', 'investmentType', 'investmentClass']
 
+/**
+ * Turns a markdown table into CSV, and leaves anything else alone.
+ *
+ * A statement pasted into the chat, or saved as .md, often arrives as a pipe table. It is
+ * a table — it has a header and rows — so refusing it would be pedantry; the separator
+ * line under the header is the only part with nothing to say.
+ */
+export function fromMarkdownTable(text: string): string {
+  const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean)
+  const rows = lines.filter((line) => line.startsWith('|') && line.endsWith('|'))
+  if (rows.length < 2) return text
+
+  const cells = rows
+    .filter((line) => !/^\|[\s|:-]+\|$/.test(line))
+    .map((line) => line.slice(1, -1).split('|').map((cell) => cell.trim()))
+  return cells.map((row) => row.map((cell) => `"${cell.replace(/"/g, '""')}"`).join(',')).join('\n')
+}
+
+/**
+ * Reads a file's text into columns and rows.
+ *
+ * The delimiter is detected rather than demanded: exports come out comma-separated,
+ * semicolon-separated (anywhere the comma is a decimal point) and tab-separated, and
+ * which one a file used is not something anyone should have to say.
+ */
 export function parseSourceCsv(rawCsv: string): { columns: string[]; rows: Record<string, string>[] } {
-  const parsed = Papa.parse<Record<string, string>>(rawCsv, { header: true, skipEmptyLines: true })
-  if (parsed.errors.length > 0) throw new Error(`Could not parse CSV: ${parsed.errors[0].message}`)
-  const columns = parsed.meta.fields ?? []
-  if (columns.length === 0) throw new Error('The CSV has no header row.')
+  const parsed = Papa.parse<Record<string, string>>(fromMarkdownTable(rawCsv), { header: true, skipEmptyLines: true })
+  // "Could not auto-detect a delimiter" is a note, not a failure: a single-column file
+  // has no delimiter to find, and the parse is still right.
+  const fatal = parsed.errors.filter((error) => error.type !== 'Delimiter')
+  if (fatal.length > 0) throw new Error(`Could not read this file: ${fatal[0].message}`)
+  const columns = (parsed.meta.fields ?? []).map((column) => column.trim()).filter(Boolean)
+  if (columns.length === 0) throw new Error('The file has no header row.')
   if (new Set(columns).size !== columns.length) throw new Error('The CSV has duplicate column names. Rename them before importing.')
   return { columns, rows: parsed.data.map((row) => Object.fromEntries(columns.map((column) => [column, row[column] ?? '']))) }
 }
@@ -264,6 +292,14 @@ export interface ConfirmationPlan {
   marked: number[]
 }
 
+/** Removes a source file that holds no rows — one emptied by confirmation, or empty from the start. */
+export async function retireIfEmpty(sourceId: number): Promise<boolean> {
+  const remaining = (await sourceRowsTable.toArray()).filter((row) => (row.data as SourceRow).sourceId === sourceId)
+  if (remaining.length > 0) return false
+  await sourceFilesTable.delete(sourceId)
+  return true
+}
+
 export async function planConfirmation(sourceId: number, catalogue: LabelCatalogue): Promise<ConfirmationPlan> {
   const rows = (await sourceRowsTable.toArray()).filter((row) => (row.data as SourceRow).sourceId === sourceId)
   const plan: ConfirmationPlan = { ready: [], incomplete: [], marked: [] }
@@ -341,10 +377,9 @@ export async function confirmSourceRows(sourceId: number, catalogue: LabelCatalo
   }
 
   await sourceRowsTable.bulkDelete(consumed)
-  if (options.discardMarked && result.leftBehind === 0) {
-    await sourceFilesTable.delete(sourceId)
-    result.removedFile = true
-  }
+  // A file whose rows have all been dealt with has nothing left to show, so it goes —
+  // whether the last of them was confirmed or discarded. Its rows keep the filename.
+  if (await retireIfEmpty(sourceId)) result.removedFile = true
   await ingestionAuditEventsTable.add({
     createdAt: confirmedAt,
     data: { event: 'rowsPromoted', actor: 'user', sourceId, details: { ...result } },

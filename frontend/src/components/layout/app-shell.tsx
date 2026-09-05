@@ -1,3 +1,4 @@
+import { ErrorBoundary } from '@/components/error-boundary'
 import { sections } from '@/sections'
 import { useUiStore } from '@/store/ui-store'
 import { ActivityBar } from './activity-bar'
@@ -39,7 +40,11 @@ export function AppShell() {
         <SecondaryBar />
       </div>
       <div className="min-w-0 flex-1 overflow-auto">
-        <ActiveComponent />
+        {/* Keyed by screen: coming back to a screen that failed gives it a fresh try
+            rather than showing yesterday's error. */}
+        <ErrorBoundary key={`${section.id}/${activeItem.id}`}>
+          <ActiveComponent />
+        </ErrorBoundary>
       </div>
     </div>
   )

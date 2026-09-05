@@ -17,6 +17,7 @@ describe('findTool', () => {
       'read_ingestion_guide',
       'list_label_options',
       'query_vault',
+      'import_as_source_file',
       'assign_source_columns',
       'set_sign_convention',
       'set_labels',

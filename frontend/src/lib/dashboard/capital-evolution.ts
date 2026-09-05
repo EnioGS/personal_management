@@ -61,6 +61,7 @@ export function capitalEvolution(
 
   const byMonth = new Map<string, { capitalDelta: number; spending: number }>()
   for (const entry of entries) {
+    if (!Number.isFinite(entry.date)) continue
     const month = monthKey(entry.date)
     const bucket = byMonth.get(month) ?? { capitalDelta: 0, spending: 0 }
     // Capital is everything of value held, so every confirmed row moves it: money out of
@@ -76,7 +77,7 @@ export function capitalEvolution(
     ['fixedIncome', new Map()],
   ])
   for (const investment of investments) {
-    if (investment.deleted) continue
+    if (investment.deleted || !Number.isFinite(investment.date)) continue
     const month = monthKey(investment.date)
     const byInvestmentMonth = investmentsByClass.get(investment.investmentClass)!
     byInvestmentMonth.set(month, [...(byInvestmentMonth.get(month) ?? []), investment])
@@ -89,6 +90,9 @@ export function capitalEvolution(
   ])].sort()
   const first = months[0]
   const last = months.at(-1)!
+  // Both ends came from real timestamps, so the walk below terminates; an unparseable
+  // date would sort past every month and loop forever.
+  if (!first || !last) return []
   const points: CapitalEvolutionPoint[] = []
   let month = first
   let cashCapital = 0

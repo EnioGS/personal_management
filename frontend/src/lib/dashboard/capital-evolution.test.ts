@@ -106,6 +106,23 @@ describe('capitalEvolution', () => {
   })
 })
 
+describe('a date nothing could read', () => {
+  it('is left out rather than walked to, which would never finish', () => {
+    const points = capitalEvolution([
+      { date: Date.UTC(2026, 0, 5), amount: 100 },
+      { date: Number.NaN, amount: -50 },
+    ], { from: Date.UTC(2026, 0, 1), to: Date.UTC(2026, 0, 31) })
+
+    expect(points).toEqual([{ month: '2026-01', cashCapital: 100, variableIncome: 0, fixedIncome: 0, capital: 100, spending: 0 }])
+  })
+
+  it('is left out of the investment lines too', () => {
+    expect(capitalEvolution([], { from: 0, to: Date.now() }, [
+      { date: Number.NaN, asset: 'X', type: 'buy', quantity: 1, price: 10, investmentClass: 'fixedIncome' },
+    ])).toEqual([])
+  })
+})
+
 describe('what moves total capital', () => {
   const range = { from: Date.UTC(2026, 0, 1), to: Date.UTC(2026, 0, 31) }
 
