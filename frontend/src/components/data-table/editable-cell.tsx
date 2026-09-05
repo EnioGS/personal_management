@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
+import { memo, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { cn } from '@/lib/utils'
 
 interface EditableCellProps {
@@ -27,15 +27,23 @@ interface EditableCellProps {
  * Enter commits, Escape abandons, and clicking away commits, which is what a spreadsheet
  * does and therefore what everyone expects.
  */
-export function EditableCell({ value, onCommit, validate, missing, readOnly, disabled, title, className }: EditableCellProps) {
+function EditableCellView({ value, onCommit, validate, missing, readOnly, disabled, title, className }: EditableCellProps) {
   const [draft, setDraft] = useState<string | null>(null)
   const input = useRef<HTMLInputElement>(null)
+  // Kept in a ref so the memo below depends on the value, not on the identity of an
+  // arrow function the parent rebuilds every render.
+  const check = useRef(validate)
+  check.current = validate
 
   useEffect(() => {
     if (draft !== null) input.current?.focus()
   }, [draft])
 
-  const error = validate?.(draft ?? value) ?? null
+  // Validating means resolving text against the app's own catalogue, which a table full
+  // of cells does hundreds of times a render if it is done unconditionally. It only
+  // changes when the text does.
+  const restingError = useMemo(() => check.current?.(value) ?? null, [value])
+  const error = draft === null ? restingError : check.current?.(draft) ?? null
 
   function commit() {
     if (draft !== null && draft !== value) onCommit(draft)
@@ -77,3 +85,10 @@ export function EditableCell({ value, onCommit, validate, missing, readOnly, dis
     </td>
   )
 }
+
+/**
+ * Memoised because a table is thousands of these: a cell whose own value, state and
+ * handler are unchanged has nothing to re-render for, and without this every keystroke
+ * anywhere in the table re-renders every cell in it.
+ */
+export const EditableCell = memo(EditableCellView)

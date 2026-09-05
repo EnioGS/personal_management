@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent, type ReactNode, type UIEvent } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent, type ReactNode, type UIEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { CircleSlash2, FileMinus2, FilePlus2, Plus, Trash2, Upload } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -8,7 +8,7 @@ import { EditableCell } from '@/components/data-table/editable-cell'
 import { ColumnSortMenu, type ColumnSort } from '@/components/data-table/column-sort-menu'
 import { useMarkMode } from '@/components/data-table/use-mark-mode'
 import { useProgressiveRows } from '@/components/data-table/use-progressive-rows'
-import { refreshAllLocalStores } from '@/lib/local-store/create-local-list-store'
+import { refreshLocalStores } from '@/lib/local-store/create-local-list-store'
 import type { StoredRow } from '@/lib/local-store/create-local-table'
 import { buildLabelCatalogue } from '@/lib/label-catalogue-source'
 import { queryRows } from '@/lib/model/row-query'
@@ -27,6 +27,7 @@ import {
   assignSourceColumns,
   confirmSourceRows,
   createSourceFile,
+  flagCrossFileDuplicates,
   planConfirmation,
   retireEmptySourceFiles,
   setSignConvention,
@@ -129,7 +130,7 @@ export function IngestionPanel() {
   // Anything left empty by an earlier session goes when the screen opens: a file table
   // with no rows in it has nothing to do.
   useEffect(() => {
-    void retireEmptySourceFiles().then((retired) => { if (retired > 0) void refreshAllLocalStores() })
+    void retireEmptySourceFiles().then((retired) => { if (retired > 0) void refreshLocalStores('sourceFiles') })
   }, [])
 
   useEffect(() => {
@@ -163,8 +164,10 @@ export function IngestionPanel() {
       }
     }
     // Source rules run at upload, which is what lets a file land already labelled.
+    // One scan for the whole upload rather than one per file, then one reload.
+    if (imported.length > 0) await flagCrossFileDuplicates(...imported)
     const applied = await applyLabelRulesToRows('source', (key) => String(t(key as never)))
-    await refreshAllLocalStores()
+    await refreshLocalStores('sourceFiles', 'sourceRows')
     if (imported[0] !== undefined) setSelected(`source:${imported[0]}`)
     setMessage([
       `Imported ${readable.length - failed.length} file(s); ${applied.rowsTouched} row(s) labelled by standing rules.`,
@@ -188,15 +191,17 @@ export function IngestionPanel() {
     if (!selectedFile) return
     try {
       await assignSourceColumns(selectedFile.id, { [column]: target === UNASSIGNED ? null : (target as IngestionTargetField) })
-      await refreshAllLocalStores()
+      await refreshLocalStores('sourceFiles', 'sourceRows')
       setMessage(null)
     } catch (error) {
       setMessage(error instanceof Error ? error.message : String(error))
     }
   }
 
+  // The handlers below are given to memoised rows, so they are stable: an arrow rebuilt
+  // every render would make the memo useless and re-render every row anyway.
   /** What a cell's text resolves to, and what in it nothing is called. Computed per keystroke. */
-  function readLabelCell(row: StoredRow<SourceRow>, column: LabelColumn, value: string) {
+  const readLabelCell = useCallback((row: StoredRow<SourceRow>, column: LabelColumn, value: string) => {
     const labels: IngestionRowLabels = { ...row.labels }
     if (column === 'account' || column === 'card') {
       const text = value.trim()
@@ -214,22 +219,22 @@ export function IngestionPanel() {
       return { labels: withDerivedSections({ ...labels, screens: parsed.values }, catalogue), unknown: parsed.unknown }
     }
     return { labels: { ...labels, [column]: value }, unknown: [] as string[] }
-  }
+  }, [catalogue])
 
-  async function editLabel(row: StoredRow<SourceRow>, column: LabelColumn, value: string) {
+  const editLabel = useCallback(async (row: StoredRow<SourceRow>, column: LabelColumn, value: string) => {
     const { labels } = readLabelCell(row, column, value)
     await sourceRowsTable.update(row.id, { data: { ...stripStored(row), labels } satisfies SourceRow })
-    await refreshAllLocalStores()
-  }
+    await refreshLocalStores('sourceRows')
+  }, [readLabelCell])
 
-  async function editSourceValue(row: StoredRow<SourceRow>, column: string, value: string) {
+  const editSourceValue = useCallback(async (row: StoredRow<SourceRow>, column: string, value: string) => {
     try {
       await updateSourceValue(row.id, column, value)
-      await refreshAllLocalStores()
+      await refreshLocalStores('sourceRows')
     } catch (error) {
       setMessage(error instanceof Error ? error.message : String(error))
     }
-  }
+  }, [])
 
   async function editConfirmed(row: StoredRow<ConfirmedRow>, column: ConfirmedEditableColumn, value: string) {
     await updateConfirmedRow(row.id, column, value)
@@ -251,7 +256,7 @@ export function IngestionPanel() {
   async function addLine() {
     if (selectedFile) await addSourceRow(selectedFile.id)
     else if (selectedConfirmed) await addConfirmedRow(selectedConfirmed.split('/')[0], selectedConfirmed.split('/')[1])
-    await refreshAllLocalStores()
+    await refreshLocalStores('sourceRows', 'confirmedRows')
   }
 
   async function removeMarked(table: MarkableTable) {
@@ -266,7 +271,7 @@ export function IngestionPanel() {
     if (!selectedFile) return
     const plan = await planConfirmation(selectedFile.id, catalogue)
     const result = await confirmSourceRows(selectedFile.id, catalogue, { discardMarked })
-    await refreshAllLocalStores()
+    await refreshLocalStores('sourceFiles', 'sourceRows', 'confirmedRows', 'ingestionAuditEvents')
     setMessage(
       `Confirmed ${result.confirmed} row(s) into ${result.copies} table copy/copies; `
       + `${result.leftBehind} left behind${discardMarked ? `, ${result.discarded} discarded` : ''}`
@@ -281,7 +286,7 @@ export function IngestionPanel() {
       return
     }
     await setSignConvention(selectedFile.id, { kind })
-    await refreshAllLocalStores()
+    await refreshLocalStores('sourceFiles', 'sourceRows')
   }
 
   const visibleSourceRows = useMemo(() => {
@@ -431,69 +436,22 @@ export function IngestionPanel() {
               </tr>
             </thead>
             <tbody>
-              {sourceWindow.visible.map((row) => {
-                // What still stands between this row and a table, said in words rather
-                // than only in colour.
-                const errors = ingestionLabelErrors(row.labels, catalogue)
-                return (
-                  <tr
-                    key={row.id}
-                    {...rowProps(() => void toggleMark('source', row.id))}
-                    className={cn(
-                      'border-b last:border-0',
-                      marking && 'cursor-pointer',
-                      row.markedForElimination && 'bg-destructive/10 line-through',
-                    )}
-                  >
-                    <td className="text-muted-foreground p-2 whitespace-nowrap" title={errors.join(' ')}>{row.values[SOURCE_FILENAME_COLUMN]}</td>
-                    <td className="text-muted-foreground p-2 font-mono whitespace-nowrap" title="Fixed at import; every copy this row is confirmed into keeps it.">{row.rowId}</td>
-                    <td className="p-2 whitespace-nowrap" title={row.duplicateOf ? `Matches ${row.duplicateOf}, which came from another file.` : undefined}>
-                      {row.duplicateOf ? <span className="text-destructive">duplicate?</span> : ''}
-                    </td>
-                    {selectedFile.originalColumns.map((column) => (
-                      <EditableCell
-                        key={column}
-                        value={row.values[column] ?? ''}
-                        disabled={marking}
-                        title={selectedFile.assignments[column] === 'value' && row.importedValue !== undefined ? `The file wrote ${row.importedValue}` : undefined}
-                        onCommit={(value) => void editSourceValue(row, column, value)}
-                      />
-                    ))}
-                    {LABEL_COLUMNS.map((column) => {
-                      const key = `${row.id}:${column}`
-                      const text = drafts[key] ?? labelText(row.labels, column, catalogue)
-                      // Category and subcategory always hold something, and a card is
-                      // genuinely optional; the rest are required and say so until filled.
-                      const optional = MEANING_COLUMNS.includes(column as never) || OPTIONAL_COLUMNS.includes(column as never)
-                      const missing = optional ? false : (row.labels[column] ?? []).length === 0
-                      return (
-                        <EditableCell
-                          key={column}
-                          value={text}
-                          disabled={marking}
-                          missing={missing}
-                          validate={(draft) => {
-                            const unknown = readLabelCell(row, column, draft).unknown
-                            return unknown.length > 0 ? `Nothing is called ${unknown.join(', ')}.` : null
-                          }}
-                          onCommit={(value) => {
-                            void editLabel(row, column, value)
-                            // What was typed stays on screen while it names nothing, so the
-                            // mistake is visible; once it resolves, the labels take over.
-                            const unknown = readLabelCell(row, column, value).unknown
-                            setDrafts((current) => {
-                              const next = { ...current }
-                              if (unknown.length > 0) next[key] = value
-                              else delete next[key]
-                              return next
-                            })
-                          }}
-                        />
-                      )
-                    })}
-                  </tr>
-                )
-              })}
+              {sourceWindow.visible.map((row) => (
+                <SourceRowLine
+                  key={row.id}
+                  row={row}
+                  file={selectedFile}
+                  catalogue={catalogue}
+                  marking={marking}
+                  drafts={drafts}
+                  rowProps={rowProps}
+                  onToggleMark={toggleMark}
+                  onEditValue={editSourceValue}
+                  onEditLabel={editLabel}
+                  onDraftsChange={setDrafts}
+                  readLabelCell={readLabelCell}
+                />
+              ))}
             </tbody>
           </table>
         </TableFrame>
@@ -611,6 +569,101 @@ export function IngestionPanel() {
     </div>
   )
 }
+
+/**
+ * One row of a source table.
+ *
+ * Memoised, and given only what it needs, because the alternative is re-rendering every
+ * cell of every row whenever anything on the screen changes — a message appearing, a
+ * draft being typed three rows down, a store reloading. With a dozen columns and a
+ * hundred rows on screen that is thousands of components rebuilt for nothing, and it is
+ * felt as the whole screen being slightly slow rather than as any one action being slow.
+ */
+const SourceRowLine = memo(function SourceRowLine({
+  row,
+  file,
+  catalogue,
+  marking,
+  drafts,
+  rowProps,
+  onToggleMark,
+  onEditValue,
+  onEditLabel,
+  onDraftsChange,
+  readLabelCell,
+}: {
+  row: StoredRow<SourceRow>
+  file: StoredRow<SourceFile>
+  catalogue: LabelCatalogue
+  marking: boolean
+  drafts: Record<string, string>
+  rowProps: (toggle: () => void) => { 'data-markable': true; onClick: () => void }
+  onToggleMark: (table: MarkableTable, rowId: number) => Promise<boolean>
+  onEditValue: (row: StoredRow<SourceRow>, column: string, value: string) => Promise<void>
+  onEditLabel: (row: StoredRow<SourceRow>, column: LabelColumn, value: string) => Promise<void>
+  onDraftsChange: (update: (current: Record<string, string>) => Record<string, string>) => void
+  readLabelCell: (row: StoredRow<SourceRow>, column: LabelColumn, value: string) => { unknown: string[] }
+}) {
+  // What still stands between this row and a table, said in words rather than only in colour.
+  const errors = ingestionLabelErrors(row.labels, catalogue)
+
+  return (
+    <tr
+      {...rowProps(() => void onToggleMark('source', row.id))}
+      className={cn(
+        'border-b last:border-0',
+        marking && 'cursor-pointer',
+        row.markedForElimination && 'bg-destructive/10 line-through',
+      )}
+    >
+      <td className="text-muted-foreground p-2 whitespace-nowrap" title={errors.join(' ')}>{row.values[SOURCE_FILENAME_COLUMN]}</td>
+      <td className="text-muted-foreground p-2 font-mono whitespace-nowrap" title="Fixed at import; every copy this row is confirmed into keeps it.">{row.rowId}</td>
+      <td className="p-2 whitespace-nowrap" title={row.duplicateOf ? `Matches ${row.duplicateOf}, which came from another file.` : undefined}>
+        {row.duplicateOf ? <span className="text-destructive">duplicate?</span> : ''}
+      </td>
+      {file.originalColumns.map((column) => (
+        <EditableCell
+          key={column}
+          value={row.values[column] ?? ''}
+          disabled={marking}
+          title={file.assignments[column] === 'value' && row.importedValue !== undefined ? `The file wrote ${row.importedValue}` : undefined}
+          onCommit={(value) => void onEditValue(row, column, value)}
+        />
+      ))}
+      {LABEL_COLUMNS.map((column) => {
+        const key = `${row.id}:${column}`
+        const text = drafts[key] ?? labelText(row.labels, column, catalogue)
+        // Category and subcategory always hold something, and a card is genuinely
+        // optional; the rest are required and say so until filled.
+        const optional = MEANING_COLUMNS.includes(column as never) || OPTIONAL_COLUMNS.includes(column as never)
+        return (
+          <EditableCell
+            key={column}
+            value={text}
+            disabled={marking}
+            missing={optional ? false : (row.labels[column] ?? []).length === 0}
+            validate={(draft) => {
+              const unknown = readLabelCell(row, column, draft).unknown
+              return unknown.length > 0 ? `Nothing is called ${unknown.join(', ')}.` : null
+            }}
+            onCommit={(value) => {
+              void onEditLabel(row, column, value)
+              // What was typed stays on screen while it names nothing, so the mistake is
+              // visible; once it resolves, the labels take over.
+              const unknown = readLabelCell(row, column, value).unknown
+              onDraftsChange((current) => {
+                const next = { ...current }
+                if (unknown.length > 0) next[key] = value
+                else delete next[key]
+                return next
+              })
+            }}
+          />
+        )
+      })}
+    </tr>
+  )
+})
 
 /**
  * A table and the controls that belong to it.
