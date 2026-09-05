@@ -1,4 +1,5 @@
-import type { ReactNode } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
+import type { ThemedColor } from '@/components/charts/chart-colors'
 import { cn } from '@/lib/utils'
 import { Sparkline } from './sparkline'
 
@@ -17,8 +18,12 @@ export interface StatDelta {
 interface StatTileProps {
   label: string
   value: string
-  /** A small colored dot echoing the value's chart series, so the tile and its chart read as one thing. */
-  indicatorColor?: string
+  /**
+   * The value's chart colour, echoed as a small dot and as the sparkline's stroke, so the
+   * tile and its chart read as one thing — both halves of it, so the dot is the same red
+   * in the dark as the bars it belongs with.
+   */
+  indicator?: ThemedColor
   tone?: 'default' | 'positive' | 'negative'
   icon?: ReactNode
   /** Comparisons under the number, in reading order: the nearest one first. */
@@ -38,11 +43,14 @@ const ARROW = { up: '▲', down: '▼', flat: '=' } as const
  * current value": a stat tile, not a one-bar chart. Several of these in a row is a
  * KPI row (see PLAN.md §3.4 and dashboard-filters usage in finances-panels.tsx).
  */
-export function StatTile({ label, value, indicatorColor, tone = 'default', icon, deltas, sparkline }: StatTileProps) {
+export function StatTile({ label, value, indicator, tone = 'default', icon, deltas, sparkline }: StatTileProps) {
   return (
-    <div className="bg-card flex flex-1 flex-col gap-1 rounded-lg border p-3">
+    <div
+      className="entity bg-card flex flex-1 flex-col gap-1 rounded-lg border p-3"
+      style={indicator ? ({ '--entity-light': indicator.light, '--entity-dark': indicator.dark } as CSSProperties) : undefined}
+    >
       <div className="text-muted-foreground flex items-center gap-1.5 text-[10px] font-medium tracking-wide uppercase">
-        {indicatorColor && <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: indicatorColor }} />}
+        {indicator && <span className="entity-fill size-2 shrink-0 rounded-full" />}
         {icon}
         {label}
       </div>
@@ -77,7 +85,7 @@ export function StatTile({ label, value, indicatorColor, tone = 'default', icon,
       )}
       {sparkline && sparkline.length >= 2 && (
         <div className="mt-auto pt-1">
-          <Sparkline values={sparkline} color={indicatorColor ?? 'var(--brand)'} />
+          <Sparkline values={sparkline} color={indicator ? 'var(--entity)' : 'var(--brand)'} />
         </div>
       )}
     </div>

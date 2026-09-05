@@ -125,28 +125,28 @@ export function OverviewPanel() {
             <StatTile
               label={t('finances:overview.currentCapital')}
               value={currency.format(capital.current)}
-              indicatorColor={DOMAIN_COLOR.balance.light}
+              indicator={DOMAIN_COLOR.balance}
               deltas={capital.deltas}
               sparkline={capital.sparkline}
             />
             <StatTile
               label={t('finances:overview.netCashFlow')}
               value={currency.format(income.current)}
-              indicatorColor={DOMAIN_COLOR.cashFlow.light}
+              indicator={DOMAIN_COLOR.cashFlow}
               deltas={income.deltas}
               sparkline={income.sparkline}
             />
             <StatTile
               label={t('common:dashboard.spending')}
               value={currency.format(spent.current)}
-              indicatorColor={DIVERGING_PAIR.negative.light}
+              indicator={DIVERGING_PAIR.negative}
               deltas={spent.deltas}
               sparkline={spent.sparkline}
             />
             <StatTile
               label={t('finances:overview.investments')}
               value={currency.format(investments.current)}
-              indicatorColor={DOMAIN_COLOR.variableIncome.light}
+              indicator={DOMAIN_COLOR.variableIncome}
               deltas={investments.deltas}
               sparkline={investments.sparkline}
             />
@@ -329,23 +329,23 @@ export function SpendingPanel() {
             <StatTile
               label={t('finances:spending.totalSpent')}
               value={currency.format(totalSpent)}
-              indicatorColor={DOMAIN_COLOR.spending.light}
+              indicator={DOMAIN_COLOR.spending}
               sparkline={monthlySpending.map((month) => month.amount)}
             />
             <StatTile
               label={t('finances:spending.monthlyAverage')}
               value={currency.format(monthlyAverage)}
-              indicatorColor={DOMAIN_COLOR.spending.light}
+              indicator={DOMAIN_COLOR.spending}
             />
             <StatTile
               label={t('finances:spending.largestExpense')}
               value={currency.format(largestExpense)}
-              indicatorColor={DOMAIN_COLOR.spending.light}
+              indicator={DOMAIN_COLOR.spending}
             />
             <StatTile
               label={t('finances:spending.entryCount')}
               value={spending.length.toLocaleString('pt-BR')}
-              indicatorColor={DOMAIN_COLOR.spending.light}
+              indicator={DOMAIN_COLOR.spending}
             />
           </div>
 

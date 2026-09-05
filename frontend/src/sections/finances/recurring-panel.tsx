@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { CategoryPill } from '@/components/dashboard/category-pill'
 import { DashboardCard } from '@/components/dashboard/dashboard-card'
+import { DOMAIN_COLOR } from '@/components/charts/chart-colors'
 import { StatTile } from '@/components/dashboard/stat-tile'
 import { FilterBar } from '@/components/dashboard/filter-bar'
 import { useDashboardFilters } from '@/components/dashboard/dashboard-filters'
@@ -78,9 +79,9 @@ export function RecurringPanel() {
         <FinanceTableDrawer id="recurring">
           <div className="flex flex-col gap-3">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <StatTile label={t('finances:recurring.monthlyTotal')} value={currency.format(monthlyTotal)} indicatorColor="var(--brand)" />
-            <StatTile label={t('finances:recurring.recurringCount')} value={candidates.length.toLocaleString('pt-BR')} indicatorColor="var(--brand)" />
-            <StatTile label={t('finances:recurring.largestRecurring')} value={currency.format(largest)} indicatorColor="var(--brand)" />
+            <StatTile label={t('finances:recurring.monthlyTotal')} value={currency.format(monthlyTotal)} indicator={DOMAIN_COLOR.balance} />
+            <StatTile label={t('finances:recurring.recurringCount')} value={candidates.length.toLocaleString('pt-BR')} indicator={DOMAIN_COLOR.balance} />
+            <StatTile label={t('finances:recurring.largestRecurring')} value={currency.format(largest)} indicator={DOMAIN_COLOR.balance} />
           </div>
 
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">

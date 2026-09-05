@@ -93,11 +93,11 @@ export function InvestmentsPanel() {
             <div className="h-full overflow-auto p-4">
               <div className="flex flex-col gap-3">
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-                  <StatTile label={t('items.overview')} value={new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalValue)} indicatorColor={DOMAIN_COLOR.balance.light} />
-                  <StatTile label={t('items.variableIncome')} value={new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(variableValue)} indicatorColor={DOMAIN_COLOR.variableIncome.light} />
-                  <StatTile label={t('items.fixedIncome')} value={new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(fixedValue)} indicatorColor={DOMAIN_COLOR.fixedIncome.light} />
-                  <StatTile label={t('items.contributions')} value={new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(contributions)} indicatorColor={DOMAIN_COLOR.contributions.light} />
-                  <StatTile label={t('items.dividends')} value={new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(dividends)} indicatorColor={DOMAIN_COLOR.dividends.light} />
+                  <StatTile label={t('items.overview')} value={new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalValue)} indicator={DOMAIN_COLOR.balance} />
+                  <StatTile label={t('items.variableIncome')} value={new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(variableValue)} indicator={DOMAIN_COLOR.variableIncome} />
+                  <StatTile label={t('items.fixedIncome')} value={new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(fixedValue)} indicator={DOMAIN_COLOR.fixedIncome} />
+                  <StatTile label={t('items.contributions')} value={new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(contributions)} indicator={DOMAIN_COLOR.contributions} />
+                  <StatTile label={t('items.dividends')} value={new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(dividends)} indicator={DOMAIN_COLOR.dividends} />
                 </div>
                 <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
                   <DashboardCard title={t('items.overview')} className="h-[320px] lg:col-span-2" bodyClassName="p-2">

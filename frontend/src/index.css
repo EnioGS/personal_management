@@ -175,3 +175,14 @@
 .dark .entity-fill {
   background-color: var(--entity-dark);
 }
+/*
+ * .entity: the same colour as a value rather than as a background, for the places that
+ * need it in an attribute — an SVG stroke, a fill. Set the two custom properties on a
+ * container and everything inside it can read one theme-correct colour.
+ */
+.entity {
+  --entity: var(--entity-light);
+}
+.dark .entity {
+  --entity: var(--entity-dark);
+}
