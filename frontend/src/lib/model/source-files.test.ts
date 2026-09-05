@@ -12,6 +12,7 @@ import {
   flagCrossFileDuplicates,
   observationsFor,
   planConfirmation,
+  retireEmptySourceFiles,
   rowSignature,
   setSignConvention,
   updateSourceValue,
@@ -327,5 +328,29 @@ describe('account and card, as labels', () => {
     await label(first.id, { sections: ['finances'], screens: ['overview'], category: 'outros', subcategory: 'outros' })
 
     expect((await planConfirmation(sourceId, catalogue)).ready).toEqual([first.id])
+  })
+})
+
+describe('files with nothing in them', () => {
+  beforeEach(async () => { await wipeAllData() })
+
+  it('are refused at the door rather than created and cleaned up later', async () => {
+    await expect(createSourceFile('header-only.csv', 'Data,Valor')).rejects.toThrow(/no rows under it/)
+    expect(await sourceFilesTable.count()).toBe(0)
+  })
+
+  it('are swept when the screen opens, for anything an older build left behind', async () => {
+    const sourceId = await createSourceFile('banco-agosto.csv', BANK_CSV)
+    await sourceRowsTable.bulkDelete((await rowsOf(sourceId)).map((entry) => entry.id))
+
+    expect(await retireEmptySourceFiles()).toBe(1)
+    expect(await sourceFilesTable.count()).toBe(0)
+  })
+
+  it('leaves a file that still holds rows alone', async () => {
+    await createSourceFile('banco-agosto.csv', BANK_CSV)
+
+    expect(await retireEmptySourceFiles()).toBe(0)
+    expect(await sourceFilesTable.count()).toBe(1)
   })
 })

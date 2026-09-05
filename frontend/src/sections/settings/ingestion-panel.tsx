@@ -28,6 +28,7 @@ import {
   confirmSourceRows,
   createSourceFile,
   planConfirmation,
+  retireEmptySourceFiles,
   setSignConvention,
   updateSourceValue,
 } from '@/lib/model/source-files'
@@ -119,6 +120,12 @@ export function IngestionPanel() {
     const next = sourceFiles[0] ? `source:${sourceFiles[0].id}` : confirmedTables[0] ? `confirmed:${confirmedTables[0]}` : NO_SELECTION
     if (next !== selected) setSelected(next)
   }, [confirmedTables, selected, selectedConfirmed, selectedFile, sourceFiles])
+
+  // Anything left empty by an earlier session goes when the screen opens: a file table
+  // with no rows in it has nothing to do.
+  useEffect(() => {
+    void retireEmptySourceFiles().then((retired) => { if (retired > 0) void refreshAllLocalStores() })
+  }, [])
 
   useEffect(() => {
     if (!selectedFile) { setAmountShape(null); return }
@@ -358,10 +365,14 @@ export function IngestionPanel() {
           }
         >
           <table className="w-full text-xs">
-            <thead className="bg-muted/60 sticky top-0">
+            {/* The head paints itself per row rather than as a block: the assignment line
+                belongs to the strip of controls above it and wears that same background,
+                while the names below carry the heavier one. Both are on the cells, since
+                a sticky head must not be see-through. */}
+            <thead className="sticky top-0">
               {/* Assignment sits on a line of its own above the names: it is a statement
                   about the column, not part of what the column is called. */}
-              <tr className="bg-muted/40">
+              <tr className="[&>th]:bg-muted/40">
                 <th colSpan={3} className="px-2 py-1" />
                 {selectedFile.originalColumns.map((column) => (
                   <th key={column} className="px-2 py-1 text-left font-normal">
@@ -376,7 +387,7 @@ export function IngestionPanel() {
                 ))}
                 <th colSpan={LABEL_COLUMNS.length} className="px-2 py-1" />
               </tr>
-              <tr>
+              <tr className="[&>th]:bg-muted/60">
                 <th className="p-2 text-left font-medium">{SOURCE_FILENAME_COLUMN}</th>
                 <th className="p-2 text-left font-medium">row_id</th>
                 <th className="p-2 text-left font-medium">duplicate?</th>
@@ -476,8 +487,8 @@ export function IngestionPanel() {
           onScroll={confirmedWindow.onScroll}
         >
           <table className="w-full text-xs">
-            <thead className="bg-muted/60 sticky top-0">
-              <tr>
+            <thead className="sticky top-0">
+              <tr className="[&>th]:bg-muted/60">
                 {CONFIRMED_COLUMNS.map((column) => (
                   <th key={column} className="p-2 text-left font-medium">
                     <span className="flex items-center gap-1">

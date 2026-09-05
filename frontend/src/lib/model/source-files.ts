@@ -133,6 +133,9 @@ export async function flagCrossFileDuplicates(sourceId: number): Promise<{ flagg
 
 export async function createSourceFile(originalFilename: string, rawCsv: string): Promise<number> {
   const parsed = parseSourceCsv(rawCsv)
+  // A table with a header and nothing under it is not data. Refusing it here is clearer
+  // than creating a file that would be retired a moment later for being empty.
+  if (parsed.rows.length === 0) throw new Error('This file has a header row and no rows under it.')
   const existing = await sourceFilesTable.toArray()
   const looksLike = existing
     .map((row) => ({ id: row.id, file: row.data as SourceFile }))
@@ -338,6 +341,23 @@ export async function updateSourceValue(rowId: number, column: string, value: st
   })
   if (file && isAmount) await rewriteAmounts(row.sourceId, file)
   if (file) await flagCrossFileDuplicates(row.sourceId)
+}
+
+/**
+ * Retires every source file with nothing left in it.
+ *
+ * Files are retired as they empty, but one emptied by a build that did not do that is
+ * still sitting there, and so is one whose last row left by some other route. This runs
+ * when the ingestion centre opens, so an empty table is never something the user has to
+ * clear up by hand.
+ */
+export async function retireEmptySourceFiles(): Promise<number> {
+  const files = await sourceFilesTable.toArray()
+  const rows = await sourceRowsTable.toArray()
+  const holding = new Set(rows.map((row) => (row.data as SourceRow).sourceId))
+  const empty = files.filter((file) => !holding.has(file.id))
+  await sourceFilesTable.bulkDelete(empty.map((file) => file.id))
+  return empty.length
 }
 
 /** Removes a source file that holds no rows — one emptied by confirmation, or empty from the start. */
