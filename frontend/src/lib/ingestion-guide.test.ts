@@ -32,7 +32,9 @@ describe('the ingestion guide', () => {
   })
 
   it('states the one asymmetry between the user and the assistant', () => {
-    expect(DEFAULT_INGESTION_GUIDE).toContain("Deleting is the user's alone")
+    // The sentence wraps in the guide's own text, so the claim is checked without its
+    // line break: what matters is that the guide says it, not how it is set.
+    expect(DEFAULT_INGESTION_GUIDE.replace(/\s+/g, ' ')).toContain("Deleting is the user's alone")
     expect(DEFAULT_INGESTION_GUIDE).toContain('Never edit a confirmed row in place')
   })
 
