@@ -9,6 +9,23 @@ interface OpenAiResponseMessage {
 
 const MAX_RESPONSE_TOKENS = 4096
 
+type Adjustments = { limitField: 'max_completion_tokens' | 'max_tokens'; withoutReasoning: boolean }
+
+/** Each refusal this client knows how to answer, and what it changes in response. */
+const RETRIES: { when: (body: string) => boolean; change: (current: Adjustments) => Adjustments }[] = [
+  {
+    // Older models, and some OpenAI-compatible proxies, know only the old name.
+    when: (body) => body.includes('max_completion_tokens'),
+    change: (current) => Object.assign(current, { limitField: 'max_tokens' as const }),
+  },
+  {
+    // Some models will not take function tools on chat completions while reasoning is on.
+    // Answering with what the API itself suggests keeps the tools, which are the point.
+    when: (body) => body.includes('reasoning_effort'),
+    change: (current) => Object.assign(current, { withoutReasoning: true }),
+  },
+]
+
 /**
  * Same OpenAI-compatible chat-completions wire format as lib/openrouter.ts's
  * client, sent straight to OpenAI's own API instead of through OpenRouter —
@@ -21,27 +38,41 @@ export async function requestOpenAiChatMessage(
   messages: OpenRouterMessage[],
   tools?: OpenRouterTool[],
 ): Promise<OpenAiResponseMessage> {
-  const send = (limitField: 'max_completion_tokens' | 'max_tokens') => fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model,
-      messages,
-      [limitField]: MAX_RESPONSE_TOKENS,
-      ...(tools && tools.length > 0 ? { tools } : {}),
-    }),
-  })
+  /**
+   * What this request is allowed to say, adjusted as the API tells us it cannot.
+   *
+   * Which parameters a model accepts is not something a client can know in advance —
+   * OpenAI has renamed the length limit, and some models refuse function tools unless
+   * reasoning is switched off, both of which vary by model and change over time. So the
+   * request is sent as it should be, and each specific refusal is answered by changing
+   * the one thing it named. Keeping a table of which model wants what would be wrong
+   * again within a month.
+   */
+  const send = (adjust: { limitField: 'max_completion_tokens' | 'max_tokens'; withoutReasoning: boolean }) =>
+    fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model,
+        messages,
+        [adjust.limitField]: MAX_RESPONSE_TOKENS,
+        ...(tools && tools.length > 0 ? { tools } : {}),
+        // Said only when the model has refused tools without it: it turns the model's
+        // own reasoning off, which is a real loss and not something to volunteer.
+        ...(adjust.withoutReasoning ? { reasoning_effort: 'none' } : {}),
+      }),
+    })
 
-  // Newer models take `max_completion_tokens` and refuse `max_tokens`; older ones, and
-  // some OpenAI-compatible proxies, know only the old name. Ask with the current one and
-  // fall back on the specific refusal, rather than keeping a list of which is which.
-  let response = await send('max_completion_tokens')
+  const adjust = { limitField: 'max_completion_tokens' as const, withoutReasoning: false }
+  let response = await send(adjust)
   let body = response.ok ? '' : await response.text().catch(() => '')
-  if (!response.ok && body.includes('max_completion_tokens')) {
-    response = await send('max_tokens')
+
+  for (const retry of RETRIES) {
+    if (response.ok || !retry.when(body)) continue
+    response = await send(retry.change(adjust))
     body = response.ok ? '' : await response.text().catch(() => '')
   }
 
