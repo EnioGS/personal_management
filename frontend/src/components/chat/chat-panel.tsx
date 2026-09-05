@@ -47,6 +47,7 @@ export function ChatPanel() {
    * width, which is what a message long enough to wrap actually needs.
    */
   const [isOverflowing, setIsOverflowing] = useState(false)
+  const [hasWrapped, setHasWrapped] = useState(false)
   const [dragOffset, setDragOffset] = useState<number | null>(null)
   const [isDraggingFileOver, setIsDraggingFileOver] = useState(false)
   const dragStartX = useRef(0)
@@ -80,8 +81,14 @@ export function ChatPanel() {
    * Where Send is. In the row while the message fits on one line; outside the panel,
    * round, once it does not — and also while the panel is closed with something written,
    * which is the only way that message could still be sent.
+   *
+   * Latched on purpose. Send leaving the row widens the composer, which can let the very
+   * text that pushed it out fit on one line again — which would put Send back, narrow the
+   * composer, and wrap the text again, forever. So once it has gone, it stays gone until
+   * the message does: the state changes when the user does something, never because the
+   * layout changed under it.
    */
-  const isSendFloating = isComposing && (isOverflowing || panelWidth === 0)
+  const isSendFloating = isComposing && (hasWrapped || panelWidth === 0)
 
   useEffect(() => {
     // Scroll only the message list's own viewport directly — `scrollIntoView` walks up
@@ -98,6 +105,15 @@ export function ChatPanel() {
   useEffect(() => {
     resizeComposer()
   }, [draft, panelWidth])
+
+  useEffect(() => {
+    if (isOverflowing) setHasWrapped(true)
+  }, [isOverflowing])
+
+  // Cleared or sent: the composer is one line again, and Send comes home.
+  useEffect(() => {
+    if (!isComposing) setHasWrapped(false)
+  }, [isComposing])
 
   // The conversation comes back by itself: nothing was ever saved by hand, so nothing
   // should have to be reopened by hand either.
@@ -209,7 +225,9 @@ export function ChatPanel() {
       aria-label={t('panel.send')}
       title={t('panel.send')}
       onClick={submitDraft}
-      style={{ right: GRIP_WIDTH + liveWidth + 12 }}
+      // Beside the panel rather than a grip's width away from it: the grip is centred
+      // vertically and this sits at the bottom, so the two never meet.
+      style={{ right: liveWidth + 32 }}
       className={cn(
         'bg-primary text-primary-foreground fixed bottom-5 z-50 flex size-10 items-center justify-center rounded-full shadow-lg',
         'transition-[opacity,transform] duration-200 ease-out',

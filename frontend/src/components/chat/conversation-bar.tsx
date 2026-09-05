@@ -33,7 +33,7 @@ export function ConversationBar() {
   useEffect(() => { void refresh() }, [refresh, conversationId])
 
   return (
-    <div className="flex h-11 shrink-0 items-center gap-1 border-b px-2">
+    <div className="flex h-11 shrink-0 items-center gap-1 px-2">
       <Button
         type="button"
         variant="ghost"

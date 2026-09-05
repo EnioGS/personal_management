@@ -595,12 +595,12 @@ export function IngestionPanel() {
           labelling waits a scroll away rather than competing with the rows. */}
       {(selectedFile || selectedConfirmed) && (
         <>
-          <div className="mt-[4.5rem] border-t pt-6">
+          <div className="mt-[2.25rem] border-t pt-6">
             {selectedFile && <LabellingRules context="source" />}
             {selectedConfirmed && <LabellingRules context="confirmed" />}
           </div>
           {/* Below the rules, and separate from them: what a rule cannot say. */}
-          <div className="mt-[2.7rem] border-t pt-6 pb-6">
+          <div className="mt-[2.25rem] border-t pt-6 pb-6">
             <ClassificationNotes context={selectedConfirmed ? 'confirmed' : 'source'} />
           </div>
         </>
