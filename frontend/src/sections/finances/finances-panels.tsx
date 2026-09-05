@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { AppBarChart } from '@/components/charts/bar-chart'
 import { CapitalEvolutionChart } from '@/components/charts/capital-evolution-chart'
 import { CategoryTreemap } from '@/components/charts/category-treemap'
-import { AppPieChart } from '@/components/charts/pie-chart'
+import { HoldingsPie } from '@/components/charts/holdings-pie'
 import { DIVERGING_PAIR, DOMAIN_COLOR } from '@/components/charts/chart-colors'
 import { DivergingBarChart } from '@/components/charts/diverging-bar-chart'
 import { CategoryPill } from '@/components/dashboard/category-pill'
@@ -17,7 +17,7 @@ import { UNLABELLED_LABEL, useDashboardEntries } from '@/components/dashboard/us
 import { formatDateLabel, formatMonthLabel, groupByKey } from '@/lib/aggregations'
 import { capitalEvolution } from '@/lib/dashboard/capital-evolution'
 import { capitalMetric } from '@/lib/dashboard/capital-metric'
-import { holdingsSplit } from '@/lib/dashboard/holdings-split'
+import { heldDelta, holdingsSplit } from '@/lib/dashboard/holdings-split'
 import {
   accountsWithCards,
   incomeByCategory,
@@ -65,7 +65,10 @@ export function OverviewPanel() {
   const investmentHistory = useDashboardEntries(historyFilters, INVESTMENTS_SCREEN)
 
   const capitalData = useMemo(
-    () => capitalEvolution({ movements: movementHistory, investments: investmentHistory }, selectedRange),
+    () => capitalEvolution({
+      movements: movementHistory,
+      investments: investmentHistory.map((row) => ({ date: row.date, value: heldDelta(row) })),
+    }, selectedRange),
     [movementHistory, investmentHistory, selectedRange],
   )
 
@@ -87,22 +90,15 @@ export function OverviewPanel() {
   const accounts = useMemo(() => accountsWithCards(movements, spending), [movements, spending])
   const incomeSources = useMemo(() => incomeByCategory(movements), [movements])
   const biggest = useMemo(() => largestMovements(movements), [movements])
-  const split = useMemo(() => holdingsSplit(investmentHistory), [investmentHistory])
-  // The three classes are always named, holding anything or not: a legend that appears
-  // and disappears with the data is a legend nobody can learn.
-  const holdingSlices = useMemo(
-    () => [
-      { key: 'fixedIncome', label: t('investments:items.fixedIncome'), value: split.fixedIncome, color: DOMAIN_COLOR.fixedIncome },
-      { key: 'variableIncome', label: t('investments:items.variableIncome'), value: split.variableIncome, color: DOMAIN_COLOR.variableIncome },
-      { key: 'cash', label: t('finances:overview.cashReserve'), value: split.cash, color: DOMAIN_COLOR.balance },
-      // Only when there is any: a slice for money nobody has classed is a prompt to class
-      // it, and an empty one would be a prompt to do nothing.
-      ...(split.unclassified > 0
-        ? [{ key: 'unclassified', label: t('finances:overview.unclassifiedHoldings'), value: split.unclassified, color: DOMAIN_COLOR.unclassified }]
-        : []),
-    ],
-    [split, t],
-  )
+  const holdings = useMemo(() => {
+    const named: Record<string, { label: string; color: typeof DOMAIN_COLOR.balance }> = {
+      cash: { label: t('finances:overview.cashReserve'), color: DOMAIN_COLOR.balance },
+      fixedIncome: { label: t('investments:items.fixedIncome'), color: DOMAIN_COLOR.fixedIncome },
+      variableIncome: { label: t('investments:items.variableIncome'), color: DOMAIN_COLOR.variableIncome },
+      unclassified: { label: t('finances:overview.unclassifiedHoldings'), color: DOMAIN_COLOR.unclassified },
+    }
+    return holdingsSplit(investmentHistory).map((group) => ({ ...group, ...named[group.key] }))
+  }, [investmentHistory, t])
   const spendingCategories = useMemo(
     () => averageSpendByCategory(spending, capitalData.map((point) => point.month)),
     [capitalData, spending],
@@ -207,7 +203,11 @@ export function OverviewPanel() {
               </DashboardCard>
 
               <DashboardCard className="h-[300px]" bodyClassName="p-2">
-                <AppPieChart data={holdingSlices} />
+                <HoldingsPie
+                  groups={holdings}
+                  valueFormatter={(value) => currency.format(value)}
+                  emptyLabel={t('finances:overview.noEntries')}
+                />
               </DashboardCard>
             </div>
           </div>

@@ -36,9 +36,17 @@ export function asTransaction(row: ConfirmedRow): Transaction {
 
 const INCOME_WORDS = ['income', 'dividend', 'dividendo', 'rendimento', 'provento', 'juros', 'yield']
 const SELL_WORDS = ['sell', 'sale', 'venda', 'resgate', 'saque', 'withdraw']
+/**
+ * The class names, removed before the kind is read.
+ *
+ * "Fixed income" says what a holding is, not what happened to it, and it contains the
+ * word this test looks for — so a row labelled with its class would otherwise be read as
+ * a payout, every purchase of a Tesouro paper counted as a dividend.
+ */
+const CLASS_PHRASES = /fixed income|variable income|renda fixa|renda vari[áa]vel/g
 
 function investmentKind(row: ConfirmedRow): Transaction['type'] {
-  const text = `${row.investmentType ?? ''} ${row.subcategory} ${row.category}`.toLowerCase()
+  const text = `${row.investmentType ?? ''} ${row.subcategory} ${row.category}`.toLowerCase().replace(CLASS_PHRASES, ' ')
   if (INCOME_WORDS.some((word) => text.includes(word))) return 'income'
   if (SELL_WORDS.some((word) => text.includes(word))) return 'sell'
   return 'buy'
@@ -47,17 +55,29 @@ function investmentKind(row: ConfirmedRow): Transaction['type'] {
 /** What the class tests need, which a confirmed row and a dashboard entry both carry. */
 interface ClassifiableRow {
   investmentClass?: string
+  category: string
   subcategory: string
+}
+
+/**
+ * Where a row may say what class it is.
+ *
+ * A file with a class column has it in `investmentClass`; a file without one is labelled
+ * by hand, and the label that carries the class is whichever of category and subcategory
+ * the user put it in. All three are read, so neither way of saying it is the wrong way.
+ */
+function classText(row: ClassifiableRow): string {
+  return `${row.investmentClass ?? ''} ${row.category} ${row.subcategory}`.toLowerCase()
 }
 
 /** True when the row's class text names fixed income, whatever language it was written in. */
 export function isFixedIncome(row: ClassifiableRow): boolean {
-  const text = `${row.investmentClass ?? ''} ${row.subcategory}`.toLowerCase()
-  return text.includes('fixed') || text.includes('fixa') || text.includes('renda fixa')
+  const text = classText(row)
+  return text.includes('fixed') || text.includes('fixa')
 }
 
 export function isVariableIncome(row: ClassifiableRow): boolean {
-  const text = `${row.investmentClass ?? ''} ${row.subcategory}`.toLowerCase()
+  const text = classText(row)
   return text.includes('variable') || text.includes('variável') || text.includes('variavel')
 }
 
@@ -68,7 +88,7 @@ export function isVariableIncome(row: ClassifiableRow): boolean {
  * accounts after the investments are counted, which is a different quantity entirely.
  */
 export function isCashReserve(row: ClassifiableRow): boolean {
-  const text = `${row.investmentClass ?? ''} ${row.subcategory}`.toLowerCase()
+  const text = classText(row)
   return text.includes('cash') || text.includes('caixa') || text.includes('reserva') || text.includes('liquidez')
 }
 

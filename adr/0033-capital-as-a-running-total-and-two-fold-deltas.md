@@ -78,9 +78,25 @@ and credit adjustments stay: those give money back on something bought.
 **The cash reserve is a holding, not a remainder.** It comes from the investment
 rows that name it (`isCashReserve`), like fixed and variable income do — never
 from capital less what is invested, which is a different quantity: money not yet
-placed is not a reserve. All three classes appear in the pie's legend whether or
-not they hold anything, since a legend that comes and goes with the data cannot
-be learned.
+placed is not a reserve. All three classes are always answered for, holding
+anything or not, since a chart that comes and goes with the data cannot be
+learned.
+
+**A row says which pot it is about, and that decides its sign** (`heldDelta`). A
+broker's file is a ledger of one account's cash, so a fund row is written from
+the cash's side — money into a fund is negative — while a row about the cash
+itself keeps its sign. So a holding is the opposite of a fund row's value and
+the same as a cash row's, and the two readings are the two ends of one transfer:
+the movement out of the bank and the holding it became now cancel instead of
+being counted twice. The class is read from `investmentClass`, `category` and
+`subcategory` together, since a file without a class column is labelled by hand
+into whichever of the two the user chose.
+
+**Holdings are drawn as two rings** (`components/charts/holdings-pie.tsx`): the
+classes inside, what each is made of outside, tinted from the parent's colour.
+Names sit on leader lines rather than in a legend — a legend makes the eye carry
+a colour across the card and back, a line just points — and a slice too thin to
+label legibly is left to the tooltip.
 
 ## Consequences
 

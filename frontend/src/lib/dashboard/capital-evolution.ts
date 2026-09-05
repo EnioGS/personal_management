@@ -36,7 +36,11 @@ export interface CapitalEvolutionPoint {
 export interface CapitalSources {
   /** Rows on the movements screen: money entering and leaving the accounts. */
   movements: CapitalEntry[]
-  /** Rows on the investments screen: money moving into and out of holdings. */
+  /**
+   * What each investment row added to the holdings, already signed as a holding rather
+   * than as the cash movement it was written as — see `heldDelta`, which knows the
+   * classes and so knows which end of the transfer a row is describing.
+   */
   investments: CapitalEntry[]
 }
 
@@ -65,10 +69,10 @@ function sumByMonth(entries: CapitalEntry[], keep: (value: number) => boolean = 
  *
  * Capital is everything of value held, so it is the running total of what the accounts did
  * and what is held in investments, from the first month there is — each month's net added
- * to the last month's total. Both halves read the investment rows the same way: they are
- * written from the account's point of view, an aplicação leaving it and a resgate coming
- * back, so money placed in a fund is subtracted from them to become a holding rather than
- * a loss. Placing money moves it between two of your own pockets; it does not spend it.
+ * to the last month's total. The investment entries arrive already signed as holdings, so
+ * money placed in a fund adds to capital rather than subtracting from it: placing money
+ * moves it between two of your own pockets, and the movement out of the account that paid
+ * for it is the other half of the same sum.
  *
  * The movements are the whole story of the accounts, spending included: a card bill and a
  * Pix both leave as movements, and what left is already netted off by summing a month's
@@ -99,8 +103,8 @@ export function capitalEvolution(sources: CapitalSources, range: DateRange): Cap
   while (month <= last) {
     const income = movements.get(month) ?? 0
     const invested = investments.get(month) ?? 0
-    capital = roundCurrency(capital + income - invested)
-    held = roundCurrency(held - invested)
+    capital = roundCurrency(capital + income + invested)
+    held = roundCurrency(held + invested)
 
     const start = monthStart(month)
     const end = Date.parse(`${nextMonth(month)}-01`) - DAY_MS

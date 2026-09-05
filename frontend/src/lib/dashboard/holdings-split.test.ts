@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { holdingsSplit } from './holdings-split'
+import { heldDelta, holdingsSplit } from './holdings-split'
 import type { FilteredEntry } from '@/components/dashboard/use-dashboard-entries'
 
 function investment(overrides: Partial<FilteredEntry>): FilteredEntry {
@@ -18,35 +18,54 @@ function investment(overrides: Partial<FilteredEntry>): FilteredEntry {
   }
 }
 
+const groupFor = (rows: FilteredEntry[], key: string) => holdingsSplit(rows).find((group) => group.key === key)
+
+describe('which pot a row is about', () => {
+  it('reads a fund row from the cash that paid for it: money out is money held', () => {
+    expect(heldDelta(investment({ category: 'fixed income', value: -1049.69 }))).toBe(1049.69)
+    expect(heldDelta(investment({ category: 'fixed income', value: 2094.37 }))).toBe(-2094.37)
+  })
+
+  it('reads a cash row as itself: money stored is money held', () => {
+    expect(heldDelta(investment({ category: 'cash', subcategory: 'cash flow', value: 100 }))).toBe(100)
+  })
+})
+
 describe('holdingsSplit', () => {
-  it('splits the holdings by the class each row names', () => {
-    expect(holdingsSplit([
-      investment({ value: -3000, investmentClass: 'Renda Fixa' }),
-      investment({ value: -2000, investmentClass: 'renda variável' }),
-      investment({ value: -800, investmentClass: 'Reserva de emergência' }),
-    ])).toEqual({ fixedIncome: 3000, variableIncome: 2000, cash: 800, unclassified: 0 })
+  // The rows as they actually stand: one open Tesouro prefixado, an IPCA+ position bought
+  // and fully redeemed, and a hundred left in the reserve.
+  const rows = [
+    investment({ category: 'cash', subcategory: 'cash flow', value: 1000, date: Date.UTC(2026, 8, 5) }),
+    investment({ category: 'cash', subcategory: 'cash flow', value: 100, date: Date.UTC(2026, 8, 5) }),
+    investment({ category: 'cash', subcategory: 'cash flow', value: -1000, date: Date.UTC(2026, 8, 5) }),
+    investment({ category: 'cash', subcategory: 'proceeds', value: 66.49 }),
+    investment({ category: 'fixed income', subcategory: 'tesouro - prefixado', value: -1049.69 }),
+    investment({ category: 'fixed income', subcategory: 'tesouro - IPCA+', value: -2094.37 }),
+    investment({ category: 'fixed income', subcategory: 'tesouro - IPCA+', value: 2094.37 }),
+  ]
+
+  it('classes a row by what any of its labels says, not by one field', () => {
+    expect(groupFor(rows, 'fixedIncome')?.value).toBeCloseTo(1049.69)
+    expect(groupFor(rows, 'cash')?.value).toBeCloseTo(166.49)
   })
 
-  it('takes the cash reserve from the rows, never from what is left in the accounts', () => {
-    expect(holdingsSplit([investment({ value: -3000, investmentClass: 'Renda Fixa' })]).cash).toBe(0)
-  })
-
-  it('nets a redemption against what is held in that class', () => {
-    const split = holdingsSplit([
-      investment({ value: -3000, investmentClass: 'Renda Fixa' }),
-      investment({ value: 1200, investmentClass: 'Renda Fixa' }),
+  it('breaks a class into what is held inside it, dropping what was redeemed to nothing', () => {
+    expect(groupFor(rows, 'fixedIncome')?.children).toEqual([
+      { key: 'fixedIncome:tesouro - prefixado', label: 'tesouro - prefixado', value: 1049.69 },
     ])
-    expect(split).toMatchObject({ fixedIncome: 1800 })
   })
 
-  it('keeps money nobody classed apart, rather than guessing at it', () => {
-    expect(holdingsSplit([investment({ value: -500 })])).toMatchObject({ unclassified: 500 })
+  it('always answers for the three classes, holding anything or not', () => {
+    expect(holdingsSplit([]).map((group) => group.key)).toEqual(['cash', 'fixedIncome', 'variableIncome'])
   })
 
-  it('draws nothing negative: a class redeemed to nothing is nothing', () => {
-    expect(holdingsSplit([
-      investment({ value: -1000, investmentClass: 'Renda Fixa' }),
-      investment({ value: 1000, investmentClass: 'Renda Fixa' }),
-    ])).toEqual({ fixedIncome: 0, variableIncome: 0, cash: 0, unclassified: 0 })
+  it('adds the unclassified only when something is in it', () => {
+    const withStrays = holdingsSplit([investment({ category: 'crypto', value: -500 })])
+    expect(withStrays.map((group) => group.key)).toContain('unclassified')
+    expect(withStrays.find((group) => group.key === 'unclassified')?.value).toBe(500)
+  })
+
+  it('floors a class that has given back more than it ever held', () => {
+    expect(groupFor([investment({ category: 'fixed income', value: 900 })], 'fixedIncome')?.value).toBe(0)
   })
 })

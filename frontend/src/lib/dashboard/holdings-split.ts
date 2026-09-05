@@ -1,45 +1,77 @@
+import { UNLABELLED_LABEL, type FilteredEntry } from '@/components/dashboard/use-dashboard-entries'
 import { isCashReserve, isFixedIncome, isVariableIncome } from '@/lib/model/investment-rows'
-import type { FilteredEntry } from '@/components/dashboard/use-dashboard-entries'
 
-export interface HoldingsSplit {
-  fixedIncome: number
-  variableIncome: number
-  /** The reserve, held as money on purpose — a class a row names, like any other. */
-  cash: number
-  /** Holdings whose class nobody named — money that is invested but unsorted. */
-  unclassified: number
+export type HoldingClass = 'cash' | 'fixedIncome' | 'variableIncome' | 'unclassified'
+
+export interface HoldingGroup {
+  key: HoldingClass
+  /** What is held in that class now: everything put in, less everything taken out. */
+  value: number
+  /** The same, by whatever the rows call the thing itself — the fund, the paper, the pot. */
+  children: { key: string; label: string; value: number }[]
 }
 
 /**
- * The holdings, divided by the class each row names.
+ * Which pot a row is about.
  *
- * Every part comes from the investment rows and nowhere else — the cash reserve included,
- * which is money deliberately held as money and says so on its own row. What is left in
- * the accounts is not a reserve; it is simply not invested yet, and calling it one would
- * put the capital line's arithmetic inside a pie about holdings.
+ * A broker's file is a ledger of one account's cash, so every line is written from that
+ * cash's point of view: money going into a fund leaves the cash and is negative, money
+ * coming back arrives and is positive. A row about the cash itself — stored, withdrawn,
+ * interest paid — is already about the pot it names, and keeps its sign.
  *
- * The rows are written from the account's point of view, the same way the capital line
- * reads them: money placed is negative, so what is held is the negative of their sum. A
- * class redeemed to nothing is floored at zero, since a pie cannot draw a negative slice.
+ * So what a row adds to the class it names is its value for cash, and the opposite of its
+ * value for everything else. Both readings are the same rule seen from the two ends of
+ * the same transfer.
  */
-export function holdingsSplit(investments: FilteredEntry[]): HoldingsSplit {
-  let fixedIncome = 0
-  let variableIncome = 0
-  let cash = 0
-  let unclassified = 0
+export function heldDelta(row: FilteredEntry): number {
+  return isCashReserve(row) ? row.value : -row.value
+}
+
+export function classOf(row: FilteredEntry): HoldingClass {
+  if (isCashReserve(row)) return 'cash'
+  if (isFixedIncome(row)) return 'fixedIncome'
+  if (isVariableIncome(row)) return 'variableIncome'
+  return 'unclassified'
+}
+
+/** The three classes, in the order they are always shown; unclassified joins only if used. */
+const CLASSES: HoldingClass[] = ['cash', 'fixedIncome', 'variableIncome']
+
+/**
+ * The holdings, by class and by what is held inside each.
+ *
+ * The three classes are always returned, holding anything or not, so a legend does not
+ * come and go with the data; unclassified appears only when something is in it, being a
+ * prompt to label rather than a fourth kind of money. Anything redeemed to nothing is
+ * dropped rather than drawn as a slice of zero, and a class that has gone negative — more
+ * taken out than was ever put in, which means a row is missing — is floored at zero.
+ */
+export function holdingsSplit(investments: FilteredEntry[]): HoldingGroup[] {
+  const totals = new Map<HoldingClass, Map<string, number>>()
 
   for (const row of investments) {
-    const held = -row.value
-    if (isCashReserve(row)) cash += held
-    else if (isFixedIncome(row)) fixedIncome += held
-    else if (isVariableIncome(row)) variableIncome += held
-    else unclassified += held
+    const group = totals.get(classOf(row)) ?? new Map<string, number>()
+    const name = row.subcategory.trim() || row.category.trim() || UNLABELLED_LABEL
+    group.set(name, (group.get(name) ?? 0) + heldDelta(row))
+    totals.set(classOf(row), group)
   }
 
-  return {
-    fixedIncome: Math.max(0, fixedIncome),
-    variableIncome: Math.max(0, variableIncome),
-    cash: Math.max(0, cash),
-    unclassified: Math.max(0, unclassified),
-  }
+  const unclassified = totals.get('unclassified')
+  const shown = [...CLASSES, ...(unclassified && sum(unclassified) > 0 ? (['unclassified'] as HoldingClass[]) : [])]
+
+  return shown.map((key) => {
+    const group = totals.get(key) ?? new Map<string, number>()
+    return {
+      key,
+      value: Math.max(0, sum(group)),
+      children: [...group.entries()]
+        .map(([label, value]) => ({ key: `${key}:${label}`, label, value }))
+        .filter((child) => child.value > 0.005)
+        .sort((left, right) => right.value - left.value),
+    }
+  })
+}
+
+function sum(group: Map<string, number>): number {
+  return [...group.values()].reduce((total, value) => total + value, 0)
 }

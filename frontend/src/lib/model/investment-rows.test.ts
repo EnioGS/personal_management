@@ -58,3 +58,14 @@ describe('which rows are investments at all', () => {
     expect(isVariableIncome(row())).toBe(false)
   })
 })
+
+describe('a row labelled with its class', () => {
+  it('is not read as a payout because "fixed income" contains the word', () => {
+    expect(asTransaction(row({ category: 'fixed income', subcategory: 'tesouro - IPCA+' })).type).toBe('buy')
+  })
+
+  it('still reads the kind when the row says one', () => {
+    expect(asTransaction(row({ category: 'fixed income', subcategory: 'resgate' })).type).toBe('sell')
+    expect(asTransaction(row({ category: 'fixed income', subcategory: 'juros' })).type).toBe('income')
+  })
+})
