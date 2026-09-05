@@ -308,11 +308,16 @@ Two things it optimizes for:
   its entity (a category, an account) via a stable hash, not the entity's
   position in whatever is currently on screen, so filtering never repaints
   a survivor.
-- Finances' Movements dashboard is a real dashboard (adr/0025): one context row
-  (date range, category) scopes a KPI row and a combined diverging in/out chart —
-  not a single hardcoded chart. Capital means everything of value held,
-  investments included, which is what *Current capital* and the capital line both
-  show.
+- Finances' Movements dashboard reads top to bottom in order of what matters (adr/0025):
+  four tiles above the fold — what is held, what the month netted, what it spent, what is
+  invested — then the shape of it over time, then the detail for whoever scrolls: in and
+  out by month, what was kept of what arrived, how long the capital covers the spending,
+  balances by account, where money came from, what each card was billed, an average month,
+  and the largest movements. Capital is everything of value held: every movement and every
+  investment, accumulated from the first month there is. **Spending is deliberately not
+  part of it** — a spending row is a copy of the movement that paid for it, and counting
+  both would spend the money twice. Each tile's own line draws the last four months; the
+  chart below is bounded only by the period on the bar.
 - Orçamento, Recorrentes, Posições, Proventos and Alocação (adr/0026) all read
   from data the model already had — a budget compares category spend already
   computed elsewhere, positions/allocation share one weighted-average-price
