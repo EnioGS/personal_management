@@ -93,10 +93,11 @@ being counted twice. The class is read from `investmentClass`, `category` and
 into whichever of the two the user chose.
 
 **Holdings are drawn as two rings** (`components/charts/holdings-pie.tsx`): the
-classes inside, what each is made of outside, tinted from the parent's colour.
-Names sit on leader lines rather than in a legend — a legend makes the eye carry
-a colour across the card and back, a line just points — and a slice too thin to
-label legibly is left to the tooltip.
+classes outside, what each is made of inside, tinted from the parent's colour.
+Only the outer ring speaks — each class named on a line pointing at its own arc,
+rather than in a legend the eye has to carry a colour across the card to read.
+The inner ring says its part by shape and shade, and by hovering; naming those
+too would be four labels for two facts on a card this size.
 
 ## Consequences
 
