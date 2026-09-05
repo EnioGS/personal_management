@@ -56,8 +56,11 @@ export function EditableCell({ value, onCommit, validate, missing, readOnly, dis
         onKeyDown={onKeyDown}
         title={error ?? undefined}
         className={cn(
-          'w-full min-w-24 rounded-sm border bg-transparent px-1 py-0.5 outline-none',
-          error ? 'border-destructive text-destructive' : 'border-ring',
+          // Fills the cell exactly, so editing does not move anything: the box you type
+          // in is the cell, not a smaller box drawn inside it.
+          'block h-full w-full bg-transparent px-2 py-1.5 outline-none',
+          'ring-inset ring-1',
+          error ? 'ring-destructive text-destructive' : 'ring-ring',
           className,
         )}
       />
@@ -69,9 +72,12 @@ export function EditableCell({ value, onCommit, validate, missing, readOnly, dis
       onDoubleClick={() => { if (!readOnly && !disabled) setDraft(value) }}
       title={title ?? restingError ?? (readOnly ? undefined : 'Double-click to edit')}
       className={cn(
-        'min-h-5 rounded-sm border px-1 py-0.5',
-        restingError ? 'border-destructive text-destructive' : missing ? 'border-amber-500' : 'border-transparent',
-        !readOnly && !disabled && 'hover:border-border',
+        // The state is drawn on the cell itself — an inset ring on the full width and
+        // height — rather than on a smaller box inside it, which reads as an input that
+        // is always open and makes a table look like a form.
+        'block h-full w-full px-2 py-1.5',
+        restingError ? 'ring-destructive text-destructive ring-inset ring-1' : missing ? 'ring-inset ring-1 ring-amber-500' : '',
+        !readOnly && !disabled && 'hover:bg-muted/40',
         className,
       )}
     >

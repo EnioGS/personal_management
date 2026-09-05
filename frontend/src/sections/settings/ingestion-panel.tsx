@@ -397,7 +397,7 @@ export function IngestionPanel() {
                       {row.duplicateOf ? <span className="text-destructive">duplicate?</span> : ''}
                     </td>
                     {selectedFile.originalColumns.map((column) => (
-                      <td key={column} className="p-1">
+                      <td key={column} className="p-0 align-middle">
                         <EditableCell
                           value={row.values[column] ?? ''}
                           disabled={marking}
@@ -411,7 +411,7 @@ export function IngestionPanel() {
                       const text = drafts[key] ?? labelText(row.labels, column, catalogue)
                       const missing = MEANING_COLUMNS.includes(column as never) ? false : (row.labels[column] ?? []).length === 0
                       return (
-                        <td key={column} className="p-1">
+                        <td key={column} className="p-0 align-middle">
                           <EditableCell
                             value={text}
                             disabled={marking}
@@ -479,14 +479,14 @@ export function IngestionPanel() {
                   )}
                 >
                   <td className="text-muted-foreground p-2 font-mono whitespace-nowrap" title="The id every copy of this row shares, fixed for its life.">{row.rowId}</td>
-                  <td className="p-1 whitespace-nowrap">
+                  <td className="p-0 align-middle whitespace-nowrap">
                     <EditableCell
                       value={row.date ? new Date(row.date).toISOString().slice(0, 10) : ''}
                       disabled={marking}
                       onCommit={(value) => void editConfirmed(row, 'date', value)}
                     />
                   </td>
-                  <td className="p-1 tabular-nums">
+                  <td className="p-0 align-middle tabular-nums">
                     <EditableCell
                       value={row.amount === undefined ? '' : String(row.amount)}
                       disabled={marking}
@@ -494,11 +494,11 @@ export function IngestionPanel() {
                     />
                   </td>
                   {(['category', 'subcategory'] as const).map((column) => (
-                    <td key={column} className="p-1">
+                    <td key={column} className="p-0 align-middle">
                       <EditableCell value={row[column]} disabled={marking} onCommit={(value) => void editConfirmed(row, column, value)} />
                     </td>
                   ))}
-                  <td className="max-w-[28rem] p-1">
+                  <td className="max-w-[28rem] p-0 align-middle">
                     <EditableCell
                       value={row.observations}
                       disabled={marking}
