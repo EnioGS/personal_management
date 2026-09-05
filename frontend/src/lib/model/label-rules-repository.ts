@@ -1,4 +1,5 @@
 import { loadLabelCatalogue } from '@/lib/label-catalogue-source'
+import type { LocalRow } from '@/lib/local-store/create-local-table'
 import { withDerivedSections } from './label-catalogue'
 import { resolveConfirmedField, resolveSourceField } from './ingestion-fields'
 import { applyLabelRules, ruleStats, type StoredRule } from './label-rules'
@@ -47,6 +48,9 @@ export async function applyLabelRulesToRows(context: RuleContext, translate: (ke
   const catalogue = await loadLabelCatalogue(translate)
   const table = context === 'source' ? sourceRowsTable : confirmedRowsTable
   const only = rowIds && rowIds.length > 0 ? rowIds : undefined
+  // Collected and written once: rules run over every row after every upload, and a write
+  // per row is a transaction per row.
+  const updates: LocalRow[] = []
 
   for (const record of await table.toArray()) {
     if (only && !only.includes(record.id)) continue
@@ -55,7 +59,8 @@ export async function applyLabelRulesToRows(context: RuleContext, translate: (ke
       const row = record.data as SourceRow
       const applied = applyLabelRules(row.labels, rules, (field) => resolveSourceField(row, field))
       if (applied.filled.length === 0) continue
-      await table.update(record.id, {
+      updates.push({
+        ...record,
         data: { ...row, labels: withDerivedSections(applied.labels, catalogue), appliedRuleIds: applied.appliedRuleIds } satisfies SourceRow,
       })
       result.rowsTouched += 1
@@ -71,7 +76,8 @@ export async function applyLabelRulesToRows(context: RuleContext, translate: (ke
     const row = record.data as ConfirmedRow
     const applied = applyLabelRules({ category: row.category, subcategory: row.subcategory }, rules, (field) => resolveConfirmedField(row, field))
     if (applied.filled.length === 0) continue
-    await table.update(record.id, {
+    updates.push({
+      ...record,
       data: { ...row, category: applied.labels.category ?? row.category, subcategory: applied.labels.subcategory ?? row.subcategory } satisfies ConfirmedRow,
     })
     result.rowsTouched += 1
@@ -81,6 +87,7 @@ export async function applyLabelRulesToRows(context: RuleContext, translate: (ke
     }
   }
 
+  if (updates.length > 0) await table.bulkPut(updates)
   if (result.rowsTouched > 0) {
     await ingestionAuditEventsTable.add({ createdAt: Date.now(), data: { event: 'rulesApplied', actor: 'user', details: { context, ...result } } })
   }

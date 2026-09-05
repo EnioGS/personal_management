@@ -151,12 +151,13 @@ export function IngestionPanel() {
     // and a .md holding a pipe table are both read here.
     const readable = files.filter((file) => /\.(csv|txt|md)$/i.test(file.name))
     if (readable.length === 0) { setMessage('Import a .csv, .txt or .md file — anything holding a header row and rows under it.'); return }
-    let firstId: number | null = null
+    const imported: number[] = []
     const failed: string[] = []
     for (const file of readable) {
       try {
-        const id = await createSourceFile(file.name, await file.text())
-        firstId ??= id
+        // The duplicate scan reads everything the vault holds, so it runs once for the
+        // whole upload rather than once per file over a set growing as it goes.
+        imported.push(await createSourceFile(file.name, await file.text(), { scanDuplicates: false }))
       } catch (error) {
         failed.push(`${file.name}: ${error instanceof Error ? error.message : 'could not be read'}`)
       }
@@ -164,7 +165,7 @@ export function IngestionPanel() {
     // Source rules run at upload, which is what lets a file land already labelled.
     const applied = await applyLabelRulesToRows('source', (key) => String(t(key as never)))
     await refreshAllLocalStores()
-    if (firstId !== null) setSelected(`source:${firstId}`)
+    if (imported[0] !== undefined) setSelected(`source:${imported[0]}`)
     setMessage([
       `Imported ${readable.length - failed.length} file(s); ${applied.rowsTouched} row(s) labelled by standing rules.`,
       ...failed,

@@ -4,6 +4,7 @@ import { parseNumberValue } from '@/lib/parse-number'
 import { placementsOf, type LabelCatalogue } from './label-catalogue'
 import { DEFAULT_MEANING, ingestionLabelErrors } from './ingestion'
 import { sourceFilenameOf } from './observations'
+import type { LocalRow } from '@/lib/local-store/create-local-table'
 import { confirmedRowsTable, ingestionAuditEventsTable, sourceFilesTable, sourceRowsTable } from './model-db'
 import { newRowId } from './row-id'
 import { applySignConvention, shapeOfAmounts } from './sign-convention'
@@ -102,42 +103,65 @@ export function rowSignature(values: Record<string, string>, assignments: Record
  * filename — inside one file, two identical rows are two real transactions. The flag is
  * advisory: it says "look at this", never "drop this", and only the person or the
  * assistant reading it decides anything.
+ *
+ * Several files are scanned in one pass. Per file it meant reading every row the app
+ * holds once for each of them — an upload of forty files read the whole vault forty
+ * times, over a set growing as it went — and writing each changed row on its own. One
+ * read, one write.
  */
-export async function flagCrossFileDuplicates(sourceId: number): Promise<{ flagged: number }> {
+export async function flagCrossFileDuplicates(...sourceIds: number[]): Promise<{ flagged: number }> {
+  if (sourceIds.length === 0) return { flagged: 0 }
+  const targets = new Set(sourceIds)
   const files = new Map((await sourceFilesTable.toArray()).map((row) => [row.id, row.data as SourceFile]))
-  const file = files.get(sourceId)
-  if (!file) throw new Error(`Source file ${sourceId} was not found.`)
-
-  const elsewhere = new Map<string, string>()
-  for (const stored of await sourceRowsTable.toArray()) {
-    const row = stored.data as SourceRow
-    if (row.sourceId === sourceId) continue
-    const other = files.get(row.sourceId)
-    if (other) elsewhere.set(rowSignature(row.values, other.assignments), row.rowId)
+  for (const sourceId of sourceIds) {
+    if (!files.has(sourceId)) throw new Error(`Source file ${sourceId} was not found.`)
   }
-  for (const stored of await confirmedRowsTable.toArray()) {
+
+  const [sourceRows, confirmedRows] = await Promise.all([sourceRowsTable.toArray(), confirmedRowsTable.toArray()])
+
+  // Every signature in the vault, with the filename it came from: a row is compared
+  // against this minus its own file, so one index serves every file being scanned.
+  const seen = new Map<string, { filename: string; rowId: string }[]>()
+  const remember = (signature: string, filename: string, rowId: string) => {
+    seen.set(signature, [...(seen.get(signature) ?? []), { filename, rowId }])
+  }
+  for (const stored of sourceRows) {
+    const row = stored.data as SourceRow
+    const file = files.get(row.sourceId)
+    if (file) remember(rowSignature(row.values, file.assignments), file.originalFilename, row.rowId)
+  }
+  for (const stored of confirmedRows) {
     const row = stored.data as ConfirmedRow
     // Which file a confirmed row came from is in its observations, where the file's own
     // name was condensed along with everything else no column was assigned to.
-    if (sourceFilenameOf(row.observations) === file.originalFilename) continue
-    if (typeof row.date === 'number' && typeof row.amount === 'number') {
-      elsewhere.set(`${row.date}|${Math.abs(row.amount).toFixed(2)}`, row.rowId)
+    if (typeof row.date === 'number' && typeof row.value === 'number') {
+      remember(`${row.date}|${Math.abs(row.value).toFixed(2)}`, sourceFilenameOf(row.observations), row.rowId)
     }
   }
 
   let flagged = 0
-  for (const stored of await sourceRowsTable.toArray()) {
+  const updates: LocalRow[] = []
+  for (const stored of sourceRows) {
     const row = stored.data as SourceRow
-    if (row.sourceId !== sourceId) continue
-    const match = elsewhere.get(rowSignature(row.values, file.assignments))
-    if (match === row.duplicateOf) { if (match) flagged += 1; continue }
-    await sourceRowsTable.update(stored.id, { data: { ...row, duplicateOf: match } satisfies SourceRow })
+    if (!targets.has(row.sourceId)) continue
+    const file = files.get(row.sourceId)!
+    const match = seen
+      .get(rowSignature(row.values, file.assignments))
+      ?.find((candidate) => candidate.filename !== file.originalFilename)?.rowId
+
     if (match) flagged += 1
+    if (match === row.duplicateOf) continue
+    updates.push({ ...stored, data: { ...row, duplicateOf: match } satisfies SourceRow })
   }
+  if (updates.length > 0) await sourceRowsTable.bulkPut(updates)
   return { flagged }
 }
 
-export async function createSourceFile(originalFilename: string, rawCsv: string): Promise<number> {
+export async function createSourceFile(
+  originalFilename: string,
+  rawCsv: string,
+  options: { scanDuplicates?: boolean } = {},
+): Promise<number> {
   const parsed = parseSourceCsv(rawCsv)
   // A table with a header and nothing under it is not data. Refusing it here is clearer
   // than creating a file that would be retired a moment later for being empty.
@@ -175,7 +199,8 @@ export async function createSourceFile(originalFilename: string, rawCsv: string)
     } satisfies SourceRow,
   })))
 
-  const duplicates = await flagCrossFileDuplicates(sourceId)
+  // A caller importing several files scans once at the end instead of once per file.
+  const duplicates = options.scanDuplicates === false ? { flagged: 0 } : await flagCrossFileDuplicates(sourceId)
   await ingestionAuditEventsTable.add({
     createdAt: Date.now(),
     data: { event: 'sourceUploaded', actor: 'user', sourceId, details: { originalFilename, rows: parsed.rows.length, ...duplicates } },
@@ -235,6 +260,7 @@ function columnFor(file: SourceFile, field: IngestionTargetField): string | unde
  */
 export async function rewriteAmounts(sourceId: number, file: SourceFile): Promise<void> {
   const valueColumn = columnFor(file, 'value')
+  const updates: LocalRow[] = []
   for (const stored of await sourceRowsTable.toArray()) {
     const row = stored.data as SourceRow
     if (row.sourceId !== sourceId) continue
@@ -243,8 +269,7 @@ export async function rewriteAmounts(sourceId: number, file: SourceFile): Promis
     // rewritten goes back to what the file said.
     if (!valueColumn) {
       if (row.importedValue === undefined) continue
-      const restored = { ...row, values: { ...row.values }, importedValue: undefined }
-      await sourceRowsTable.update(stored.id, { data: restored satisfies SourceRow })
+      updates.push({ ...stored, data: { ...row, values: { ...row.values }, importedValue: undefined } satisfies SourceRow })
       continue
     }
 
@@ -259,8 +284,9 @@ export async function rewriteAmounts(sourceId: number, file: SourceFile): Promis
       next.importedValue = imported
     }
     if (next.values[valueColumn] === row.values[valueColumn] && next.importedValue === row.importedValue) continue
-    await sourceRowsTable.update(stored.id, { data: next })
+    updates.push({ ...stored, data: next })
   }
+  if (updates.length > 0) await sourceRowsTable.bulkPut(updates)
 }
 
 /** What the file's value column looks like — the evidence a sign decision is made from. */

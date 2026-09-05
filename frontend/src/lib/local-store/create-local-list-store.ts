@@ -19,15 +19,29 @@ interface LocalListState<T> {
  * to wait for, whatever is already in the browser is on screen from the first
  * render, without the user clicking anything (see adr/0019).
  */
-const refreshCallbacks: (() => Promise<void>)[] = []
+/** Every store this factory has made, by the name of the Dexie table behind it. */
+const refreshCallbacks = new Map<string, () => Promise<void>>()
 
 /**
- * Re-reads every store created by this factory. Used after an operation that
- * rewrites the tables underneath them (import/wipe in lib/data-file.ts), which
- * the individual stores have no way of noticing on their own.
+ * Re-reads every store created by this factory. For an operation that rewrites the tables
+ * underneath them wholesale — import, wipe — where naming what changed would mean naming
+ * everything.
  */
 export async function refreshAllLocalStores(): Promise<void> {
-  await Promise.all(refreshCallbacks.map((refresh) => refresh()))
+  await Promise.all([...refreshCallbacks.values()].map((refresh) => refresh()))
+}
+
+/**
+ * Re-reads only the stores named.
+ *
+ * Refreshing everything after every write means reading every row the app holds to show a
+ * change to one of them — and with a few thousand rows in the browser that is the cost
+ * the user feels when a file is imported or a cell is edited. Naming the tables that
+ * actually changed keeps the reload proportional to the change. A name nothing was made
+ * for is ignored rather than throwing: it can only mean a table with no store on it.
+ */
+export async function refreshLocalStores(...tables: string[]): Promise<void> {
+  await Promise.all(tables.map((table) => refreshCallbacks.get(table)?.()).filter(Boolean))
 }
 
 export function createLocalListStore<T>(table: EntityTable<LocalRow, 'id'>) {
@@ -69,7 +83,7 @@ export function createLocalListStore<T>(table: EntityTable<LocalRow, 'id'>) {
     },
   }))
 
-  refreshCallbacks.push(() => useStore.getState().refresh())
+  refreshCallbacks.set(table.name, () => useStore.getState().refresh())
   void useStore.getState().refresh()
 
   return useStore

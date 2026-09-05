@@ -133,7 +133,14 @@ Two things it optimizes for:
 - No backend by design — data stays local-first or in private storage the
   user controls, not a third-party-hosted service.
 - Local storage is one generic factory (`lib/local-store/`), not per-section
-  persistence code — every new section that needs stored data reuses it.
+  persistence code — every new section that needs stored data reuses it. A write says
+  which tables it changed (`refreshLocalStores('sourceRows')`) so only those are re-read;
+  refreshing everything after every write meant reading every row the app holds to show a
+  change to one of them, which is what an import of forty files felt like.
+- Work that touches many rows is done in one pass and written once: the duplicate scan
+  reads the vault a single time for a whole upload rather than once per file over a set
+  growing as it goes, and the sign rewrite and the standing rules `bulkPut` their changes
+  instead of opening a transaction per row.
 - The chat assistant is a global overlay (`components/chat/`), not a
   section — it stays available regardless of which section/item is active.
 - Tools the assistant can call are a flat registry (`lib/tools/registry.ts`):

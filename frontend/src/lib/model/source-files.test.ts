@@ -361,3 +361,29 @@ describe('files with nothing in them', () => {
     expect(await sourceFilesTable.count()).toBe(1)
   })
 })
+
+describe('scanning many files at once', () => {
+  beforeEach(async () => { await wipeAllData() })
+
+  it('flags across files in one pass, exactly as scanning them one by one would', async () => {
+    const august = await createSourceFile('banco-agosto.csv', BANK_CSV, { scanDuplicates: false })
+    const september = await createSourceFile('banco-setembro.csv', BANK_CSV, { scanDuplicates: false })
+    await assignSourceColumns(august, { Data: 'date', Valor: 'value' })
+    await assignSourceColumns(september, { Data: 'date', Valor: 'value' })
+
+    // Nothing was scanned on the way in; one pass settles both files.
+    await flagCrossFileDuplicates(august, september)
+
+    expect((await rowsOf(september)).every((entry) => entry.row.duplicateOf)).toBe(true)
+    expect((await rowsOf(august)).every((entry) => entry.row.duplicateOf)).toBe(true)
+  })
+
+  it('still compares a row only against other files, however many are scanned together', async () => {
+    const repeated = await createSourceFile('repeat.csv', 'Data,Valor\n01/08/2026,10\n01/08/2026,10', { scanDuplicates: false })
+    await assignSourceColumns(repeated, { Data: 'date', Valor: 'value' })
+
+    await flagCrossFileDuplicates(repeated)
+
+    expect((await rowsOf(repeated)).map((entry) => entry.row.duplicateOf)).toEqual([undefined, undefined])
+  })
+})
