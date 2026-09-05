@@ -5,7 +5,6 @@
   "items": {
     "general": "General",
     "assistant": "Assistant",
-    "accountsCards": "Accounts & Cards",
     "ingestion": "Data ingestion centre"
   },
   "appearance": {
