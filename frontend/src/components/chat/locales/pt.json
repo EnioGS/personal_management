@@ -19,6 +19,7 @@
     "newConversation": "Nova conversa",
     "conversations": "Conversas",
     "noConversations": "Nada aqui ainda.",
-    "deleteConversation": "Excluir esta conversa"
+    "deleteConversation": "Excluir esta conversa",
+    "queued": "{{count}} na fila"
   }
 }

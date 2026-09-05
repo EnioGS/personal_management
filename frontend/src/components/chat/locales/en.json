@@ -19,6 +19,7 @@
     "newConversation": "New conversation",
     "conversations": "Conversations",
     "noConversations": "Nothing here yet.",
-    "deleteConversation": "Delete this conversation"
+    "deleteConversation": "Delete this conversation",
+    "queued": "{{count}} queued"
   }
 }

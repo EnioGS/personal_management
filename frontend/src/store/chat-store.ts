@@ -56,6 +56,12 @@ interface ChatState {
   isSending: boolean
   status: ChatStatus
   usage: ChatUsage
+  /**
+   * Messages written while a reply was still coming, waiting their turn. They are already
+   * in `messages` — each one its own bubble — and go to the model together when the
+   * current exchange finishes.
+   */
+  queued: string[]
   /** The conversation being written to, or null before its first message is sent. */
   conversationId: number | null
   title: string
@@ -107,22 +113,22 @@ function activeConnection(): AssistantConfig | null {
   return null
 }
 
-export const useChatStore = create<ChatState>((set, get) => ({
-  messages: [],
-  attachments: [],
-  isSending: false,
-  status: { type: 'idle' },
-  usage: { lastMessageTokens: 0, lastMessageRounds: 0, sessionTokens: 0, contextTokens: 0, contextWindow: null, sessionCost: null, lastMessageCost: null },
-  conversationId: null,
-  title: UNTITLED,
-
-  sendMessage: async (text) => {
-    const userMessage: ChatMessage = { id: crypto.randomUUID(), role: 'user', content: text }
-    const priorMessages = get().messages
-    set({ messages: [...priorMessages, userMessage], isSending: true, status: { type: 'waiting' } })
-    // Saved the moment it is sent, not when the reply lands: a message that cost the user
-    // thought should survive a reply that never arrives.
-    await persist(set, get)
+export const useChatStore = create<ChatState>((set, get) => {
+  /**
+   * Sends one exchange, for messages whose bubbles are already on screen.
+   *
+   * `texts` is what goes to the model as a single user turn — several, when the user
+   * wrote while a reply was still coming. The conversation keeps them apart, because
+   * that is how they were written and how they will read tomorrow; the model gets them
+   * together, because they are one thing said in several breaths and answering each in
+   * turn would mean answering the first without the rest.
+   */
+  async function deliver(texts: string[]): Promise<void> {
+    const history = get().messages
+    // The bubbles for this turn are already at the end of the history; the model sees
+    // everything before them, then the turn itself as one message.
+    const priorMessages = history.slice(0, Math.max(0, history.length - texts.length))
+    set({ isSending: true, status: { type: 'waiting' } })
 
     try {
       const connection = activeConnection()
@@ -142,7 +148,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
       const apiMessages: OpenRouterMessage[] = [
         { role: 'system', content: systemPrompt + formatAttachmentsForPrompt(attachments) },
-        ...[...priorMessages, userMessage].map((m) => ({ role: m.role, content: m.content }) as OpenRouterMessage),
+        ...priorMessages.map((m) => ({ role: m.role, content: m.content }) as OpenRouterMessage),
+        { role: 'user', content: texts.join('\n\n') },
       ]
 
       const requestFn = connection.provider === 'openai' ? requestOpenAiChatMessage : requestChatMessage
@@ -193,7 +200,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       await persist(set, get)
       // A conversation nobody has named takes its name from what it opened with, once.
       if (get().title === UNTITLED) {
-        const named = await titleFor(connection, text)
+        const named = await titleFor(connection, texts[0])
         if (named) await get().setTitle(named)
       }
     } catch (err) {
@@ -204,11 +211,46 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
 
     if (useChatPanelStore.getState().panelWidth === 0) useChatPanelStore.getState().markUnread()
+
+    // Whatever was written while that was in flight goes now, as one turn.
+    const waiting = get().queued
+    if (waiting.length > 0) {
+      set({ queued: [] })
+      await deliver(waiting)
+    }
+  }
+
+  return {
+  messages: [],
+  attachments: [],
+  isSending: false,
+  status: { type: 'idle' },
+  usage: { lastMessageTokens: 0, lastMessageRounds: 0, sessionTokens: 0, contextTokens: 0, contextWindow: null, sessionCost: null, lastMessageCost: null },
+  queued: [],
+  conversationId: null,
+  title: UNTITLED,
+
+  sendMessage: async (text) => {
+    const userMessage: ChatMessage = { id: crypto.randomUUID(), role: 'user', content: text }
+    set({ messages: [...get().messages, userMessage] })
+    // Saved the moment it is sent, not when the reply lands: a message that cost the user
+    // thought should survive a reply that never arrives.
+    await persist(set, get)
+
+    // A reply is still coming: the message waits its turn rather than the user waiting to
+    // write it. It is already on screen, so nothing about it is hidden while it waits.
+    if (get().isSending) {
+      set({ queued: [...get().queued, text] })
+      return
+    }
+
+    await deliver([text])
   },
 
   clearMessages: () => set({
     messages: [],
     attachments: [],
+    queued: [],
     conversationId: null,
     title: UNTITLED,
     // The window survives a cleared conversation; what it cost does not.
@@ -225,6 +267,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       title: conversation.title,
       messages: conversation.messages,
       attachments: [],
+      queued: [],
       status: { type: 'idle' },
       usage: { ...get().usage, lastMessageTokens: 0, lastMessageRounds: 0, sessionTokens: 0, contextTokens: 0, sessionCost: null, lastMessageCost: null },
     })
@@ -254,7 +297,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const errorMessage: ChatMessage = { id: crypto.randomUUID(), role: 'assistant', content: text, isError: true }
     set({ messages: [...get().messages, errorMessage] })
   },
-}))
+  }
+})
 
 /** Writes the conversation as it now stands, remembering the id a first save mints. */
 async function persist(set: (partial: Partial<ChatState>) => void, get: () => ChatState) {

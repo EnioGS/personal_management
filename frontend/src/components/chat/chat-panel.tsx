@@ -41,6 +41,7 @@ export function ChatPanel() {
   const removeAttachment = useChatStore((s) => s.removeAttachment)
   const pushError = useChatStore((s) => s.pushError)
   const usage = useChatStore((s) => s.usage)
+  const queued = useChatStore((s) => s.queued)
 
   const [draft, setDraft] = useState('')
   /** Anything typed hands the composer the whole width until it is sent or cleared. */
@@ -250,7 +251,7 @@ export function ChatPanel() {
   }
 
   function submitDraft() {
-    if (!draft.trim() || isSending) return
+    if (!draft.trim()) return
     void sendMessage(draft.trim())
     setDraft('')
     // Sent from the closed panel, the message and its reply would land out of sight and
@@ -379,6 +380,13 @@ export function ChatPanel() {
                   {status.type === 'tool'
                     ? t('panel.statusUsingTool', { name: status.name })
                     : t('panel.statusWaiting')}
+                  {/* Beside the reply that is holding them up, which is the only place the
+                      count answers the question it raises. */}
+                  {queued.length > 0 && (
+                    <span className="bg-background/60 rounded-full px-2 py-0.5 text-xs">
+                      {t('panel.queued', { count: queued.length })}
+                    </span>
+                  )}
                 </div>
               )}
             </div>
@@ -447,7 +455,7 @@ export function ChatPanel() {
           {!isSendFloating && (
             <Button
               type="submit"
-              disabled={!draft.trim() || isSending}
+              disabled={!draft.trim()}
               size={isComposing ? 'icon' : 'default'}
               aria-label={t('panel.send')}
               title={t('panel.send')}
@@ -479,7 +487,6 @@ export function ChatPanel() {
                   submitDraft()
                 }
               }}
-              disabled={isSending}
               className={cn('min-h-0 resize-none overflow-y-hidden leading-5', !isComposing && 'pr-9')}
             />
             {/* Only while the box is empty: once there is a message, the width belongs to
