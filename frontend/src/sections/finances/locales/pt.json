@@ -41,8 +41,7 @@
     "accountsAndCards": "Por conta e cartão",
     "medianMonth": "Mês mediano",
     "bestMonth": "Melhor mês",
-    "worstMonth": "Pior mês",
-    "categoriesFootnote": "Média por mês; a seta compara o trimestre mais recente do período com essa média."
+    "worstMonth": "Pior mês"
   },
   "spending": {
     "totalSpent": "Total gasto",

@@ -56,13 +56,16 @@ positive and the ratio is at most ten times over — a base of zero, of the
 opposite sign, or near enough to zero to yield hundreds of percent, describes
 the base rather than the change, and is left off rather than shown.
 
-**Spending categories are a treemap, not a list.** Area carries the ranking, so
-forty categories fit where a list scrolled, and each box is coloured by the
-entity it names (`colorForKey`, past eight slots colours repeat — the ordering
-is the ranking, not the hue). Precision is the trade: a box says its name, then
-its value, then its comparison arrow, each only once it is big enough to hold
-them legibly. It took the space of the two smallest tiles, which said one
-uncontextualised number each.
+**Spending gets a treemap** (`components/charts/category-treemap.tsx`). Area
+carries the ranking, so forty categories fit where a list scrolled; a box says
+its name, then its value, then its comparison arrow, each only once it is big
+enough to hold them legibly. Two things it deliberately does not do: it draws
+nothing between the boxes, a treemap being one shape divided rather than a grid
+of tiles, and it colours from a single-hue ramp ordered by rank rather than from
+the categorical palette — eight validated hues scattered over forty boxes read
+as confetti, and a ramp running the same direction as the areas lets colour and
+size agree. Movements keeps its ranked list, in the taller space freed by
+retiring the two one-number tiles beside the cash flow.
 
 ## Consequences
 

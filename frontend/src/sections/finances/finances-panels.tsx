@@ -177,16 +177,12 @@ export function OverviewPanel() {
               </DashboardCard>
             </div>
 
-            <DashboardCard
-              title={t('finances:overview.spendingCategories')}
-              className="h-[420px] lg:h-[632px]"
-              bodyClassName="p-2"
-              footnote={t('finances:overview.categoriesFootnote')}
-            >
-              <CategoryTreemap
+            <DashboardCard title={t('finances:overview.spendingCategories')} className="h-[420px] lg:h-[632px]">
+              <RankedBarList
                 items={spendingCategories}
                 valueFormatter={(v) => currency.format(v)}
                 emptyLabel={t('finances:spending.noSpending')}
+                variant="underlined"
               />
             </DashboardCard>
           </div>
@@ -353,8 +349,8 @@ export function SpendingPanel() {
               )}
             </DashboardCard>
 
-            <DashboardCard title={t('finances:spending.byCategory')} className="h-[320px]">
-              <RankedBarList
+            <DashboardCard title={t('finances:spending.byCategory')} className="h-[320px]" bodyClassName="p-0">
+              <CategoryTreemap
                 items={categorySpending}
                 valueFormatter={(value) => currency.format(value)}
                 emptyLabel={t('finances:spending.noSpending')}

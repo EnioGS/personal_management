@@ -41,8 +41,7 @@
     "accountsAndCards": "By account and card",
     "medianMonth": "Median month",
     "bestMonth": "Best month",
-    "worstMonth": "Worst month",
-    "categoriesFootnote": "Average per month; the arrow compares the most recent quarter of the period with that average."
+    "worstMonth": "Worst month"
   },
   "spending": {
     "totalSpent": "Total spent",
