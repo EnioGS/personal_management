@@ -10,7 +10,10 @@ export const financesSection: AppSection = {
   icon: Wallet,
   holdsData: true,
   items: [
-    { id: 'overview', labelKey: 'finances:items.movements', icon: ArrowLeftRight, component: OverviewPanel },
+    // The id is the label a row is stored with and the name of its table, so it says the
+    // same word the screen does: a row explained as "finances → movements" should be
+    // findable under that name in the data as well as on screen.
+    { id: 'movements', labelKey: 'finances:items.movements', icon: ArrowLeftRight, component: OverviewPanel },
     { id: 'spending', labelKey: 'finances:items.spending', icon: Receipt, component: SpendingPanel },
     { id: 'investments', labelKey: 'investments:section.label', icon: LineChart, component: InvestmentsPanel },
     { id: 'recurring', labelKey: 'finances:items.recurring', icon: Repeat, component: RecurringPanel },

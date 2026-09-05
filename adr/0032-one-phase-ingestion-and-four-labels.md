@@ -55,3 +55,13 @@ tables appear under their own names in both.
 Capital becomes the sum of every confirmed row's signed amount, counted once per `row_id`,
 investments included: one number for everything of value held, with position value
 (quantity × price) kept as the separate quantity it is.
+
+## Addendum — a screen's id is a word the user reads
+
+`overview` was the id behind the screen displayed as *Movements*, so a row could only be
+explained by translating between the two, and the table it lived in was named after a
+word that appears nowhere in the app. Ids are labels here: they are stored on rows, they
+name confirmed tables, and both the user and the assistant read them. So the id was
+renamed to `movements`, and — per Q16, a screen renamed with its content intact takes its
+table along — Dexie v11 carries the confirmed rows, the labels still waiting on source
+rows, and any rule naming the screen across with it.

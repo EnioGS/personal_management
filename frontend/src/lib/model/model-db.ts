@@ -132,6 +132,28 @@ db.version(9).stores({
  */
 db.version(10).stores({ classificationNotes: '++id, createdAt' })
 
+/**
+ * The Movements screen was stored under the id `overview`, which is the word it had
+ * before it was renamed on screen — so a row could only be explained by translating
+ * between the two. Renaming the id renames the table those rows live in, so the rows,
+ * the labels still waiting on them and any rule that names the screen are carried over
+ * with it. See adr/0032: a screen renamed with its content intact takes its table along.
+ */
+db.version(11).stores({}).upgrade(async (tx) => {
+  const rename = (screen: unknown) => (screen === 'overview' ? 'movements' : screen)
+
+  await tx.table('confirmedRows').toCollection().modify((row: { data?: { screen?: string } }) => {
+    if (row.data?.screen === 'overview') row.data.screen = 'movements'
+  })
+
+  const relabel = (row: { data?: { labels?: { screens?: string[] } } }) => {
+    const screens = row.data?.labels?.screens
+    if (screens) row.data!.labels!.screens = screens.map(rename) as string[]
+  }
+  await tx.table('sourceRows').toCollection().modify(relabel)
+  await tx.table('labelRules').toCollection().modify(relabel)
+})
+
 export const accountsTable = db.accounts
 export const cardsTable = db.cards
 export const budgetsTable = db.budgets
