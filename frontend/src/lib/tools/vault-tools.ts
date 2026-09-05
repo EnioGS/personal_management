@@ -1,6 +1,6 @@
 import { loadLabelCatalogue } from '@/lib/label-catalogue-source'
 import { describeVault, queryVault } from '@/lib/sql/query-vault'
-import { placeConfirmedRow, setConfirmedMeaning } from '@/lib/model/confirmed-rows'
+import { fillFromObservations, placeConfirmedRow, setConfirmedMeaning } from '@/lib/model/confirmed-rows'
 import { SOURCE_FILENAME_KEY, withObservation } from '@/lib/model/observations'
 import { DEFAULT_MEANING, ingestionLabelErrors } from '@/lib/model/ingestion'
 import { parsePlacementLabels, placementsOf, resolveAccountLabel, resolveCardLabel, resolveScreenLabel, resolveSectionLabel, withDerivedSections, type LabelCatalogue } from '@/lib/model/label-catalogue'
@@ -14,6 +14,7 @@ import {
   assignSourceColumns,
   confirmSourceRows,
   createSourceFile,
+  missingAssignments,
   planConfirmation,
   setSignConvention,
   updateSourceValue,
@@ -308,6 +309,34 @@ export const setConfirmedMeaningTool: ToolDefinition = {
   },
 }
 
+export const fillFromObservationsTool: ToolDefinition = {
+  name: 'fill_from_observations',
+  description: "Fills in a confirmed row's date or value from the observations, where the file's own columns were kept. Use it for rows confirmed before their file was told which column held the date and which held the money: they are in their table with both empty, invisible to every dashboard, while the values sit in the observations under the file's column names — read one row's observations first to see what those names are. Only empty fields are touched, so it can be run twice safely, and nothing else about the row changes: this extracts a value that was always there rather than correcting one that was wrong.",
+  parameters: {
+    type: 'object',
+    properties: {
+      section: { type: 'string', description: 'Limit to one table. Omit to sweep every confirmed row.' },
+      screen: { type: 'string' },
+      dateKey: { type: 'string', description: "The observations key holding the date, e.g. \"Data\"." },
+      valueKey: { type: 'string', description: "The observations key holding the money, e.g. \"Valor\"." },
+    },
+    additionalProperties: false,
+  },
+  execute: async (args, context) => {
+    const dateKey = typeof args.dateKey === 'string' ? args.dateKey : undefined
+    const valueKey = typeof args.valueKey === 'string' ? args.valueKey : undefined
+    if (!dateKey && !valueKey) return 'Error: name at least one observations key — dateKey, valueKey, or both.'
+
+    const catalogue = await loadLabelCatalogue(context.translate)
+    const section = typeof args.section === 'string' ? resolveSectionLabel(catalogue, args.section) : undefined
+    const screen = typeof args.screen === 'string' ? resolveScreenLabel(catalogue, args.screen, section ? [section] : undefined) : undefined
+    if (typeof args.section === 'string' && !section) return 'Error: no section is called that.'
+    if (typeof args.screen === 'string' && !screen) return 'Error: no screen is called that.'
+
+    return JSON.stringify(await fillFromObservations({ section, screen }, { date: dateKey, value: valueKey }))
+  },
+}
+
 export const placeConfirmedRowsTool: ToolDefinition = {
   name: 'place_confirmed_rows',
   description: "Changes which table confirmed rows are in, or puts a copy of them in another one. Which table a row is in *is* its section and screen — there is no separate address — so this is how a placement is corrected, and how a row that turns out to belong on two screens gets its second copy. The row id is kept either way: it is what ties copies of one transaction together and what stops anything counting it twice. Use mode 'move' for a placement that was wrong and 'copy' for one that was incomplete. The user edits the same two cells in the confirmed table.",
@@ -466,15 +495,20 @@ export const confirmRowsTool: ToolDefinition = {
 
 /** What is still missing from the rows a file could not confirm, counted by reason. */
 async function reasonsRowsWereLeft(sourceId: number, catalogue: LabelCatalogue): Promise<Record<string, number>> {
+  const stored = await sourceFilesTable.get(sourceId)
+  if (!stored) return {}
+  const file = stored.data as SourceFile
   const reasons: Record<string, number> = {}
-  for (const stored of await sourceRowsTable.toArray()) {
-    const row = stored.data as SourceRow
+
+  for (const record of await sourceRowsTable.toArray()) {
+    const row = record.data as SourceRow
     if (row.sourceId !== sourceId || row.markedForElimination) continue
-    const errors = ingestionLabelErrors(row.labels, catalogue)
     const placed = placementsOf(row.labels, catalogue).length > 0
-    for (const error of errors.length > 0 ? errors : placed ? [] : ['The section and screen it names are not a pair the app has.']) {
-      reasons[error] = (reasons[error] ?? 0) + 1
-    }
+    const errors = [
+      ...ingestionLabelErrors(row.labels, catalogue),
+      ...(placed ? missingAssignments(row, file, catalogue) : ['The section and screen it names are not a pair the app has.']),
+    ]
+    for (const error of errors) reasons[error] = (reasons[error] ?? 0) + 1
   }
   return reasons
 }

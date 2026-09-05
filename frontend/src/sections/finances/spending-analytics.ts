@@ -48,7 +48,7 @@ export function averageSpendByCategory(rows: FilteredEntry[], selectedMonths: st
     if (!isSpendingRow(row)) continue
     const month = monthKey(row.date)
     const aggregate = totals.get(row.category) ?? { total: 0, recentTotal: 0 }
-    const amount = -row.amount
+    const amount = -row.value
     aggregate.total += amount
     if (recentMonths.has(month)) aggregate.recentTotal += amount
     totals.set(row.category, aggregate)
@@ -79,7 +79,7 @@ export function spendingByMonth(rows: FilteredEntry[]): MonthlySpend[] {
   for (const row of rows) {
     const month = monthKey(row.date)
     // Spend is reported as a positive quantity; the rows that make it up are negative.
-    totals.set(month, (totals.get(month) ?? 0) - row.amount)
+    totals.set(month, (totals.get(month) ?? 0) - row.value)
   }
   return [...totals.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([month, amount]) => ({ month, amount }))
 }
@@ -106,7 +106,7 @@ export function categorySpendChanges(rows: FilteredEntry[]): CategorySpendChange
     const target = monthKey(row.date) === latestMonth ? current : monthKey(row.date) === precedingMonth ? preceding : null
     if (!target) continue
     // Magnitudes, like everything else this screen reports: spending rows are negative.
-    target.set(row.category, (target.get(row.category) ?? 0) - row.amount)
+    target.set(row.category, (target.get(row.category) ?? 0) - row.value)
   }
 
   return [...new Set([...current.keys(), ...preceding.keys()])]
@@ -124,7 +124,7 @@ export function frequentDescriptions(rows: FilteredEntry[]): DescriptionFrequenc
     const label = row.description.trim() || row.category
     const aggregate = totals.get(label) ?? { label, count: 0, total: 0 }
     aggregate.count += 1
-    aggregate.total -= row.amount
+    aggregate.total -= row.value
     totals.set(label, aggregate)
   }
   return [...totals.values()].sort((a, b) => b.count - a.count || b.total - a.total || a.label.localeCompare(b.label))

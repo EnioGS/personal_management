@@ -54,7 +54,7 @@ const sourceFile = {
   importedAt: 1,
   rawCsv: 'Data,Valor\n01/09/2026,"-10,00"',
   originalColumns: ['Data', 'Valor'],
-  assignments: { Data: 'date', Valor: 'amount' },
+  assignments: { Data: 'date', Valor: 'value' },
   signConvention: { kind: 'asImported' },
 }
 
@@ -81,7 +81,7 @@ describe('data-file', () => {
   it('round-trips export -> wipe -> import, preserving data across tables', async () => {
     const marker = crypto.randomUUID()
     await notes.add({ marker })
-    await confirmedRowsTable.add({ createdAt: 1, data: { rowId: marker, section: 'finances', screen: 'overview', amount: -10 } })
+    await confirmedRowsTable.add({ createdAt: 1, data: { rowId: marker, section: 'finances', screen: 'overview', value: -10 } })
 
     const exported = await exportData()
     expect(exported.version).toBe(DATA_EXPORT_VERSION)
@@ -92,7 +92,7 @@ describe('data-file', () => {
     await importData(exported)
 
     expect((await notes.list()).some((row) => row.marker === marker)).toBe(true)
-    expect((await confirmedRowsTable.toArray())[0].data).toMatchObject({ rowId: marker, amount: -10 })
+    expect((await confirmedRowsTable.toArray())[0].data).toMatchObject({ rowId: marker, value: -10 })
   })
 
   it('carries the configurable model, so an import restores the setup and not just rows', async () => {
@@ -123,7 +123,7 @@ describe('data-file', () => {
     await wipeAllData()
     await importData(exported)
 
-    expect((await sourceFilesTable.toArray())[0].data).toMatchObject({ originalFilename: 'nubank_2026-09.csv', assignments: { Valor: 'amount' } })
+    expect((await sourceFilesTable.toArray())[0].data).toMatchObject({ originalFilename: 'nubank_2026-09.csv', assignments: { Valor: 'value' } })
     expect((await sourceRowsTable.toArray())[0].data).toMatchObject({
       values: { Data: '01/09/2026', Valor: '-10,00' },
       labels: { sections: ['finances'], screens: ['spending'], category: 'mercado' },

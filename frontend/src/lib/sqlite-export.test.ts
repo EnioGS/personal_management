@@ -22,7 +22,7 @@ function exportFile(): DataExportFile {
           importedAt: 1,
           rawCsv: '',
           originalColumns: ['Data', 'Descrição', 'Valor'],
-          assignments: { Data: 'date', Valor: 'amount' },
+          assignments: { Data: 'date', Valor: 'value' },
           signConvention: { kind: 'asImported' },
         },
       }],
@@ -41,7 +41,7 @@ function exportFile(): DataExportFile {
         createdAt: 1,
         data: {
           rowId: 'def', section: 'finances', screen: 'spending',
-          confirmedAt: 1, date: 1, amount: -5, observations: '{}', category: 'mercado', subcategory: 'outros',
+          confirmedAt: 1, date: 1, value: -5, observations: '{}', category: 'mercado', subcategory: 'outros',
         },
       }],
     } as DataExportFile['tables'],
@@ -71,7 +71,7 @@ describe('the exported .db', () => {
   it('carries a view per (section, screen) pair holding confirmed rows', async () => {
     const db = await open(await buildSqliteFile(exportFile()))
     try {
-      const [result] = db.exec('SELECT row_id, amount FROM "confirmed__finances__spending"')
+      const [result] = db.exec('SELECT row_id, value FROM "confirmed__finances__spending"')
       expect(result.values).toEqual([['def', -5]])
     } finally {
       db.close()
@@ -83,6 +83,6 @@ describe('the exported .db', () => {
 
     expect(restored.version).toBe(DATA_EXPORT_VERSION)
     expect(restored.tables.sourceRows[0].data).toMatchObject({ rowId: 'abc', values: { Descrição: 'MERCADO' } })
-    expect(restored.tables.confirmedRows[0].data).toMatchObject({ rowId: 'def', amount: -5 })
+    expect(restored.tables.confirmedRows[0].data).toMatchObject({ rowId: 'def', value: -5 })
   })
 })

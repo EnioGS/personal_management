@@ -6,8 +6,8 @@ const DAY_MS = 86_400_000
 
 export interface CapitalEntry {
   date: number
-  /** Signed: negative left an account, positive arrived in one. */
-  amount: number
+  /** Money that moved, signed: negative left an account, positive arrived in one. */
+  value: number
   screen?: string
 }
 
@@ -67,8 +67,8 @@ export function capitalEvolution(
     // Capital is everything of value held, so every confirmed row moves it: money out of
     // one account is negative there and positive wherever it arrived, and the pair nets
     // to zero by arithmetic rather than by either side being hidden.
-    bucket.capitalDelta += entry.amount
-    if (entry.screen === 'spending') bucket.spending += -entry.amount
+    bucket.capitalDelta += entry.value
+    if (entry.screen === 'spending') bucket.spending += -entry.value
     byMonth.set(month, bucket)
   }
 

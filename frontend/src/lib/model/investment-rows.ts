@@ -19,14 +19,15 @@ export const INVESTMENTS_SCREEN = 'investments'
  * dropped here — a position is a size, not a direction.
  */
 export function asTransaction(row: ConfirmedRow): Transaction {
-  const quantity = typeof row.quantity === 'number' ? Math.abs(row.quantity) : 0
-  const amount = typeof row.amount === 'number' ? Math.abs(row.amount) : 0
-  const price = typeof row.price === 'number' ? Math.abs(row.price) : quantity > 0 ? amount / quantity : amount
+  // `amount` is units and `value` is money — the two an investment row is made of.
+  const units = typeof row.amount === 'number' ? Math.abs(row.amount) : 0
+  const money = typeof row.value === 'number' ? Math.abs(row.value) : 0
+  const price = typeof row.price === 'number' ? Math.abs(row.price) : units > 0 ? money / units : money
   return {
     date: Number.isFinite(row.date) ? (row.date as number) : 0,
     asset: row.asset ?? row.category,
     type: investmentKind(row),
-    quantity: quantity > 0 ? quantity : amount > 0 && price > 0 ? amount / price : 0,
+    quantity: units > 0 ? units : money > 0 && price > 0 ? money / price : 0,
     price,
     category: row.category,
     note: row.observations,

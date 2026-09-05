@@ -154,6 +154,39 @@ db.version(11).stores({}).upgrade(async (tx) => {
   await tx.table('labelRules').toCollection().modify(relabel)
 })
 
+/**
+ * `amount` meant two different things, and the collision was costing real data.
+ *
+ * On a money row it was what moved; on an investment row the money was `quantity` ×
+ * `price` while `amount` meant nothing at all — so a file's amount column could be
+ * assigned in either sense and only one of them was read. Money is `value` now and
+ * `amount` is units of a thing, which is what the word means when someone says "the
+ * amount I bought". Existing rows are carried across rather than reinterpreted: what was
+ * money stays money, what was a quantity keeps being a quantity.
+ */
+db.version(12).stores({}).upgrade(async (tx) => {
+  await tx.table('confirmedRows').toCollection().modify((row: { data?: Record<string, unknown> }) => {
+    const data = row.data
+    if (!data) return
+    if ('amount' in data) { data.value = data.amount; delete data.amount }
+    if ('quantity' in data) { data.amount = data.quantity; delete data.quantity }
+  })
+
+  await tx.table('sourceFiles').toCollection().modify((row: { data?: { assignments?: Record<string, string> } }) => {
+    const assignments = row.data?.assignments
+    if (!assignments) return
+    for (const [column, field] of Object.entries(assignments)) {
+      if (field === 'amount') assignments[column] = 'value'
+      else if (field === 'quantity') assignments[column] = 'amount'
+    }
+  })
+
+  await tx.table('sourceRows').toCollection().modify((row: { data?: Record<string, unknown> }) => {
+    const data = row.data
+    if (data && 'importedAmount' in data) { data.importedValue = data.importedAmount; delete data.importedAmount }
+  })
+})
+
 export const accountsTable = db.accounts
 export const cardsTable = db.cards
 export const budgetsTable = db.budgets

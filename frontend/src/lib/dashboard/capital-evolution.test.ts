@@ -4,10 +4,10 @@ import { capitalEvolution } from './capital-evolution'
 describe('capitalEvolution', () => {
   it('carries the running capital across months while grouping spending separately', () => {
     const points = capitalEvolution([
-      { date: Date.UTC(2026, 0, 5), amount: 100 },
-      { date: Date.UTC(2026, 0, 8), amount: -30 },
-      { date: Date.UTC(2026, 2, 2), amount: -20, screen: 'spending' },
-      { date: Date.UTC(2026, 2, 5), amount: 5, screen: 'spending' },
+      { date: Date.UTC(2026, 0, 5), value: 100 },
+      { date: Date.UTC(2026, 0, 8), value: -30 },
+      { date: Date.UTC(2026, 2, 2), value: -20, screen: 'spending' },
+      { date: Date.UTC(2026, 2, 5), value: 5, screen: 'spending' },
     ], { from: Date.UTC(2026, 0, 1), to: Date.UTC(2026, 2, 31) })
 
     expect(points).toEqual([
@@ -20,8 +20,8 @@ describe('capitalEvolution', () => {
 
   it('uses history before the displayed range to calculate the correct opening capital', () => {
     const points = capitalEvolution([
-      { date: Date.UTC(2025, 11, 1), amount: 100 },
-      { date: Date.UTC(2026, 0, 1), amount: -20 },
+      { date: Date.UTC(2025, 11, 1), value: 100 },
+      { date: Date.UTC(2026, 0, 1), value: -20 },
     ], { from: Date.UTC(2026, 0, 1), to: Date.UTC(2026, 0, 31) })
 
     expect(points).toEqual([{ month: '2026-01', cashCapital: 80, variableIncome: 0, fixedIncome: 0, capital: 80, spending: 0 }])
@@ -29,7 +29,7 @@ describe('capitalEvolution', () => {
 
   it('starts at the earliest month across cash and investments, and adds both investment values to capital', () => {
     const points = capitalEvolution(
-      [{ date: Date.UTC(2026, 1, 4), amount: 50 }],
+      [{ date: Date.UTC(2026, 1, 4), value: 50 }],
       { from: Date.UTC(2026, 0, 1), to: Date.UTC(2026, 2, 31) },
       [
         { date: Date.UTC(2026, 0, 8), asset: 'PETR4', type: 'buy', quantity: 10, price: 5, investmentClass: 'variableIncome' },
@@ -109,8 +109,8 @@ describe('capitalEvolution', () => {
 describe('a date nothing could read', () => {
   it('is left out rather than walked to, which would never finish', () => {
     const points = capitalEvolution([
-      { date: Date.UTC(2026, 0, 5), amount: 100 },
-      { date: Number.NaN, amount: -50 },
+      { date: Date.UTC(2026, 0, 5), value: 100 },
+      { date: Number.NaN, value: -50 },
     ], { from: Date.UTC(2026, 0, 1), to: Date.UTC(2026, 0, 31) })
 
     expect(points).toEqual([{ month: '2026-01', cashCapital: 100, variableIncome: 0, fixedIncome: 0, capital: 100, spending: 0 }])
@@ -128,9 +128,9 @@ describe('what moves total capital', () => {
 
   it("leaves capital untouched for a transfer between the user's own accounts — by arithmetic, not by hiding either side", () => {
     const points = capitalEvolution([
-      { date: Date.UTC(2026, 0, 5), amount: 100, screen: 'overview' },
-      { date: Date.UTC(2026, 0, 6), amount: -40, screen: 'overview' },
-      { date: Date.UTC(2026, 0, 7), amount: 40, screen: 'overview' },
+      { date: Date.UTC(2026, 0, 5), value: 100, screen: 'overview' },
+      { date: Date.UTC(2026, 0, 6), value: -40, screen: 'overview' },
+      { date: Date.UTC(2026, 0, 7), value: 40, screen: 'overview' },
     ], range)
 
     expect(points[0].cashCapital).toBe(100)
@@ -138,7 +138,7 @@ describe('what moves total capital', () => {
 
   it('counts a purchase against spending and against capital, each once', () => {
     const points = capitalEvolution([
-      { date: Date.UTC(2026, 0, 3), amount: -110, screen: 'spending' },
+      { date: Date.UTC(2026, 0, 3), value: -110, screen: 'spending' },
     ], range)
 
     expect(points[0].cashCapital).toBe(-110)

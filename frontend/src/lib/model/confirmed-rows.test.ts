@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { wipeAllData } from '@/lib/data-file'
-import { addConfirmedRow, placeConfirmedRow, updateConfirmedRow } from './confirmed-rows'
+import { addConfirmedRow, fillFromObservations, placeConfirmedRow, updateConfirmedRow } from './confirmed-rows'
 import { confirmedRowsTable } from './model-db'
 import { sourceFilenameOf } from './observations'
 import type { ConfirmedRow } from './types'
@@ -33,9 +33,9 @@ describe('editing a confirmed cell', () => {
   it('reads a date day-first and an amount with either decimal mark, like an import does', async () => {
     const id = await addConfirmedRow('finances', 'spending')
     await updateConfirmedRow(id, 'date', '15/08/2025')
-    await updateConfirmedRow(id, 'amount', '-1.234,56')
+    await updateConfirmedRow(id, 'value', '-1.234,56')
 
-    expect(await only()).toMatchObject({ date: Date.UTC(2025, 7, 15), amount: -1234.56 })
+    expect(await only()).toMatchObject({ date: Date.UTC(2025, 7, 15), value: -1234.56 })
   })
 
   it('puts the default meaning back when a meaning cell is emptied', async () => {
@@ -69,5 +69,41 @@ describe('re-placing a confirmed row', () => {
     const rows = (await confirmedRowsTable.toArray()).map((row) => row.data as ConfirmedRow)
     expect(rows.map((row) => row.screen).sort()).toEqual(['overview', 'spending'])
     expect(new Set(rows.map((row) => row.rowId)).size).toBe(1)
+  })
+})
+
+describe('rows confirmed before their file said where the numbers were', () => {
+  beforeEach(async () => { await wipeAllData() })
+
+  it('take their date and value back out of the observations', async () => {
+    const id = await addConfirmedRow('finances', 'movements')
+    await updateConfirmedRow(id, 'observations', JSON.stringify({ Data: '01/04/2025', Valor: '2100.00' }))
+
+    expect(await fillFromObservations({}, { date: 'Data', value: 'Valor' })).toMatchObject({ filled: 1 })
+    expect(await only()).toMatchObject({ date: Date.UTC(2025, 3, 1), value: 2100 })
+  })
+
+  it('leave a row that already has them alone, so it can be run twice', async () => {
+    const id = await addConfirmedRow('finances', 'movements')
+    await updateConfirmedRow(id, 'observations', JSON.stringify({ Data: '01/04/2025', Valor: '2100.00' }))
+    await updateConfirmedRow(id, 'value', '-5')
+
+    await fillFromObservations({}, { date: 'Data', value: 'Valor' })
+
+    expect((await only()).value).toBe(-5)
+    expect(await fillFromObservations({}, { date: 'Data', value: 'Valor' })).toMatchObject({ filled: 0, untouched: 1 })
+  })
+
+  it('touch only the table they were pointed at', async () => {
+    const spending = await addConfirmedRow('finances', 'spending')
+    await updateConfirmedRow(spending, 'observations', JSON.stringify({ Valor: '10' }))
+    const movements = await addConfirmedRow('finances', 'movements')
+    await updateConfirmedRow(movements, 'observations', JSON.stringify({ Valor: '20' }))
+
+    await fillFromObservations({ screen: 'movements' }, { value: 'Valor' })
+
+    const rows = (await confirmedRowsTable.toArray()).map((row) => row.data as ConfirmedRow)
+    expect(rows.find((row) => row.screen === 'movements')!.value).toBe(20)
+    expect(rows.find((row) => row.screen === 'spending')!.value).toBeUndefined()
   })
 })

@@ -8,7 +8,7 @@ const file = {
   importedAt: 1,
   rawCsv: '',
   originalColumns: ['Data', 'Valor'],
-  assignments: { Data: 'date', Valor: 'amount' },
+  assignments: { Data: 'date', Valor: 'value' },
   signConvention: { kind: 'asImported' },
 }
 
@@ -18,7 +18,7 @@ describe('SQL over the browser data', () => {
   it('names one table per file and one per (section, screen) pair', async () => {
     const sourceId = await sourceFilesTable.add({ createdAt: 1, data: file })
     await sourceRowsTable.add({ createdAt: 1, data: { sourceId, rowId: 'r1', values: { source_filename: 'banco-agosto.csv', Data: '01/08/2026', Valor: '10' }, labels: {} } })
-    await confirmedRowsTable.add({ createdAt: 1, data: { rowId: 'r2', section: 'finances', screen: 'spending', confirmedAt: 1, amount: -10, observations: '{}', category: 'mercado', subcategory: 'outros' } })
+    await confirmedRowsTable.add({ createdAt: 1, data: { rowId: 'r2', section: 'finances', screen: 'spending', confirmedAt: 1, value: -10, observations: '{}', category: 'mercado', subcategory: 'outros' } })
 
     const tables = await describeVault()
     const names = tables.map((table) => table.name)

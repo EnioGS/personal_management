@@ -9,7 +9,7 @@ function entry(overrides: Partial<FilteredEntry>): FilteredEntry {
     section: 'finances',
     screen: 'spending',
     date: Date.UTC(2026, 6, 1),
-    amount: -100,
+    value: -100,
     category: 'Food',
     subcategory: 'outros',
     observations: '{"source_filename":"nubank.csv"}',
@@ -21,19 +21,19 @@ function entry(overrides: Partial<FilteredEntry>): FilteredEntry {
 
 describe('spending analytics', () => {
   it('keeps rows confirmed onto a spending screen and drops rows confirmed elsewhere', () => {
-    const spending = entry({ amount: -120 })
+    const spending = entry({ value: -120 })
     expect(outgoingSpending([
       spending,
-      entry({ screen: 'overview', amount: -120 }),
-      entry({ screen: 'investments', amount: -20 }),
+      entry({ screen: 'overview', value: -120 }),
+      entry({ screen: 'investments', value: -20 }),
     ])).toEqual([spending])
   })
 
   it('groups spending into sorted monthly totals, reported as what left', () => {
     expect(spendingByMonth([
-      entry({ date: Date.UTC(2026, 7, 1), amount: -80 }),
-      entry({ date: Date.UTC(2026, 6, 2), amount: -20 }),
-      entry({ date: Date.UTC(2026, 6, 1), amount: -30 }),
+      entry({ date: Date.UTC(2026, 7, 1), value: -80 }),
+      entry({ date: Date.UTC(2026, 6, 2), value: -20 }),
+      entry({ date: Date.UTC(2026, 6, 1), value: -30 }),
     ])).toEqual([
       { month: '2026-07', amount: 50 },
       { month: '2026-08', amount: 80 },
@@ -42,17 +42,17 @@ describe('spending analytics', () => {
 
   it('nets a refund against the month it lands in, rather than hiding it', () => {
     expect(spendingByMonth([
-      entry({ date: Date.UTC(2026, 6, 1), amount: -80 }),
-      entry({ date: Date.UTC(2026, 6, 9), amount: 30 }),
+      entry({ date: Date.UTC(2026, 6, 1), value: -80 }),
+      entry({ date: Date.UTC(2026, 6, 9), value: 30 }),
     ])).toEqual([{ month: '2026-07', amount: 50 }])
   })
 
   it('compares the latest month to the preceding month and sorts by absolute movement', () => {
     expect(categorySpendChanges([
-      entry({ date: Date.UTC(2026, 6, 1), category: 'Food', amount: -40 }),
-      entry({ date: Date.UTC(2026, 7, 1), category: 'Food', amount: -100 }),
-      entry({ date: Date.UTC(2026, 6, 2), category: 'Travel', amount: -200 }),
-      entry({ date: Date.UTC(2026, 7, 2), category: 'Books', amount: -50 }),
+      entry({ date: Date.UTC(2026, 6, 1), category: 'Food', value: -40 }),
+      entry({ date: Date.UTC(2026, 7, 1), category: 'Food', value: -100 }),
+      entry({ date: Date.UTC(2026, 6, 2), category: 'Travel', value: -200 }),
+      entry({ date: Date.UTC(2026, 7, 2), category: 'Books', value: -50 }),
     ])).toEqual([
       { category: 'Travel', increased: 0, decreased: 200 },
       { category: 'Food', increased: 60, decreased: 0 },
@@ -62,10 +62,10 @@ describe('spending analytics', () => {
 
   it('ranks descriptions by occurrence, then by total', () => {
     expect(frequentDescriptions([
-      entry({ description: 'Market', amount: -20 }),
-      entry({ description: 'Market', amount: -30 }),
-      entry({ description: '', category: 'Transport', amount: -100 }),
-      entry({ description: 'Taxi', amount: -150 }),
+      entry({ description: 'Market', value: -20 }),
+      entry({ description: 'Market', value: -30 }),
+      entry({ description: '', category: 'Transport', value: -100 }),
+      entry({ description: 'Taxi', value: -150 }),
     ])).toEqual([
       { label: 'Market', count: 2, total: 50 },
       { label: 'Taxi', count: 1, total: 150 },
@@ -75,11 +75,11 @@ describe('spending analytics', () => {
 
   it('averages categories over all selected months and compares the latest quarter', () => {
     const rows = [
-      entry({ category: 'Food', amount: -100, date: Date.UTC(2026, 0, 1) }),
-      entry({ category: 'Food', amount: -300, date: Date.UTC(2026, 3, 1) }),
-      entry({ category: 'Travel', amount: -400, date: Date.UTC(2026, 3, 2) }),
-      entry({ category: 'Food', amount: 50, date: Date.UTC(2026, 3, 3) }),
-      entry({ screen: 'overview', category: 'Not spending', amount: -900, date: Date.UTC(2026, 3, 4) }),
+      entry({ category: 'Food', value: -100, date: Date.UTC(2026, 0, 1) }),
+      entry({ category: 'Food', value: -300, date: Date.UTC(2026, 3, 1) }),
+      entry({ category: 'Travel', value: -400, date: Date.UTC(2026, 3, 2) }),
+      entry({ category: 'Food', value: 50, date: Date.UTC(2026, 3, 3) }),
+      entry({ screen: 'overview', category: 'Not spending', value: -900, date: Date.UTC(2026, 3, 4) }),
     ]
 
     expect(averageSpendByCategory(rows, ['2026-01', '2026-02', '2026-03', '2026-04'])).toEqual([
@@ -94,7 +94,7 @@ describe('a purchase paid straight from the bank', () => {
     const pix = entry({
       description: 'Transferência enviada pelo Pix - MERCADO SAO JORGE',
       category: 'Supermercado',
-      amount: -284.9,
+      value: -284.9,
     })
 
     expect(outgoingSpending([pix])).toEqual([pix])

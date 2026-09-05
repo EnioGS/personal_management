@@ -59,7 +59,7 @@ const LABEL_HINT: Record<LabelColumn, string> = {
   subcategory: 'free text',
 }
 
-const CONFIRMED_COLUMNS = ['row_id', 'section', 'screen', 'date', 'amount', 'account', 'card', 'category', 'subcategory', 'observations'] as const
+const CONFIRMED_COLUMNS = ['row_id', 'section', 'screen', 'date', 'value', 'account', 'card', 'category', 'subcategory', 'observations'] as const
 
 function confirmedTableKey(row: ConfirmedRow): string {
   return `${row.section}/${row.screen}`
@@ -454,7 +454,7 @@ export function IngestionPanel() {
                         key={column}
                         value={row.values[column] ?? ''}
                         disabled={marking}
-                        title={selectedFile.assignments[column] === 'amount' && row.importedAmount !== undefined ? `The file wrote ${row.importedAmount}` : undefined}
+                        title={selectedFile.assignments[column] === 'value' && row.importedValue !== undefined ? `The file wrote ${row.importedValue}` : undefined}
                         onCommit={(value) => void editSourceValue(row, column, value)}
                       />
                     ))}
@@ -557,9 +557,9 @@ export function IngestionPanel() {
                   />
                   <EditableCell
                     className="tabular-nums"
-                    value={row.amount === undefined ? '' : String(row.amount)}
+                    value={row.value === undefined ? '' : String(row.value)}
                     disabled={marking}
-                    onCommit={(value) => void editConfirmed(row, 'amount', value)}
+                    onCommit={(value) => void editConfirmed(row, 'value', value)}
                   />
                   {(['account', 'card'] as const).map((column) => (
                     <EditableCell

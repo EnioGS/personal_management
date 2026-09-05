@@ -87,7 +87,7 @@ export function OverviewPanel() {
   const balancesBySource = useMemo(() => {
     const totals = new Map<string, number>()
     for (const entry of capitalHistoryRows) {
-      totals.set(entry.sourceFilename, (totals.get(entry.sourceFilename) ?? 0) + entry.amount)
+      totals.set(entry.sourceFilename, (totals.get(entry.sourceFilename) ?? 0) + entry.value)
     }
     return [...totals.entries()].map(([filename, value]) => ({ key: filename, label: filename, value }))
   }, [capitalHistoryRows])
@@ -209,10 +209,10 @@ export function OverviewPanel() {
                           <CategoryPill label={entry.category} wrap />
                         </td>
                         <td
-                          className={`p-2 text-right tabular-nums ${entry.amount > 0 ? 'text-brand' : ''}`}
+                          className={`p-2 text-right tabular-nums ${entry.value > 0 ? 'text-brand' : ''}`}
                         >
-                          {entry.amount > 0 ? '+' : '-'}
-                          {currency.format(Math.abs(entry.amount))}
+                          {entry.value > 0 ? '+' : '-'}
+                          {currency.format(Math.abs(entry.value))}
                         </td>
                       </tr>
                     ))}
@@ -236,7 +236,7 @@ export function SpendingPanel() {
   const spending = useMemo(() => outgoingSpending(rows), [rows])
   const monthlySpending = useMemo(() => spendingByMonth(spending), [spending])
   const categorySpending = useMemo(
-    () => groupByKey(spending.map((row) => ({ ...row, amount: -row.amount })), 'category', 'amount')
+    () => groupByKey(spending.map((row) => ({ ...row, amount: -row.value })), 'category', 'amount')
       .map((group) => ({ key: group.label, label: group.label, value: group.value })),
     [spending],
   )
@@ -245,9 +245,9 @@ export function SpendingPanel() {
 
   // Spending rows are negative, being money that left; every figure here reports the
   // magnitude that left, so each one negates.
-  const totalSpent = spending.reduce((total, row) => total - row.amount, 0)
+  const totalSpent = spending.reduce((total, row) => total - row.value, 0)
   const monthlyAverage = monthlySpending.length > 0 ? totalSpent / monthlySpending.length : 0
-  const largestExpense = spending.reduce((largest, row) => Math.max(largest, -row.amount), 0)
+  const largestExpense = spending.reduce((largest, row) => Math.max(largest, -row.value), 0)
   const byCount = [...descriptions].sort((a, b) => b.count - a.count || b.total - a.total).slice(0, 5)
   const byTotal = [...descriptions].sort((a, b) => b.total - a.total || b.count - a.count).slice(0, 5)
 

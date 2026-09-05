@@ -12,7 +12,7 @@ function row(overrides: Partial<StoredRow<ConfirmedRow>> = {}): StoredRow<Confir
     screen: 'investments',
     confirmedAt: 0,
     date: Date.UTC(2026, 0, 5),
-    amount: -500,
+    value: -500,
     observations: '{}',
     category: 'outros',
     subcategory: 'outros',
@@ -22,11 +22,11 @@ function row(overrides: Partial<StoredRow<ConfirmedRow>> = {}): StoredRow<Confir
 
 describe('reading a confirmed row as a portfolio transaction', () => {
   it('recovers the unit price from the amount when the file only gave a total', () => {
-    expect(asTransaction(row({ quantity: 10, price: undefined, amount: -500 }))).toMatchObject({ quantity: 10, price: 50 })
+    expect(asTransaction(row({ amount: 10, price: undefined, value: -500 }))).toMatchObject({ quantity: 10, price: 50 })
   })
 
   it('drops the sign, because a position is a size and not a direction', () => {
-    expect(asTransaction(row({ quantity: -3, price: -20 }))).toMatchObject({ quantity: 3, price: 20 })
+    expect(asTransaction(row({ amount: -3, price: -20 }))).toMatchObject({ quantity: 3, price: 20 })
   })
 
   it('reads the kind from whatever the file called it, in either language', () => {

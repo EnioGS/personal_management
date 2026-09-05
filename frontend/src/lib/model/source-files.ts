@@ -13,7 +13,10 @@ import type { ConfirmedRow, IngestionTargetField, SourceFile, SourceRow } from '
 export const SOURCE_FILENAME_COLUMN = 'source_filename'
 
 /** Canonical fields a source column can be assigned to. Placement is a label, not a column. */
-export const ASSIGNABLE_FIELDS: IngestionTargetField[] = ['date', 'amount', 'asset', 'quantity', 'price', 'investmentType', 'investmentClass']
+export const ASSIGNABLE_FIELDS: IngestionTargetField[] = ['date', 'value', 'amount', 'asset', 'price', 'investmentType', 'investmentClass']
+
+/** The screen whose rows are holdings rather than money: what it needs assigned differs. */
+const INVESTMENTS_SCREEN = 'investments'
 
 /**
  * Turns a markdown table into CSV, and leaves anything else alone.
@@ -83,8 +86,8 @@ export function rowSignature(values: Record<string, string>, assignments: Record
     return column ? values[column] : undefined
   }
   const date = parseDateValue(of('date'))
-  const amount = parseNumberValue(of('amount'))
-  if (date !== null && amount !== null) return `${date}|${Math.abs(amount).toFixed(2)}`
+  const value = parseNumberValue(of('value'))
+  if (date !== null && value !== null) return `${date}|${Math.abs(value).toFixed(2)}`
   return Object.entries(values)
     .filter(([column]) => column !== SOURCE_FILENAME_COLUMN)
     .sort(([left], [right]) => left.localeCompare(right))
@@ -222,7 +225,7 @@ function columnFor(file: SourceFile, field: IngestionTargetField): string | unde
 }
 
 /**
- * Rewrites the amount column so the table says what the app means.
+ * Rewrites the value column so the table says what the app means.
  *
  * The transformation is applied to the data, not kept as a note beside it: a source table
  * read by eye, by SQL or by the assistant shows one amount, and it is the one that will
@@ -231,44 +234,44 @@ function columnFor(file: SourceFile, field: IngestionTargetField): string | unde
  * observations of every confirmed row.
  */
 export async function rewriteAmounts(sourceId: number, file: SourceFile): Promise<void> {
-  const amountColumn = columnFor(file, 'amount')
+  const valueColumn = columnFor(file, 'value')
   for (const stored of await sourceRowsTable.toArray()) {
     const row = stored.data as SourceRow
     if (row.sourceId !== sourceId) continue
 
     // Without an amount column there is nothing to transform, so anything previously
     // rewritten goes back to what the file said.
-    if (!amountColumn) {
-      if (row.importedAmount === undefined) continue
-      const restored = { ...row, values: { ...row.values }, importedAmount: undefined }
+    if (!valueColumn) {
+      if (row.importedValue === undefined) continue
+      const restored = { ...row, values: { ...row.values }, importedValue: undefined }
       await sourceRowsTable.update(stored.id, { data: restored satisfies SourceRow })
       continue
     }
 
-    const imported = row.importedAmount ?? row.values[amountColumn] ?? ''
+    const imported = row.importedValue ?? row.values[valueColumn] ?? ''
     const next: SourceRow = { ...row, values: { ...row.values } }
     if (file.signConvention.kind === 'asImported') {
-      next.values[amountColumn] = imported
-      next.importedAmount = undefined
+      next.values[valueColumn] = imported
+      next.importedValue = undefined
     } else {
-      const transformed = applySignConvention(parseNumberValue(imported), file.signConvention, { ...row.values, [amountColumn]: imported })
-      next.values[amountColumn] = transformed === null ? imported : String(transformed)
-      next.importedAmount = imported
+      const transformed = applySignConvention(parseNumberValue(imported), file.signConvention, { ...row.values, [valueColumn]: imported })
+      next.values[valueColumn] = transformed === null ? imported : String(transformed)
+      next.importedValue = imported
     }
-    if (next.values[amountColumn] === row.values[amountColumn] && next.importedAmount === row.importedAmount) continue
+    if (next.values[valueColumn] === row.values[valueColumn] && next.importedValue === row.importedValue) continue
     await sourceRowsTable.update(stored.id, { data: next })
   }
 }
 
-/** What the file's amount column looks like — the evidence a sign decision is made from. */
+/** What the file's value column looks like — the evidence a sign decision is made from. */
 export async function amountShapeOf(sourceId: number) {
   const stored = await sourceFilesTable.get(sourceId)
   if (!stored) throw new Error(`Source file ${sourceId} was not found.`)
   const file = stored.data as SourceFile
-  const amountColumn = columnFor(file, 'amount')
-  if (!amountColumn) return { amountColumn: null, shape: null }
+  const valueColumn = columnFor(file, 'value')
+  if (!valueColumn) return { amountColumn: null, shape: null }
   const rows = (await sourceRowsTable.toArray()).map((row) => row.data as SourceRow).filter((row) => row.sourceId === sourceId)
-  return { amountColumn, shape: shapeOfAmounts(rows.map((row) => row.values[amountColumn])) }
+  return { amountColumn: valueColumn, shape: shapeOfAmounts(rows.map((row) => row.values[valueColumn])) }
 }
 
 function canonicalValue(row: SourceRow, file: SourceFile, field: IngestionTargetField): string | undefined {
@@ -281,20 +284,48 @@ function canonicalValue(row: SourceRow, file: SourceFile, field: IngestionTarget
  * when the sign was changed — the value the file actually wrote. Kept as one column so a
  * confirmed table stays readable whatever shape the file it came from had.
  */
-export function observationsFor(row: SourceRow, file: SourceFile, importedAmount?: string): string {
+export function observationsFor(row: SourceRow, file: SourceFile, importedValue?: string): string {
   const assigned = new Set(Object.keys(file.assignments))
   const parts: Record<string, string> = {}
   for (const [column, value] of Object.entries(row.values)) {
     if (assigned.has(column) || value === '') continue
     parts[column] = value
   }
-  if (importedAmount !== undefined) parts.amount_as_imported = importedAmount
+  if (importedValue !== undefined) parts.value_as_imported = importedValue
   return JSON.stringify(parts)
 }
 
+/**
+ * What the file has not been told, for a row that is otherwise ready to go.
+ *
+ * Labels say where a row belongs; assignments say which of the file's columns hold the
+ * numbers that screen is made of. A row confirmed without them lands with an empty date
+ * and an empty value — present in its table, invisible on every dashboard, and only
+ * fixable by hand afterwards. So the file is asked for them before the row moves, and the
+ * question names the columns that are missing rather than reporting a count of nothing.
+ */
+export function missingAssignments(row: SourceRow, file: SourceFile, catalogue: LabelCatalogue): string[] {
+  const placements = placementsOf(row.labels, catalogue)
+  if (placements.length === 0) return []
+  const missing: string[] = []
+
+  if (!columnFor(file, 'date')) {
+    missing.push(`Assign one of "${file.originalFilename}"'s columns to date: a row without one is on no dashboard, whatever else it says.`)
+  }
+  if (placements.some((placement) => placement.screen !== INVESTMENTS_SCREEN) && !columnFor(file, 'value')) {
+    missing.push(`Assign the column holding the money to value: rows going to ${placements.map((placement) => placement.screen).filter((screen) => screen !== INVESTMENTS_SCREEN).join(', ')} are made of it.`)
+  }
+  if (placements.some((placement) => placement.screen === INVESTMENTS_SCREEN) && !columnFor(file, 'amount')) {
+    missing.push('Assign the column holding how many units were bought or sold to amount: an investment row is a quantity of something, and price is what one unit was worth.')
+  }
+  return missing
+}
+
 /** A row is ready when nothing is missing from it and its labels name somewhere to go. */
-function isReady(row: SourceRow, catalogue: LabelCatalogue): boolean {
-  return ingestionLabelErrors(row.labels, catalogue).length === 0 && placementsOf(row.labels, catalogue).length > 0
+function isReady(row: SourceRow, file: SourceFile, catalogue: LabelCatalogue): boolean {
+  return ingestionLabelErrors(row.labels, catalogue).length === 0
+    && placementsOf(row.labels, catalogue).length > 0
+    && missingAssignments(row, file, catalogue).length === 0
 }
 
 export interface ConfirmationPlan {
@@ -332,7 +363,7 @@ export async function addSourceRow(sourceId: number): Promise<number> {
 /**
  * Edits one of a row's own values.
  *
- * Editing the amount edits what the *file* said, not what the convention made of it: the
+ * Editing the value edits what the *file* said, not what the convention made of it: the
  * transformation is re-applied to the new value, so a corrected amount ends up signed the
  * same way as every other row in the file rather than escaping the rule.
  */
@@ -343,11 +374,11 @@ export async function updateSourceValue(rowId: number, column: string, value: st
   if (column === SOURCE_FILENAME_COLUMN) throw new Error('Where a row came from is not editable.')
 
   const file = (await sourceFilesTable.get(row.sourceId))?.data as SourceFile | undefined
-  const isAmount = file ? columnFor(file, 'amount') === column : false
+  const isValue = file ? columnFor(file, 'value') === column : false
   await sourceRowsTable.update(rowId, {
-    data: { ...row, values: { ...row.values, [column]: value }, importedAmount: isAmount ? undefined : row.importedAmount } satisfies SourceRow,
+    data: { ...row, values: { ...row.values, [column]: value }, importedValue: isValue ? undefined : row.importedValue } satisfies SourceRow,
   })
-  if (file && isAmount) await rewriteAmounts(row.sourceId, file)
+  if (file && isValue) await rewriteAmounts(row.sourceId, file)
   if (file) await flagCrossFileDuplicates(row.sourceId)
 }
 
@@ -377,13 +408,16 @@ export async function retireIfEmpty(sourceId: number): Promise<boolean> {
 }
 
 export async function planConfirmation(sourceId: number, catalogue: LabelCatalogue): Promise<ConfirmationPlan> {
+  const stored = await sourceFilesTable.get(sourceId)
+  if (!stored) throw new Error(`Source file ${sourceId} was not found.`)
+  const file = stored.data as SourceFile
   const rows = (await sourceRowsTable.toArray()).filter((row) => (row.data as SourceRow).sourceId === sourceId)
   const plan: ConfirmationPlan = { ready: [], incomplete: [], marked: [] }
-  for (const stored of rows) {
-    const row = stored.data as SourceRow
-    if (row.markedForElimination) { plan.marked.push(stored.id); continue }
-    if (isReady(row, catalogue)) plan.ready.push(stored.id)
-    else plan.incomplete.push(stored.id)
+  for (const record of rows) {
+    const row = record.data as SourceRow
+    if (row.markedForElimination) { plan.marked.push(record.id); continue }
+    if (isReady(row, file, catalogue)) plan.ready.push(record.id)
+    else plan.incomplete.push(record.id)
   }
   return plan
 }
@@ -423,20 +457,20 @@ export async function confirmSourceRows(sourceId: number, catalogue: LabelCatalo
       else result.leftBehind += 1
       continue
     }
-    if (!isReady(row, catalogue)) { result.leftBehind += 1; continue }
+    if (!isReady(row, file, catalogue)) { result.leftBehind += 1; continue }
     const placements = placementsOf(row.labels, catalogue)
 
-    const amount = parseNumberValue(canonicalValue(row, file, 'amount'))
+    const value = parseNumberValue(canonicalValue(row, file, 'value'))
     const base = {
       rowId: row.rowId,
       confirmedAt,
       date: parseDateValue(canonicalValue(row, file, 'date')) ?? undefined,
-      amount: amount ?? undefined,
-      observations: observationsFor(row, file, row.importedAmount),
+      value: value ?? undefined,
+      observations: observationsFor(row, file, row.importedValue),
       category: row.labels.category?.trim() || DEFAULT_MEANING,
       subcategory: row.labels.subcategory?.trim() || DEFAULT_MEANING,
       asset: canonicalValue(row, file, 'asset') || undefined,
-      quantity: parseNumberValue(canonicalValue(row, file, 'quantity')) ?? undefined,
+      amount: parseNumberValue(canonicalValue(row, file, 'amount')) ?? undefined,
       price: parseNumberValue(canonicalValue(row, file, 'price')) ?? undefined,
       investmentType: canonicalValue(row, file, 'investmentType') || undefined,
       investmentClass: canonicalValue(row, file, 'investmentClass') || undefined,

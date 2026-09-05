@@ -58,9 +58,12 @@ export interface AllocationTarget {
  */
 export type IngestionTargetField =
   | 'date'
+  /** Money that moved, signed. What Movements and Spending are made of. */
+  | 'value'
+  /** How much of a thing changed hands: units of an investment, not money. */
   | 'amount'
   | 'asset'
-  | 'quantity'
+  /** What one unit was worth. `amount` x `price` is the money an investment row moved. */
   | 'price'
   | 'investmentType'
   | 'investmentClass'
@@ -188,11 +191,11 @@ export interface SourceRow {
   markedForElimination?: boolean
   appliedRuleIds?: number[]
   /**
-   * What the file wrote in the amount column, kept when a sign convention rewrote it.
+   * What the file wrote in the value column, kept when a sign convention rewrote it.
    * The rewrite happens in the data rather than beside it, so this is what makes it
    * reversible — and what reaches the observations of every confirmed row.
    */
-  importedAmount?: string
+  importedValue?: string
   /**
    * The `row_id` of a row from **another** file that this one looks like. Advisory and
    * nothing more: it removes nothing by itself. Two identical rows inside one file are
@@ -215,14 +218,15 @@ export interface ConfirmedRow {
   screen: string
   confirmedAt: number
   date?: number
-  /** Signed the way this app means it: negative leaves, positive arrives. */
-  amount?: number
+  /** Money that moved, signed the way this app means it: negative leaves, positive arrives. */
+  value?: number
   /** Everything the file said that no column was assigned to, including what it came from. */
   observations: string
   category: string
   subcategory: string
   asset?: string
-  quantity?: number
+  /** Units of the asset, for an investment row. */
+  amount?: number
   price?: number
   investmentType?: string
   investmentClass?: string

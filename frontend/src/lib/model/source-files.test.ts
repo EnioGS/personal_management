@@ -87,7 +87,7 @@ describe('confirming', () => {
 
   async function readyFile() {
     const sourceId = await createSourceFile('banco-agosto.csv', BANK_CSV)
-    await assignSourceColumns(sourceId, { Data: 'date', Valor: 'amount' })
+    await assignSourceColumns(sourceId, { Data: 'date', Valor: 'value' })
     return sourceId
   }
 
@@ -131,7 +131,7 @@ describe('confirming', () => {
       Tipo: 'D',
     })
     expect('sourceFilename' in confirmed).toBe(false)
-    expect(confirmed.amount).toBe(-284.9)
+    expect(confirmed.value).toBe(-284.9)
     expect(confirmed.date).toBe(Date.UTC(2026, 7, 2))
   })
 
@@ -142,13 +142,13 @@ describe('confirming', () => {
     await label(rows[0].id, { sections: ['finances'], screens: ['overview'], category: 'salário', subcategory: 'outros', account: 'Banco A', card: 'Cartão X' })
 
     // The rewrite lands in the data, so the table itself shows what will be confirmed.
-    expect((await rowsOf(sourceId))[0].row).toMatchObject({ values: { Valor: '-3500' }, importedAmount: '3.500,00' })
+    expect((await rowsOf(sourceId))[0].row).toMatchObject({ values: { Valor: '-3500' }, importedValue: '3.500,00' })
 
     await confirmSourceRows(sourceId, catalogue)
 
     const confirmed = (await confirmedRowsTable.toArray())[0].data as ConfirmedRow
-    expect(confirmed.amount).toBe(-3500)
-    expect(JSON.parse(confirmed.observations).amount_as_imported).toBe('3.500,00')
+    expect(confirmed.value).toBe(-3500)
+    expect(JSON.parse(confirmed.observations).value_as_imported).toBe('3.500,00')
   })
 
   it('puts the amounts back when the convention is set to what the file wrote', async () => {
@@ -157,7 +157,7 @@ describe('confirming', () => {
     await setSignConvention(sourceId, { kind: 'asImported' })
 
     expect((await rowsOf(sourceId))[0].row).toMatchObject({ values: { Valor: '3.500,00' } })
-    expect((await rowsOf(sourceId))[0].row.importedAmount).toBeUndefined()
+    expect((await rowsOf(sourceId))[0].row.importedValue).toBeUndefined()
   })
 
   it('reads direction from another column when that is where the file put it', async () => {
@@ -170,7 +170,7 @@ describe('confirming', () => {
 
     await confirmSourceRows(sourceId, catalogue)
 
-    const amounts = (await confirmedRowsTable.toArray()).map((stored) => (stored.data as ConfirmedRow).amount)
+    const amounts = (await confirmedRowsTable.toArray()).map((stored) => (stored.data as ConfirmedRow).value)
     expect(amounts.sort((a, b) => a! - b!)).toEqual([-284.9, 3500])
   })
 
@@ -217,7 +217,7 @@ describe('a file with nothing left in it', () => {
 
   it('is retired once its last row has been confirmed', async () => {
     const sourceId = await createSourceFile('one-row.csv', 'Data,Valor\n01/08/2026,-10')
-    await assignSourceColumns(sourceId, { Data: 'date', Valor: 'amount' })
+    await assignSourceColumns(sourceId, { Data: 'date', Valor: 'value' })
     const [only] = await rowsOf(sourceId)
     await label(only.id, { sections: ['finances'], screens: ['overview'], category: 'outros', subcategory: 'outros', account: 'Banco A', card: 'Cartão X' })
 
@@ -238,9 +238,9 @@ describe('what counts as a duplicate', () => {
 
   it('is a row that matches one from another file, flagged and nothing more', async () => {
     const august = await createSourceFile('banco-agosto.csv', BANK_CSV)
-    await assignSourceColumns(august, { Data: 'date', Valor: 'amount' })
+    await assignSourceColumns(august, { Data: 'date', Valor: 'value' })
     const september = await createSourceFile('banco-setembro.csv', BANK_CSV)
-    await assignSourceColumns(september, { Data: 'date', Valor: 'amount' })
+    await assignSourceColumns(september, { Data: 'date', Valor: 'value' })
 
     const flagged = (await rowsOf(september)).filter((entry) => entry.row.duplicateOf)
     expect(flagged).toHaveLength(2)
@@ -249,7 +249,7 @@ describe('what counts as a duplicate', () => {
   })
 
   it('compares on the date and the amount once the file says which columns those are', () => {
-    const assignments = { Data: 'date', Valor: 'amount' } as const
+    const assignments = { Data: 'date', Valor: 'value' } as const
     expect(rowSignature({ Data: '01/08/2026', Valor: '-10,00', Descrição: 'A' }, assignments))
       .toBe(rowSignature({ Data: '01/08/2026', Valor: '10,00', Descrição: 'B' }, assignments))
   })
@@ -290,13 +290,13 @@ describe('a line added by hand, and a cell corrected', () => {
 
   it('re-applies the file\'s sign convention to an amount typed by hand', async () => {
     const sourceId = await createSourceFile('banco-agosto.csv', BANK_CSV)
-    await assignSourceColumns(sourceId, { Valor: 'amount' })
+    await assignSourceColumns(sourceId, { Valor: 'value' })
     await setSignConvention(sourceId, { kind: 'invertAll' })
     const [first] = await rowsOf(sourceId)
 
     await updateSourceValue(first.id, 'Valor', '250,00')
 
-    expect((await rowsOf(sourceId))[0].row).toMatchObject({ values: { Valor: '-250' }, importedAmount: '250,00' })
+    expect((await rowsOf(sourceId))[0].row).toMatchObject({ values: { Valor: '-250' }, importedValue: '250,00' })
   })
 
   it('refuses to rewrite where a row came from', async () => {
@@ -312,7 +312,7 @@ describe('account and card, as labels', () => {
 
   it('travel with the row into the table it is confirmed to', async () => {
     const sourceId = await createSourceFile('banco-agosto.csv', BANK_CSV)
-    await assignSourceColumns(sourceId, { Data: 'date', Valor: 'amount' })
+    await assignSourceColumns(sourceId, { Data: 'date', Valor: 'value' })
     const [first] = await rowsOf(sourceId)
     await label(first.id, {
       sections: ['finances'], screens: ['overview'], category: 'outros', subcategory: 'outros',
@@ -326,6 +326,7 @@ describe('account and card, as labels', () => {
 
   it('hold a row back when it names no account, and let one through with no card', async () => {
     const sourceId = await createSourceFile('banco-agosto.csv', BANK_CSV)
+    await assignSourceColumns(sourceId, { Data: 'date', Valor: 'value' })
     const [first, second] = await rowsOf(sourceId)
     await label(first.id, { sections: ['finances'], screens: ['overview'], category: 'outros', subcategory: 'outros' })
     // No card, and that is a complete answer: this row never touched one.

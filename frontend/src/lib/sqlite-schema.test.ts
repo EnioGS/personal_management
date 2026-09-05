@@ -71,7 +71,7 @@ describe('rowToSqlValues / sqlValuesToRow round-trip', () => {
         importedAt: 2,
         rawCsv: 'Data,Valor\n01/09/2026,"-10,00"',
         originalColumns: ['Data', 'Valor'],
-        assignments: { Data: 'date', Valor: 'amount' },
+        assignments: { Data: 'date', Valor: 'value' },
         signConvention: { kind: 'invertWhen', column: 'Tipo', values: ['D'] },
       },
     }
@@ -106,7 +106,7 @@ describe('rowToSqlValues / sqlValuesToRow round-trip', () => {
         screen: 'spending',
         confirmedAt: 42,
         date: 1700000000000,
-        amount: -123.45,
+        value: -123.45,
         observations: '{"source_filename":"nubank_2026-09.csv","descricao":"Mercado"}',
         category: 'mercado',
         subcategory: 'outros',

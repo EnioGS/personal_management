@@ -11,8 +11,8 @@ export interface FilteredEntry {
   section: string
   screen: string
   date: number
-  /** Signed the way the app means it: negative left, positive arrived. */
-  amount: number
+  /** Money that moved, signed the way the app means it: negative left, positive arrived. */
+  value: number
   category: string
   subcategory: string
   /** Everything the source file said that no column was assigned to. */
@@ -22,7 +22,8 @@ export interface FilteredEntry {
   /** The most description-like thing the file said — see `describeRow`. */
   description: string
   asset?: string
-  quantity?: number
+  /** Units of the asset, for an investment row. */
+  amount?: number
   price?: number
   investmentType?: string
   investmentClass?: string
@@ -59,14 +60,14 @@ export function filterConfirmedRows({ rows, filters, screen }: FilterParams): Fi
       section: row.section,
       screen: row.screen,
       date: row.date,
-      amount: typeof row.amount === 'number' ? row.amount : 0,
+      value: typeof row.value === 'number' ? row.value : 0,
       category: row.category,
       subcategory: row.subcategory,
       observations: row.observations,
       description: describeRow(row.observations),
       sourceFilename: sourceFilenameOf(row.observations),
       asset: row.asset,
-      quantity: row.quantity,
+      amount: row.amount,
       price: row.price,
       investmentType: row.investmentType,
       investmentClass: row.investmentClass,

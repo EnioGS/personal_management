@@ -33,7 +33,7 @@ export function RecurringPanel() {
   const entries = useDashboardEntries(filters)
   // Money that left, as the magnitude that left: a recurring charge is a repeated size.
   const outgoing = useMemo(
-    () => entries.filter((entry) => entry.amount < 0).map((entry) => ({ ...entry, amount: -entry.amount })),
+    () => entries.filter((entry) => entry.value < 0).map((entry) => ({ ...entry, amount: -entry.value })),
     [entries],
   )
   const candidates = useMemo(() => {
@@ -57,7 +57,7 @@ export function RecurringPanel() {
     const days = new Set<number>()
     for (const entry of outgoing) {
       if (monthKey(entry.date) !== latestMonth) continue
-      if (!recurringKeys.has(`${entry.category}\u0000${Math.round(entry.amount)}`)) continue
+      if (!recurringKeys.has(`${entry.category}\u0000${Math.round(entry.value)}`)) continue
       days.add(new Date(entry.date).getUTCDate())
     }
     return days

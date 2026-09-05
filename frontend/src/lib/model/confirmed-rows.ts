@@ -2,7 +2,7 @@ import { refreshAllLocalStores } from '@/lib/local-store/create-local-list-store
 import { parseDateValue } from '@/lib/parse-date'
 import { parseNumberValue } from '@/lib/parse-number'
 import { DEFAULT_MEANING } from './ingestion'
-import { SOURCE_FILENAME_KEY } from './observations'
+import { SOURCE_FILENAME_KEY, readObservations } from './observations'
 import { confirmedRowsTable } from './model-db'
 import { newRowId } from './row-id'
 import type { ConfirmedRow } from './types'
@@ -49,7 +49,7 @@ export async function addConfirmedRow(section: string, screen: string): Promise<
 }
 
 /** The cells a person may edit in a confirmed table, and how each reads what was typed. */
-export const CONFIRMED_EDITABLE = ['date', 'amount', 'category', 'subcategory', 'account', 'card', 'observations'] as const
+export const CONFIRMED_EDITABLE = ['date', 'value', 'category', 'subcategory', 'account', 'card', 'observations'] as const
 export type ConfirmedEditableColumn = (typeof CONFIRMED_EDITABLE)[number]
 
 /**
@@ -67,7 +67,7 @@ export async function updateConfirmedRow(rowId: number, column: ConfirmedEditabl
 
   const patch: Partial<ConfirmedRow> =
     column === 'date' ? { date: parseDateValue(value) ?? undefined }
-    : column === 'amount' ? { amount: parseNumberValue(value) ?? undefined }
+    : column === 'value' ? { value: parseNumberValue(value) ?? undefined }
     : column === 'observations' ? { observations: value }
     // An account or a card can genuinely be nothing — not every row has one — while a
     // category emptied out means "nobody has said", which is what `outros` is for.
@@ -99,4 +99,44 @@ export async function placeConfirmedRow(
   if (mode === 'copy') await confirmedRowsTable.add({ createdAt: Date.now(), data: { ...row, ...placement } })
   else await confirmedRowsTable.update(rowId, { data: { ...row, ...placement } })
   await refreshAllLocalStores()
+}
+
+/**
+ * Fills a confirmed row's date or value from what its observations already hold.
+ *
+ * Rows confirmed before the file was told which columns held its date and its money
+ * landed with both empty — present in their table, invisible on every dashboard — while
+ * the values themselves sat in the observations all along, under the file's own column
+ * names. This reads them back out. It is not a correction in the add-and-mark sense:
+ * nothing about the row changes, a value that was always there is simply extracted.
+ */
+export async function fillFromObservations(
+  rows: { section?: string; screen?: string },
+  keys: { date?: string; value?: string },
+): Promise<{ filled: number; untouched: number }> {
+  const result = { filled: 0, untouched: 0 }
+
+  for (const stored of await confirmedRowsTable.toArray()) {
+    const row = stored.data as ConfirmedRow
+    if (rows.section && row.section !== rows.section) continue
+    if (rows.screen && row.screen !== rows.screen) continue
+
+    const observations = readObservations(row.observations)
+    const patch: Partial<ConfirmedRow> = {}
+    if (row.date === undefined && keys.date) {
+      const date = parseDateValue(observations[keys.date])
+      if (date !== null) patch.date = date
+    }
+    if (row.value === undefined && keys.value) {
+      const value = parseNumberValue(observations[keys.value])
+      if (value !== null) patch.value = value
+    }
+
+    if (Object.keys(patch).length === 0) { result.untouched += 1; continue }
+    await confirmedRowsTable.update(stored.id, { data: { ...row, ...patch } })
+    result.filled += 1
+  }
+
+  await refreshAllLocalStores()
+  return result
 }

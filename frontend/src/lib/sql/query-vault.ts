@@ -102,7 +102,7 @@ export async function buildVaultSnapshot(): Promise<VaultSnapshot> {
     const key = confirmedTableName(row.section, row.screen)
     byPlacement.set(key, [...(byPlacement.get(key) ?? []), { id: stored.id, data: row }])
   }
-  const confirmedColumns = ['id', 'row_id', 'section', 'screen', 'source_filename', 'date', 'amount', 'observations', 'category', 'subcategory', 'account', 'card', 'asset', 'quantity', 'price', 'investment_type', 'investment_class', 'marked_for_elimination']
+  const confirmedColumns = ['id', 'row_id', 'section', 'screen', 'source_filename', 'date', 'value', 'observations', 'category', 'subcategory', 'account', 'card', 'asset', 'amount', 'price', 'investment_type', 'investment_class', 'marked_for_elimination']
   for (const [name, rows] of byPlacement) {
     createAndFill(db, name, rows.map(({ id, data }) => ({
       id,
@@ -113,12 +113,12 @@ export async function buildVaultSnapshot(): Promise<VaultSnapshot> {
       // not have to dig it out of JSON to group by where a row came from.
       source_filename: sourceFilenameOf(data.observations),
       date: data.date ?? null,
-      amount: data.amount ?? null,
+      value: data.value ?? null,
       observations: data.observations,
       category: data.category,
       subcategory: data.subcategory,
       asset: data.asset ?? null,
-      quantity: data.quantity ?? null,
+      amount: data.amount ?? null,
       price: data.price ?? null,
       investment_type: data.investmentType ?? null,
       investment_class: data.investmentClass ?? null,
@@ -131,8 +131,8 @@ export async function buildVaultSnapshot(): Promise<VaultSnapshot> {
       columns: confirmedColumns,
       rows: rows.length,
       signs: {
-        negative: rows.filter(({ data }) => typeof data.amount === 'number' && data.amount < 0).length,
-        positive: rows.filter(({ data }) => typeof data.amount === 'number' && data.amount > 0).length,
+        negative: rows.filter(({ data }) => typeof data.value === 'number' && data.value < 0).length,
+        positive: rows.filter(({ data }) => typeof data.value === 'number' && data.value > 0).length,
       },
     })
   }

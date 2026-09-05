@@ -21,7 +21,7 @@ function row(id: number, overrides: Partial<ConfirmedRow> = {}): StoredRow<Confi
     screen: 'overview',
     confirmedAt: 0,
     date: inYear,
-    amount: -100,
+    value: -100,
     observations: '{"source_filename":"nubank.csv"}',
     category: 'outros',
     subcategory: 'outros',
@@ -31,9 +31,9 @@ function row(id: number, overrides: Partial<ConfirmedRow> = {}): StoredRow<Confi
 
 describe('filterConfirmedRows', () => {
   it('keeps a confirmed row with its sign intact', () => {
-    const result = filterConfirmedRows({ rows: [row(1, { amount: 250 })], filters: baseFilters() })
+    const result = filterConfirmedRows({ rows: [row(1, { value: 250 })], filters: baseFilters() })
     expect(result).toHaveLength(1)
-    expect(result[0].amount).toBe(250)
+    expect(result[0].value).toBe(250)
   })
 
   it('hides a row marked for elimination — the one thing a dashboard does not show', () => {

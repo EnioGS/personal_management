@@ -32,8 +32,17 @@ a markdown pipe table is read as a table.
 - Six label columns on the right. Placement starts empty; category and subcategory start
   at \`outros\`; account and card start empty and are optional.
 
-Only the file's own columns can be assigned to a canonical field (date, amount, asset,
-quantity, price, investmentType, investmentClass). The filename column and the label
+Only the file's own columns can be assigned to a canonical field: **date**, **value**
+(the money that moved, signed — what Movements and Spending are made of), **amount** (how
+many units of a thing changed hands, which is what an investment row is), **price** (what
+one unit was worth), asset, investmentType, investmentClass. Value and amount are not the
+same number and never interchangeable: money is a value, a holding is an amount.
+
+A row cannot be confirmed until its file says where those numbers are. Every row needs a
+date; a row going anywhere but Investments needs a value; a row going to Investments needs
+an amount. Confirming without them is refused and says which column is missing — a row
+that lands with an empty date and an empty value sits in its table and appears on no
+dashboard at all, which is the one failure nobody notices. The filename column and the label
 columns are never assignable. Anything left unassigned is not lost: it is condensed into
 the observations column when the row is confirmed, which is where a description ends up.
 

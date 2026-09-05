@@ -162,8 +162,13 @@ Two things it optimizes for:
   own table, keeping every column the file wrote, with `source_filename` in front
   of them and four label columns after them. Only the file's own columns can be
   assigned a meaning (date, amount, asset, quantity, price, investment type and
-  class); everything unassigned is condensed into one observations column when the
-  row is confirmed, so nothing is dropped and no column has to be invented. **Where a row
+  class); **value** is the money that moved and **amount** is how many units of a thing
+  changed hands, which are different numbers and never interchangeable. A row is not
+  confirmed until its file says which column holds the ones its destination needs — every
+  row a date, a money row its value, an investment row its amount — because a row that
+  lands with those empty sits in its table and appears on no dashboard, which is the one
+  failure nobody notices. Everything unassigned is condensed into one observations column
+  when the row is confirmed, so nothing is dropped and no column has to be invented. **Where a row
   came from lives in there too**, and nowhere else — the confirmed tables have no
   filename column repeating it. Duplicate checking, the balances-by-source card and the
   SQL views all read it back out of the observations, and the exported `.db` exposes it
