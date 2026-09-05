@@ -1,4 +1,4 @@
-import { useState, type CSSProperties } from 'react'
+import { useEffect, useState, type CSSProperties } from 'react'
 import { ChevronRight } from 'lucide-react'
 import { colorForKey, colorForRank, tintedColor, type ThemedColor } from '@/components/charts/chart-colors'
 import { cn } from '@/lib/utils'
@@ -47,6 +47,7 @@ export function RankedBarList({ items, valueFormatter, emptyLabel, variant = 'in
               item={item}
               color={colorForRank(rank)}
               share={Math.max(0, item.value) / max}
+              rank={rank}
               valueFormatter={valueFormatter}
             />
           )
@@ -100,11 +101,13 @@ const CHILD_INDENT_PX = 13
  * parent's, so the same fraction of it would overshoot — hence the `calc`, which takes
  * the fraction of the parent's bar and then gives back the indent the child never had.
  */
-function UnderlinedRow({ item, color, share, valueFormatter }: {
+function UnderlinedRow({ item, color, share, rank, valueFormatter }: {
   item: RankedBarItem
   color: ThemedColor
   /** How much of this row's own track the bar fills, from 0 to 1. */
   share: number
+  /** Its place in the list, which is what staggers the bars as they grow. */
+  rank: number
   valueFormatter: (value: number) => string
 }) {
   const [open, setOpen] = useState(false)
@@ -125,7 +128,7 @@ function UnderlinedRow({ item, color, share, valueFormatter }: {
           )}
           <span className="min-w-0 break-words" title={item.label}>{item.label || '—'}</span>
         </span>
-        <Bar width={`${(share * 100).toFixed(3)}%`} color={color} />
+        <Bar width={`${(share * 100).toFixed(3)}%`} color={color} delay={rank * GROW_STAGGER_MS} />
       </div>
       <span className="pt-0.5 text-right tabular-nums">{valueFormatter(item.value)}</span>
       <span className={`mr-[5px] pt-0.5 text-right tabular-nums whitespace-nowrap ${comparison.className}`}>{comparison.label}</span>
@@ -149,7 +152,7 @@ function UnderlinedRow({ item, color, share, valueFormatter }: {
               <div key={child.key} className="grid grid-cols-[minmax(0,1fr)_5rem_3.5rem] items-start gap-x-2 text-xs">
                 <div className="text-muted-foreground min-w-0">
                   <span className="block min-w-0 break-words leading-4" title={child.label}>{child.label || '—'}</span>
-                  <Bar width={childWidth(child.value)} color={tintedColor(color, rank)} />
+                  <Bar width={childWidth(child.value)} color={tintedColor(color, rank)} delay={rank * GROW_STAGGER_MS} />
                 </div>
                 <span className="text-muted-foreground pt-0.5 text-right tabular-nums">{valueFormatter(child.value)}</span>
                 <span className={`mr-[5px] pt-0.5 text-right tabular-nums whitespace-nowrap ${childComparison.className}`}>
@@ -164,12 +167,42 @@ function UnderlinedRow({ item, color, share, valueFormatter }: {
   )
 }
 
-function Bar({ width, color }: { width: string; color: ThemedColor }) {
+/** Long enough to be seen as movement, short enough that nobody waits for it. */
+const GROW_MS = 380
+/** A little apart, so the list fills like a list rather than like one wide bar. */
+const GROW_STAGGER_MS = 22
+const MAX_STAGGER_MS = 260
+
+/**
+ * A bar that draws itself.
+ *
+ * It grows from nothing on the frame after it mounts — which is the whole trick: mounting
+ * is what happens when the panel first renders and when a category is opened, so the parts
+ * sliding out from under a category use the same code as the categories themselves, with
+ * no state to keep about which of them has been seen.
+ *
+ * The stagger is per row, capped, so a long list still finishes about when a short one
+ * does; and anyone who has asked their system for less motion gets the final width
+ * immediately.
+ */
+function Bar({ width, color, delay = 0 }: { width: string; color: ThemedColor; delay?: number }) {
+  const [grown, setGrown] = useState(false)
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => setGrown(true))
+    return () => cancelAnimationFrame(frame)
+  }, [])
+
   return (
     <div className="bg-muted mt-1 h-[3px] overflow-hidden rounded-full">
       <div
-        className="entity-fill h-full rounded-full"
-        style={{ width, '--entity-light': color.light, '--entity-dark': color.dark } as CSSProperties}
+        className="entity-fill h-full rounded-full transition-[width] ease-out motion-reduce:transition-none"
+        style={{
+          width: grown ? width : 0,
+          transitionDuration: `${GROW_MS}ms`,
+          transitionDelay: `${Math.min(delay, MAX_STAGGER_MS)}ms`,
+          '--entity-light': color.light,
+          '--entity-dark': color.dark,
+        } as CSSProperties}
       />
     </div>
   )

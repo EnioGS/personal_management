@@ -1,4 +1,4 @@
-import { Cell, Pie, PieChart } from 'recharts'
+import { Cell, Pie, PieChart, Sector } from 'recharts'
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart'
 import { chartSafeKey, tintedColor, type ThemedColor } from './chart-colors'
 
@@ -31,9 +31,33 @@ interface LabelProps {
 interface LabelLineProps {
   points?: { x: number; y: number }[]
   percent: number
+  midAngle?: number
 }
 
 const RADIAN = Math.PI / 180
+/** How far a slice sits out from the centre. The outer ring travels further, being further out. */
+const EXPLODE = { parts: 4, classes: 7 }
+
+/**
+ * Pushes a slice out along its own middle, away from the centre.
+ *
+ * Which is what an exploded pie is: not slices with gaps between them, but slices that
+ * have each moved outward, the gaps being what is left behind. Every slice leaves in a
+ * different direction, so the ring comes apart into the things it was made of.
+ */
+function exploded(offset: number) {
+  return function ExplodedSector(props: unknown) {
+    const sector = props as { cx: number; cy: number; midAngle: number }
+    const angle = -sector.midAngle * RADIAN
+    return (
+      <Sector
+        {...(props as object)}
+        cx={sector.cx + Math.cos(angle) * offset}
+        cy={sector.cy + Math.sin(angle) * offset}
+      />
+    )
+  }
+}
 /** Below this a slice's own label would collide with its neighbours; the tooltip has it. */
 const LABEL_FLOOR = 0.04
 
@@ -51,10 +75,11 @@ const LABEL_FLOOR = 0.04
  * each one is. Naming them too would be four labels for two facts, and on a card this
  * size they would collide before they explained anything.
  *
- * Both rings are cut into separate pieces rather than drawn as continuous bands. A gap
- * between slices is what makes a ring read as several things instead of one striped
- * thing, and it does the work a dividing stroke used to do without borrowing the card's
- * colour to do it.
+ * Both rings are exploded: every slice has moved out along its own middle, so the gaps
+ * between them are what each one left behind rather than a stroke drawn between them.
+ * That is what makes a ring read as several things instead of one striped thing, and it
+ * keeps a slice's angle exactly where it was, which is what lets the inner pieces stay
+ * legible as parts of the arc above them.
  */
 export function HoldingsPie({ groups, valueFormatter, emptyLabel }: HoldingsPieProps) {
   const held = groups.filter((group) => group.value > 0)
@@ -91,11 +116,11 @@ export function HoldingsPie({ groups, valueFormatter, emptyLabel }: HoldingsPieP
           data={parts}
           dataKey="value"
           nameKey="fillKey"
-          outerRadius="52%"
-          paddingAngle={2}
+          outerRadius="50%"
           cornerRadius={2}
           stroke="none"
           isAnimationActive={false}
+          shape={exploded(EXPLODE.parts)}
         >
           {parts.map((child) => (
             <Cell key={child.key} fill={`var(--color-${child.fillKey})`} />
@@ -107,11 +132,11 @@ export function HoldingsPie({ groups, valueFormatter, emptyLabel }: HoldingsPieP
           dataKey="value"
           nameKey="fillKey"
           innerRadius="59%"
-          outerRadius="78%"
-          paddingAngle={2}
+          outerRadius="76%"
           cornerRadius={2}
           stroke="none"
           isAnimationActive={false}
+          shape={exploded(EXPLODE.classes)}
           labelLine={LeaderLine}
           label={SliceLabel}
         >
@@ -125,11 +150,16 @@ export function HoldingsPie({ groups, valueFormatter, emptyLabel }: HoldingsPieP
 
   /** Drawn only where a label was: recharts would otherwise leave a line pointing at nothing. */
   function LeaderLine(props: unknown) {
-    const { points, percent } = props as LabelLineProps
+    const { points, percent, midAngle = 0 } = props as LabelLineProps
     if (percent < LABEL_FLOOR || !points || points.length < 2) return <g />
+    // Recharts measured the line against the ring as it would have been drawn unexploded,
+    // so the whole line travels the same distance the slice did.
+    const angle = -midAngle * RADIAN
+    const dx = Math.cos(angle) * EXPLODE.classes
+    const dy = Math.sin(angle) * EXPLODE.classes
     return (
       <polyline
-        points={points.map((point) => `${point.x},${point.y}`).join(' ')}
+        points={points.map((point) => `${point.x + dx},${point.y + dy}`).join(' ')}
         fill="none"
         stroke="var(--muted-foreground)"
         strokeWidth={1}
@@ -141,7 +171,9 @@ export function HoldingsPie({ groups, valueFormatter, emptyLabel }: HoldingsPieP
     const { cx, cy, midAngle, outerRadius, percent, payload } = props as LabelProps
     if (percent < LABEL_FLOOR) return null
 
-    const radius = outerRadius + 14
+    // The slice moved out, so its name moves with it; otherwise the line would point at
+    // where the slice used to be.
+    const radius = outerRadius + EXPLODE.classes + 14
     const x = cx + radius * Math.cos(-midAngle * RADIAN)
     const y = cy + radius * Math.sin(-midAngle * RADIAN)
     const onTheRight = x >= cx
