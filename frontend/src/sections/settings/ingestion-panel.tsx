@@ -244,22 +244,22 @@ export function IngestionPanel() {
     }
   }, [])
 
-  async function editConfirmed(row: StoredRow<ConfirmedRow>, column: ConfirmedEditableColumn, value: string) {
+  const editConfirmed = useCallback(async (row: StoredRow<ConfirmedRow>, column: ConfirmedEditableColumn, value: string) => {
     await updateConfirmedRow(row.id, column, value)
-  }
+  }, [])
 
   /**
    * Re-placing a confirmed row. Which table it is in is its section and screen, so editing
    * either of them moves it — the row leaves this table and appears in the one it now
    * names, keeping the id every copy of it shares.
    */
-  async function editPlacement(row: StoredRow<ConfirmedRow>, column: 'section' | 'screen', value: string) {
+  const editPlacement = useCallback(async (row: StoredRow<ConfirmedRow>, column: 'section' | 'screen', value: string) => {
     const section = column === 'section' ? resolveSectionLabel(catalogue, value) : row.section
     const screen = column === 'screen' ? resolveScreenLabel(catalogue, value, section ? [section] : undefined) : row.screen
     if (!section || !screen) { setMessage(`Nothing is called ${value}.`); return }
     await placeConfirmedRow(row.id, { section, screen })
     setMessage(`Moved row ${row.rowId} to ${sectionLabelFor(catalogue, section)} · ${screenLabelFor(catalogue, screen)}.`)
-  }
+  }, [catalogue])
 
   async function addLine() {
     if (selectedFile) await addSourceRow(selectedFile.id)
@@ -490,68 +490,16 @@ export function IngestionPanel() {
             </thead>
             <tbody>
               {confirmedWindow.visible.map((row) => (
-                <tr
+                <ConfirmedRowLine
                   key={row.id}
-                  {...rowProps(() => void toggleMark('confirmed', row.id))}
-                  className={cn(
-                    'border-b last:border-0',
-                    marking && 'cursor-pointer',
-                    row.markedForElimination && 'bg-destructive/10 line-through',
-                  )}
-                >
-                  <td className="text-muted-foreground p-2 font-mono whitespace-nowrap" title="The id every copy of this row shares, fixed for its life.">{row.rowId}</td>
-                  {(['section', 'screen'] as const).map((column) => (
-                    <EditableCell
-                      key={column}
-                      value={column === 'section' ? sectionLabelFor(catalogue, row.section) : screenLabelFor(catalogue, row.screen)}
-                      disabled={marking}
-                      title="Which table this row is in. Change it and the row moves there."
-                      validate={(draft) => {
-                        const section = column === 'section' ? resolveSectionLabel(catalogue, draft) : row.section
-                        const resolved = column === 'section'
-                          ? section
-                          : resolveScreenLabel(catalogue, draft, section ? [section] : undefined)
-                        return resolved ? null : `Nothing is called ${draft}.`
-                      }}
-                      onCommit={(value) => void editPlacement(row, column, value)}
-                    />
-                  ))}
-                  <EditableCell
-                    className="whitespace-nowrap"
-                    value={row.date ? new Date(row.date).toISOString().slice(0, 10) : ''}
-                    disabled={marking}
-                    onCommit={(value) => void editConfirmed(row, 'date', value)}
-                  />
-                  <EditableCell
-                    className="tabular-nums"
-                    value={row.value === undefined ? '' : String(row.value)}
-                    disabled={marking}
-                    onCommit={(value) => void editConfirmed(row, 'value', value)}
-                  />
-                  {(['account', 'card'] as const).map((column) => (
-                    <EditableCell
-                      key={column}
-                      value={row[column] ?? ''}
-                      disabled={marking}
-                      validate={(draft) => {
-                        const text = draft.trim()
-                        if (!text) return null
-                        const resolved = column === 'account' ? resolveAccountLabel(catalogue, text) : resolveCardLabel(catalogue, text)
-                        return resolved ? null : `No ${column} is called ${text}. Set it up in Settings → General.`
-                      }}
-                      onCommit={(value) => void editConfirmed(row, column, value)}
-                    />
-                  ))}
-                  {(['category', 'subcategory'] as const).map((column) => (
-                    <EditableCell key={column} value={row[column]} disabled={marking} onCommit={(value) => void editConfirmed(row, column, value)} />
-                  ))}
-                  <EditableCell
-                    className="max-w-[28rem] truncate"
-                    value={row.observations}
-                    disabled={marking}
-                    onCommit={(value) => void editConfirmed(row, 'observations', value)}
-                  />
-                </tr>
+                  row={row}
+                  catalogue={catalogue}
+                  marking={marking}
+                  rowProps={rowProps}
+                  onToggleMark={toggleMark}
+                  onEdit={editConfirmed}
+                  onEditPlacement={editPlacement}
+                />
               ))}
             </tbody>
           </table>
@@ -669,6 +617,93 @@ const SourceRowLine = memo(function SourceRowLine({
           />
         )
       })}
+    </tr>
+  )
+})
+
+/**
+ * One row of a confirmed table. Memoised for the same reason a source row is: a table is
+ * a thousand cells, and none of them has anything to redraw when a row three screens away
+ * changes.
+ */
+const ConfirmedRowLine = memo(function ConfirmedRowLine({
+  row,
+  catalogue,
+  marking,
+  rowProps,
+  onToggleMark,
+  onEdit,
+  onEditPlacement,
+}: {
+  row: StoredRow<ConfirmedRow>
+  catalogue: LabelCatalogue
+  marking: boolean
+  rowProps: (toggle: () => void) => { 'data-markable': true; onClick: () => void }
+  onToggleMark: (table: MarkableTable, rowId: number) => Promise<boolean>
+  onEdit: (row: StoredRow<ConfirmedRow>, column: ConfirmedEditableColumn, value: string) => Promise<void>
+  onEditPlacement: (row: StoredRow<ConfirmedRow>, column: 'section' | 'screen', value: string) => Promise<void>
+}) {
+  return (
+    <tr
+      {...rowProps(() => void onToggleMark('confirmed', row.id))}
+      className={cn(
+        'border-b last:border-0',
+        marking && 'cursor-pointer',
+        row.markedForElimination && 'bg-destructive/10 line-through',
+      )}
+    >
+      <td className="text-muted-foreground p-2 font-mono whitespace-nowrap" title="The id every copy of this row shares, fixed for its life.">{row.rowId}</td>
+      {(['section', 'screen'] as const).map((column) => (
+        <EditableCell
+          key={column}
+          value={column === 'section' ? sectionLabelFor(catalogue, row.section) : screenLabelFor(catalogue, row.screen)}
+          disabled={marking}
+          title="Which table this row is in. Change it and the row moves there."
+          validate={(draft) => {
+            const section = column === 'section' ? resolveSectionLabel(catalogue, draft) : row.section
+            const resolved = column === 'section'
+              ? section
+              : resolveScreenLabel(catalogue, draft, section ? [section] : undefined)
+            return resolved ? null : `Nothing is called ${draft}.`
+          }}
+          onCommit={(value) => void onEditPlacement(row, column, value)}
+        />
+      ))}
+      <EditableCell
+        className="whitespace-nowrap"
+        value={row.date ? new Date(row.date).toISOString().slice(0, 10) : ''}
+        disabled={marking}
+        onCommit={(value) => void onEdit(row, 'date', value)}
+      />
+      <EditableCell
+        className="tabular-nums"
+        value={row.value === undefined ? '' : String(row.value)}
+        disabled={marking}
+        onCommit={(value) => void onEdit(row, 'value', value)}
+      />
+      {(['account', 'card'] as const).map((column) => (
+        <EditableCell
+          key={column}
+          value={row[column] ?? ''}
+          disabled={marking}
+          validate={(draft) => {
+            const text = draft.trim()
+            if (!text) return null
+            const resolved = column === 'account' ? resolveAccountLabel(catalogue, text) : resolveCardLabel(catalogue, text)
+            return resolved ? null : `No ${column} is called ${text}. Set it up in Settings → General.`
+          }}
+          onCommit={(value) => void onEdit(row, column, value)}
+        />
+      ))}
+      {(['category', 'subcategory'] as const).map((column) => (
+        <EditableCell key={column} value={row[column]} disabled={marking} onCommit={(value) => void onEdit(row, column, value)} />
+      ))}
+      <EditableCell
+        className="max-w-[28rem] truncate"
+        value={row.observations}
+        disabled={marking}
+        onCommit={(value) => void onEdit(row, 'observations', value)}
+      />
     </tr>
   )
 })
