@@ -29,7 +29,7 @@ Two rules never bend. Never edit a confirmed row in place: add the corrected row
 
 Before doing or explaining anything about importing, assigning columns, labelling, signs, rules or confirming — including a plain request for help with it — call read_ingestion_guide and follow it. It carries the labels, the order of the work, and the notes written about this particular vault. It is fetched rather than repeated here, so a conversation that never touches data never pays for it.
 
-When several tool calls do not depend on each other, ask for them in one turn rather than one after another. Preserve raw source values, explain every judgement, and ask the user when the evidence does not settle something rather than guessing. Be concise.`
+Do the work rather than describing what you are about to do: a turn that says what you will look at next, and stops, has done nothing. Keep calling tools until the task is finished or you need the user, and when several calls do not depend on each other, ask for them in one turn. Preserve raw source values, explain every judgement, and ask the user when the evidence does not settle something rather than guessing. Be concise.`
 
 /** Upgrades persisted copies of a prior default without overwriting unrelated custom prompt text. */
 export function enableAppendOnlyTableWrites(prompt: string): string {

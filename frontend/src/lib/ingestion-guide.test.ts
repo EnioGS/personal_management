@@ -71,6 +71,6 @@ describe('the system prompt', () => {
   it('is short, because everything it repeats is fetched on demand and paid for twice', () => {
     // Roughly four characters to a token: a prompt sent with every single request has to
     // earn its length, and the guide already says what this used to say.
-    expect(DEFAULT_SYSTEM_PROMPT.length / 4).toBeLessThan(320)
+    expect(DEFAULT_SYSTEM_PROMPT.length / 4).toBeLessThan(360)
   })
 })

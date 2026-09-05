@@ -318,6 +318,11 @@ Two things it optimizes for:
   computed elsewhere, positions/allocation share one weighted-average-price
   calculation (`lib/current-value.ts`), recurring detection is pattern
   matching over existing entries, not a declared schedule.
+- A request adapts to what the model will accept rather than to a table of which model
+  wants what, since that table is wrong within a month: the length limit is asked for
+  under its current name and retried under the old one, and a model that refuses function
+  tools alongside its reasoning is sent to OpenAI's Responses API instead — where it keeps
+  both — rather than having its thinking switched off to keep its tools.
 - The assistant's Connections list supports more than one provider — one
   saved connection per provider, detected from the key's own prefix rather
   than a picker, with exactly one active at a time (adr/0027). Nothing in

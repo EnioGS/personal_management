@@ -1,3 +1,4 @@
+import { requestOpenAiResponse } from './openai-responses'
 import { readUsage, type OpenRouterMessage, type OpenRouterTool, type OpenRouterToolCall, type TokenUsage } from './openrouter'
 
 interface OpenAiResponseMessage {
@@ -7,7 +8,14 @@ interface OpenAiResponseMessage {
   usage?: TokenUsage
 }
 
-const MAX_RESPONSE_TOKENS = 4096
+/**
+ * How much the model may write back.
+ *
+ * A reasoning model spends this budget on its thinking as well as its answer, so a cap
+ * sized for plain replies cuts it off mid-thought — which arrives as a truncated message
+ * rather than as an error, and reads like a model that gave up halfway.
+ */
+const MAX_RESPONSE_TOKENS = 16_000
 
 type Adjustments = { limitField: 'max_completion_tokens' | 'max_tokens'; withoutReasoning: boolean }
 
@@ -19,12 +27,23 @@ const RETRIES: { when: (body: string) => boolean; change: (current: Adjustments)
     change: (current) => Object.assign(current, { limitField: 'max_tokens' as const }),
   },
   {
-    // Some models will not take function tools on chat completions while reasoning is on.
-    // Answering with what the API itself suggests keeps the tools, which are the point.
-    when: (body) => body.includes('reasoning_effort'),
+    // A model that refuses tools alongside reasoning without offering the Responses API:
+    // its own suggestion is all there is, so take it.
+    when: (body) => body.includes('reasoning_effort') && !body.includes('/v1/responses'),
     change: (current) => Object.assign(current, { withoutReasoning: true }),
   },
 ]
+
+/**
+ * The refusal that means this model cannot do tools here at all.
+ *
+ * Its own suggestion is to turn reasoning off — which keeps the tools and loses the
+ * thinking, on work that is entirely thinking. The other suggestion is the Responses API,
+ * where the model keeps both, so that is where the request goes instead.
+ */
+function needsResponsesApi(body: string): boolean {
+  return body.includes('reasoning_effort') && body.includes('/v1/responses')
+}
 
 /**
  * Same OpenAI-compatible chat-completions wire format as lib/openrouter.ts's
@@ -76,14 +95,22 @@ export async function requestOpenAiChatMessage(
     body = response.ok ? '' : await response.text().catch(() => '')
   }
 
+  if (!response.ok && needsResponsesApi(body)) return requestOpenAiResponse(apiKey, model, messages, tools)
+
   if (!response.ok) {
     throw new Error(`OpenAI request failed (${response.status}): ${body || response.statusText}`)
   }
 
   const data: unknown = await response.json()
-  const message = (data as { choices?: { message?: OpenAiResponseMessage }[] })?.choices?.[0]?.message
+  const choice = (data as { choices?: { message?: OpenAiResponseMessage; finish_reason?: string }[] })?.choices?.[0]
+  const message = choice?.message
   if (!message || (typeof message.content !== 'string' && message.content !== null)) {
     throw new Error('Unexpected response from OpenAI.')
+  }
+  // Said out loud rather than returned as a half-answer: a reply cut off at the budget is
+  // indistinguishable from a model that simply stopped, and the two need different fixes.
+  if (choice.finish_reason === 'length' && !message.tool_calls?.length) {
+    throw new Error(`The model reached its ${MAX_RESPONSE_TOKENS}-token limit before finishing. Ask for less at once, or raise the limit.`)
   }
   return { ...message, usage: readUsage(data) }
 }

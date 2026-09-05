@@ -50,11 +50,11 @@ describe('talking to OpenAI', () => {
 })
 
 describe('models that will not take tools while reasoning', () => {
-  it('turns reasoning off rather than dropping the tools', async () => {
+  it('goes to the Responses API, where they keep both, rather than turning thinking off', async () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(refusal("Function tools with reasoning_effort are not supported for gpt-5.6-terra in /v1/chat/completions. To use function tools, use /v1/responses or set reasoning_effort to 'none'."))
-      .mockResolvedValueOnce(reply('done'))
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ output: [{ type: 'message', content: [{ type: 'output_text', text: 'done' }] }] }) })
     vi.stubGlobal('fetch', fetchMock)
 
     const message = await requestOpenAiChatMessage('k', 'gpt-5.6-terra', [{ role: 'user', content: 'hi' }], [
@@ -62,9 +62,21 @@ describe('models that will not take tools while reasoning', () => {
     ])
 
     expect(message.content).toBe('done')
-    const retried = bodyOf(fetchMock.mock.calls[1])
-    expect(retried).toMatchObject({ reasoning_effort: 'none' })
-    expect(retried.tools).toHaveLength(1)
+    expect(fetchMock.mock.calls[1][0]).toBe('https://api.openai.com/v1/responses')
+  })
+
+  it('turns reasoning off only for a model that refuses without offering that door', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(refusal("Function tools with reasoning_effort are not supported. Set reasoning_effort to 'none'."))
+      .mockResolvedValueOnce(reply('done'))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await requestOpenAiChatMessage('k', 'some-model', [{ role: 'user', content: 'hi' }], [
+      { type: 'function', function: { name: 'query_vault', description: 'reads', parameters: {} } },
+    ])
+
+    expect(bodyOf(fetchMock.mock.calls[1])).toMatchObject({ reasoning_effort: 'none' })
   })
 
   it('never volunteers it when the model has not asked', async () => {
