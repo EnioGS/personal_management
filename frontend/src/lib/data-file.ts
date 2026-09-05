@@ -14,7 +14,7 @@ import {
   sourceFilesTable,
   sourceRowsTable,
 } from '@/lib/model/model-db'
-import { conversationsTable, usageTotalsTable } from '@/lib/chat/conversations-db'
+import { assistantProfilesTable, conversationsTable, profileUsageTable, usageTotalsTable } from '@/lib/chat/conversations-db'
 import { preferencesTable } from '@/lib/preferences-table'
 import { notesTable } from '@/sections/notes/notes-db'
 
@@ -52,6 +52,8 @@ const TABLES = {
   notes: notesTable,
   conversations: conversationsTable,
   usageTotals: usageTotalsTable,
+  profileUsage: profileUsageTable,
+  assistantProfiles: assistantProfilesTable,
   assistantPrompts: assistantPromptsTable,
   assistantConfig: assistantConfigTable,
   preferences: preferencesTable,

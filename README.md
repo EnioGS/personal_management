@@ -47,6 +47,7 @@ Two things it optimizes for:
 │   │   │   └── chat-panel-store.ts # chat panel open/closed + unread state
 │   │   ├── locales/common/    # shared strings not owned by one section
 │   │   ├── lib/
+│   │   │   ├── prompts/                  # assistant profiles: every prompt text, per-profile — adr/0037
 │   │   │   ├── local-store/              # generic Dexie-table + Zustand-store factories
 │   │   │   ├── model/                    # accounts/cards, source files, confirmed rows, rules — see adr/0022,
 │   │   │   │                             # adr/0032 and adr/0036 (the seven labels)

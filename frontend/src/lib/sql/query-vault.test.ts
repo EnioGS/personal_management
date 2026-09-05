@@ -70,3 +70,21 @@ describe('SQL over the browser data', () => {
     expect(result.truncated).toBe(true)
   })
 })
+
+describe('finding a source table from the file it came from', () => {
+  beforeEach(async () => { await wipeAllData() })
+
+  it('reports the filename beside the name, which the name itself cannot spell', async () => {
+    const sourceId = await sourceFilesTable.add({
+      createdAt: 1,
+      data: { ...file, originalFilename: 'NU_99999999_01MAR2026_31MAR2026.csv' },
+    })
+    await sourceRowsTable.add({ createdAt: 1, data: { sourceId, rowId: 'r1', values: {}, labels: {} } })
+
+    const source = (await describeVault()).find((table) => table.name.startsWith('source__'))
+
+    // The identifier is lowercased, stripped and cut; the file it was made from is not.
+    expect(source?.file).toBe('NU_99999999_01MAR2026_31MAR2026.csv')
+    expect(source?.name).not.toContain('.csv')
+  })
+})

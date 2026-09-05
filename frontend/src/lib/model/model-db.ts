@@ -272,6 +272,25 @@ db.version(15).stores({}).upgrade(async (tx) => {
   })
 })
 
+/**
+ * The word nobody chose, cleared from the rules that still hand it out.
+ *
+ * Version 14 cleared `outros` from the rows themselves — it was the app's word rather than
+ * the user's, and an empty category says the true thing. The rules written while it was the
+ * default kept handing it back out on every import, so a file could arrive looking
+ * classified before anyone had looked at it, which is exactly what that change was for.
+ */
+db.version(16).stores({}).upgrade(async (tx) => {
+  const empty = (value: unknown) => value === 'outros' || value === 'others'
+
+  await tx.table('labelRules').toCollection().modify((row: { data?: { labels?: Record<string, unknown> } }) => {
+    const labels = row.data?.labels
+    if (!labels) return
+    if (empty(labels.category)) delete labels.category
+    if (empty(labels.subcategory)) delete labels.subcategory
+  })
+})
+
 export const accountsTable = db.accounts
 export const cardsTable = db.cards
 export const budgetsTable = db.budgets

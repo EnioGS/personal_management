@@ -2,6 +2,7 @@ import { assistantPromptsTable } from '@/lib/assistant-prompts-db'
 import { DEFAULT_INGESTION_GUIDE, INGESTION_GUIDE_KEY } from '@/lib/ingestion-guide'
 import { classificationNotesForPrompt } from '@/lib/model/classification-notes'
 import { renderPrompt } from '@/lib/prompt-placeholders'
+import { promptText } from '@/lib/prompts/registry'
 import type { AssistantPrompt } from '@/lib/assistant-prompts'
 import type { ToolDefinition } from './types'
 
@@ -14,7 +15,8 @@ export const readIngestionGuideTool: ToolDefinition = {
     // Rendered, never raw: the guide names the sections and screens that exist at this
     // moment, and a saved copy that has lost that placeholder is refused with an
     // explanation rather than sent as if it were still true.
-    const guide = renderPrompt(INGESTION_GUIDE_KEY, stored ? (stored.data as AssistantPrompt).content : DEFAULT_INGESTION_GUIDE, context.translate)
+    const saved = stored ? (stored.data as AssistantPrompt).content : DEFAULT_INGESTION_GUIDE
+    const guide = renderPrompt(INGESTION_GUIDE_KEY, promptText(INGESTION_GUIDE_KEY, saved), context.translate)
     // The vault's own notes ride along with the guide: one read, and nothing the user
     // wrote about their data can be missed for not having been asked for.
     return `${guide}${await classificationNotesForPrompt()}`

@@ -40,7 +40,7 @@ describe('reading the reply back', () => {
 
     expect(message.content).toBe('Here is what I found.')
     expect(message.tool_calls).toEqual([{ id: 'call_9', type: 'function', function: { name: 'mark_rows', arguments: '{"table":"confirmed"}' } }])
-    expect(message.usage).toEqual({ promptTokens: 900, completionTokens: 120, totalTokens: 1020 })
+    expect(message.usage).toMatchObject({ promptTokens: 900, completionTokens: 120, totalTokens: 1020 })
   })
 
   it('reads a reply that is only tool calls, which is most rounds of real work', () => {
@@ -106,5 +106,30 @@ describe('an image in a message', () => {
 
   it('leaves a message of plain words a plain string', () => {
     expect(toResponsesInput([{ role: 'user', content: 'hello' }])).toEqual([{ role: 'user', content: 'hello' }])
+  })
+})
+
+describe('what a responses-API round cost', () => {
+  it('reads the names this API uses, details and all', () => {
+    const message = fromResponsesOutput({
+      output: [{ type: 'message', content: [{ type: 'output_text', text: 'done' }] }],
+      usage: {
+        input_tokens: 9000,
+        output_tokens: 400,
+        total_tokens: 9400,
+        input_tokens_details: { cached_tokens: 7000 },
+        output_tokens_details: { reasoning_tokens: 250 },
+      },
+    })
+
+    expect(message.usage).toEqual({
+      promptTokens: 9000, completionTokens: 400, totalTokens: 9400, cachedTokens: 7000, reasoningTokens: 250,
+    })
+  })
+
+  it('says nothing was cached when the API says nothing about caching', () => {
+    const message = fromResponsesOutput({ output: [], usage: { input_tokens: 10, output_tokens: 1, total_tokens: 11 } })
+
+    expect(message.usage).toMatchObject({ cachedTokens: 0, reasoningTokens: 0 })
   })
 })

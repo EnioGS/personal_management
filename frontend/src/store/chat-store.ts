@@ -5,9 +5,11 @@ import { DEV_API_KEY, useAssistantConfigStore, type AssistantConfig } from '@/li
 import { defaultModelForProvider } from '@/lib/assistant-models'
 import { DEFAULT_SYSTEM_PROMPT, SYSTEM_PROMPT_KEY, enableAppendOnlyTableWrites, useAssistantPromptsStore } from '@/lib/assistant-prompts'
 import { formatAttachmentsForPrompt, isImageAttachment, type ChatAttachment } from '@/lib/chat-attachments'
+import { activeProfile, activeProfileName, profileConnection } from '@/lib/prompts/profiles'
+import { damagedPrompts, promptText } from '@/lib/prompts/registry'
 import type { OpenRouterMessage } from '@/lib/openrouter'
 import { toolsForRequest } from '@/lib/tools/registry'
-import { runConversation, type ConversationStatus } from '@/lib/tools/run-conversation'
+import { runConversation, type ConversationStatus, type ConversationUsage } from '@/lib/tools/run-conversation'
 import { toolContext } from '@/lib/tools/tool-context'
 import { modelFactsFor } from '@/lib/model-context-window'
 import { refreshAllLocalStores } from '@/lib/local-store/create-local-list-store'
@@ -36,6 +38,14 @@ export interface ChatMessage {
   images?: { name: string; dataUrl: string }[]
   isError?: boolean
   model?: string
+  /**
+   * Which profile was selected when this was written.
+   *
+   * On the user's own message rather than the reply, because it is a property of what was
+   * asked: switching profiles mid-conversation is allowed, and the bubbles are then the
+   * record of which wording each answer was given under.
+   */
+  profile?: string
 }
 
 export type ChatStatus = { type: 'idle' } | ConversationStatus
@@ -66,6 +76,8 @@ export interface ChatUsage {
   /** What the last message cost, on the same terms. */
   lastMessageCost: number | null
   model?: string
+  /** Everything the last exchange did, kept whole so the ledger can be given all of it. */
+  lastExchange?: ConversationUsage
 }
 
 interface ChatState {
@@ -127,6 +139,10 @@ async function titleFor(connection: AssistantConfig, opening: string): Promise<s
  * OpenRouter key from .env, so a fresh browser profile still works locally.
  */
 function activeConnection(): AssistantConfig | null {
+  // A profile carries the connection it was made under, so switching profile switches the
+  // model and the key with it; without one, the app's own selection stands.
+  const profiled = profileConnection(activeProfile())
+  if (profiled?.apiKey) return profiled
   const active = useAssistantConfigStore.getState().items.find((item) => item.isActive)
   if (active) return active
   if (DEV_API_KEY) return { provider: 'openrouter', apiKey: DEV_API_KEY, model: defaultModelForProvider('openrouter'), isActive: true }
@@ -155,9 +171,20 @@ export const useChatStore = create<ChatState>((set, get) => {
       if (!connection) {
         throw new Error('No API key configured — add one in Settings → Assistant.')
       }
+      const sentUnder = activeProfileName()
+
+      // A prompt that has lost a placeholder would tell the model to use labels without
+      // saying which exist. Refused here, before the request is paid for.
+      const damaged = damagedPrompts()
+      if (damaged.length > 0) {
+        throw new Error(
+          `${damaged.map((prompt) => `"${prompt.label}" is missing ${prompt.missing.join(' and ')}`).join('; ')}. `
+          + 'Put them back in Settings → Assistant, or clear that text to fall back to the default.',
+        )
+      }
 
       const promptRow = useAssistantPromptsStore.getState().items.find((item) => item.key === SYSTEM_PROMPT_KEY)
-      const savedPrompt = promptRow?.content ?? DEFAULT_SYSTEM_PROMPT
+      const savedPrompt = promptText(SYSTEM_PROMPT_KEY, promptRow?.content ?? DEFAULT_SYSTEM_PROMPT)
       const systemPrompt = enableAppendOnlyTableWrites(savedPrompt)
       // Existing browser profiles persist their system prompt. Upgrade only the prior
       // read-only sentence in place, leaving the user's other custom instructions intact.
@@ -204,6 +231,7 @@ export const useChatStore = create<ChatState>((set, get) => {
             usage: {
               ...previous,
               lastMessageTokens: usage.totalTokens,
+              lastExchange: usage,
               lastMessageRounds: usage.rounds,
               lastMessageCost: cost,
               sessionCost: cost === null ? previous.sessionCost : sessionCostBefore + cost,
@@ -227,7 +255,18 @@ export const useChatStore = create<ChatState>((set, get) => {
       // Counted once the exchange is over, and kept where deleting the conversation
       // cannot reach: what was spent was spent.
       const spent = get().usage
-      await recordUsage({ tokens: spent.lastMessageTokens, requests: spent.lastMessageRounds, cost: spent.lastMessageCost })
+      await recordUsage(
+        {
+          tokens: spent.lastMessageTokens,
+          requests: spent.lastMessageRounds,
+          cost: spent.lastMessageCost,
+          ...(spent.lastExchange ?? {}),
+        },
+        // Attributed to the profile that was in force when the message was sent, not to
+        // whichever is selected by the time it comes back: switching mid-conversation is
+        // allowed, and each profile answers only for the part it did.
+        { profile: sentUnder, provider: connection.provider, model: connection.model },
+      )
       // A conversation nobody has named takes its name from what it opened with, once.
       if (get().title === UNTITLED) {
         const named = await titleFor(connection, texts[0])
@@ -238,6 +277,25 @@ export const useChatStore = create<ChatState>((set, get) => {
       const errorMessage: ChatMessage = { id: crypto.randomUUID(), role: 'assistant', content: message, isError: true }
       set({ messages: [...get().messages, errorMessage], isSending: false, status: { type: 'idle' } })
       await persist(set, get)
+
+      // A message that ended in an error spent everything it spent on the way there —
+      // thirty rounds of tokens, in the case that made this obvious — and the measurement
+      // matters most precisely when something went wrong. Recorded on whatever it managed
+      // to reach; a failure before the first request has nothing to add but the failure.
+      const spent = get().usage
+      const connection = activeConnection()
+      if (connection) {
+        await recordUsage(
+          {
+            tokens: spent.lastMessageTokens,
+            requests: spent.lastMessageRounds,
+            cost: spent.lastMessageCost,
+            ...(spent.lastExchange ?? {}),
+            failed: true,
+          },
+          { profile: activeProfileName(), provider: connection.provider, model: connection.model },
+        )
+      }
     }
 
     if (useChatPanelStore.getState().panelWidth === 0) useChatPanelStore.getState().markUnread()
@@ -270,6 +328,9 @@ export const useChatStore = create<ChatState>((set, get) => {
       id: crypto.randomUUID(),
       role: 'user',
       content: text,
+      // Named even when it is the default: which wording asked a question is a fact about
+      // the question, and "Default" is a wording like any other.
+      profile: activeProfileName(),
       ...(images.length > 0 ? { images: images.map((image) => ({ name: image.name, dataUrl: image.content })) } : {}),
     }
     if (images.length > 0) set({ attachments: get().attachments.filter((attachment) => !isImageAttachment(attachment)) })

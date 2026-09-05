@@ -21,7 +21,8 @@ import { deleteMarked, toggleMark, type MarkableTable } from '@/lib/model/markin
 import { sourceRowsTable } from '@/lib/model/model-db'
 import { useAccountsStore, useCardsStore, useConfirmedRowsStore, useSourceFilesStore, useSourceRowsStore } from '@/lib/model/model-stores'
 import {
-  ASSIGNABLE_FIELDS,
+  assignableFieldsFor,
+  placementRefusal,
   SOURCE_FILENAME_COLUMN,
   addSourceRow,
   amountShapeOf,
@@ -62,19 +63,23 @@ const LABEL_HINT: Record<LabelColumn, string> = {
   subcategory: 'free text',
 }
 
-const CONFIRMED_COLUMNS = ['row_id', 'section', 'screen', 'date', 'value', 'amount', 'price', 'account', 'card', 'class', 'category', 'subcategory', 'observations'] as const
+const CONFIRMED_COLUMNS = ['account', 'card', 'section', 'screen', 'class', 'category', 'subcategory', 'date', 'value', 'amount', 'price', 'row_id', 'observations'] as const
 
 /**
  * What the simplified view puts away.
  *
- * The observations everywhere: they are the whole file kept verbatim, which is a thing to
- * consult rather than to read past. And the two numbers only an investment row fills —
- * elsewhere they are a column of ones and a column repeating the money beside it.
+ * The row id and the observations everywhere: one is lineage and the other is the whole
+ * file kept verbatim, both things to consult rather than to read past. And the two numbers
+ * only an investment row fills — elsewhere they are a column of ones and a column
+ * repeating the money beside it.
  */
 function hiddenColumns(simplified: boolean, tableKey: string | null): Set<string> {
   if (!simplified) return new Set()
   const investments = tableKey?.endsWith(`/${INVESTMENTS_SCREEN}`) ?? false
-  return new Set(investments ? ['observations'] : ['observations', 'amount', 'price'])
+  // The row id goes too: it is the thread tying a correction to what it corrects, which
+  // matters when reading lineage and never when reading the rows themselves.
+  const always = ['row_id', 'observations']
+  return new Set(investments ? always : [...always, 'amount', 'price'])
 }
 
 function confirmedTableKey(row: ConfirmedRow): string {
@@ -172,6 +177,9 @@ export function IngestionPanel() {
     () => (selectedConfirmed ? confirmedRows.filter((row) => confirmedTableKey(row) === selectedConfirmed) : []),
     [confirmedRows, selectedConfirmed],
   )
+  // What this file may assign follows from where its rows are going, so the list shortens
+  // and lengthens as they are placed rather than offering a target the screen cannot use.
+  const offerable = useMemo(() => assignableFieldsFor(fileRows), [fileRows])
 
   async function importFiles(files: File[]) {
     // A table is a table whatever the extension says: a .txt of semicolon-separated rows
@@ -249,9 +257,12 @@ export function IngestionPanel() {
 
   const editLabel = useCallback(async (row: StoredRow<SourceRow>, column: LabelColumn, value: string) => {
     const { labels } = readLabelCell(row, column, value)
+    const file = sourceFiles.find((entry) => entry.id === row.sourceId)
+    const refusal = placementRefusal(file, row.labels, labels)
+    if (refusal) { setMessage(refusal); return }
     await sourceRowsTable.update(row.id, { data: { ...stripStored(row), labels } satisfies SourceRow })
     await refreshLocalStores('sourceRows')
-  }, [readLabelCell])
+  }, [readLabelCell, sourceFiles])
 
   const editSourceValue = useCallback(async (row: StoredRow<SourceRow>, column: string, value: string) => {
     try {
@@ -432,7 +443,7 @@ export function IngestionPanel() {
                       <SelectTrigger size="sm" className="h-5 w-36 gap-1 px-1.5 py-0 text-[10px] [&>svg]:size-3"><SelectValue /></SelectTrigger>
                       <SelectContent className="text-xs">
                         <SelectItem value={UNASSIGNED}>— unassigned —</SelectItem>
-                        {ASSIGNABLE_FIELDS.map((field) => <SelectItem key={field} value={field}>{field}</SelectItem>)}
+                        {offerable.map((field) => <SelectItem key={field} value={field}>{field}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   </th>
@@ -682,7 +693,20 @@ const ConfirmedRowLine = memo(function ConfirmedRowLine({
         row.markedForElimination && 'bg-destructive/10 line-through',
       )}
     >
-      <td className="text-muted-foreground p-2 font-mono whitespace-nowrap" title="The id every copy of this row shares, fixed for its life.">{row.rowId}</td>
+      {(['account', 'card'] as const).map((column) => (
+        <EditableCell
+          key={column}
+          value={row[column] ?? ''}
+          disabled={marking}
+          validate={(draft) => {
+            const text = draft.trim()
+            if (!text) return null
+            const resolved = column === 'account' ? resolveAccountLabel(catalogue, text) : resolveCardLabel(catalogue, text)
+            return resolved ? null : `No ${column} is called ${text}. Set it up in Settings → General.`
+          }}
+          onCommit={(value) => void onEdit(row, column, value)}
+        />
+      ))}
       {(['section', 'screen'] as const).map((column) => (
         <EditableCell
           key={column}
@@ -698,6 +722,9 @@ const ConfirmedRowLine = memo(function ConfirmedRowLine({
           }}
           onCommit={(value) => void onEditPlacement(row, column, value)}
         />
+      ))}
+      {(['class', 'category', 'subcategory'] as const).map((column) => (
+        <EditableCell key={column} value={row[column] ?? ''} disabled={marking} onCommit={(value) => void onEdit(row, column, value)} />
       ))}
       <EditableCell
         className="whitespace-nowrap"
@@ -717,23 +744,9 @@ const ConfirmedRowLine = memo(function ConfirmedRowLine({
           onCommit={(value) => void onEdit(row, column, value)}
         />
       ))}
-      {(['account', 'card'] as const).map((column) => (
-        <EditableCell
-          key={column}
-          value={row[column] ?? ''}
-          disabled={marking}
-          validate={(draft) => {
-            const text = draft.trim()
-            if (!text) return null
-            const resolved = column === 'account' ? resolveAccountLabel(catalogue, text) : resolveCardLabel(catalogue, text)
-            return resolved ? null : `No ${column} is called ${text}. Set it up in Settings → General.`
-          }}
-          onCommit={(value) => void onEdit(row, column, value)}
-        />
-      ))}
-      {(['class', 'category', 'subcategory'] as const).map((column) => (
-        <EditableCell key={column} value={row[column] ?? ''} disabled={marking} onCommit={(value) => void onEdit(row, column, value)} />
-      ))}
+      {!hidden.has('row_id') && (
+        <td className="text-muted-foreground p-2 font-mono whitespace-nowrap" title="The id every copy of this row shares, fixed for its life.">{row.rowId}</td>
+      )}
       {!hidden.has('observations') && (
         <EditableCell
           className="max-w-[28rem] truncate"

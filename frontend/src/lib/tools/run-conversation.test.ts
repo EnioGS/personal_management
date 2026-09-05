@@ -59,11 +59,13 @@ describe('runConversation', () => {
     expect(requestFn).toHaveBeenCalledTimes(3)
   })
 
-  it('allows a long labelling session before giving up: the default cap is well past a handful of rounds', async () => {
+  it('allows a long session before giving up: the cap clears a request of twenty steps done one at a time', async () => {
     const requestFn = vi.fn().mockResolvedValue(toolCallMessage('call_x', 'read_text_file', { fileId: 'f1' }))
 
     await expect(runConversation({ apiKey: 'k', model: 'm', messages: baseMessages, context, requestFn })).rejects.toThrow(/did not produce a final answer/)
-    expect(requestFn.mock.calls.length).toBeGreaterThanOrEqual(30)
+    // A model that batches needs few rounds and one that does not needs one per step; the
+    // cap has to clear the second kind, or it caps the model rather than the looping.
+    expect(requestFn.mock.calls.length).toBeGreaterThanOrEqual(60)
   })
 
   it('rejects once maxIterations is exhausted, calling requestFn exactly that many times', async () => {
@@ -173,7 +175,7 @@ describe('what a message cost', () => {
 
     await runConversation({ apiKey: 'k', model: 'm', messages: baseMessages, context, requestFn, onUsage: (usage) => seen.push(usage) })
 
-    expect(seen.at(-1)).toEqual({ rounds: 2, promptTokens: 2400, completionTokens: 170, totalTokens: 2570, lastPromptTokens: 1400 })
+    expect(seen.at(-1)).toMatchObject({ rounds: 2, promptTokens: 2400, completionTokens: 170, totalTokens: 2570, lastPromptTokens: 1400 })
   })
 
   it('says nothing when the API reports no usage, rather than inventing zeros', async () => {
@@ -229,3 +231,4 @@ describe('opening a set of tools', () => {
     expect(offered).toContain('save_label_rule')
   })
 })
+

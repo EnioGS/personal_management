@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
-import { RotateCcw, Trash2 } from 'lucide-react'
+import { useState } from 'react'
+import { Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import {
   AlertDialog,
@@ -14,35 +14,16 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Textarea } from '@/components/ui/textarea'
 import { assistantModelsForProvider, defaultModelForProvider, groupAssistantModelsByProvider } from '@/lib/assistant-models'
 import { DEV_API_KEY, useAssistantConfigStore, type AssistantConfig } from '@/lib/assistant-config'
 import { detectApiProvider, providerLabel, type ApiProvider } from '@/lib/ai-providers'
-import { DEFAULT_SYSTEM_PROMPT, SYSTEM_PROMPT_KEY, useAssistantPromptsStore } from '@/lib/assistant-prompts'
-import { DEFAULT_INGESTION_GUIDE, INGESTION_GUIDE_KEY } from '@/lib/ingestion-guide'
-import { missingPlaceholders, PROMPT_PLACEHOLDERS } from '@/lib/prompt-placeholders'
 import type { StoredRow } from '@/lib/local-store/create-local-table'
-import { cn } from '@/lib/utils'
+import { AssistantProfiles } from './assistant-profiles'
 
 export function AssistantPanel() {
-  const { t } = useTranslation('settings')
   return (
     <div className="flex h-full flex-col gap-6 overflow-auto p-4">
-      <ConnectionsSection />
-      <PromptSection
-        promptKey={SYSTEM_PROMPT_KEY}
-        defaultContent={DEFAULT_SYSTEM_PROMPT}
-        label={t('assistant.systemPromptLabel')}
-        description={t('assistant.systemPromptDescription')}
-        resetLabel={t('assistant.resetPrompt')}
-      />
-      <PromptSection
-        promptKey={INGESTION_GUIDE_KEY}
-        defaultContent={DEFAULT_INGESTION_GUIDE}
-        label={t('assistant.ingestionGuideLabel')}
-        description={t('assistant.ingestionGuideDescription')}
-        resetLabel={t('assistant.resetPrompt')}
-      />
+      <AssistantProfiles />
     </div>
   )
 }
@@ -51,9 +32,19 @@ function maskApiKey(key: string): string {
   return key.length <= 4 ? '••••' : `••••${key.slice(-4)}`
 }
 
-function ConnectionsSection() {
+/** Where a list of connections lives: the app's own, or the one a profile cloned. */
+export interface ConnectionsBacking {
+  items: StoredRow<AssistantConfig>[]
+  isLoading: boolean
+  addItem: (value: AssistantConfig) => Promise<unknown>
+  updateItem: (id: number, value: AssistantConfig) => Promise<unknown>
+  deleteItem: (id: number) => Promise<unknown>
+}
+
+export function ConnectionsSection({ backing }: { backing?: ConnectionsBacking }) {
   const { t } = useTranslation('settings')
-  const { items, isLoading, addItem, updateItem, deleteItem } = useAssistantConfigStore()
+  const store = useAssistantConfigStore()
+  const { items, isLoading, addItem, updateItem, deleteItem } = backing ?? store
   const [adding, setAdding] = useState(false)
   const [newKey, setNewKey] = useState('')
   const [replacing, setReplacing] = useState<{ provider: ApiProvider; existing: StoredRow<AssistantConfig> } | null>(null)
@@ -219,91 +210,3 @@ function ConnectionsSection() {
  * ingestion guide the assistant fetches with read_ingestion_guide — both are text
  * sent to the model, so both are the user's to rewrite and to reset.
  */
-function PromptSection({ promptKey, defaultContent, label, description, resetLabel }: { promptKey: string; defaultContent: string; label: string; description: string; resetLabel: string }) {
-  const { t } = useTranslation('settings')
-  const { items, isLoading, addItem, updateItem } = useAssistantPromptsStore()
-  const [draft, setDraft] = useState<string | null>(null)
-  const [isFocused, setIsFocused] = useState(false)
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
-
-  const promptRow = items.find((item) => item.key === promptKey)
-
-  // Only seeds the draft once, the first time data is available — deliberately
-  // not depending on promptRow, so a later refresh (e.g. after an auto-save
-  // round-trip) doesn't clobber whatever the user is currently typing.
-  useEffect(() => {
-    if (draft === null && !isLoading) {
-      setDraft(promptRow?.content ?? defaultContent)
-    }
-  }, [isLoading, draft, promptRow, defaultContent])
-
-  // Resting height is eight lines, enough to read and edit a prompt without
-  // focusing it first. Focusing grows the box to fit the whole text, measured via
-  // scrollHeight rather than relying solely on field-sizing: content (already on the
-  // base Textarea), since that alone always shows full content rather than collapsing
-  // again once focus is lost. A long prompt is clamped to most of the viewport and
-  // scrolls inside itself, so the settings page never becomes one endless textarea.
-  useEffect(() => {
-    const el = textareaRef.current
-    if (!el) return
-    if (isFocused) {
-      el.style.height = 'auto'
-      el.style.height = `${el.scrollHeight}px`
-    } else {
-      el.style.height = ''
-    }
-  }, [isFocused, draft])
-
-  // A prompt that has lost a placeholder is not sent to the model at all, so the editor
-  // has to say so plainly rather than letting it look saved and working.
-  const missing = draft === null ? [] : missingPlaceholders(promptKey, draft)
-
-  async function persist(content: string) {
-    if (promptRow) await updateItem(promptRow.id, { key: promptKey, content })
-    else await addItem({ key: promptKey, content })
-  }
-
-  function resetToDefault() {
-    setDraft(defaultContent)
-    void persist(defaultContent)
-  }
-
-  return (
-    <div className="flex flex-col gap-2">
-      <div className="flex items-start justify-between gap-2">
-        <div>
-          <p className="text-sm font-medium">{label}</p>
-          <p className="text-muted-foreground text-xs">{description}</p>
-        </div>
-        <Button type="button" variant="outline" size="xs" className="shrink-0 gap-1" disabled={draft === null} onClick={resetToDefault}>
-          <RotateCcw className="size-3" />
-          {resetLabel}
-        </Button>
-      </div>
-      <Textarea
-        ref={textareaRef}
-        value={draft ?? ''}
-        onChange={(e) => setDraft(e.target.value)}
-        onFocus={() => setIsFocused(true)}
-        onBlur={(e) => {
-          setIsFocused(false)
-          void persist(e.target.value)
-        }}
-        className={cn(
-          'max-h-[70vh] resize-none overflow-auto font-mono text-sm',
-          !isFocused && 'h-72 min-h-0',
-          missing.length > 0 && 'border-destructive focus-visible:ring-destructive',
-        )}
-        disabled={draft === null}
-      />
-      {missing.length > 0 && (
-        <p className="text-destructive text-xs">
-          {t('assistant.placeholderMissing', {
-            placeholders: missing.map((name) => PROMPT_PLACEHOLDERS[name]).join(' '),
-            defaultValue: `This instruction needs ${missing.map((name) => PROMPT_PLACEHOLDERS[name]).join(' and ')}, which is where the app fills in the sections and screens that exist right now. Without it the assistant is told to use labels without being told which ones there are, so it will refuse to use this instruction until you put it back — or reset it to the default.`,
-        })}
-        </p>
-      )}
-    </div>
-  )
-}

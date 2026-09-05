@@ -542,8 +542,13 @@ const MessageBubble = memo(function MessageBubble({ message }: { message: ChatMe
         message.role === 'user' ? 'self-end items-end' : 'self-start items-start',
       )}
     >
+      {/* Each side says what produced it: the reply names its model, the message names the
+          profile it was written under. Both are absent when there is nothing to say. */}
       {message.role === 'assistant' && !message.isError && message.model && (
         <span className="text-muted-foreground px-1 text-[10px]">{message.model}</span>
+      )}
+      {message.role === 'user' && message.profile && (
+        <span className="text-muted-foreground px-1 text-[10px]">Selected profile: {message.profile}</span>
       )}
       <div
         className={cn(

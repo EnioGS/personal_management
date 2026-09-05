@@ -8,7 +8,7 @@ import type { LocalRow } from '@/lib/local-store/create-local-table'
 import { confirmedRowsTable, ingestionAuditEventsTable, sourceFilesTable, sourceRowsTable } from './model-db'
 import { newRowId } from './row-id'
 import { applySignConvention, shapeOfAmounts } from './sign-convention'
-import type { ConfirmedRow, IngestionTargetField, SourceFile, SourceRow } from './types'
+import type { ConfirmedRow, IngestionRowLabels, IngestionTargetField, SourceFile, SourceRow } from './types'
 
 /** The column every source row carries, and which no assignment may claim. */
 export const SOURCE_FILENAME_COLUMN = 'source_filename'
@@ -23,6 +23,40 @@ export const SOURCE_FILENAME_COLUMN = 'source_filename'
  * one, and its price is the money. A row that is several of something says how many.
  */
 export const ASSIGNABLE_FIELDS: IngestionTargetField[] = ['date', 'price', 'amount']
+
+/**
+ * What a file may assign, given where its rows are going.
+ *
+ * Amount is offered only to a file with rows bound for Investments, because a quantity is
+ * what an investment row is and a column of ones everywhere else. Keeping it off the list
+ * is what stops a column being spent on a target the screen will never read — and an
+ * assigned column is excluded from the observations, so a wrong assignment does not merely
+ * sit unused, it takes a fact out of the row.
+ */
+export function assignableFieldsFor(rows: SourceRow[]): IngestionTargetField[] {
+  const investing = rows.some((row) => (row.labels.screens ?? []).includes(INVESTMENTS_SCREEN))
+  return investing ? ASSIGNABLE_FIELDS : ASSIGNABLE_FIELDS.filter((field) => field !== 'amount')
+}
+
+/** Said in one place, because two screens refuse the same act for the same reason. */
+export const PLACEMENT_LOCKED = 'This file already has columns assigned. Unassign them before changing where its rows go: which columns a file needs depends on where they are going.'
+export const PLACEMENT_FIRST = 'Label the section and the screen first. Which columns a file needs depends on where its rows are going.'
+
+/**
+ * Whether a change of placement is allowed, and why not.
+ *
+ * The order is not arbitrary: section and screen decide which targets a file may assign,
+ * so a screen changed afterwards can leave a column assigned to something the new screen
+ * has no use for — and that column, being assigned, has already been taken out of the
+ * observations. Locking placement once a column is assigned makes the sequence real
+ * rather than advisory: unassign, re-place, assign again.
+ */
+export function placementRefusal(file: SourceFile | undefined, before: IngestionRowLabels, after: IngestionRowLabels): string | null {
+  if (!file || Object.keys(file.assignments).length === 0) return null
+  const same = (left?: string[], right?: string[]) => (left ?? []).join('|') === (right ?? []).join('|')
+  if (same(before.sections, after.sections) && same(before.screens, after.screens)) return null
+  return PLACEMENT_LOCKED
+}
 
 /**
  * The column holding the money, whatever it was called when the file was assigned.
@@ -80,13 +114,19 @@ export function parseSourceCsv(rawCsv: string, delimiter?: string): { columns: s
     skipEmptyLines: true,
     ...(delimiter ? { delimiter } : { delimitersToGuess: DELIMITERS_TO_GUESS }),
   })
-  // "Could not auto-detect a delimiter" is a note, not a failure: a single-column file
-  // has no delimiter to find, and the parse is still right.
-  const fatal = parsed.errors.filter((error) => error.type !== 'Delimiter')
+  // Two notes rather than failures. "Could not auto-detect a delimiter": a single-column
+  // file has no delimiter to find, and the parse is still right. And a row with fewer
+  // fields than the header, which is what a trailing empty column looks like after any
+  // editor, spreadsheet or person has touched the file — the last column is simply empty
+  // on that row, which is a thing the file said, not a reason to refuse all of it.
+  const notes = new Set(['Delimiter', 'FieldMismatch'])
+  const fatal = parsed.errors.filter((error) => !notes.has(error.type))
   if (fatal.length > 0) throw new Error(`Could not read this file: ${fatal[0].message}`)
   const columns = (parsed.meta.fields ?? []).map((column) => column.trim()).filter(Boolean)
   if (columns.length === 0) throw new Error('The file has no header row.')
   if (new Set(columns).size !== columns.length) throw new Error('The CSV has duplicate column names. Rename them before importing.')
+  // Every row carries every column, missing ones empty: the shape of a table is the
+  // header's, and a short row is a row with nothing to say at the end of it.
   return { columns, rows: parsed.data.map((row) => Object.fromEntries(columns.map((column) => [column, row[column] ?? '']))) }
 }
 
@@ -265,13 +305,20 @@ export async function assignSourceColumns(sourceId: number, assignments: Record<
   if (!stored) throw new Error(`Source file ${sourceId} was not found.`)
   const file = stored.data as SourceFile
   const next: Record<string, IngestionTargetField> = { ...file.assignments }
+  const rows = (await sourceRowsTable.toArray()).map((row) => row.data as SourceRow).filter((row) => row.sourceId === sourceId)
+  const allowed = assignableFieldsFor(rows)
+  const placed = rows.some((row) => (row.labels.screens ?? []).length > 0)
 
   for (const [column, target] of Object.entries(assignments)) {
     if (!file.originalColumns.includes(column)) {
       throw new Error(`"${column}" is not a column of this file. Only the file's own columns can be assigned.`)
     }
     if (target === null) { delete next[column]; continue }
+    if (!placed) throw new Error(PLACEMENT_FIRST)
     if (!ASSIGNABLE_FIELDS.includes(target)) throw new Error(`"${target}" is not a canonical field.`)
+    if (!allowed.includes(target)) {
+      throw new Error(`"${target}" is not something these rows can hold: it is for rows going to Investments, and none of this file's are.`)
+    }
     // One meaning, one column: reassigning a field moves it rather than duplicating it.
     for (const [other, assigned] of Object.entries(next)) if (assigned === target && other !== column) delete next[other]
     next[column] = target

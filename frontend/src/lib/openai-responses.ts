@@ -85,13 +85,33 @@ export function fromResponsesOutput(data: unknown): { role: 'assistant'; content
       function: { name: item.name as string, arguments: item.arguments ?? '{}' },
     }))
 
-  const usage = (data as { usage?: { input_tokens?: number; output_tokens?: number; total_tokens?: number } })?.usage
+  // This API names the same four things differently: input and output rather than prompt
+  // and completion, and the two details nested one level deeper. Read here rather than
+  // guessed at elsewhere, or the cache-hit and reasoning columns read zero for every model
+  // that speaks this dialect — which is every reasoning model OpenAI sells.
+  const usage = (data as {
+    usage?: {
+      input_tokens?: number
+      output_tokens?: number
+      total_tokens?: number
+      input_tokens_details?: { cached_tokens?: number }
+      output_tokens_details?: { reasoning_tokens?: number }
+    }
+  })?.usage
   return {
     role: 'assistant',
     content: text || null,
     ...(toolCalls.length > 0 ? { tool_calls: toolCalls } : {}),
     ...(usage && typeof usage.total_tokens === 'number'
-      ? { usage: { promptTokens: usage.input_tokens ?? 0, completionTokens: usage.output_tokens ?? 0, totalTokens: usage.total_tokens } }
+      ? {
+          usage: {
+            promptTokens: usage.input_tokens ?? 0,
+            completionTokens: usage.output_tokens ?? 0,
+            totalTokens: usage.total_tokens,
+            cachedTokens: usage.input_tokens_details?.cached_tokens ?? 0,
+            reasoningTokens: usage.output_tokens_details?.reasoning_tokens ?? 0,
+          },
+        }
       : {}),
   }
 }

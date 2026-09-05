@@ -6,7 +6,7 @@ import { buildSqliteFile, looksLikeSqlite, parseSqliteFile } from './sqlite-expo
 
 function exportFile(): DataExportFile {
   const empty = {
-    accounts: [], cards: [], budgets: [], allocationTargets: [], labelRules: [], classificationNotes: [], conversations: [], usageTotals: [],
+    accounts: [], cards: [], budgets: [], allocationTargets: [], labelRules: [], classificationNotes: [], conversations: [], usageTotals: [], profileUsage: [], assistantProfiles: [],
     ingestionAuditEvents: [], notes: [], assistantPrompts: [], assistantConfig: [], preferences: [],
   }
   return {
@@ -107,5 +107,21 @@ describe('a file exported by an older version', () => {
     // The retired columns are not read, and the label that did not exist yet arrives empty.
     expect(data).not.toHaveProperty('asset')
     expect(data.class ?? null).toBeNull()
+  })
+})
+
+describe('a profile making the round trip', () => {
+  it('comes back with its wordings and the connections it sends under', async () => {
+    const profile = {
+      name: 'Terse',
+      isActive: true,
+      overrides: { system: 'Say less.', 'tool.mark_rows': 'Marks rows.' },
+      connections: [{ id: 1, provider: 'openai', apiKey: 'sk-test', model: 'gpt', isActive: true }],
+    }
+    const file = { ...exportFile(), tables: { ...exportFile().tables, assistantProfiles: [{ id: 1, createdAt: 1, data: profile }] } }
+
+    const parsed = await parseSqliteFile(await buildSqliteFile(file))
+
+    expect(parsed.tables.assistantProfiles[0].data).toEqual(profile)
   })
 })

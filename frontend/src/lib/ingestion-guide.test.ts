@@ -18,11 +18,11 @@ describe('the ingestion guide', () => {
     expect(DEFAULT_INGESTION_GUIDE).toContain(PROMPT_PLACEHOLDERS.screens)
   })
 
-  it('states the order of the work, ending with the sign', () => {
+  it('states the order of the work: placement, then columns, then the sign', () => {
     const guide = DEFAULT_INGESTION_GUIDE
-    expect(guide.indexOf('Assign the columns')).toBeLessThan(guide.indexOf('Label the sections'))
-    expect(guide.indexOf('Label the sections')).toBeLessThan(guide.indexOf('Label the screens'))
-    expect(guide.indexOf('Label the screens')).toBeLessThan(guide.indexOf('Only then decide the sign'))
+    // Placement decides what a file may assign, so it cannot come second.
+    expect(guide.indexOf('Label the sections')).toBeLessThan(guide.indexOf('Assign the columns'))
+    expect(guide.indexOf('Assign the columns')).toBeLessThan(guide.indexOf('Only then decide the sign'))
   })
 
   it('tells the model to look at the destination tables rather than trust a recorded convention', () => {
@@ -36,8 +36,11 @@ describe('the ingestion guide', () => {
   })
 
   it('stays short: it is fetched whole, and everything the tools already say is waste here', () => {
+    // Measured as sent: a placeholder is replaced by the live list before the guide goes
+    // anywhere, so its own spelling is not part of what the model is charged for.
+    const asSent = DEFAULT_INGESTION_GUIDE.replace(/\[PLACEHOLDER_FOR_[A-Z0-9_]+\]/g, '')
     // Roughly four characters to a token.
-    expect(DEFAULT_INGESTION_GUIDE.length / 4).toBeLessThan(1400)
+    expect(asSent.length / 4).toBeLessThan(1400)
   })
 
   it('states the one asymmetry between the user and the assistant', () => {

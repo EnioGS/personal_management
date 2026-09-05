@@ -14,6 +14,7 @@ import {
   assignSourceColumns,
   confirmSourceRows,
   createSourceFile,
+  placementRefusal,
   missingAssignments,
   planConfirmation,
   setSignConvention,
@@ -140,7 +141,13 @@ async function labelSourceRows(rowIds: number[], values: Record<string, unknown>
     const stored = await sourceRowsTable.get(id)
     if (!stored) { results.push({ id, error: 'not found' }); continue }
     const row = stored.data as SourceRow
-    const text = (field: string) => (typeof values[field] === 'string' ? (values[field] as string) : undefined)
+    // Empty means keep, everywhere. A caller filling in every field of a form writes ""
+    // into the ones it has nothing to say about, and that must not erase a placement or a
+    // category somebody chose — clearing is said out loud, with a clear* flag.
+    const text = (field: string) => {
+      const value = values[field]
+      return typeof value === 'string' && value.trim() ? value : undefined
+    }
 
     const sections = text('sections') === undefined ? undefined : parsePlacementLabels(text('sections')!, (value) => resolveSectionLabel(catalogue, value))
     const screens = text('screens') === undefined
@@ -163,11 +170,19 @@ async function labelSourceRows(rowIds: number[], values: Record<string, unknown>
       ...row.labels,
       ...(sections ? { sections: sections.values } : {}),
       ...(screens ? { screens: screens.values } : {}),
+      ...(text('class') !== undefined ? { class: text('class') } : {}),
       ...(text('category') !== undefined ? { category: text('category') } : {}),
       ...(text('subcategory') !== undefined ? { subcategory: text('subcategory') } : {}),
       ...(text('account')?.trim() ? { account } : {}),
       ...(clearingCard ? { card: undefined } : text('card')?.trim() ? { card } : {}),
     }, catalogue)
+
+    // Where a row goes is settled before its file assigns anything, so a placement
+    // changed afterwards is refused rather than silently leaving a column assigned to
+    // something the new screen has no use for.
+    const file = (await sourceFilesTable.get(row.sourceId))?.data as SourceFile | undefined
+    const refusal = placementRefusal(file, row.labels, labels)
+    if (refusal) { results.push({ id, error: refusal }); continue }
 
     await sourceRowsTable.update(id, { data: { ...row, labels } satisfies SourceRow })
     const unknown = [...(sections?.unknown ?? []), ...(screens?.unknown ?? []), ...unnamed]
@@ -348,7 +363,7 @@ export const fillFromObservationsTool: ToolDefinition = {
 
 export const reviseConfirmedRowsTool: ToolDefinition = {
   name: 'revise_confirmed_rows',
-  description: "Corrects many confirmed rows at once, keeping the discipline: for every row it adds the corrected version with the same row_id and marks the old one. Nothing is overwritten or deleted. Pick rows with selectIds (a SELECT returning an id column) or list them, and name only the fields that change \u2014 one left out, or passed empty, stays as it was. clearCard: true removes a card; an empty name does not. Money cannot be changed here: a wrong amount is a fact about one transaction, corrected with add_confirmed_row. Placement is place_confirmed_rows. Already-marked rows are skipped.",
+  description: "Corrects many confirmed rows at once, keeping the discipline: for every row it adds the corrected version with the same row_id and marks the old one. Nothing is overwritten or deleted. Pick rows with selectIds (a SELECT returning an id column) or list them, and name only the fields that change \u2014 one left out, or passed empty, stays as it was. clearCard: true removes a card and clearClass: true a class; an empty name does neither. Money cannot be changed here: a wrong amount is a fact about one transaction, corrected with add_confirmed_row. Placement is place_confirmed_rows. Already-marked rows are skipped.",
   parameters: {
     type: 'object',
     properties: {
@@ -357,7 +372,8 @@ export const reviseConfirmedRowsTool: ToolDefinition = {
       account: { type: 'string' },
       card: { type: 'string', description: "One of the user's cards, by name. Leave it out to keep whatever each row has." },
       clearCard: { type: 'boolean', description: 'Removes the card from every row selected. Say this only when you mean it: the rows that had one lose it.' },
-      class: { type: 'string', description: 'What kind of thing the row is (renda fixa, cash reserve). Empty string clears it.' },
+      class: { type: 'string', description: 'What kind of thing the row is: renda fixa, cash reserve.' },
+      clearClass: { type: 'boolean', description: 'Removes the class from every row selected.' },
       category: { type: 'string' },
       subcategory: { type: 'string' },
       reason: { type: 'string', description: 'Why, for the user. Not stored on the row.' },
@@ -375,8 +391,13 @@ export const reviseConfirmedRowsTool: ToolDefinition = {
 
     const catalogue = await loadLabelCatalogue(context.translate)
     const revision: ConfirmedRevision = {}
-    if (typeof args.account === 'string') {
-      const account = resolveAccountLabel(catalogue, args.account)
+    // Empty means keep, for every field alike: a caller that fills in the whole form
+    // writes "" where it has nothing to change, and a partial revision must not erase what
+    // it did not mention. Clearing is a separate word — clearCard, clearClass.
+    const said = (field: string) => (typeof args[field] === 'string' && (args[field] as string).trim() ? (args[field] as string).trim() : undefined)
+
+    if (said('account')) {
+      const account = resolveAccountLabel(catalogue, said('account')!)
       if (!account) return `Error: no account is called "${args.account}". Call list_accounts_and_cards, or add_account first.`
       revision.account = account
     }
@@ -384,16 +405,15 @@ export const reviseConfirmedRowsTool: ToolDefinition = {
     // in every field produces, and it must not be able to strip the card off rows that
     // have one — the same way a stray value once rewrote three hundred amounts.
     if (args.clearCard === true) revision.card = null
-    else if (typeof args.card === 'string' && args.card.trim()) {
-      const card = resolveCardLabel(catalogue, args.card)
+    else if (said('card')) {
+      const card = resolveCardLabel(catalogue, said('card')!)
       if (!card) return `Error: no card is called "${args.card}". Call list_accounts_and_cards, or add_card first.`
       revision.card = card
     }
-    // Emptying is meaningful here and nowhere else in this tool: a class is optional, so
-    // "" means the row has none, while an account or a card must name something real.
-    if (typeof args.class === 'string') revision.class = args.class.trim() || null
-    if (typeof args.category === 'string') revision.category = args.category.trim()
-    if (typeof args.subcategory === 'string') revision.subcategory = args.subcategory.trim()
+    if (args.clearClass === true) revision.class = null
+    else if (said('class')) revision.class = said('class')
+    if (said('category')) revision.category = said('category')
+    if (said('subcategory')) revision.subcategory = said('subcategory')
 
     try {
       return JSON.stringify({ ...await reviseConfirmedRows(rowIds, revision), changed: revision, reason: args.reason ?? null })

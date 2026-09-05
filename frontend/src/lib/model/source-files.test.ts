@@ -6,11 +6,14 @@ import type { ConfirmedRow, SourceFile, SourceRow } from './types'
 import {
   addSourceRow,
   assignSourceColumns,
+  assignableFieldsFor,
   confirmSourceRows,
   createSourceFile,
   filenameSimilarity,
   flagCrossFileDuplicates,
   observationsFor,
+  parseSourceCsv,
+  placementRefusal,
   planConfirmation,
   retireEmptySourceFiles,
   rowSignature,
@@ -38,6 +41,17 @@ async function rowsOf(sourceId: number): Promise<{ id: number; row: SourceRow }[
   return (await sourceRowsTable.toArray())
     .map((stored) => ({ id: stored.id, row: stored.data as SourceRow }))
     .filter((entry) => entry.row.sourceId === sourceId)
+}
+
+/**
+ * Placement first, then assignment — the order the app now enforces, since which columns
+ * a file may assign depends on where its rows are going.
+ */
+async function assign(sourceId: number, assignments: Record<string, string>, screens = ['overview']) {
+  for (const entry of await rowsOf(sourceId)) {
+    if ((entry.row.labels.screens ?? []).length === 0) await label(entry.id, { ...entry.row.labels, sections: ['finances'], screens })
+  }
+  return assignSourceColumns(sourceId, assignments as never)
 }
 
 async function label(id: number, labels: SourceRow['labels']) {
@@ -76,8 +90,8 @@ describe('a file arriving', () => {
 
   it('moves a canonical field rather than duplicating it when it is assigned twice', async () => {
     const sourceId = await createSourceFile('banco-agosto.csv', BANK_CSV)
-    await assignSourceColumns(sourceId, { Data: 'date' })
-    const file = await assignSourceColumns(sourceId, { Descrição: 'date' })
+    await assign(sourceId, { Data: 'date' })
+    const file = await assign(sourceId, { Descrição: 'date' })
 
     expect(file.assignments).toEqual({ Descrição: 'date' })
   })
@@ -88,7 +102,8 @@ describe('confirming', () => {
 
   async function readyFile() {
     const sourceId = await createSourceFile('banco-agosto.csv', BANK_CSV)
-    await assignSourceColumns(sourceId, { Data: 'date', Valor: 'price' })
+    // Placement comes first: which columns a file may assign depends on where its rows go.
+    await assign(sourceId, { Data: 'date', Valor: 'price' })
     return sourceId
   }
 
@@ -218,7 +233,7 @@ describe('a file with nothing left in it', () => {
 
   it('is retired once its last row has been confirmed', async () => {
     const sourceId = await createSourceFile('one-row.csv', 'Data,Valor\n01/08/2026,-10')
-    await assignSourceColumns(sourceId, { Data: 'date', Valor: 'price' })
+    await assign(sourceId, { Data: 'date', Valor: 'price' })
     const [only] = await rowsOf(sourceId)
     await label(only.id, { sections: ['finances'], screens: ['overview'], category: 'outros', subcategory: 'outros', account: 'Banco A', card: 'Cartão X' })
 
@@ -239,9 +254,9 @@ describe('what counts as a duplicate', () => {
 
   it('is a row that matches one from another file, flagged and nothing more', async () => {
     const august = await createSourceFile('banco-agosto.csv', BANK_CSV)
-    await assignSourceColumns(august, { Data: 'date', Valor: 'price' })
+    await assign(august, { Data: 'date', Valor: 'price' })
     const september = await createSourceFile('banco-setembro.csv', BANK_CSV)
-    await assignSourceColumns(september, { Data: 'date', Valor: 'price' })
+    await assign(september, { Data: 'date', Valor: 'price' })
 
     const flagged = (await rowsOf(september)).filter((entry) => entry.row.duplicateOf)
     expect(flagged).toHaveLength(2)
@@ -305,7 +320,7 @@ describe('a line added by hand, and a cell corrected', () => {
 
   it('re-applies the file\'s sign convention to an amount typed by hand', async () => {
     const sourceId = await createSourceFile('banco-agosto.csv', BANK_CSV)
-    await assignSourceColumns(sourceId, { Valor: 'price' })
+    await assign(sourceId, { Valor: 'price' })
     await setSignConvention(sourceId, { kind: 'invertAll' })
     const [first] = await rowsOf(sourceId)
 
@@ -327,7 +342,7 @@ describe('account and card, as labels', () => {
 
   it('travel with the row into the table it is confirmed to', async () => {
     const sourceId = await createSourceFile('banco-agosto.csv', BANK_CSV)
-    await assignSourceColumns(sourceId, { Data: 'date', Valor: 'price' })
+    await assign(sourceId, { Data: 'date', Valor: 'price' })
     const [first] = await rowsOf(sourceId)
     await label(first.id, {
       sections: ['finances'], screens: ['overview'], category: 'outros', subcategory: 'outros',
@@ -341,7 +356,7 @@ describe('account and card, as labels', () => {
 
   it('hold a row back when it names no account, and let one through with no card', async () => {
     const sourceId = await createSourceFile('banco-agosto.csv', BANK_CSV)
-    await assignSourceColumns(sourceId, { Data: 'date', Valor: 'price' })
+    await assign(sourceId, { Data: 'date', Valor: 'price' })
     const [first, second] = await rowsOf(sourceId)
     await label(first.id, { sections: ['finances'], screens: ['overview'], category: 'outros', subcategory: 'outros' })
     // No card, and that is a complete answer: this row never touched one.
@@ -383,8 +398,8 @@ describe('scanning many files at once', () => {
   it('flags across files in one pass, exactly as scanning them one by one would', async () => {
     const august = await createSourceFile('banco-agosto.csv', BANK_CSV, { scanDuplicates: false })
     const september = await createSourceFile('banco-setembro.csv', BANK_CSV, { scanDuplicates: false })
-    await assignSourceColumns(august, { Data: 'date', Valor: 'price' })
-    await assignSourceColumns(september, { Data: 'date', Valor: 'price' })
+    await assign(august, { Data: 'date', Valor: 'price' })
+    await assign(september, { Data: 'date', Valor: 'price' })
 
     // Nothing was scanned on the way in; one pass settles both files.
     await flagCrossFileDuplicates(august, september)
@@ -395,7 +410,7 @@ describe('scanning many files at once', () => {
 
   it('still compares a row only against other files, however many are scanned together', async () => {
     const repeated = await createSourceFile('repeat.csv', 'Data,Valor\n01/08/2026,10\n01/08/2026,10', { scanDuplicates: false })
-    await assignSourceColumns(repeated, { Data: 'date', Valor: 'price' })
+    await assign(repeated, { Data: 'date', Valor: 'price' })
 
     await flagCrossFileDuplicates(repeated)
 
@@ -440,7 +455,7 @@ describe('what a row claims before anyone has looked at it', () => {
 
   it('and a row confirmed without one arrives with it empty, not with a word nobody chose', async () => {
     const sourceId = await createSourceFile('banco-agosto.csv', BANK_CSV)
-    await assignSourceColumns(sourceId, { Data: 'date', Valor: 'price' })
+    await assign(sourceId, { Data: 'date', Valor: 'price' })
     const [first] = await rowsOf(sourceId)
     await label(first.id, { sections: ['finances'], screens: ['overview'], account: 'Banco A' })
 
@@ -467,8 +482,8 @@ describe('what makes two rows the same row', () => {
       '01/08/2026,POSTO IPIRANGA,"-284,90"',
       '02/08/2026,FARMACIA,"-284,90"',
     ].join('\n'), { scanDuplicates: false })
-    await assignSourceColumns(first, { Data: 'date', Valor: 'price' })
-    await assignSourceColumns(second, { Data: 'date', Valor: 'price' })
+    await assign(first, { Data: 'date', Valor: 'price' })
+    await assign(second, { Data: 'date', Valor: 'price' })
 
     await flagCrossFileDuplicates(first, second)
 
@@ -478,8 +493,8 @@ describe('what makes two rows the same row', () => {
   it('and the same rows in another file are still caught', async () => {
     const first = await createSourceFile('banco-agosto.csv', august, { scanDuplicates: false })
     const again = await createSourceFile('banco-agosto (1).csv', august, { scanDuplicates: false })
-    await assignSourceColumns(first, { Data: 'date', Valor: 'price' })
-    await assignSourceColumns(again, { Data: 'date', Valor: 'price' })
+    await assign(first, { Data: 'date', Valor: 'price' })
+    await assign(again, { Data: 'date', Valor: 'price' })
 
     await flagCrossFileDuplicates(first, again)
 
@@ -497,11 +512,12 @@ describe('the money a row moved', () => {
 
   async function confirmOne(csv: string, assignments: Record<string, string>, screens: string[], usedCatalogue = catalogue) {
     const sourceId = await createSourceFile('arquivo.csv', csv)
-    await assignSourceColumns(sourceId, assignments as never)
     const [row] = await sourceRowsTable.toArray()
+    // Placed first, so the file may assign what that placement needs.
     await sourceRowsTable.update(row.id, {
       data: { ...(row.data as SourceRow), labels: { sections: ['finances'], screens, account: 'Banco A' } },
     })
+    await assignSourceColumns(sourceId, assignments as never)
     await confirmSourceRows(sourceId, usedCatalogue)
     return (await confirmedRowsTable.toArray()).map((stored) => stored.data as ConfirmedRow)[0]
   }
@@ -521,5 +537,70 @@ describe('the money a row moved', () => {
     )
 
     expect(confirmed).toMatchObject({ value: -150.75, price: -50.25, amount: 3 })
+  })
+})
+
+describe('the order the work has to happen in', () => {
+  beforeEach(async () => { await wipeAllData() })
+
+  it('refuses an assignment before anything says where the rows are going', async () => {
+    const sourceId = await createSourceFile('banco.csv', BANK_CSV)
+
+    await expect(assignSourceColumns(sourceId, { Data: 'date' })).rejects.toThrow(/section and the screen first/)
+  })
+
+  it('offers amount only to a file with rows bound for Investments', async () => {
+    const rows = (screens: string[]) => [{ labels: { screens } } as unknown as SourceRow]
+
+    expect(assignableFieldsFor(rows(['overview']))).toEqual(['date', 'price'])
+    expect(assignableFieldsFor(rows(['investments']))).toEqual(['date', 'price', 'amount'])
+  })
+
+  it('refuses amount to a file whose rows go elsewhere, rather than letting a column be spent on it', async () => {
+    const sourceId = await createSourceFile('banco.csv', BANK_CSV)
+    for (const entry of await rowsOf(sourceId)) await label(entry.id, { sections: ['finances'], screens: ['overview'] })
+
+    await expect(assignSourceColumns(sourceId, { Valor: 'amount' })).rejects.toThrow(/going to Investments/)
+  })
+
+  it('locks placement once a column is assigned, and unlocks it when the assignment goes', async () => {
+    const sourceId = await createSourceFile('banco.csv', BANK_CSV)
+    const [entry] = await rowsOf(sourceId)
+    await label(entry.id, { sections: ['finances'], screens: ['overview'] })
+    await assignSourceColumns(sourceId, { Data: 'date', Valor: 'price' })
+
+    const assigned = (await sourceFilesTable.get(sourceId))!.data as SourceFile
+    expect(placementRefusal(assigned, { screens: ['overview'] }, { screens: ['spending'] })).toMatch(/Unassign/)
+    // Something that is not a placement passes through: only where a row goes is locked.
+    expect(placementRefusal(assigned, { screens: ['overview'] }, { screens: ['overview'], category: 'mercado' })).toBeNull()
+
+    await assignSourceColumns(sourceId, { Data: null, Valor: null })
+    const cleared = (await sourceFilesTable.get(sourceId))!.data as SourceFile
+    expect(placementRefusal(cleared, { screens: ['overview'] }, { screens: ['spending'] })).toBeNull()
+  })
+})
+
+describe('a file whose rows are shorter than its header', () => {
+  beforeEach(async () => { await wipeAllData() })
+
+  it('reads them anyway, the missing column empty on the rows that lack it', () => {
+    // What a trailing empty column looks like once any editor has trimmed the line.
+    const parsed = parseSourceCsv('Date\tType\tObs\n03/04/2026\tPurchase\n10/04/2026\tSale\tchecked')
+
+    expect(parsed.columns).toEqual(['Date', 'Type', 'Obs'])
+    expect(parsed.rows).toEqual([
+      { Date: '03/04/2026', Type: 'Purchase', Obs: '' },
+      { Date: '10/04/2026', Type: 'Sale', Obs: 'checked' },
+    ])
+  })
+
+  it('reads one with more fields than the header too, keeping what the header names', () => {
+    const parsed = parseSourceCsv('Date,Type\n03/04/2026,Purchase,stray')
+
+    expect(parsed.rows).toEqual([{ Date: '03/04/2026', Type: 'Purchase' }])
+  })
+
+  it('still refuses a file with no header at all', () => {
+    expect(() => parseSourceCsv('')).toThrow(/no header row/)
   })
 })

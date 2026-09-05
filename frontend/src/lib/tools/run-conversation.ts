@@ -13,8 +13,13 @@ type RequestFn = typeof requestChatMessage
  * rounds on its own, and each round may carry several parallel tool calls. The cap
  * exists only to stop a model that has started looping, so it sits well above what
  * real work needs rather than just above the shortest task.
+ *
+ * Raised from thirty after a twenty-step request hit it and lost the whole message: a
+ * model that batches its calls needs few rounds, and one that does not needs one per
+ * step — the cap has to clear the second kind, or it is a cap on the model rather than
+ * on looping.
  */
-const DEFAULT_MAX_TOOL_ROUNDS = 30
+const DEFAULT_MAX_TOOL_ROUNDS = 80
 
 export type ConversationStatus = { type: 'waiting' } | { type: 'tool'; name: string }
 
@@ -30,6 +35,24 @@ export interface ConversationUsage {
   totalTokens: number
   /** The prompt size of the final round — the live context this conversation occupies. */
   lastPromptTokens: number
+  /** Prompt tokens the provider served from cache, and completion tokens spent thinking. */
+  cachedTokens: number
+  reasoningTokens: number
+  /** The largest prompt any one round carried: what the context window is measured against. */
+  peakPromptTokens: number
+  /** Wall clock, in milliseconds: what waiting for this message actually felt like. */
+  elapsedMs: number
+  /** Of that, the part spent inside tools rather than waiting on the model. */
+  toolMs: number
+  /** How many tool calls were made, and how many of them came back saying Error. */
+  toolCalls: number
+  toolErrors: number
+  /** Each tool by name, so a wording can be judged by what it made the model reach for. */
+  tools: Record<string, { calls: number; errors: number; ms: number }>
+  /** Tool sets opened, which is what progressive disclosure costs and saves. */
+  toolsetsOpened: number
+  /** Characters the model wrote back, which is verbosity measured without a tokenizer. */
+  replyChars: number
 }
 
 export interface RunConversationArgs {
@@ -81,7 +104,12 @@ export async function runConversation({
   // so opening one costs a round and then nothing.
   const opened = new Set(openGroups)
   let offered = tools
-  const usage: ConversationUsage = { rounds: 0, promptTokens: 0, completionTokens: 0, totalTokens: 0, lastPromptTokens: 0 }
+  const usage: ConversationUsage = {
+    rounds: 0, promptTokens: 0, completionTokens: 0, totalTokens: 0, lastPromptTokens: 0,
+    cachedTokens: 0, reasoningTokens: 0, peakPromptTokens: 0, elapsedMs: 0, toolMs: 0,
+    toolCalls: 0, toolErrors: 0, tools: {}, toolsetsOpened: 0, replyChars: 0,
+  }
+  const startedAt = Date.now()
 
   for (let iteration = 0; iteration < maxIterations; iteration++) {
     onStatus?.({ type: 'waiting' })
@@ -92,11 +120,20 @@ export async function runConversation({
       usage.completionTokens += message.usage.completionTokens
       usage.totalTokens += message.usage.totalTokens
       usage.lastPromptTokens = message.usage.promptTokens
+      usage.cachedTokens += message.usage.cachedTokens ?? 0
+      usage.reasoningTokens += message.usage.reasoningTokens ?? 0
+      usage.peakPromptTokens = Math.max(usage.peakPromptTokens, message.usage.promptTokens)
+      usage.elapsedMs = Date.now() - startedAt
       onUsage?.({ ...usage })
     }
 
     if (!message.tool_calls || message.tool_calls.length === 0) {
       if (typeof message.content !== 'string') throw new Error('Unexpected response from the assistant API.')
+      usage.replyChars = message.content.length
+      usage.elapsedMs = Date.now() - startedAt
+      // Only when the API said what anything cost: a provider that reports no usage is
+      // told about as nothing, not as a message that spent zero.
+      if (usage.rounds > 0) onUsage?.({ ...usage })
       return message.content
     }
 
@@ -104,13 +141,26 @@ export async function runConversation({
 
     for (const toolCall of message.tool_calls) {
       onStatus?.({ type: 'tool', name: toolCall.function.name })
+      const calledAt = Date.now()
       const result = await executeToolCall(toolCall, context)
+      const took = Date.now() - calledAt
+
+      // Counted by name: which tools a wording makes the model reach for, how often it is
+      // refused, and where the waiting goes, are all questions about the wording.
+      const name = toolCall.function.name
+      const failed = result.startsWith('Error:')
+      const tally = usage.tools[name] ?? { calls: 0, errors: 0, ms: 0 }
+      usage.tools[name] = { calls: tally.calls + 1, errors: tally.errors + (failed ? 1 : 0), ms: tally.ms + took }
+      usage.toolCalls += 1
+      usage.toolErrors += failed ? 1 : 0
+      usage.toolMs += took
+
       conversation.push({ role: 'tool', content: result, tool_call_id: toolCall.id })
 
       // Opening a set takes effect from the next round, and is remembered by the caller
       // so the rest of the conversation does not have to ask again.
       if (toolCall.function.name === openToolsetTool.name) {
-        for (const group of groupsOpenedBy(result)) opened.add(group)
+        for (const group of groupsOpenedBy(result)) { if (!opened.has(group)) usage.toolsetsOpened += 1; opened.add(group) }
         offered = toolsForRequest([...opened])
         onGroupsOpened?.([...opened])
       }

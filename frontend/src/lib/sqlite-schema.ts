@@ -107,6 +107,45 @@ export const SQLITE_SCHEMAS: Record<DataTableKey, SqliteTableSchema> = {
       { column: 'marked_for_elimination', key: 'markedForElimination', type: 'boolean' },
     ],
   },
+  profileUsage: {
+    sqlName: 'profile_usage',
+    columns: [
+      { column: 'profile', key: 'profile', type: 'text' },
+      { column: 'provider', key: 'provider', type: 'text' },
+      { column: 'model', key: 'model', type: 'text' },
+      { column: 'messages', key: 'messages', type: 'integer' },
+      { column: 'requests', key: 'requests', type: 'integer' },
+      { column: 'tokens', key: 'tokens', type: 'integer' },
+      { column: 'prompt_tokens', key: 'promptTokens', type: 'integer' },
+      { column: 'completion_tokens', key: 'completionTokens', type: 'integer' },
+      { column: 'cached_tokens', key: 'cachedTokens', type: 'integer' },
+      { column: 'reasoning_tokens', key: 'reasoningTokens', type: 'integer' },
+      { column: 'peak_prompt_tokens', key: 'peakPromptTokens', type: 'integer' },
+      { column: 'cost', key: 'cost', type: 'real' },
+      { column: 'elapsed_ms', key: 'elapsedMs', type: 'integer' },
+      { column: 'tool_ms', key: 'toolMs', type: 'integer' },
+      { column: 'tool_calls', key: 'toolCalls', type: 'integer' },
+      { column: 'tool_errors', key: 'toolErrors', type: 'integer' },
+      { column: 'toolsets_opened', key: 'toolsetsOpened', type: 'integer' },
+      { column: 'failures', key: 'failures', type: 'integer' },
+      { column: 'slowest_ms', key: 'slowestMs', type: 'integer' },
+      { column: 'reply_chars', key: 'replyChars', type: 'integer' },
+      { column: 'first_used_at', key: 'firstUsedAt', type: 'integer' },
+      { column: 'last_used_at', key: 'lastUsedAt', type: 'integer' },
+      { column: 'tools', key: 'tools', type: 'json' },
+    ],
+  },
+  assistantProfiles: {
+    sqlName: 'assistant_profiles',
+    columns: [
+      { column: 'name', key: 'name', type: 'text' },
+      { column: 'is_active', key: 'isActive', type: 'boolean' },
+      { column: 'overrides', key: 'overrides', type: 'json' },
+      // The keys and models it sends under travel with it: a profile restored without
+      // them would open disconnected, which is not the profile that was exported.
+      { column: 'connections', key: 'connections', type: 'json' },
+    ],
+  },
   labelRules: {
     sqlName: 'label_rules',
     columns: [

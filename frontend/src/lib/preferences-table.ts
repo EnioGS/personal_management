@@ -1,17 +1,19 @@
 import type { LocalRow } from '@/lib/local-store/create-local-table'
 import { LOCALE_STORAGE_KEY } from '@/lib/locale'
+import { METRIC_COLUMNS_STORAGE_KEY } from '@/lib/metric-columns'
 import { THEME_STORAGE_KEY } from '@/store/theme-store'
 
 /**
  * The preferences that live in localStorage, dressed as a table.
  *
- * Theme and language are settings a person expects to travel with their data — an
- * export that restores every row but opens in the wrong language has not restored
- * their setup. They cannot move into Dexie without the theme flashing on every load
+ * Theme, language and which metric columns are hidden are settings a person expects to
+ * travel with their data — an export that restores every row but opens in the wrong
+ * language, or with a table they had narrowed showing all twenty-eight columns, has not
+ * restored their setup. They cannot move into Dexie without the theme flashing on every load
  * (index.html reads the key before React exists), so instead they present the same
  * shape the export machinery already knows, and travel with everything else.
  */
-const KEYS = [THEME_STORAGE_KEY, LOCALE_STORAGE_KEY] as const
+const KEYS = [THEME_STORAGE_KEY, LOCALE_STORAGE_KEY, METRIC_COLUMNS_STORAGE_KEY] as const
 
 export const preferencesTable = {
   async toArray(): Promise<LocalRow[]> {

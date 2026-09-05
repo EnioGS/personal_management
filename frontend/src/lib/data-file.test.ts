@@ -44,6 +44,8 @@ function emptyTables(): DataExportFile['tables'] {
     notes: [],
     conversations: [],
     usageTotals: [],
+    profileUsage: [],
+    assistantProfiles: [],
     assistantPrompts: [],
     assistantConfig: [],
     preferences: [],
@@ -240,5 +242,35 @@ describe('importing a file this version did not write', () => {
     await importData(file)
 
     expect(await sourceFilesTable.count()).toBe(2)
+  })
+})
+
+describe('what travels with a profile', () => {
+  beforeEach(async () => { await wipeAllData() })
+
+  it('exports and re-imports every profile whole, connections and overrides alike', async () => {
+    const { assistantProfilesTable, profileUsageTable } = await import('@/lib/chat/conversations-db')
+    await assistantProfilesTable.add({
+      createdAt: 1,
+      data: {
+        name: 'Terse',
+        isActive: true,
+        overrides: { system: 'Say less.' },
+        connections: [{ id: 1, provider: 'openai', apiKey: 'sk-test', model: 'gpt', isActive: true }],
+      },
+    })
+    await profileUsageTable.add({ createdAt: 1, data: { profile: 'Terse', provider: 'openai', model: 'gpt', tokens: 500, messages: 1 } })
+
+    const exported = await exportData()
+    await wipeAllData()
+    expect(await assistantProfilesTable.count()).toBe(0)
+
+    await importData(exported)
+
+    const [profile] = await assistantProfilesTable.toArray()
+    expect(profile.data).toMatchObject({ name: 'Terse', overrides: { system: 'Say less.' } })
+    expect((profile.data as { connections: unknown[] }).connections).toHaveLength(1)
+    // The measurements come back too, so a comparison survives moving between browsers.
+    expect((await profileUsageTable.toArray())[0].data).toMatchObject({ profile: 'Terse', tokens: 500 })
   })
 })

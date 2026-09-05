@@ -40,15 +40,31 @@ export interface TokenUsage {
   promptTokens: number
   completionTokens: number
   totalTokens: number
+  /** Prompt tokens the provider served from its cache, where it says so. */
+  cachedTokens?: number
+  /** Completion tokens spent thinking rather than answering, where it says so. */
+  reasoningTokens?: number
 }
 
 export function readUsage(data: unknown): TokenUsage | undefined {
-  const usage = (data as { usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number } })?.usage
+  const usage = (data as {
+    usage?: {
+      prompt_tokens?: number
+      completion_tokens?: number
+      total_tokens?: number
+      prompt_tokens_details?: { cached_tokens?: number }
+      completion_tokens_details?: { reasoning_tokens?: number }
+    }
+  })?.usage
   if (!usage || typeof usage.total_tokens !== 'number') return undefined
   return {
     promptTokens: usage.prompt_tokens ?? 0,
     completionTokens: usage.completion_tokens ?? 0,
     totalTokens: usage.total_tokens,
+    // Reported by the providers that cache prompts and by those that think aloud; absent
+    // elsewhere, which is why both default to nothing rather than to zero-as-a-fact.
+    cachedTokens: usage.prompt_tokens_details?.cached_tokens ?? 0,
+    reasoningTokens: usage.completion_tokens_details?.reasoning_tokens ?? 0,
   }
 }
 

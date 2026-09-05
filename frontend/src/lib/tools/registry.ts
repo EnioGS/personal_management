@@ -1,4 +1,5 @@
 import type { OpenRouterTool } from '@/lib/openrouter'
+import { promptText } from '@/lib/prompts/registry'
 import { applyLabelRulesTool, deleteLabelRuleTool, editLabelRuleTool, listLabelRulesTool, saveLabelRuleTool } from './label-rule-tools'
 import { readCsvTool } from './read-csv'
 import { readIngestionGuideTool } from './guide-tool'
@@ -158,8 +159,10 @@ export function toolsForRequest(openGroups: string[] = []): OpenRouterTool[] {
   const opened = new Set(openGroups.flatMap((group) => TOOL_GROUPS[group]?.tools ?? []))
   const names = new Set([...CORE_TOOLS, ...opened])
 
+  // Descriptions are read through the active profile rather than off the definition: a
+  // tool's wording is prompt text like any other, and this is the one place it is sent.
   return [openToolsetTool, ...toolRegistry.filter((tool) => names.has(tool.name))].map((tool) => ({
     type: 'function',
-    function: { name: tool.name, description: tool.description, parameters: tool.parameters },
+    function: { name: tool.name, description: promptText(`tool.${tool.name}`, tool.description), parameters: tool.parameters },
   }))
 }

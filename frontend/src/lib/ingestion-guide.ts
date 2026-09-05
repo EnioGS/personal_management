@@ -14,8 +14,7 @@ export const INGESTION_GUIDE_KEY = 'ingestionGuide'
 export const DEFAULT_INGESTION_GUIDE = `# Data ingestion centre
 
 Dashboards read confirmed rows only. A file's rows are worked on in the file's own table
-and move into confirmed tables when they are ready — one phase, not two: assigning columns
-and labelling happen side by side, on the same rows.
+and move into confirmed tables when they are ready — one phase, not two.
 
 ## A source table
 
@@ -30,25 +29,28 @@ interchangeable: money is a value, a holding is an amount. Anything unassigned i
 into the observations of each confirmed row, which is where a description ends up.
 
 A row is not confirmed until its file says where its numbers are: every row a date and a
-price, and a row going to Investments an amount as well. Confirming
-without them is refused and names the missing column — a row landing with an empty date and
-value sits in its table and appears on no dashboard, which is the failure nobody notices.
+price, a row going to Investments an amount too. Confirming without them is refused and
+names what is missing — a row landing with an empty date sits in its table and appears on
+no dashboard, which is the failure nobody notices.
 
 ## The order of work
 
-1. **Assign the columns.** Read which accounts and cards exist while you are here, and
-   register what the file plainly needs and nobody has set up.
-2. **Label the sections.** Which parts of the app the row belongs to.
-3. **Label the screens.** Which pages inside those sections. Both take several values.
+1. **Label the sections**, then **the screens**: which parts of the app, which pages
+   inside them. Both take several values.
+2. **Assign the columns**, only now: what a file may assign follows from where its rows go
+   (amount to Investments alone), and placement locks while anything is assigned — to
+   re-place, unassign first.
+3. **Label the rest.** Read which accounts and cards exist, and register what the file
+   plainly needs and nobody has set up.
 4. **Only then decide the sign** — it depends on where the rows are going.
 
 ## The labels
 
-Sections — several allowed, valid when they name a section that exists now:
+Sections — several allowed, valid when they name one that exists now:
 ${PROMPT_PLACEHOLDERS.sections}
 
 Screens — the pages inside them, validated *within* the sections the row names, since two
-sections may offer screens of the same name: ${PROMPT_PLACEHOLDERS.screens}
+sections may offer the same name: ${PROMPT_PLACEHOLDERS.screens}
 
 Class — free text: what kind of thing it is, which is what a balance is sliced by — renda
 fixa, renda variável, cash reserve. What it *is*, never where it came from: interest
@@ -95,9 +97,9 @@ unmarking are yours and the user's alike. **Deleting is the user's alone.**
 
 ## Duplicates
 
-Two identical rows *inside one file* are two real transactions — banks report them. A row is
-a possible duplicate only when everything it says matches a row from a **different file**,
-or when a newly uploaded file's name is nearly one already imported.
+Two identical rows *inside one file* are two real transactions — banks report them. A row
+is a possible duplicate only when everything it says matches a row from a **different
+file**, or a new file's name is nearly one already imported.
 
 ## Rules and notes
 
@@ -109,7 +111,7 @@ already say, so it cannot overwrite a judgement. Write the rationale, and read t
 rules before adding another.
 
 Notes are the rest: free text about this data, saying what a rule cannot — that a shop
-nobody would recognise sells food, that one file's March rows were a rebalance. They are
-appended below when there are any. Treat them as the user talking about their own data, and
-write one yourself whenever they explain something you would otherwise ask about again.
+nobody would recognise sells food, that one file's March rows were a rebalance. Appended
+below when there are any. Treat them as the user talking about their own data, and write
+one yourself whenever they explain something you would otherwise ask about again.
 `

@@ -13,8 +13,8 @@ import { buildLabelCatalogue } from '@/lib/label-catalogue-source'
  * is refused rather than sent, and the editor says why.
  */
 export const PROMPT_PLACEHOLDERS = {
-  sections: '{{sections}}',
-  screens: '{{screens}}',
+  sections: '[PLACEHOLDER_FOR_SECTIONS]',
+  screens: '[PLACEHOLDER_FOR_SCREENS]',
 } as const
 
 export type PlaceholderName = keyof typeof PROMPT_PLACEHOLDERS

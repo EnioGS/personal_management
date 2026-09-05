@@ -13,12 +13,13 @@ describe('confirming through the assistant', () => {
   it('knows the accounts the user set up, so a labelled row is not judged unlabelled', async () => {
     await accountsTable.add({ createdAt: 1, data: { name: 'Conta principal', kind: 'checking' } })
     const sourceId = await createSourceFile('nubank.csv', 'Data,Valor\n01/08/2026,-10')
-    await assignSourceColumnsTool.execute({ sourceId, assignments: { Data: 'date', Valor: 'price' } }, context)
     const [row] = await sourceRowsTable.toArray()
 
+    // Placement first, then assignment: which columns a file may assign depends on it.
     await setLabelsTool.execute({
       rowIds: [row.id], sections: 'finances', screens: 'movements', account: 'Conta principal',
     }, context)
+    await assignSourceColumnsTool.execute({ sourceId, assignments: { Data: 'date', Valor: 'price' } }, context)
 
     const result = JSON.parse(await confirmRowsTool.execute({ sourceId }, context))
 
@@ -118,5 +119,53 @@ describe('clearing a card, said out loud', () => {
       .map((row) => row.data as { card?: string; markedForElimination?: boolean })
       .filter((row) => !row.markedForElimination)
     expect(current[0].card).toBeUndefined()
+  })
+})
+
+describe('a field passed empty', () => {
+  beforeEach(async () => { await wipeAllData() })
+
+  it('leaves a placement alone rather than sending the row nowhere', async () => {
+    await createSourceFile('nubank.csv', 'Data,Valor\n01/08/2026,-10')
+    const [row] = await sourceRowsTable.toArray()
+    await setLabelsTool.execute({ rowIds: [row.id], sections: 'finances', screens: 'movements' }, context)
+
+    // What a caller writes when it means to change only the category.
+    await setLabelsTool.execute({ rowIds: [row.id], sections: '', screens: '', category: 'mercado' }, context)
+
+    const labels = ((await sourceRowsTable.get(row.id))!.data as SourceRow).labels
+    expect(labels).toMatchObject({ sections: ['finances'], screens: ['movements'], category: 'mercado' })
+  })
+
+  it('leaves the other labels alone when a revision names one of them', async () => {
+    await accountsTable.add({ createdAt: 1, data: { name: 'Conta principal', kind: 'checking' } })
+    const { addConfirmedRow, updateConfirmedRow } = await import('@/lib/model/confirmed-rows')
+    const { reviseConfirmedRowsTool } = await import('./vault-tools')
+    const id = await addConfirmedRow('finances', 'investments')
+    await updateConfirmedRow(id, 'category', 'tesouro')
+    await updateConfirmedRow(id, 'subcategory', 'IPCA+ 2029')
+
+    // Only the class is being set; the blanks are the rest of the form.
+    await reviseConfirmedRowsTool.execute({ rowIds: [id], class: 'renda fixa', account: '', category: '', subcategory: '' }, context)
+
+    const live = (await confirmedRowsTable.toArray())
+      .map((stored) => stored.data as { class?: string; category?: string; subcategory?: string; markedForElimination?: boolean })
+      .filter((stored) => !stored.markedForElimination)
+    expect(live).toHaveLength(1)
+    expect(live[0]).toMatchObject({ class: 'renda fixa', category: 'tesouro', subcategory: 'IPCA+ 2029' })
+  })
+
+  it('clears only when clearing is said out loud', async () => {
+    const { addConfirmedRow, updateConfirmedRow } = await import('@/lib/model/confirmed-rows')
+    const { reviseConfirmedRowsTool } = await import('./vault-tools')
+    const id = await addConfirmedRow('finances', 'investments')
+    await updateConfirmedRow(id, 'class', 'renda fixa')
+
+    await reviseConfirmedRowsTool.execute({ rowIds: [id], clearClass: true }, context)
+
+    const live = (await confirmedRowsTable.toArray())
+      .map((stored) => stored.data as { class?: string; markedForElimination?: boolean })
+      .filter((stored) => !stored.markedForElimination)
+    expect(live[0].class).toBeUndefined()
   })
 })

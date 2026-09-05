@@ -49,6 +49,15 @@ export interface VaultTable {
   columns: string[]
   rows: number
   /**
+   * For a source table: the file it was made from, spelled as the user's disk spells it.
+   *
+   * The table's own name cannot be: a SQL identifier is lowercased, stripped of accents
+   * and punctuation, and cut to forty characters, so `NU_99999999_01MAR2026_31MAR2026.csv`
+   * becomes something no one would guess back. Carrying the filename here is what makes
+   * the two findable from each other without reading the schema first.
+   */
+  file?: string
+  /**
    * For a confirmed table: how its amounts are signed today. This is the reference a
    * sign decision is measured against — recorded from the data itself rather than
    * declared somewhere that can go stale.
@@ -93,7 +102,7 @@ export async function buildVaultSnapshot(): Promise<VaultSnapshot> {
     const columns = ['id', 'row_id', 'source_filename', ...file.originalColumns, 'sections', 'screens', 'class', 'category', 'subcategory', 'account', 'card', 'marked_for_elimination', 'duplicate_of']
     const name = sourceTableName(file, stored.id)
     createAndFill(db, name, rows, columns)
-    tables.push({ name, columns, rows: rows.length })
+    tables.push({ name, columns, rows: rows.length, file: file.originalFilename })
   }
 
   const byPlacement = new Map<string, { id: number; data: ConfirmedRow }[]>()
@@ -102,7 +111,7 @@ export async function buildVaultSnapshot(): Promise<VaultSnapshot> {
     const key = confirmedTableName(row.section, row.screen)
     byPlacement.set(key, [...(byPlacement.get(key) ?? []), { id: stored.id, data: row }])
   }
-  const confirmedColumns = ['id', 'row_id', 'section', 'screen', 'source_filename', 'date', 'value', 'observations', 'category', 'subcategory', 'account', 'card', 'asset', 'amount', 'price', 'investment_type', 'investment_class', 'marked_for_elimination']
+  const confirmedColumns = ['id', 'row_id', 'section', 'screen', 'source_filename', 'date', 'value', 'observations', 'class', 'category', 'subcategory', 'account', 'card', 'amount', 'price', 'marked_for_elimination']
   for (const [name, rows] of byPlacement) {
     createAndFill(db, name, rows.map(({ id, data }) => ({
       id,
