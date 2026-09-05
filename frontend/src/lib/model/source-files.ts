@@ -40,6 +40,69 @@ export function filenameSimilarity(left: string, right: string): number {
   return common / shorter
 }
 
+/**
+ * What two rows are compared on when asking whether they are the same transaction.
+ *
+ * The date and the amount when the file says which columns those are — that is what
+ * survives a bank re-exporting the same statement with a column renamed. Otherwise
+ * everything the row carries except where it came from, which is the only honest
+ * fallback for a file nobody has assigned yet.
+ */
+export function rowSignature(values: Record<string, string>, assignments: Record<string, IngestionTargetField>): string {
+  const of = (field: IngestionTargetField) => {
+    const column = Object.entries(assignments).find(([, target]) => target === field)?.[0]
+    return column ? values[column] : undefined
+  }
+  const date = parseDateValue(of('date'))
+  const amount = parseNumberValue(of('amount'))
+  if (date !== null && amount !== null) return `${date}|${Math.abs(amount).toFixed(2)}`
+  return Object.entries(values)
+    .filter(([column]) => column !== SOURCE_FILENAME_COLUMN)
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([column, value]) => `${column}=${value.trim().toLowerCase()}`)
+    .join('|')
+}
+
+/**
+ * Flags rows that look like rows of a different file, and unflags those that no longer do.
+ *
+ * Narrow on purpose. A row is only ever compared against rows that came from another
+ * filename — inside one file, two identical rows are two real transactions. The flag is
+ * advisory: it says "look at this", never "drop this", and only the person or the
+ * assistant reading it decides anything.
+ */
+export async function flagCrossFileDuplicates(sourceId: number): Promise<{ flagged: number }> {
+  const files = new Map((await sourceFilesTable.toArray()).map((row) => [row.id, row.data as SourceFile]))
+  const file = files.get(sourceId)
+  if (!file) throw new Error(`Source file ${sourceId} was not found.`)
+
+  const elsewhere = new Map<string, string>()
+  for (const stored of await sourceRowsTable.toArray()) {
+    const row = stored.data as SourceRow
+    if (row.sourceId === sourceId) continue
+    const other = files.get(row.sourceId)
+    if (other) elsewhere.set(rowSignature(row.values, other.assignments), row.rowId)
+  }
+  for (const stored of await confirmedRowsTable.toArray()) {
+    const row = stored.data as ConfirmedRow
+    if (row.sourceFilename === file.originalFilename) continue
+    if (typeof row.date === 'number' && typeof row.amount === 'number') {
+      elsewhere.set(`${row.date}|${Math.abs(row.amount).toFixed(2)}`, row.rowId)
+    }
+  }
+
+  let flagged = 0
+  for (const stored of await sourceRowsTable.toArray()) {
+    const row = stored.data as SourceRow
+    if (row.sourceId !== sourceId) continue
+    const match = elsewhere.get(rowSignature(row.values, file.assignments))
+    if (match === row.duplicateOf) { if (match) flagged += 1; continue }
+    await sourceRowsTable.update(stored.id, { data: { ...row, duplicateOf: match } satisfies SourceRow })
+    if (match) flagged += 1
+  }
+  return { flagged }
+}
+
 export async function createSourceFile(originalFilename: string, rawCsv: string): Promise<number> {
   const parsed = parseSourceCsv(rawCsv)
   const existing = await sourceFilesTable.toArray()
@@ -75,9 +138,10 @@ export async function createSourceFile(originalFilename: string, rawCsv: string)
     } satisfies SourceRow,
   })))
 
+  const duplicates = await flagCrossFileDuplicates(sourceId)
   await ingestionAuditEventsTable.add({
     createdAt: Date.now(),
-    data: { event: 'sourceUploaded', actor: 'user', sourceId, details: { originalFilename, rows: parsed.rows.length } },
+    data: { event: 'sourceUploaded', actor: 'user', sourceId, details: { originalFilename, rows: parsed.rows.length, ...duplicates } },
   })
   return sourceId
 }
@@ -102,6 +166,8 @@ export async function assignSourceColumns(sourceId: number, assignments: Record<
 
   const updated: SourceFile = { ...file, assignments: next }
   await sourceFilesTable.update(sourceId, { data: updated })
+  // What a row is compared on has just changed, so what looks like a duplicate has too.
+  await flagCrossFileDuplicates(sourceId)
   return updated
 }
 
@@ -138,7 +204,9 @@ export function observationsFor(row: SourceRow, file: SourceFile, importedAmount
   const assigned = new Set(Object.keys(file.assignments))
   const parts: Record<string, string> = {}
   for (const [column, value] of Object.entries(row.values)) {
-    if (assigned.has(column) || value === '') continue
+    // The filename is a column of the confirmed row in its own right; repeating it here
+    // would put the same fact in two places.
+    if (assigned.has(column) || column === SOURCE_FILENAME_COLUMN || value === '') continue
     parts[column] = value
   }
   if (importedAmount !== undefined) parts.amount_as_imported = importedAmount

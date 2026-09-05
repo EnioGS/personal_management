@@ -73,8 +73,9 @@ export async function buildVaultSnapshot(): Promise<VaultSnapshot> {
         category: data.labels.category ?? '',
         subcategory: data.labels.subcategory ?? '',
         marked_for_elimination: data.markedForElimination ? 1 : 0,
+        duplicate_of: data.duplicateOf ?? null,
       }))
-    const columns = ['id', 'row_id', 'source_filename', ...file.originalColumns, 'sections', 'screens', 'category', 'subcategory', 'marked_for_elimination']
+    const columns = ['id', 'row_id', 'source_filename', ...file.originalColumns, 'sections', 'screens', 'category', 'subcategory', 'marked_for_elimination', 'duplicate_of']
     const name = sourceTableName(file, stored.id)
     createAndFill(db, name, rows, columns)
     tables.push({ name, columns, rows: rows.length })

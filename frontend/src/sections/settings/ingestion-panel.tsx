@@ -15,7 +15,8 @@ import { queryRows } from '@/lib/model/row-query'
 import { ingestionLabelErrors } from '@/lib/model/ingestion'
 import { parsePlacementLabels, resolveScreenLabel, resolveSectionLabel, screenLabelFor, sectionLabelFor, withDerivedSections, type LabelCatalogue } from '@/lib/model/label-catalogue'
 import { applyLabelRulesToRows } from '@/lib/model/label-rules-repository'
-import { confirmedRowsTable, sourceRowsTable } from '@/lib/model/model-db'
+import { deleteMarked, toggleMark, type MarkableTable } from '@/lib/model/marking'
+import { sourceRowsTable } from '@/lib/model/model-db'
 import { useConfirmedRowsStore, useSourceFilesStore, useSourceRowsStore } from '@/lib/model/model-stores'
 import {
   ASSIGNABLE_FIELDS,
@@ -162,20 +163,12 @@ export function IngestionPanel() {
     await refreshAllLocalStores()
   }
 
-  async function toggleMark(table: 'source' | 'confirmed', row: StoredRow<SourceRow | ConfirmedRow>) {
-    const store = table === 'source' ? sourceRowsTable : confirmedRowsTable
-    await store.update(row.id, { data: { ...stripStored(row), markedForElimination: !row.markedForElimination } })
-    await refreshAllLocalStores()
-  }
-
-  async function deleteMarked(table: 'source' | 'confirmed') {
-    const store = table === 'source' ? sourceRowsTable : confirmedRowsTable
+  async function removeMarked(table: MarkableTable) {
     const rows = (table === 'source' ? fileRows : tableRows).filter((row) => row.markedForElimination)
     if (rows.length === 0) { setMessage('Nothing is marked in this table.'); return }
-    await store.bulkDelete(rows.map((row) => row.id))
-    await refreshAllLocalStores()
+    const deleted = await deleteMarked(table, rows.map((row) => row.id))
     setMarking(false)
-    setMessage(`Deleted ${rows.length} marked row(s). This cannot be undone.`)
+    setMessage(`Deleted ${deleted} marked row(s). This cannot be undone.`)
   }
 
   async function confirm(discardMarked: boolean) {
@@ -256,7 +249,7 @@ export function IngestionPanel() {
           size="xs"
           variant="ghost"
           className="text-destructive"
-          onClick={() => void deleteMarked(selectedFile ? 'source' : 'confirmed')}
+          onClick={() => void removeMarked(selectedFile ? 'source' : 'confirmed')}
         >
           <Trash2 className="mr-1 size-3.5" /> Delete marked lines
         </Button>
@@ -300,6 +293,7 @@ export function IngestionPanel() {
             <thead className="bg-muted/60 sticky top-0">
               <tr>
                 <th className="p-2 text-left font-medium">{SOURCE_FILENAME_COLUMN}</th>
+                <th className="p-2 text-left font-medium">duplicate?</th>
                 {selectedFile.originalColumns.map((column) => (
                   <th key={column} className="p-2 text-left font-medium">
                     <div className="flex flex-col gap-1">
@@ -336,7 +330,7 @@ export function IngestionPanel() {
                 return (
                   <tr
                     key={row.id}
-                    {...rowProps(() => void toggleMark('source', row))}
+                    {...rowProps(() => void toggleMark('source', row.id))}
                     className={cn(
                       'border-b last:border-0',
                       marking && 'cursor-pointer',
@@ -344,6 +338,9 @@ export function IngestionPanel() {
                     )}
                   >
                     <td className="text-muted-foreground p-2 whitespace-nowrap">{row.values[SOURCE_FILENAME_COLUMN]}</td>
+                    <td className="p-2 whitespace-nowrap" title={row.duplicateOf ? `Matches ${row.duplicateOf}, which came from another file.` : undefined}>
+                      {row.duplicateOf ? <span className="text-destructive">duplicate?</span> : ''}
+                    </td>
                     {selectedFile.originalColumns.map((column) => (
                       <td key={column} className="p-2">
                         {selectedFile.assignments[column] === 'amount'
@@ -389,7 +386,7 @@ export function IngestionPanel() {
               {confirmedWindow.visible.map((row) => (
                 <tr
                   key={row.id}
-                  {...rowProps(() => void toggleMark('confirmed', row))}
+                  {...rowProps(() => void toggleMark('confirmed', row.id))}
                   className={cn(
                     'border-b last:border-0',
                     marking && 'cursor-pointer',

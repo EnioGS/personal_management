@@ -11,15 +11,18 @@ import { useCallback, useEffect, useState } from 'react'
  * Nothing here deletes: a mark hides the row from dashboards and leaves it in its table.
  * Removing marked rows is the user's alone, and lives with the table that owns them.
  */
+/** A click on a row, or on the mode's own checkbox, keeps the mode; anything else ends it. */
+export function staysInMarkMode(target: Element | null): boolean {
+  return Boolean(target?.closest('[data-markable]') || target?.closest('[data-mark-toggle]'))
+}
+
 export function useMarkMode(): { marking: boolean; setMarking: (value: boolean) => void; rowProps: (toggle: () => void) => { 'data-markable': true; onClick: () => void } } {
   const [marking, setMarking] = useState(false)
 
   useEffect(() => {
     if (!marking) return
     function handle(event: MouseEvent) {
-      const target = event.target as HTMLElement | null
-      if (target?.closest('[data-markable]') || target?.closest('[data-mark-toggle]')) return
-      setMarking(false)
+      if (!staysInMarkMode(event.target as Element | null)) setMarking(false)
     }
     document.addEventListener('click', handle)
     return () => document.removeEventListener('click', handle)

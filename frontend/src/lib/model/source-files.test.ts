@@ -1,0 +1,210 @@
+import { beforeEach, describe, expect, it } from 'vitest'
+import { wipeAllData } from '@/lib/data-file'
+import { confirmedRowsTable, sourceFilesTable, sourceRowsTable } from './model-db'
+import type { LabelCatalogue } from './label-catalogue'
+import type { ConfirmedRow, SourceFile, SourceRow } from './types'
+import {
+  assignSourceColumns,
+  confirmSourceRows,
+  createSourceFile,
+  filenameSimilarity,
+  flagCrossFileDuplicates,
+  observationsFor,
+  planConfirmation,
+  rowSignature,
+  setSignConvention,
+} from './source-files'
+
+const catalogue: LabelCatalogue = {
+  sections: [{ id: 'finances', label: 'Finanças' }],
+  screens: [
+    { id: 'overview', sectionId: 'finances', label: 'Movimentações' },
+    { id: 'spending', sectionId: 'finances', label: 'Gastos' },
+  ],
+}
+
+const BANK_CSV = [
+  'Data,Descrição,Valor,Tipo',
+  '01/08/2026,SALARIO,"3.500,00",C',
+  '02/08/2026,MERCADO SAO JORGE,"-284,90",D',
+].join('\n')
+
+async function rowsOf(sourceId: number): Promise<{ id: number; row: SourceRow }[]> {
+  return (await sourceRowsTable.toArray())
+    .map((stored) => ({ id: stored.id, row: stored.data as SourceRow }))
+    .filter((entry) => entry.row.sourceId === sourceId)
+}
+
+async function label(id: number, labels: SourceRow['labels']) {
+  const stored = await sourceRowsTable.get(id)
+  await sourceRowsTable.update(id, { data: { ...(stored!.data as SourceRow), labels } })
+}
+
+describe('a file arriving', () => {
+  beforeEach(async () => { await wipeAllData() })
+
+  it('becomes its own table: every column the file wrote, and where it came from', async () => {
+    const sourceId = await createSourceFile('banco-agosto.csv', BANK_CSV)
+    const file = (await sourceFilesTable.get(sourceId))!.data as SourceFile
+    const rows = await rowsOf(sourceId)
+
+    expect(file.originalColumns).toEqual(['Data', 'Descrição', 'Valor', 'Tipo'])
+    expect(rows).toHaveLength(2)
+    expect(rows[0].row.values).toMatchObject({ source_filename: 'banco-agosto.csv', Descrição: 'SALARIO' })
+    expect(rows[0].row.labels).toEqual({ category: 'outros', subcategory: 'outros' })
+  })
+
+  it('gives two identical rows different ids, because a bank may report the same charge twice', async () => {
+    const sourceId = await createSourceFile('repeat.csv', 'Data,Valor\n01/08/2026,10\n01/08/2026,10')
+    const [first, second] = await rowsOf(sourceId)
+
+    expect(first.row.rowId).not.toBe(second.row.rowId)
+  })
+
+  it('refuses to assign anything that is not one of the file\'s own columns', async () => {
+    const sourceId = await createSourceFile('banco-agosto.csv', BANK_CSV)
+
+    await expect(assignSourceColumns(sourceId, { source_filename: 'date' })).rejects.toThrow(/own columns/)
+    await expect(assignSourceColumns(sourceId, { category: 'date' })).rejects.toThrow(/own columns/)
+  })
+
+  it('moves a canonical field rather than duplicating it when it is assigned twice', async () => {
+    const sourceId = await createSourceFile('banco-agosto.csv', BANK_CSV)
+    await assignSourceColumns(sourceId, { Data: 'date' })
+    const file = await assignSourceColumns(sourceId, { Descrição: 'date' })
+
+    expect(file.assignments).toEqual({ Descrição: 'date' })
+  })
+})
+
+describe('confirming', () => {
+  beforeEach(async () => { await wipeAllData() })
+
+  async function readyFile() {
+    const sourceId = await createSourceFile('banco-agosto.csv', BANK_CSV)
+    await assignSourceColumns(sourceId, { Data: 'date', Valor: 'amount' })
+    return sourceId
+  }
+
+  it('writes one copy per (section, screen) pair, all sharing the row id, and empties the file', async () => {
+    const sourceId = await readyFile()
+    const rows = await rowsOf(sourceId)
+    await label(rows[1].id, { sections: ['finances'], screens: ['overview', 'spending'], category: 'mercado', subcategory: 'outros' })
+
+    const result = await confirmSourceRows(sourceId, catalogue)
+
+    expect(result).toMatchObject({ confirmed: 1, copies: 2, leftBehind: 1 })
+    const confirmed = (await confirmedRowsTable.toArray()).map((stored) => stored.data as ConfirmedRow)
+    expect(confirmed.map((row) => row.screen).sort()).toEqual(['overview', 'spending'])
+    expect(new Set(confirmed.map((row) => row.rowId)).size).toBe(1)
+    expect(await rowsOf(sourceId)).toHaveLength(1)
+  })
+
+  it('leaves a row nobody has placed exactly where it is', async () => {
+    const sourceId = await readyFile()
+
+    const plan = await planConfirmation(sourceId, catalogue)
+    expect(plan.ready).toHaveLength(0)
+    expect(plan.incomplete).toHaveLength(2)
+
+    expect(await confirmSourceRows(sourceId, catalogue)).toMatchObject({ confirmed: 0, leftBehind: 2 })
+    expect(await rowsOf(sourceId)).toHaveLength(2)
+  })
+
+  it('condenses every unassigned column into the observations, so nothing the file said is lost', async () => {
+    const sourceId = await readyFile()
+    const rows = await rowsOf(sourceId)
+    await label(rows[1].id, { sections: ['finances'], screens: ['spending'], category: 'mercado', subcategory: 'outros' })
+
+    await confirmSourceRows(sourceId, catalogue)
+
+    const confirmed = (await confirmedRowsTable.toArray())[0].data as ConfirmedRow
+    expect(JSON.parse(confirmed.observations)).toEqual({ Descrição: 'MERCADO SAO JORGE', Tipo: 'D' })
+    expect(confirmed.amount).toBe(-284.9)
+    expect(confirmed.date).toBe(Date.UTC(2026, 7, 2))
+  })
+
+  it('keeps the amount the file wrote whenever the sign was changed', async () => {
+    const sourceId = await readyFile()
+    await setSignConvention(sourceId, { kind: 'invertAll' })
+    const rows = await rowsOf(sourceId)
+    await label(rows[0].id, { sections: ['finances'], screens: ['overview'], category: 'salário', subcategory: 'outros' })
+
+    await confirmSourceRows(sourceId, catalogue)
+
+    const confirmed = (await confirmedRowsTable.toArray())[0].data as ConfirmedRow
+    expect(confirmed.amount).toBe(-3500)
+    expect(JSON.parse(confirmed.observations).amount_as_imported).toBe('3.500,00')
+  })
+
+  it('reads direction from another column when that is where the file put it', async () => {
+    const sourceId = await readyFile()
+    await setSignConvention(sourceId, { kind: 'invertWhen', column: 'Tipo', values: ['D'] })
+    for (const { id } of await rowsOf(sourceId)) {
+      await label(id, { sections: ['finances'], screens: ['overview'], category: 'outros', subcategory: 'outros' })
+    }
+
+    await confirmSourceRows(sourceId, catalogue)
+
+    const amounts = (await confirmedRowsTable.toArray()).map((stored) => (stored.data as ConfirmedRow).amount)
+    expect(amounts.sort((a, b) => a! - b!)).toEqual([-284.9, 3500])
+  })
+
+  it('only discards what is marked, and only retires the file, when explicitly told to', async () => {
+    const sourceId = await readyFile()
+    const rows = await rowsOf(sourceId)
+    await label(rows[0].id, { sections: ['finances'], screens: ['overview'], category: 'salário', subcategory: 'outros' })
+    await sourceRowsTable.update(rows[1].id, { data: { ...rows[1].row, markedForElimination: true } })
+
+    expect(await confirmSourceRows(sourceId, catalogue)).toMatchObject({ confirmed: 1, discarded: 0, leftBehind: 1, removedFile: false })
+    expect(await confirmSourceRows(sourceId, catalogue, { discardMarked: true })).toMatchObject({ discarded: 1, removedFile: true })
+    expect(await sourceFilesTable.count()).toBe(0)
+  })
+})
+
+describe('what counts as a duplicate', () => {
+  beforeEach(async () => { await wipeAllData() })
+
+  it('is never two identical rows inside one file — those are two real transactions', async () => {
+    const sourceId = await createSourceFile('repeat.csv', 'Data,Valor\n01/08/2026,10\n01/08/2026,10')
+    await flagCrossFileDuplicates(sourceId)
+
+    expect((await rowsOf(sourceId)).map((entry) => entry.row.duplicateOf)).toEqual([undefined, undefined])
+  })
+
+  it('is a row that matches one from another file, flagged and nothing more', async () => {
+    const august = await createSourceFile('banco-agosto.csv', BANK_CSV)
+    await assignSourceColumns(august, { Data: 'date', Valor: 'amount' })
+    const september = await createSourceFile('banco-setembro.csv', BANK_CSV)
+    await assignSourceColumns(september, { Data: 'date', Valor: 'amount' })
+
+    const flagged = (await rowsOf(september)).filter((entry) => entry.row.duplicateOf)
+    expect(flagged).toHaveLength(2)
+    // Advisory: the rows are still there, and still confirmable.
+    expect(flagged.every((entry) => !entry.row.markedForElimination)).toBe(true)
+  })
+
+  it('compares on the date and the amount once the file says which columns those are', () => {
+    const assignments = { Data: 'date', Valor: 'amount' } as const
+    expect(rowSignature({ Data: '01/08/2026', Valor: '-10,00', Descrição: 'A' }, assignments))
+      .toBe(rowSignature({ Data: '01/08/2026', Valor: '10,00', Descrição: 'B' }, assignments))
+  })
+
+  it('flags a file whose name is nearly one already imported, against the shorter name', async () => {
+    const first = await createSourceFile('Nubank_2026-09-08.csv', BANK_CSV)
+    const second = await createSourceFile('Nubank_2026-09-08 (1).csv', BANK_CSV)
+
+    expect(filenameSimilarity('Nubank_2026-09-08 (1).csv', 'Nubank_2026-09-08.csv')).toBeGreaterThan(0.8)
+    expect(((await sourceFilesTable.get(second))!.data as SourceFile).looksLikeSourceId).toBe(first)
+    expect(((await sourceFilesTable.get(first))!.data as SourceFile).looksLikeSourceId).toBeUndefined()
+  })
+})
+
+describe('observationsFor', () => {
+  it('keeps only what no column was assigned to, and never an empty value', () => {
+    const file = { assignments: { Data: 'date' } } as unknown as SourceFile
+    const row = { values: { Data: '01/08/2026', Descrição: 'MERCADO', Tipo: '' } } as unknown as SourceRow
+
+    expect(JSON.parse(observationsFor(row, file))).toEqual({ Descrição: 'MERCADO' })
+  })
+})

@@ -20,5 +20,8 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     setupFiles: ['./vitest.setup.ts'],
+    // sql.js's wasm is a served URL in the browser and a file path in Node; the tests
+    // get the path, so the SQL layer can be exercised for real rather than mocked.
+    alias: [{ find: /^sql\.js\/dist\/sql-wasm\.wasm\?url$/, replacement: path.resolve(__dirname, './src/test/sql-wasm-url.ts') }],
   },
 })
