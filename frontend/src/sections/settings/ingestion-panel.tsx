@@ -591,14 +591,16 @@ export function IngestionPanel() {
 
       {/* §1.6.1: the rules of a stage are shown only while a table of that stage is
           selected — set apart below the table, because it is a different subject. */}
+      {/* The table is the screen: it takes the height, and what is written about the
+          labelling waits a scroll away rather than competing with the rows. */}
       {(selectedFile || selectedConfirmed) && (
         <>
-          <div className="mt-8 border-t pt-6">
+          <div className="mt-24 border-t pt-6">
             {selectedFile && <LabellingRules context="source" />}
             {selectedConfirmed && <LabellingRules context="confirmed" />}
           </div>
           {/* Below the rules, and separate from them: what a rule cannot say. */}
-          <div className="mt-8 border-t pt-6">
+          <div className="mt-16 border-t pt-6 pb-6">
             <ClassificationNotes context={selectedConfirmed ? 'confirmed' : 'source'} />
           </div>
         </>
@@ -638,7 +640,9 @@ function TableFrame({
   children: ReactNode
 }) {
   return (
-    <div className="flex min-h-0 flex-1 flex-col rounded-md border">
+    // Tall by measure rather than by what is in it: an empty table and a full one both
+    // hold the screen, and what is written below stays a scroll away in either case.
+    <div className="flex min-h-[72vh] flex-1 flex-col rounded-md border">
       <div className="bg-muted/40 flex flex-wrap items-center justify-end gap-1 border-b px-2 py-1">
         <Button type="button" size="xs" variant="ghost" onClick={onAddLine}>
           <Plus className="mr-1 size-3.5" /> Add a line

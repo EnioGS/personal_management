@@ -245,6 +245,14 @@ Two things it optimizes for:
   one side empty means "above" or "below", and render one page at a time, growing
   as the container nears the bottom. The assistant asks the same questions in SQL
   instead of paging a backlog it cannot filter.
+- **Chat history saves itself.** Every conversation is written to the browser as it
+  happens — once the message is sent, again when the reply lands — comes back on reload
+  (the one last written to), and travels in the export. A bar above the messages starts a
+  new conversation and opens any of the old ones; the list is read from the database when
+  it is opened rather than kept in step with every keystroke, and a row's trash appears
+  under the pointer so a list of names does not read as a list of delete buttons. A
+  conversation names itself from its opening message through a one-shot request the
+  assistant never carries in context, and renames on request (`set_conversation_title`).
 - The chat reports what it costs: tokens for the last message and the requests it
   took, the session total, and how full the model's context window is when that
   window can be looked up.
