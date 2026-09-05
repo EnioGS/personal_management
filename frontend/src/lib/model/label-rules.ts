@@ -100,6 +100,11 @@ export interface RuleSubject {
  * What a rule can honestly claim: rows it filled, and of those, the ones confirmed with
  * its labels still intact. Counted from the rows every time rather than kept as a tally,
  * so it cannot drift from the truth.
+ *
+ * A row is only ever compared on the labels the rule actually sets. A rule that says
+ * nothing about a category cannot be overridden by one, and a row that matches the text
+ * while carrying labels somebody chose by hand is what "overridden" is for — not a row
+ * the rule never spoke about.
  */
 export function ruleStats(rule: StoredRule, subjects: RuleSubject[]): RuleStats {
   const stats: RuleStats = { applied: 0, confirmedRespected: 0, overridden: 0, pending: 0, matchedStrings: [] }

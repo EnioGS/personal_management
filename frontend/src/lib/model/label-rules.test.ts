@@ -86,3 +86,17 @@ describe('what a rule can honestly claim', () => {
     expect(stats).toMatchObject({ applied: 3, confirmedRespected: 1, overridden: 1, pending: 1 })
   })
 })
+
+describe('a rule that says nothing about a label', () => {
+  it('is not judged on it: only what it sets can be respected or overridden', () => {
+    const cardRule = rule({ labels: { card: 'Nubank - Main credit card' } })
+    const stats = ruleStats(cardRule, [
+      // Kept what the rule said, and holds a category the rule never mentioned.
+      { labels: { card: 'Nubank - Main credit card', category: 'cartão' }, confirmed: true, text: () => 'NETFLIX' },
+      // Somebody chose a different card by hand. That is what overriding means.
+      { labels: { card: 'Another card' }, confirmed: true, text: () => 'NETFLIX' },
+    ])
+
+    expect(stats).toMatchObject({ applied: 2, confirmedRespected: 1, overridden: 1 })
+  })
+})

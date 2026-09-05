@@ -158,7 +158,9 @@ long shared beginning measured against the shorter of the two.
 
 A decision that will recur belongs in a rule. Rules live in one of two contexts — the
 source stage or the confirmed tables — and never cross. A source rule can give rows their
-labels as the file arrives, so an import can land already placed.
+labels as the file arrives, so an import can land already placed. A confirmed rule fills
+in what a row already in a table says about itself — its category, its subcategory, its
+account and its card — but never where it belongs, which confirming already decided.
 
 Below the rules are the **notes**: free text about this data, written by the user or by
 you, saying what a rule cannot — that a shop nobody would recognise sells food, that one

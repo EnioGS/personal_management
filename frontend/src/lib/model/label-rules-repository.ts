@@ -72,13 +72,26 @@ export async function applyLabelRulesToRows(context: RuleContext, translate: (ke
     }
 
     // A confirmed row's placement is already spent — it is what put the row in this
-    // table — so a confirmed rule may only fill in what a row means.
+    // table — so a confirmed rule fills in everything else a row says about itself: what
+    // it means, and which account and card it belongs to. Those two fell through this gap
+    // before: a rule could be written with a card, was shown holding one, and did nothing
+    // with it when it ran.
     const row = record.data as ConfirmedRow
-    const applied = applyLabelRules({ category: row.category, subcategory: row.subcategory }, rules, (field) => resolveConfirmedField(row, field))
+    const applied = applyLabelRules(
+      { category: row.category, subcategory: row.subcategory, account: row.account, card: row.card },
+      rules,
+      (field) => resolveConfirmedField(row, field),
+    )
     if (applied.filled.length === 0) continue
     updates.push({
       ...record,
-      data: { ...row, category: applied.labels.category ?? row.category, subcategory: applied.labels.subcategory ?? row.subcategory } satisfies ConfirmedRow,
+      data: {
+        ...row,
+        category: applied.labels.category ?? row.category,
+        subcategory: applied.labels.subcategory ?? row.subcategory,
+        account: applied.labels.account ?? row.account,
+        card: applied.labels.card ?? row.card,
+      } satisfies ConfirmedRow,
     })
     result.rowsTouched += 1
     for (const filled of applied.filled) {
@@ -104,7 +117,17 @@ export async function labelRulesWithStats(context?: RuleContext) {
       : ruleStats(rule, confirmedRows.map((row) => {
         const confirmed = row.data as ConfirmedRow
         return {
-          labels: { category: confirmed.category, subcategory: confirmed.subcategory },
+          // Every label a confirmed rule can set, so "did the row keep what the rule
+          // said?" is asked of all of them. Comparing only the meaning meant a rule that
+          // set an account or a card could never be respected: the labels it was checked
+          // against did not contain the ones it sets, so every row it matched read as
+          // having overridden it.
+          labels: {
+            category: confirmed.category,
+            subcategory: confirmed.subcategory,
+            account: confirmed.account,
+            card: confirmed.card,
+          },
           appliedRuleIds: undefined,
           confirmed: true,
           text: (field: string) => resolveConfirmedField(confirmed, field),
