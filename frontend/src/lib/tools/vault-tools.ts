@@ -8,12 +8,14 @@ import { newRowId } from '@/lib/model/row-id'
 import { applyLabelRulesToRows } from '@/lib/model/label-rules-repository'
 import {
   ASSIGNABLE_FIELDS,
+  addSourceRow,
   amountShapeOf,
   assignSourceColumns,
   confirmSourceRows,
   createSourceFile,
   planConfirmation,
   setSignConvention,
+  updateSourceValue,
 } from '@/lib/model/source-files'
 import type { ConfirmedRow, IngestionTargetField, SourceFile, SourceRow } from '@/lib/model/types'
 import type { ToolDefinition } from './types'
@@ -210,6 +212,54 @@ export const labelRowsByMatchTool: ToolDefinition = {
 
     const results = await labelSourceRows(matched.map((row) => row.id), args, context.translate)
     return JSON.stringify({ matched: matched.length, sample: matched.slice(0, 5).map((row) => row.text), rows: results.slice(0, 5) })
+  },
+}
+
+export const addSourceRowTool: ToolDefinition = {
+  name: 'add_source_row',
+  description: "Adds a row to a file's own table — for a transaction the file left out, or one the user knows about and wants recorded before it appears anywhere. Pass values keyed by the file's own column names; anything you leave out starts empty. The row is unlabelled and gets an id of its own, so it goes through exactly what every other row goes through before it can be confirmed. The user has the same button on the table.",
+  parameters: {
+    type: 'object',
+    properties: {
+      sourceId: { type: 'number' },
+      values: { type: 'object', additionalProperties: { type: 'string' }, description: "Column name -> value, using the file's own column names." },
+    },
+    required: ['sourceId'],
+    additionalProperties: false,
+  },
+  execute: async (args) => {
+    if (typeof args.sourceId !== 'number') return 'Error: sourceId is required.'
+    try {
+      const id = await addSourceRow(args.sourceId)
+      const values = (args.values ?? {}) as Record<string, unknown>
+      for (const [column, value] of Object.entries(values)) await updateSourceValue(id, column, String(value ?? ''))
+      const stored = await sourceRowsTable.get(id)
+      return JSON.stringify({ rowId: id, row: stored?.data })
+    } catch (error) { return `Error: ${error instanceof Error ? error.message : 'that row could not be added.'}` }
+  },
+}
+
+export const setSourceValuesTool: ToolDefinition = {
+  name: 'set_source_values',
+  description: "Corrects a source row's own values, by the file's column names. Use it where the file itself is wrong or unreadable — a date the export mangled, an amount split across columns — and not to express meaning: what a row *is* belongs in its labels, and a raw value rewritten to say something is a value nobody can check against the file any more. Editing the amount edits what the file said, and the file's sign convention is then re-applied to it. The user edits the same cells by double-clicking them.",
+  parameters: {
+    type: 'object',
+    properties: {
+      rowId: { type: 'number' },
+      values: { type: 'object', additionalProperties: { type: 'string' } },
+    },
+    required: ['rowId', 'values'],
+    additionalProperties: false,
+  },
+  execute: async (args) => {
+    if (typeof args.rowId !== 'number' || typeof args.values !== 'object' || args.values === null) return 'Error: rowId and values are required.'
+    try {
+      for (const [column, value] of Object.entries(args.values as Record<string, unknown>)) {
+        await updateSourceValue(args.rowId, column, String(value ?? ''))
+      }
+      const stored = await sourceRowsTable.get(args.rowId)
+      return JSON.stringify({ rowId: args.rowId, row: stored?.data })
+    } catch (error) { return `Error: ${error instanceof Error ? error.message : 'those values could not be written.'}` }
   },
 }
 

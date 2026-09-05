@@ -292,6 +292,54 @@ export interface ConfirmationPlan {
   marked: number[]
 }
 
+/**
+ * Adds a blank row to a file's table.
+ *
+ * A statement can be missing a line — a transaction the bank never exported, or one the
+ * user knows about before it clears. The row is empty and unlabelled, so it is subject to
+ * exactly the same requirements as every other row before it can be confirmed, and it
+ * gets a row id of its own like any other.
+ */
+export async function addSourceRow(sourceId: number): Promise<number> {
+  const stored = await sourceFilesTable.get(sourceId)
+  if (!stored) throw new Error(`Source file ${sourceId} was not found.`)
+  const file = stored.data as SourceFile
+  const values: Record<string, string> = { [SOURCE_FILENAME_COLUMN]: file.originalFilename }
+  for (const column of file.originalColumns) values[column] = ''
+
+  return sourceRowsTable.add({
+    createdAt: Date.now(),
+    data: {
+      sourceId,
+      rowId: newRowId({ ...values, addedAt: Date.now() }),
+      values,
+      labels: { category: DEFAULT_MEANING, subcategory: DEFAULT_MEANING },
+    } satisfies SourceRow,
+  })
+}
+
+/**
+ * Edits one of a row's own values.
+ *
+ * Editing the amount edits what the *file* said, not what the convention made of it: the
+ * transformation is re-applied to the new value, so a corrected amount ends up signed the
+ * same way as every other row in the file rather than escaping the rule.
+ */
+export async function updateSourceValue(rowId: number, column: string, value: string): Promise<void> {
+  const stored = await sourceRowsTable.get(rowId)
+  if (!stored) throw new Error(`Source row ${rowId} was not found.`)
+  const row = stored.data as SourceRow
+  if (column === SOURCE_FILENAME_COLUMN) throw new Error('Where a row came from is not editable.')
+
+  const file = (await sourceFilesTable.get(row.sourceId))?.data as SourceFile | undefined
+  const isAmount = file ? columnFor(file, 'amount') === column : false
+  await sourceRowsTable.update(rowId, {
+    data: { ...row, values: { ...row.values, [column]: value }, importedAmount: isAmount ? undefined : row.importedAmount } satisfies SourceRow,
+  })
+  if (file && isAmount) await rewriteAmounts(row.sourceId, file)
+  if (file) await flagCrossFileDuplicates(row.sourceId)
+}
+
 /** Removes a source file that holds no rows — one emptied by confirmation, or empty from the start. */
 export async function retireIfEmpty(sourceId: number): Promise<boolean> {
   const remaining = (await sourceRowsTable.toArray()).filter((row) => (row.data as SourceRow).sourceId === sourceId)

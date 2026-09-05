@@ -22,6 +22,8 @@ describe('findTool', () => {
       'set_sign_convention',
       'set_labels',
       'label_rows_by_match',
+      'add_source_row',
+      'set_source_values',
       'set_confirmed_meaning',
       'mark_rows',
       'new_row_id',

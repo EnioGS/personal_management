@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ChevronDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -42,7 +43,11 @@ export function FilterBar({
   show = { categories: true },
 }: FilterBarProps) {
   const { t } = useTranslation(['common'])
-  const categories = useConfirmedRowsStore((store) => [...new Set(store.items.map((row) => row.category))].sort())
+  // The selector returns the stored array itself and the list is derived here: a
+  // selector that builds a new array every call is never equal to the last one, and the
+  // subscription re-renders forever.
+  const rows = useConfirmedRowsStore((store) => store.items)
+  const categories = useMemo(() => [...new Set(rows.map((row) => row.category))].sort(), [rows])
 
   return (
     <div className="flex flex-wrap items-center gap-1.5 border-b p-2">

@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent, type ReactNode, type UIEvent } from 'react'
 import { useTranslation } from 'react-i18next'
-import { CircleSlash2, FilePlus2, Trash2, Upload } from 'lucide-react'
+import { CircleSlash2, FileMinus2, FilePlus2, Plus, Trash2, Upload } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ColumnFilterMenu, type ColumnFilter } from '@/components/data-table/column-filter-menu'
+import { EditableCell } from '@/components/data-table/editable-cell'
 import { ColumnSortMenu, type ColumnSort } from '@/components/data-table/column-sort-menu'
 import { useMarkMode } from '@/components/data-table/use-mark-mode'
 import { useProgressiveRows } from '@/components/data-table/use-progressive-rows'
@@ -12,22 +12,24 @@ import { refreshAllLocalStores } from '@/lib/local-store/create-local-list-store
 import type { StoredRow } from '@/lib/local-store/create-local-table'
 import { buildLabelCatalogue } from '@/lib/label-catalogue-source'
 import { queryRows } from '@/lib/model/row-query'
-import { DEFAULT_MEANING, ingestionLabelErrors } from '@/lib/model/ingestion'
+import { ingestionLabelErrors } from '@/lib/model/ingestion'
 import { parsePlacementLabels, resolveScreenLabel, resolveSectionLabel, screenLabelFor, sectionLabelFor, withDerivedSections, type LabelCatalogue } from '@/lib/model/label-catalogue'
 import { applyLabelRulesToRows } from '@/lib/model/label-rules-repository'
-import { setConfirmedMeaning } from '@/lib/model/confirmed-rows'
+import { addConfirmedRow, updateConfirmedRow, type ConfirmedEditableColumn } from '@/lib/model/confirmed-rows'
 import { deleteMarked, toggleMark, type MarkableTable } from '@/lib/model/marking'
 import { sourceRowsTable } from '@/lib/model/model-db'
 import { useConfirmedRowsStore, useSourceFilesStore, useSourceRowsStore } from '@/lib/model/model-stores'
 import {
   ASSIGNABLE_FIELDS,
   SOURCE_FILENAME_COLUMN,
+  addSourceRow,
   amountShapeOf,
   assignSourceColumns,
   confirmSourceRows,
   createSourceFile,
   planConfirmation,
   setSignConvention,
+  updateSourceValue,
 } from '@/lib/model/source-files'
 import type { ConfirmedRow, IngestionRowLabels, IngestionTargetField, SourceFile, SourceRow } from '@/lib/model/types'
 import { cn } from '@/lib/utils'
@@ -185,9 +187,23 @@ export function IngestionPanel() {
     await refreshAllLocalStores()
   }
 
-  /** Category and subcategory are the labels §1.5 says may be added later, so they stay editable here. */
-  async function editConfirmedMeaning(row: StoredRow<ConfirmedRow>, column: 'category' | 'subcategory', value: string) {
-    await setConfirmedMeaning(row.id, { [column]: value.trim() || DEFAULT_MEANING })
+  async function editSourceValue(row: StoredRow<SourceRow>, column: string, value: string) {
+    try {
+      await updateSourceValue(row.id, column, value)
+      await refreshAllLocalStores()
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : String(error))
+    }
+  }
+
+  async function editConfirmed(row: StoredRow<ConfirmedRow>, column: ConfirmedEditableColumn, value: string) {
+    await updateConfirmedRow(row.id, column, value)
+  }
+
+  async function addLine() {
+    if (selectedFile) await addSourceRow(selectedFile.id)
+    else if (selectedConfirmed) await addConfirmedRow(selectedConfirmed.split('/')[0], selectedConfirmed.split('/')[1])
+    await refreshAllLocalStores()
   }
 
   async function removeMarked(table: MarkableTable) {
@@ -304,6 +320,7 @@ export function IngestionPanel() {
           marking={marking}
           onToggleMarking={() => setMarking(!marking)}
           onDeleteMarked={() => void removeMarked('source')}
+          onAddLine={() => void addLine()}
           markedCount={fileRows.filter((row) => row.markedForElimination).length}
           summary={`${sourceWindow.shown} of ${sourceWindow.total} row(s)`}
           onScroll={sourceWindow.onScroll}
@@ -312,8 +329,8 @@ export function IngestionPanel() {
               <Button type="button" size="xs" variant="outline" onClick={() => void confirm(false)}>
                 <FilePlus2 className="mr-1 size-3.5" /> Import new values
               </Button>
-              <Button type="button" size="xs" variant="outline" onClick={() => void confirm(true)}>
-                Import and discard
+              <Button type="button" size="xs" variant="outline" onClick={() => void confirm(true)} title="Confirms what is ready, throws away what is marked for elimination, and retires the file.">
+                <FileMinus2 className="mr-1 size-3.5" /> Import and discard
               </Button>
             </>
           }
@@ -322,12 +339,12 @@ export function IngestionPanel() {
             <thead className="bg-muted/60 sticky top-0">
               {/* Assignment sits on a line of its own above the names: it is a statement
                   about the column, not part of what the column is called. */}
-              <tr>
-                <th colSpan={3} className="px-2 pt-2" />
+              <tr className="bg-muted/40">
+                <th colSpan={3} className="px-2 py-1" />
                 {selectedFile.originalColumns.map((column) => (
-                  <th key={column} className="px-2 pt-2 text-left font-normal">
+                  <th key={column} className="px-2 py-1 text-left font-normal">
                     <Select value={selectedFile.assignments[column] ?? UNASSIGNED} onValueChange={(value) => void assign(column, value)}>
-                      <SelectTrigger className="h-6 w-36 text-[10px]"><SelectValue /></SelectTrigger>
+                      <SelectTrigger size="sm" className="h-5 w-36 gap-1 px-1.5 py-0 text-[10px] [&>svg]:size-3"><SelectValue /></SelectTrigger>
                       <SelectContent className="text-xs">
                         <SelectItem value={UNASSIGNED}>— unassigned —</SelectItem>
                         {ASSIGNABLE_FIELDS.map((field) => <SelectItem key={field} value={field}>{field}</SelectItem>)}
@@ -335,7 +352,7 @@ export function IngestionPanel() {
                     </Select>
                   </th>
                 ))}
-                <th colSpan={LABEL_COLUMNS.length} className="px-2 pt-2" />
+                <th colSpan={LABEL_COLUMNS.length} className="px-2 py-1" />
               </tr>
               <tr>
                 <th className="p-2 text-left font-medium">{SOURCE_FILENAME_COLUMN}</th>
@@ -380,33 +397,41 @@ export function IngestionPanel() {
                       {row.duplicateOf ? <span className="text-destructive">duplicate?</span> : ''}
                     </td>
                     {selectedFile.originalColumns.map((column) => (
-                      <td key={column} className="p-2" title={selectedFile.assignments[column] === 'amount' && row.importedAmount !== undefined ? `The file wrote ${row.importedAmount}` : undefined}>
-                        {row.values[column]}
+                      <td key={column} className="p-1">
+                        <EditableCell
+                          value={row.values[column] ?? ''}
+                          disabled={marking}
+                          title={selectedFile.assignments[column] === 'amount' && row.importedAmount !== undefined ? `The file wrote ${row.importedAmount}` : undefined}
+                          onCommit={(value) => void editSourceValue(row, column, value)}
+                        />
                       </td>
                     ))}
                     {LABEL_COLUMNS.map((column) => {
                       const key = `${row.id}:${column}`
-                      const typed = drafts[key]
-                      const text = typed ?? labelText(row.labels, column, catalogue)
-                      const unknown = typed === undefined ? [] : readLabelCell(row, column, typed).unknown
+                      const text = drafts[key] ?? labelText(row.labels, column, catalogue)
                       const missing = MEANING_COLUMNS.includes(column as never) ? false : (row.labels[column] ?? []).length === 0
                       return (
-                        <td key={column} className="p-2">
-                          <Input
+                        <td key={column} className="p-1">
+                          <EditableCell
                             value={text}
-                            title={unknown.length > 0 ? `Nothing is called ${unknown.join(', ')}.` : undefined}
-                            onChange={(event) => setDrafts((current) => ({ ...current, [key]: event.target.value }))}
-                            onBlur={(event) => {
-                              void editLabel(row, column, event.target.value)
-                              // The text stays on screen while it names nothing, so the mistake
-                              // is visible; once it resolves, the stored labels take over.
-                              if (unknown.length === 0) setDrafts(({ [key]: _cleared, ...rest }) => rest)
+                            disabled={marking}
+                            missing={missing}
+                            validate={(draft) => {
+                              const unknown = readLabelCell(row, column, draft).unknown
+                              return unknown.length > 0 ? `Nothing is called ${unknown.join(', ')}.` : null
                             }}
-                            className={cn(
-                              'h-6 w-36 text-[11px]',
-                              unknown.length > 0 && 'border-destructive text-destructive',
-                              unknown.length === 0 && missing && 'border-amber-500',
-                            )}
+                            onCommit={(value) => {
+                              void editLabel(row, column, value)
+                              // What was typed stays on screen while it names nothing, so the
+                              // mistake is visible; once it resolves, the labels take over.
+                              const unknown = readLabelCell(row, column, value).unknown
+                              setDrafts((current) => {
+                                const next = { ...current }
+                                if (unknown.length > 0) next[key] = value
+                                else delete next[key]
+                                return next
+                              })
+                            }}
                           />
                         </td>
                       )
@@ -424,6 +449,7 @@ export function IngestionPanel() {
           marking={marking}
           onToggleMarking={() => setMarking(!marking)}
           onDeleteMarked={() => void removeMarked('confirmed')}
+          onAddLine={() => void addLine()}
           markedCount={tableRows.filter((row) => row.markedForElimination).length}
           summary={`${confirmedWindow.shown} of ${confirmedWindow.total} row(s)`}
           onScroll={confirmedWindow.onScroll}
@@ -453,18 +479,33 @@ export function IngestionPanel() {
                   )}
                 >
                   <td className="text-muted-foreground p-2 font-mono whitespace-nowrap" title="The id every copy of this row shares, fixed for its life.">{row.rowId}</td>
-                  <td className="p-2 whitespace-nowrap">{row.date ? new Date(row.date).toISOString().slice(0, 10) : ''}</td>
-                  <td className="p-2 text-right tabular-nums">{row.amount ?? ''}</td>
+                  <td className="p-1 whitespace-nowrap">
+                    <EditableCell
+                      value={row.date ? new Date(row.date).toISOString().slice(0, 10) : ''}
+                      disabled={marking}
+                      onCommit={(value) => void editConfirmed(row, 'date', value)}
+                    />
+                  </td>
+                  <td className="p-1 tabular-nums">
+                    <EditableCell
+                      value={row.amount === undefined ? '' : String(row.amount)}
+                      disabled={marking}
+                      onCommit={(value) => void editConfirmed(row, 'amount', value)}
+                    />
+                  </td>
                   {(['category', 'subcategory'] as const).map((column) => (
-                    <td key={column} className="p-2">
-                      <Input
-                        defaultValue={row[column]}
-                        onBlur={(event) => void editConfirmedMeaning(row, column, event.target.value)}
-                        className="h-6 w-32 text-[11px]"
-                      />
+                    <td key={column} className="p-1">
+                      <EditableCell value={row[column]} disabled={marking} onCommit={(value) => void editConfirmed(row, column, value)} />
                     </td>
                   ))}
-                  <td className="text-muted-foreground max-w-[28rem] truncate p-2" title={row.observations}>{row.observations}</td>
+                  <td className="max-w-[28rem] p-1">
+                    <EditableCell
+                      value={row.observations}
+                      disabled={marking}
+                      className="truncate"
+                      onCommit={(value) => void editConfirmed(row, 'observations', value)}
+                    />
+                  </td>
                   <td className="text-muted-foreground p-2 whitespace-nowrap">{row.sourceFilename}</td>
                 </tr>
               ))}
@@ -498,6 +539,7 @@ function TableFrame({
   marking,
   onToggleMarking,
   onDeleteMarked,
+  onAddLine,
   markedCount,
   summary,
   onScroll,
@@ -507,38 +549,37 @@ function TableFrame({
   marking: boolean
   onToggleMarking: () => void
   onDeleteMarked: () => void
+  onAddLine: () => void
   markedCount: number
   summary: string
   onScroll: (event: UIEvent<HTMLElement>) => void
   actions?: ReactNode
   children: ReactNode
 }) {
-  const controls = (
-    <>
-      <Button
-        type="button"
-        size="xs"
-        variant={marking ? 'secondary' : 'ghost'}
-        aria-pressed={marking}
-        data-mark-toggle
-        className={cn(marking && 'ring-ring ring-1')}
-        onClick={onToggleMarking}
-      >
-        <CircleSlash2 className="mr-1 size-3.5" /> Mark for elimination
-      </Button>
-      <Button type="button" size="xs" variant="ghost" className="text-destructive" onClick={onDeleteMarked}>
-        <Trash2 className="mr-1 size-3.5" /> {markedCount > 0 ? `Delete ${markedCount} marked line(s)` : 'Delete marked lines'}
-      </Button>
-    </>
-  )
-
   return (
     <div className="flex min-h-0 flex-1 flex-col rounded-md border">
-      <div className="bg-muted/40 flex flex-wrap items-center justify-end gap-1 border-b px-2 py-1">{controls}</div>
+      <div className="bg-muted/40 flex flex-wrap items-center justify-end gap-1 border-b px-2 py-1">
+        <Button type="button" size="xs" variant="ghost" onClick={onAddLine}>
+          <Plus className="mr-1 size-3.5" /> Add a line
+        </Button>
+        <Button
+          type="button"
+          size="xs"
+          variant={marking ? 'secondary' : 'ghost'}
+          aria-pressed={marking}
+          data-mark-toggle
+          className={cn(marking && 'ring-ring ring-1')}
+          onClick={onToggleMarking}
+        >
+          <CircleSlash2 className="mr-1 size-3.5" /> Mark for elimination
+        </Button>
+        <Button type="button" size="xs" variant="ghost" className="text-destructive" onClick={onDeleteMarked}>
+          <Trash2 className="mr-1 size-3.5" /> {markedCount > 0 ? `Delete ${markedCount} marked line(s)` : 'Delete marked lines'}
+        </Button>
+      </div>
       <div className="min-h-0 flex-1 overflow-auto" onScroll={onScroll}>{children}</div>
       <div className="bg-muted/40 flex flex-wrap items-center justify-end gap-1 border-t px-2 py-1">
         <span className="text-muted-foreground mr-auto text-xs">{summary}</span>
-        {controls}
         {actions}
       </div>
     </div>

@@ -6,6 +6,7 @@ import { readTextFileTool } from './read-text-file'
 import type { ToolDefinition } from './types'
 import {
   addConfirmedRowTool,
+  addSourceRowTool,
   assignSourceColumnsTool,
   confirmRowsTool,
   dropSourceTableTool,
@@ -18,6 +19,7 @@ import {
   setConfirmedMeaningTool,
   setLabelsTool,
   setSignConventionTool,
+  setSourceValuesTool,
 } from './vault-tools'
 
 // Reading is SQL; writing is a small set of functions that validate. Deleting rows is
@@ -36,6 +38,8 @@ export const toolRegistry: ToolDefinition[] = [
   setSignConventionTool,
   setLabelsTool,
   labelRowsByMatchTool,
+  addSourceRowTool,
+  setSourceValuesTool,
   setConfirmedMeaningTool,
   markRowsTool,
   newRowIdTool,

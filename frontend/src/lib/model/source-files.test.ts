@@ -4,6 +4,7 @@ import { confirmedRowsTable, sourceFilesTable, sourceRowsTable } from './model-d
 import type { LabelCatalogue } from './label-catalogue'
 import type { ConfirmedRow, SourceFile, SourceRow } from './types'
 import {
+  addSourceRow,
   assignSourceColumns,
   confirmSourceRows,
   createSourceFile,
@@ -13,6 +14,7 @@ import {
   planConfirmation,
   rowSignature,
   setSignConvention,
+  updateSourceValue,
 } from './source-files'
 
 const catalogue: LabelCatalogue = {
@@ -263,5 +265,39 @@ describe('observationsFor', () => {
     const row = { values: { source_filename: 'banco.csv', Data: '01/08/2026', Descrição: 'MERCADO', Tipo: '' } } as unknown as SourceRow
 
     expect(JSON.parse(observationsFor(row, file))).toEqual({ source_filename: 'banco.csv', Descrição: 'MERCADO' })
+  })
+})
+
+describe('a line added by hand, and a cell corrected', () => {
+  beforeEach(async () => { await wipeAllData() })
+
+  it('adds an empty row carrying the file\'s columns and its own id', async () => {
+    const sourceId = await createSourceFile('banco-agosto.csv', BANK_CSV)
+    const before = await rowsOf(sourceId)
+    await addSourceRow(sourceId)
+    const after = await rowsOf(sourceId)
+
+    expect(after).toHaveLength(before.length + 1)
+    const added = after.at(-1)!.row
+    expect(added.values).toEqual({ source_filename: 'banco-agosto.csv', Data: '', Descrição: '', Valor: '', Tipo: '' })
+    expect(after.map((entry) => entry.row.rowId)).toHaveLength(new Set(after.map((entry) => entry.row.rowId)).size)
+  })
+
+  it('re-applies the file\'s sign convention to an amount typed by hand', async () => {
+    const sourceId = await createSourceFile('banco-agosto.csv', BANK_CSV)
+    await assignSourceColumns(sourceId, { Valor: 'amount' })
+    await setSignConvention(sourceId, { kind: 'invertAll' })
+    const [first] = await rowsOf(sourceId)
+
+    await updateSourceValue(first.id, 'Valor', '250,00')
+
+    expect((await rowsOf(sourceId))[0].row).toMatchObject({ values: { Valor: '-250' }, importedAmount: '250,00' })
+  })
+
+  it('refuses to rewrite where a row came from', async () => {
+    const sourceId = await createSourceFile('banco-agosto.csv', BANK_CSV)
+    const [first] = await rowsOf(sourceId)
+
+    await expect(updateSourceValue(first.id, 'source_filename', 'other.csv')).rejects.toThrow(/not editable/)
   })
 })

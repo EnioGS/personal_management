@@ -1,5 +1,9 @@
 import { refreshAllLocalStores } from '@/lib/local-store/create-local-list-store'
+import { parseDateValue } from '@/lib/parse-date'
+import { parseNumberValue } from '@/lib/parse-number'
+import { DEFAULT_MEANING } from './ingestion'
 import { confirmedRowsTable } from './model-db'
+import { newRowId } from './row-id'
 import type { ConfirmedRow } from './types'
 
 /**
@@ -16,5 +20,56 @@ export async function setConfirmedMeaning(rowId: number, meaning: Partial<Pick<C
   const stored = await confirmedRowsTable.get(rowId)
   if (!stored) throw new Error(`Confirmed row ${rowId} was not found.`)
   await confirmedRowsTable.update(rowId, { data: { ...(stored.data as ConfirmedRow), ...meaning } })
+  await refreshAllLocalStores()
+}
+
+/**
+ * Adds a row straight to a confirmed table.
+ *
+ * For something that was never in any file: a cash payment, a transfer nobody exported.
+ * It is a new row, so it mints a new id rather than borrowing one — an id is shared only
+ * between copies of the same row and between a correction and what it corrects.
+ */
+export async function addConfirmedRow(section: string, screen: string): Promise<number> {
+  const now = Date.now()
+  return confirmedRowsTable.add({
+    createdAt: now,
+    data: {
+      rowId: newRowId({ section, screen, addedAt: now }),
+      section,
+      screen,
+      sourceFilename: 'added by hand',
+      confirmedAt: now,
+      observations: '{}',
+      category: DEFAULT_MEANING,
+      subcategory: DEFAULT_MEANING,
+    } satisfies ConfirmedRow,
+  })
+}
+
+/** The cells a person may edit in a confirmed table, and how each reads what was typed. */
+export const CONFIRMED_EDITABLE = ['date', 'amount', 'category', 'subcategory', 'observations'] as const
+export type ConfirmedEditableColumn = (typeof CONFIRMED_EDITABLE)[number]
+
+/**
+ * Edits one cell of a confirmed row.
+ *
+ * This is the user's own hand on their own data, so it writes what they typed — dates
+ * read day-first and amounts read with either decimal mark, the same way an import reads
+ * them. The assistant does not have this: it corrects by adding a row with the same
+ * `row_id` and marking the old one, so a change it makes is always visible as a pair.
+ */
+export async function updateConfirmedRow(rowId: number, column: ConfirmedEditableColumn, value: string): Promise<void> {
+  const stored = await confirmedRowsTable.get(rowId)
+  if (!stored) throw new Error(`Confirmed row ${rowId} was not found.`)
+  const row = stored.data as ConfirmedRow
+
+  const patch: Partial<ConfirmedRow> =
+    column === 'date' ? { date: parseDateValue(value) ?? undefined }
+    : column === 'amount' ? { amount: parseNumberValue(value) ?? undefined }
+    : column === 'observations' ? { observations: value }
+    : { [column]: value.trim() || DEFAULT_MEANING }
+
+  await confirmedRowsTable.update(rowId, { data: { ...row, ...patch } })
   await refreshAllLocalStores()
 }
