@@ -7,6 +7,8 @@ const catalogue: LabelCatalogue = {
     { id: 'overview', sectionId: 'finances', label: 'Movimentações' },
     { id: 'spending', sectionId: 'finances', label: 'Gastos' },
   ],
+  accounts: [{ id: 'Banco A', label: 'Banco A' }],
+  cards: [{ id: 'Cartão X', label: 'Cartão X' }],
 }
 
 describe('placement labels', () => {

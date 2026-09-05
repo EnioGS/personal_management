@@ -1,5 +1,6 @@
 import { refreshAllLocalStores } from '@/lib/local-store/create-local-list-store'
 import { confirmedRowsTable, sourceRowsTable } from './model-db'
+import { retireIfEmpty } from './source-files'
 import type { ConfirmedRow, SourceRow } from './types'
 
 export type MarkableTable = 'source' | 'confirmed'
@@ -46,11 +47,18 @@ export async function toggleMark(table: MarkableTable, rowId: number): Promise<b
 export async function deleteMarked(table: MarkableTable, rowIds: number[]): Promise<number> {
   const store = tableOf(table)
   const marked: number[] = []
+  const sources = new Set<number>()
   for (const id of rowIds) {
     const stored = await store.get(id)
-    if ((stored?.data as SourceRow | undefined)?.markedForElimination) marked.push(id)
+    const row = stored?.data as SourceRow | undefined
+    if (!row?.markedForElimination) continue
+    marked.push(id)
+    if (table === 'source') sources.add(row.sourceId)
   }
   await store.bulkDelete(marked)
+  // A file whose last rows were deleted is as finished as one whose last rows were
+  // confirmed: there is nothing left to work on, so the table goes.
+  for (const sourceId of sources) await retireIfEmpty(sourceId)
   await refreshAllLocalStores()
   return marked.length
 }

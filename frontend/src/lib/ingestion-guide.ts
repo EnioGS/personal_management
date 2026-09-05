@@ -29,8 +29,8 @@ a markdown pipe table is read as a table.
 
 - \`source_filename\` on the left: which file the row came from. Not assignable.
 - The file's own columns, exactly as the file wrote them.
-- Four label columns on the right. Placement starts empty; category and subcategory start
-  at \`outros\`.
+- Six label columns on the right. Placement starts empty; category and subcategory start
+  at \`outros\`; account and card start empty and are optional.
 
 Only the file's own columns can be assigned to a canonical field (date, amount, asset,
 quantity, price, investmentType, investmentClass). The filename column and the label
@@ -60,6 +60,11 @@ has said anything more precise yet.
 Subcategory — free text, one value, the detail under the category. Also starts at
 \`outros\`. Some words are reserved and read by the Recurring screen: assinatura,
 membership, parcelado and their obvious equivalents.
+
+Account and card — optional, one value each, and validated against what the user set up
+in Settings: they say which account a row moved through and which card it was billed to.
+Leave them empty when a row has no account or no card; a name nothing is set up under is
+refused rather than stored. list_label_options names the ones that exist.
 
 ## Signs
 

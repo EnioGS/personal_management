@@ -4,8 +4,8 @@ import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { buildLabelCatalogue } from '@/lib/label-catalogue-source'
-import { parsePlacementLabels, resolveScreenLabel, resolveSectionLabel, withDerivedSections } from '@/lib/model/label-catalogue'
+import { loadLabelCatalogue } from '@/lib/label-catalogue-source'
+import { parsePlacementLabels, resolveAccountLabel, resolveCardLabel, resolveScreenLabel, resolveSectionLabel, withDerivedSections } from '@/lib/model/label-catalogue'
 import { applyLabelRulesToRows, deleteLabelRule, labelRulesWithStats, saveLabelRule } from '@/lib/model/label-rules-repository'
 import { useLabelRulesStore } from '@/lib/model/model-stores'
 import type { IngestionRowLabels, LabelRule, RuleContext } from '@/lib/model/types'
@@ -27,6 +27,8 @@ interface Draft {
   screens: string
   category: string
   subcategory: string
+  account: string
+  card: string
   rationale: string
 }
 
@@ -41,6 +43,8 @@ function emptyDraft(context: RuleContext): Draft {
     screens: '',
     category: '',
     subcategory: '',
+    account: '',
+    card: '',
     rationale: '',
   }
 }
@@ -51,6 +55,8 @@ function describeLabels(rule: StoredRule): string {
   if (rule.labels.screens?.length) parts.push(`screens: ${rule.labels.screens.join(', ')}`)
   if (rule.labels.category) parts.push(`category: ${rule.labels.category}`)
   if (rule.labels.subcategory) parts.push(`subcategory: ${rule.labels.subcategory}`)
+  if (rule.labels.account) parts.push(`account: ${rule.labels.account}`)
+  if (rule.labels.card) parts.push(`card: ${rule.labels.card}`)
   return parts.join(' · ')
 }
 
@@ -92,7 +98,7 @@ export function LabellingRules({ context }: { context: RuleContext }) {
    */
   async function save() {
     if (!draft) return
-    const catalogue = buildLabelCatalogue((key) => String(t(key as never)))
+    const catalogue = await loadLabelCatalogue((key) => String(t(key as never)))
     if (!draft.contains.trim()) { setError('Say what text the rule matches.'); return }
     if (!draft.rationale.trim()) { setError('Say why these labels are right for everything matching it.'); return }
     if (draft.match === 'regex') {
@@ -101,7 +107,14 @@ export function LabellingRules({ context }: { context: RuleContext }) {
 
     const sections = parsePlacementLabels(draft.sections, (value) => resolveSectionLabel(catalogue, value))
     const screens = parsePlacementLabels(draft.screens, (value) => resolveScreenLabel(catalogue, value, sections.values))
-    const unknown = [...sections.unknown, ...screens.unknown]
+    const account = draft.account.trim() ? resolveAccountLabel(catalogue, draft.account.trim()) : undefined
+    const card = draft.card.trim() ? resolveCardLabel(catalogue, draft.card.trim()) : undefined
+    const unknown = [
+      ...sections.unknown,
+      ...screens.unknown,
+      ...(draft.account.trim() && !account ? [draft.account.trim()] : []),
+      ...(draft.card.trim() && !card ? [draft.card.trim()] : []),
+    ]
     if (unknown.length > 0) { setError(`Nothing is called ${unknown.join(', ')}.`); return }
 
     const labels: IngestionRowLabels = withDerivedSections({
@@ -109,6 +122,8 @@ export function LabellingRules({ context }: { context: RuleContext }) {
       ...(screens.values.length ? { screens: screens.values } : {}),
       ...(draft.category.trim() ? { category: draft.category.trim() } : {}),
       ...(draft.subcategory.trim() ? { subcategory: draft.subcategory.trim() } : {}),
+      ...(account ? { account } : {}),
+      ...(card ? { card } : {}),
     }, catalogue)
     if (Object.keys(labels).length === 0) { setError('A rule has to set at least one label.'); return }
 
@@ -161,6 +176,8 @@ export function LabellingRules({ context }: { context: RuleContext }) {
             <Input value={draft.screens} placeholder="screens" className="h-7 w-40 text-xs" onChange={(event) => setDraft({ ...draft, screens: event.target.value })} />
             <Input value={draft.category} placeholder="category" className="h-7 w-32 text-xs" onChange={(event) => setDraft({ ...draft, category: event.target.value })} />
             <Input value={draft.subcategory} placeholder="subcategory" className="h-7 w-32 text-xs" onChange={(event) => setDraft({ ...draft, subcategory: event.target.value })} />
+            <Input value={draft.account} placeholder="account" className="h-7 w-32 text-xs" onChange={(event) => setDraft({ ...draft, account: event.target.value })} />
+            <Input value={draft.card} placeholder="card" className="h-7 w-32 text-xs" onChange={(event) => setDraft({ ...draft, card: event.target.value })} />
           </div>
           <Input value={draft.rationale} placeholder="why these labels are right for everything matching this" className="h-7 text-xs" onChange={(event) => setDraft({ ...draft, rationale: event.target.value })} />
           {error && <p className="text-destructive">{error}</p>}

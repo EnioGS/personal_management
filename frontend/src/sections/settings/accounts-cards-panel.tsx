@@ -29,9 +29,17 @@ import type { Account, AccountKind, Card } from '@/lib/model/types'
 
 const ACCOUNT_KINDS: AccountKind[] = ['checking', 'savings', 'cash', 'broker']
 
-export function AccountsCardsPanel() {
+/**
+ * The accounts and cards a person has.
+ *
+ * They live inside General rather than on a screen of their own: they are a short list
+ * of names, they are set up once, and — now that a row says which account or card it
+ * belongs to through a label — they are vocabulary for labelling rather than a place
+ * data is kept.
+ */
+export function AccountsCardsSettings() {
   return (
-    <div className="flex h-full flex-col gap-6 overflow-auto p-4">
+    <div className="flex flex-col gap-6">
       <AccountsSection />
       <CardsSection />
     </div>

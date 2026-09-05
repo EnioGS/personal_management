@@ -1,5 +1,5 @@
-import { buildLabelCatalogue } from '@/lib/label-catalogue-source'
-import { parsePlacementLabels, resolveScreenLabel, resolveSectionLabel, withDerivedSections } from '@/lib/model/label-catalogue'
+import { loadLabelCatalogue } from '@/lib/label-catalogue-source'
+import { parsePlacementLabels, resolveAccountLabel, resolveCardLabel, resolveScreenLabel, resolveSectionLabel, withDerivedSections } from '@/lib/model/label-catalogue'
 import { applyLabelRulesToRows, deleteLabelRule, labelRulesWithStats, saveLabelRule } from '@/lib/model/label-rules-repository'
 import type { IngestionRowLabels, LabelRule, RuleContext } from '@/lib/model/types'
 import type { ToolDefinition } from './types'
@@ -75,6 +75,8 @@ export const saveLabelRuleTool: ToolDefinition = {
       screens: { type: 'string', description: 'Screen names or ids, comma-separated.' },
       category: { type: 'string' },
       subcategory: { type: 'string' },
+      account: { type: 'string', description: "One of the user's accounts, by name — how a rule says which account a file's rows moved through." },
+      card: { type: 'string', description: "One of the user's credit cards, by name." },
       applyNow: { type: 'boolean', description: 'Also run it over the rows already waiting. Default true.' },
     },
     required: ['contains', 'rationale', 'context'],
@@ -85,11 +87,18 @@ export const saveLabelRuleTool: ToolDefinition = {
     if (typeof args.rationale !== 'string' || !args.rationale.trim()) return 'Error: a rationale is required — a rule nobody can justify later is a rule nobody can keep.'
     const stage: RuleContext = args.context === 'confirmed' ? 'confirmed' : 'source'
 
-    const catalogue = buildLabelCatalogue(context.translate)
+    const catalogue = await loadLabelCatalogue(context.translate)
     const text = (field: string) => (typeof args[field] === 'string' ? (args[field] as string) : undefined)
     const sections = text('sections') ? parsePlacementLabels(text('sections')!, (value) => resolveSectionLabel(catalogue, value)) : undefined
     const screens = text('screens') ? parsePlacementLabels(text('screens')!, (value) => resolveScreenLabel(catalogue, value, sections?.values)) : undefined
-    const unknown = [...(sections?.unknown ?? []), ...(screens?.unknown ?? [])]
+    const account = text('account') ? resolveAccountLabel(catalogue, text('account')!) : undefined
+    const card = text('card') ? resolveCardLabel(catalogue, text('card')!) : undefined
+    const unknown = [
+      ...(sections?.unknown ?? []),
+      ...(screens?.unknown ?? []),
+      ...(text('account') && !account ? [text('account')!] : []),
+      ...(text('card') && !card ? [text('card')!] : []),
+    ]
     if (unknown.length > 0) return `Error: nothing is called ${unknown.join(', ')}. Call list_label_options for what exists.`
 
     const labels: IngestionRowLabels = withDerivedSections({
@@ -97,6 +106,8 @@ export const saveLabelRuleTool: ToolDefinition = {
       ...(screens?.values.length ? { screens: screens.values } : {}),
       ...(text('category') ? { category: text('category') } : {}),
       ...(text('subcategory') ? { subcategory: text('subcategory') } : {}),
+      ...(account ? { account } : {}),
+      ...(card ? { card } : {}),
     }, catalogue)
     if (Object.keys(labels).length === 0) return 'Error: a rule must set at least one label.'
 

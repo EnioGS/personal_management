@@ -84,10 +84,12 @@ export async function buildVaultSnapshot(): Promise<VaultSnapshot> {
         screens: (data.labels.screens ?? []).join(', '),
         category: data.labels.category ?? '',
         subcategory: data.labels.subcategory ?? '',
+        account: data.labels.account ?? '',
+        card: data.labels.card ?? '',
         marked_for_elimination: data.markedForElimination ? 1 : 0,
         duplicate_of: data.duplicateOf ?? null,
       }))
-    const columns = ['id', 'row_id', 'source_filename', ...file.originalColumns, 'sections', 'screens', 'category', 'subcategory', 'marked_for_elimination', 'duplicate_of']
+    const columns = ['id', 'row_id', 'source_filename', ...file.originalColumns, 'sections', 'screens', 'category', 'subcategory', 'account', 'card', 'marked_for_elimination', 'duplicate_of']
     const name = sourceTableName(file, stored.id)
     createAndFill(db, name, rows, columns)
     tables.push({ name, columns, rows: rows.length })
@@ -99,7 +101,7 @@ export async function buildVaultSnapshot(): Promise<VaultSnapshot> {
     const key = confirmedTableName(row.section, row.screen)
     byPlacement.set(key, [...(byPlacement.get(key) ?? []), { id: stored.id, data: row }])
   }
-  const confirmedColumns = ['id', 'row_id', 'section', 'screen', 'source_filename', 'date', 'amount', 'observations', 'category', 'subcategory', 'asset', 'quantity', 'price', 'investment_type', 'investment_class', 'marked_for_elimination']
+  const confirmedColumns = ['id', 'row_id', 'section', 'screen', 'source_filename', 'date', 'amount', 'observations', 'category', 'subcategory', 'account', 'card', 'asset', 'quantity', 'price', 'investment_type', 'investment_class', 'marked_for_elimination']
   for (const [name, rows] of byPlacement) {
     createAndFill(db, name, rows.map(({ id, data }) => ({
       id,
@@ -117,6 +119,8 @@ export async function buildVaultSnapshot(): Promise<VaultSnapshot> {
       price: data.price ?? null,
       investment_type: data.investmentType ?? null,
       investment_class: data.investmentClass ?? null,
+      account: data.account ?? null,
+      card: data.card ?? null,
       marked_for_elimination: data.markedForElimination ? 1 : 0,
     })), confirmedColumns)
     tables.push({

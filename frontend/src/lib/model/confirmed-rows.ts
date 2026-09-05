@@ -48,7 +48,7 @@ export async function addConfirmedRow(section: string, screen: string): Promise<
 }
 
 /** The cells a person may edit in a confirmed table, and how each reads what was typed. */
-export const CONFIRMED_EDITABLE = ['date', 'amount', 'category', 'subcategory', 'observations'] as const
+export const CONFIRMED_EDITABLE = ['date', 'amount', 'category', 'subcategory', 'account', 'card', 'observations'] as const
 export type ConfirmedEditableColumn = (typeof CONFIRMED_EDITABLE)[number]
 
 /**
@@ -68,6 +68,9 @@ export async function updateConfirmedRow(rowId: number, column: ConfirmedEditabl
     column === 'date' ? { date: parseDateValue(value) ?? undefined }
     : column === 'amount' ? { amount: parseNumberValue(value) ?? undefined }
     : column === 'observations' ? { observations: value }
+    // An account or a card can genuinely be nothing — not every row has one — while a
+    // category emptied out means "nobody has said", which is what `outros` is for.
+    : column === 'account' || column === 'card' ? { [column]: value.trim() || undefined }
     : { [column]: value.trim() || DEFAULT_MEANING }
 
   await confirmedRowsTable.update(rowId, { data: { ...row, ...patch } })

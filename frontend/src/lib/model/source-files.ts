@@ -413,6 +413,8 @@ export async function confirmSourceRows(sourceId: number, catalogue: LabelCatalo
       price: parseNumberValue(canonicalValue(row, file, 'price')) ?? undefined,
       investmentType: canonicalValue(row, file, 'investmentType') || undefined,
       investmentClass: canonicalValue(row, file, 'investmentClass') || undefined,
+      account: row.labels.account?.trim() || undefined,
+      card: row.labels.card?.trim() || undefined,
     }
 
     await confirmedRowsTable.bulkAdd(placements.map((placement) => ({

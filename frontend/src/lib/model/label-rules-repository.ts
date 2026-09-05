@@ -1,4 +1,4 @@
-import { buildLabelCatalogue } from '@/lib/label-catalogue-source'
+import { loadLabelCatalogue } from '@/lib/label-catalogue-source'
 import { withDerivedSections } from './label-catalogue'
 import { resolveConfirmedField, resolveSourceField } from './ingestion-fields'
 import { applyLabelRules, ruleStats, type StoredRule } from './label-rules'
@@ -44,7 +44,7 @@ export async function applyLabelRulesToRows(context: RuleContext, translate: (ke
   const result: RuleRunResult = { rowsTouched: 0, byRule: rules.map((rule) => ({ ruleId: rule.id, name: rule.name || rule.contains, rowsFilled: 0 })) }
   if (rules.length === 0) return result
 
-  const catalogue = buildLabelCatalogue(translate)
+  const catalogue = await loadLabelCatalogue(translate)
   const table = context === 'source' ? sourceRowsTable : confirmedRowsTable
   const only = rowIds && rowIds.length > 0 ? rowIds : undefined
 

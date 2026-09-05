@@ -153,8 +153,10 @@ Two things it optimizes for:
   purpose — it keeps the accounts and cards, which are configuration rather than
   transactions.
 - Accounts and cards are user data, not compile-time constants (`lib/model/`,
-  see adr/0022): their number is unbounded. Everything else about the shape of the
-  data comes from the files themselves.
+  see adr/0022): their number is unbounded. They live in Settings → General, beside
+  language and theme, because what they are now is **label vocabulary** — a short list
+  of names set up once — rather than a place data is kept. Everything else about the
+  shape of the data comes from the files themselves.
 - Data enters through Settings → Data ingestion centre, and there is **one phase**
   to it (adr/0032, superseding adr/0030, adr/0031, adr/0018 and adr/0021). A dropped CSV becomes its
   own table, keeping every column the file wrote, with `source_filename` in front
@@ -162,6 +164,11 @@ Two things it optimizes for:
   assigned a meaning (date, amount, asset, quantity, price, investment type and
   class); everything unassigned is condensed into one observations column when the
   row is confirmed, so nothing is dropped and no column has to be invented.
+- Two more labels, both optional and both validated against Settings: **account** says
+  which account a row moved through and **card** which card it was billed to. They are
+  stored by name, so a table and a query read as words rather than as ids; renaming an
+  account renames the vocabulary and existing rows keep the name they were labelled with,
+  which is visible rather than silent.
 - Four labels, not seven: **sections** and **screens** say where a row belongs and
   are validated against the app's own navigation as they are typed — a screen only
   counts inside a section the row names, and a value nothing is called stays in the

@@ -23,6 +23,16 @@ export interface ScreenEntry extends CatalogueEntry {
 export interface LabelCatalogue {
   sections: CatalogueEntry[]
   screens: ScreenEntry[]
+  /**
+   * The accounts and cards the user has set up, as label vocabulary.
+   *
+   * Unlike a section, these are names the user wrote, so the name *is* the value — a
+   * numeric id would make every table and every query unreadable. Renaming an account in
+   * Settings therefore renames the vocabulary, and rows keep the name they were labelled
+   * with until they are relabelled, which is visible rather than silent.
+   */
+  accounts: CatalogueEntry[]
+  cards: CatalogueEntry[]
 }
 
 function comparable(value: string): string {
@@ -33,6 +43,17 @@ function comparable(value: string): string {
 export function resolveSectionLabel(catalogue: LabelCatalogue, text: string): string | undefined {
   const wanted = comparable(text)
   return catalogue.sections.find((section) => comparable(section.id) === wanted || comparable(section.label) === wanted)?.id
+}
+
+/** Resolves what someone typed to a configured account, by the name it was set up under. */
+export function resolveAccountLabel(catalogue: LabelCatalogue, text: string): string | undefined {
+  const wanted = comparable(text)
+  return catalogue.accounts.find((account) => comparable(account.label) === wanted)?.label
+}
+
+export function resolveCardLabel(catalogue: LabelCatalogue, text: string): string | undefined {
+  const wanted = comparable(text)
+  return catalogue.cards.find((card) => comparable(card.label) === wanted)?.label
 }
 
 /**

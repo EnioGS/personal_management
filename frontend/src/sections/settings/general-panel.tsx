@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import type { Locale } from '@/lib/locale'
 import { useLocaleStore } from '@/store/locale-store'
 import { useThemeStore, type Theme } from '@/store/theme-store'
+import { AccountsCardsSettings } from './accounts-cards-panel'
 
 const options: { value: Locale; labelKey: string }[] = [
   { value: 'pt', labelKey: 'general.portuguese' },
@@ -23,7 +24,7 @@ export function GeneralPanel() {
   const { theme, setTheme } = useThemeStore()
 
   return (
-    <div className="flex h-full flex-col gap-4 p-4">
+    <div className="flex h-full flex-col gap-6 overflow-auto p-4">
       <div>
         <p className="mb-2 text-sm text-muted-foreground">{t('general.languageLabel')}</p>
         <div className="inline-flex rounded-md border p-1">
@@ -60,6 +61,10 @@ export function GeneralPanel() {
             </Button>
           ))}
         </div>
+      </div>
+
+      <div className="border-t pt-6">
+        <AccountsCardsSettings />
       </div>
     </div>
   )

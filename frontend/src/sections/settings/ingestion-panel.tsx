@@ -13,12 +13,12 @@ import type { StoredRow } from '@/lib/local-store/create-local-table'
 import { buildLabelCatalogue } from '@/lib/label-catalogue-source'
 import { queryRows } from '@/lib/model/row-query'
 import { ingestionLabelErrors } from '@/lib/model/ingestion'
-import { parsePlacementLabels, resolveScreenLabel, resolveSectionLabel, screenLabelFor, sectionLabelFor, withDerivedSections, type LabelCatalogue } from '@/lib/model/label-catalogue'
+import { parsePlacementLabels, resolveAccountLabel, resolveCardLabel, resolveScreenLabel, resolveSectionLabel, screenLabelFor, sectionLabelFor, withDerivedSections, type LabelCatalogue } from '@/lib/model/label-catalogue'
 import { applyLabelRulesToRows } from '@/lib/model/label-rules-repository'
 import { addConfirmedRow, updateConfirmedRow, type ConfirmedEditableColumn } from '@/lib/model/confirmed-rows'
 import { deleteMarked, toggleMark, type MarkableTable } from '@/lib/model/marking'
 import { sourceRowsTable } from '@/lib/model/model-db'
-import { useConfirmedRowsStore, useSourceFilesStore, useSourceRowsStore } from '@/lib/model/model-stores'
+import { useAccountsStore, useCardsStore, useConfirmedRowsStore, useSourceFilesStore, useSourceRowsStore } from '@/lib/model/model-stores'
 import {
   ASSIGNABLE_FIELDS,
   SOURCE_FILENAME_COLUMN,
@@ -39,20 +39,25 @@ const UNASSIGNED = '__unassigned__'
 const NO_SELECTION = '__none__'
 
 /** The label columns every table carries, in the order they are read. */
-const LABEL_COLUMNS = ['sections', 'screens', 'category', 'subcategory'] as const
+const LABEL_COLUMNS = ['sections', 'screens', 'category', 'subcategory', 'account', 'card'] as const
 type LabelColumn = (typeof LABEL_COLUMNS)[number]
 
-/** The two that are free text, never validated, and default rather than start empty. */
+/** The ones that are free text, never validated, and default rather than start empty. */
 const MEANING_COLUMNS = ['category', 'subcategory'] as const
+
+/** The ones that are optional: a row that names no account or card is not incomplete. */
+const OPTIONAL_COLUMNS = ['account', 'card'] as const
 
 const LABEL_HINT: Record<LabelColumn, string> = {
   sections: "the app's sections — several allowed, separated by commas",
   screens: 'the screens inside those sections — several allowed',
   category: 'free text',
   subcategory: 'free text',
+  account: 'one of your accounts, by name — optional',
+  card: 'one of your credit cards, by name — optional',
 }
 
-const CONFIRMED_COLUMNS = ['row_id', 'date', 'amount', 'category', 'subcategory', 'observations', 'source_filename'] as const
+const CONFIRMED_COLUMNS = ['row_id', 'date', 'amount', 'category', 'subcategory', 'account', 'card', 'observations', 'source_filename'] as const
 
 function confirmedTableKey(row: ConfirmedRow): string {
   return `${row.section}/${row.screen}`
@@ -87,7 +92,17 @@ export function IngestionPanel() {
   // silently discarded — and the row keeps the labels it already had until it is fixed.
   const [drafts, setDrafts] = useState<Record<string, string>>({})
   const fileInput = useRef<HTMLInputElement>(null)
-  const catalogue = useMemo(() => buildLabelCatalogue((key) => String(t(key as never))), [t])
+  const accounts = useAccountsStore((store) => store.items)
+  const cards = useCardsStore((store) => store.items)
+  // Accounts and cards are label vocabulary now, so the catalogue is rebuilt when the
+  // user adds one — a name set up in Settings is a valid label the moment it exists.
+  const catalogue = useMemo(
+    () => buildLabelCatalogue((key) => String(t(key as never)), {
+      accounts: accounts.filter((account) => !account.archived).map((account) => account.name),
+      cards: cards.filter((card) => !card.archived).map((card) => card.name),
+    }),
+    [accounts, cards, t],
+  )
   const { marking, setMarking, rowProps } = useMarkMode()
 
   const confirmedTables = useMemo(
@@ -170,6 +185,13 @@ export function IngestionPanel() {
   /** What a cell's text resolves to, and what in it nothing is called. Computed per keystroke. */
   function readLabelCell(row: StoredRow<SourceRow>, column: LabelColumn, value: string) {
     const labels: IngestionRowLabels = { ...row.labels }
+    if (column === 'account' || column === 'card') {
+      const text = value.trim()
+      const resolved = column === 'account' ? resolveAccountLabel(catalogue, text) : resolveCardLabel(catalogue, text)
+      // Empty is a real answer here: not every row belongs to an account or a card.
+      if (!text) return { labels: { ...labels, [column]: undefined }, unknown: [] as string[] }
+      return { labels: { ...labels, [column]: resolved }, unknown: resolved ? [] : [text] }
+    }
     if (column === 'sections') {
       const parsed = parsePlacementLabels(value, (text) => resolveSectionLabel(catalogue, text))
       return { labels: { ...labels, sections: parsed.values }, unknown: parsed.unknown }
@@ -408,7 +430,8 @@ export function IngestionPanel() {
                     {LABEL_COLUMNS.map((column) => {
                       const key = `${row.id}:${column}`
                       const text = drafts[key] ?? labelText(row.labels, column, catalogue)
-                      const missing = MEANING_COLUMNS.includes(column as never) ? false : (row.labels[column] ?? []).length === 0
+                      const optional = MEANING_COLUMNS.includes(column as never) || OPTIONAL_COLUMNS.includes(column as never)
+                      const missing = optional ? false : (row.labels[column] ?? []).length === 0
                       return (
                         <EditableCell
                           key={column}
@@ -491,6 +514,20 @@ export function IngestionPanel() {
                   />
                   {(['category', 'subcategory'] as const).map((column) => (
                     <EditableCell key={column} value={row[column]} disabled={marking} onCommit={(value) => void editConfirmed(row, column, value)} />
+                  ))}
+                  {(['account', 'card'] as const).map((column) => (
+                    <EditableCell
+                      key={column}
+                      value={row[column] ?? ''}
+                      disabled={marking}
+                      validate={(draft) => {
+                        const text = draft.trim()
+                        if (!text) return null
+                        const resolved = column === 'account' ? resolveAccountLabel(catalogue, text) : resolveCardLabel(catalogue, text)
+                        return resolved ? null : `No ${column} is called ${text}. Set it up in Settings → General.`
+                      }}
+                      onCommit={(value) => void editConfirmed(row, column, value)}
+                    />
                   ))}
                   <EditableCell
                     className="max-w-[28rem] truncate"

@@ -22,6 +22,13 @@ export function ingestionLabelErrors(labels: IngestionRowLabels, catalogue?: Lab
   const unknownSections = (labels.sections ?? []).filter((value) => !catalogue.sections.some((section) => section.id === value))
   if (unknownSections.length > 0) errors.push(`No section is called ${unknownSections.join(', ')}.`)
 
+  if (labels.account && !catalogue.accounts.some((account) => account.label === labels.account)) {
+    errors.push(`No account is called ${labels.account}. Set it up in Settings, or leave the cell empty.`)
+  }
+  if (labels.card && !catalogue.cards.some((card) => card.label === labels.card)) {
+    errors.push(`No card is called ${labels.card}. Set it up in Settings, or leave the cell empty.`)
+  }
+
   for (const screen of labels.screens ?? []) {
     const offeredBy = catalogue.screens.filter((item) => item.id === screen).map((item) => item.sectionId)
     if (offeredBy.length === 0) { errors.push(`No screen is called ${screen}.`); continue }

@@ -70,6 +70,10 @@ export interface IngestionRowLabels {
   screens?: string[]
   category?: string
   subcategory?: string
+  /** Which of the user's accounts this row belongs to, by the name it was set up under. */
+  account?: string
+  /** Which of the user's credit cards it belongs to, likewise by name. */
+  card?: string
 }
 
 /**
@@ -207,5 +211,8 @@ export interface ConfirmedRow {
   price?: number
   investmentType?: string
   investmentClass?: string
+  /** The account and card labels the row was confirmed with, by name. */
+  account?: string
+  card?: string
   markedForElimination?: boolean
 }

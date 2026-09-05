@@ -1,8 +1,8 @@
-import { buildLabelCatalogue } from '@/lib/label-catalogue-source'
+import { buildLabelCatalogue, loadLabelCatalogue } from '@/lib/label-catalogue-source'
 import { describeVault, queryVault } from '@/lib/sql/query-vault'
 import { setConfirmedMeaning } from '@/lib/model/confirmed-rows'
 import { DEFAULT_MEANING, ingestionLabelErrors } from '@/lib/model/ingestion'
-import { parsePlacementLabels, resolveScreenLabel, resolveSectionLabel, withDerivedSections } from '@/lib/model/label-catalogue'
+import { parsePlacementLabels, resolveAccountLabel, resolveCardLabel, resolveScreenLabel, resolveSectionLabel, withDerivedSections } from '@/lib/model/label-catalogue'
 import { confirmedRowsTable, sourceFilesTable, sourceRowsTable } from '@/lib/model/model-db'
 import { newRowId } from '@/lib/model/row-id'
 import { applyLabelRulesToRows } from '@/lib/model/label-rules-repository'
@@ -126,7 +126,7 @@ export const setSignConventionTool: ToolDefinition = {
 }
 
 async function labelSourceRows(rowIds: number[], values: Record<string, unknown>, translate: (key: string) => string) {
-  const catalogue = buildLabelCatalogue(translate)
+  const catalogue = await loadLabelCatalogue(translate)
   const results: unknown[] = []
   for (const id of rowIds) {
     const stored = await sourceRowsTable.get(id)
@@ -139,16 +139,27 @@ async function labelSourceRows(rowIds: number[], values: Record<string, unknown>
       ? undefined
       : parsePlacementLabels(text('screens')!, (value) => resolveScreenLabel(catalogue, value, sections?.values ?? row.labels.sections))
 
+    // An account or a card has to name one the user set up; anything else is refused
+    // rather than stored, the same way a screen nobody has is refused.
+    const account = text('account') === undefined ? undefined : resolveAccountLabel(catalogue, text('account')!)
+    const card = text('card') === undefined ? undefined : resolveCardLabel(catalogue, text('card')!)
+    const unnamed = [
+      ...(text('account') && !account ? [text('account')!] : []),
+      ...(text('card') && !card ? [text('card')!] : []),
+    ]
+
     const labels = withDerivedSections({
       ...row.labels,
       ...(sections ? { sections: sections.values } : {}),
       ...(screens ? { screens: screens.values } : {}),
       ...(text('category') !== undefined ? { category: text('category') } : {}),
       ...(text('subcategory') !== undefined ? { subcategory: text('subcategory') } : {}),
+      ...(text('account') !== undefined ? { account } : {}),
+      ...(text('card') !== undefined ? { card } : {}),
     }, catalogue)
 
     await sourceRowsTable.update(id, { data: { ...row, labels } satisfies SourceRow })
-    const unknown = [...(sections?.unknown ?? []), ...(screens?.unknown ?? [])]
+    const unknown = [...(sections?.unknown ?? []), ...(screens?.unknown ?? []), ...unnamed]
     results.push({ id, labels, errors: [...ingestionLabelErrors(labels, catalogue), ...unknown.map((value) => `Nothing is called ${value}.`)] })
   }
   return results
@@ -156,7 +167,7 @@ async function labelSourceRows(rowIds: number[], values: Record<string, unknown>
 
 export const setLabelsTool: ToolDefinition = {
   name: 'set_labels',
-  description: "Sets labels on source rows by their id. Sections and screens take several values separated by commas and are checked against the app's own navigation — list_label_options says what exists, and a screen is only valid inside a section the row names. Category and subcategory are free text, one value each, and start at 'outros', which means nobody has said anything more precise. Fields you leave out keep what they hold.",
+  description: "Sets labels on source rows by their id. Sections and screens take several values separated by commas and are checked against the app's own navigation — list_label_options says what exists, and a screen is only valid inside a section the row names. Category and subcategory are free text, one value each, and start at 'outros', which means nobody has said anything more precise. Account and card are optional and must name one the user set up in Settings, by its name; they are how a row says which account it moved through or which card it was billed to, and list_label_options names the ones that exist. Fields you leave out keep what they hold.",
   parameters: {
     type: 'object',
     properties: {
@@ -165,6 +176,8 @@ export const setLabelsTool: ToolDefinition = {
       screens: { type: 'string' },
       category: { type: 'string' },
       subcategory: { type: 'string' },
+      account: { type: 'string', description: "One of the user's accounts, by name. Pass an empty string to clear it." },
+      card: { type: 'string', description: "One of the user's credit cards, by name." },
     },
     required: ['rowIds'],
     additionalProperties: false,
@@ -190,6 +203,8 @@ export const labelRowsByMatchTool: ToolDefinition = {
       screens: { type: 'string' },
       category: { type: 'string' },
       subcategory: { type: 'string' },
+      account: { type: 'string' },
+      card: { type: 'string' },
     },
     required: ['field', 'contains'],
     additionalProperties: false,
@@ -343,13 +358,15 @@ export const addConfirmedRowTool: ToolDefinition = {
       observations: { type: 'string' },
       category: { type: 'string' },
       subcategory: { type: 'string' },
+      account: { type: 'string', description: "One of the user's accounts, by name." },
+      card: { type: 'string', description: "One of the user's credit cards, by name." },
       sourceFilename: { type: 'string' },
     },
     required: ['rowId', 'section', 'screen'],
     additionalProperties: false,
   },
   execute: async (args, context) => {
-    const catalogue = buildLabelCatalogue(context.translate)
+    const catalogue = await loadLabelCatalogue(context.translate)
     const section = resolveSectionLabel(catalogue, String(args.section ?? ''))
     const screen = resolveScreenLabel(catalogue, String(args.screen ?? ''), section ? [section] : undefined)
     if (!section || !screen) return `Error: ${!section ? 'no section' : 'no screen'} is called that. Call list_label_options for what exists.`
@@ -365,6 +382,13 @@ export const addConfirmedRowTool: ToolDefinition = {
       observations: typeof args.observations === 'string' ? args.observations : '',
       category: typeof args.category === 'string' && args.category.trim() ? args.category.trim() : 'outros',
       subcategory: typeof args.subcategory === 'string' && args.subcategory.trim() ? args.subcategory.trim() : 'outros',
+      account: typeof args.account === 'string' ? resolveAccountLabel(catalogue, args.account) : undefined,
+      card: typeof args.card === 'string' ? resolveCardLabel(catalogue, args.card) : undefined,
+    }
+    for (const [field, given] of [['account', args.account], ['card', args.card]] as const) {
+      if (typeof given === 'string' && given.trim() && !row[field]) {
+        return `Error: no ${field} is called "${given}". Call list_label_options for the ones that exist, or leave it out.`
+      }
     }
     const id = await confirmedRowsTable.add({ createdAt: Date.now(), data: row })
     return JSON.stringify({ id, row })
@@ -414,10 +438,10 @@ export const dropSourceTableTool: ToolDefinition = {
 
 export const listLabelOptionsTool: ToolDefinition = {
   name: 'list_label_options',
-  description: "Lists what the placement labels may be set to right now: the app's sections and the screens inside each, with the id to store and the name currently shown. These follow the app, so read them here rather than remembering them, and never invent one. Category and subcategory are free text and need no list.",
+  description: "Lists what the closed labels may be set to right now: the app's sections and the screens inside each, with the id to store and the name currently shown, plus the accounts and credit cards the user has set up. These follow the app and the user's own settings, so read them here rather than remembering them, and never invent one. Category and subcategory are free text and need no list.",
   parameters: { type: 'object', properties: {}, additionalProperties: false },
   execute: async (_args, context) => {
-    const catalogue = buildLabelCatalogue(context.translate)
+    const catalogue = await loadLabelCatalogue(context.translate)
     return JSON.stringify({
       sections: catalogue.sections,
       screens: catalogue.screens,

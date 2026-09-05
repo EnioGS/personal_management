@@ -63,3 +63,32 @@ describe('deleting marked rows', () => {
     expect(await confirmedRowsTable.count()).toBe(1)
   })
 })
+
+describe('a file whose rows are all deleted', () => {
+  beforeEach(async () => { await wipeAllData() })
+
+  it('goes with them — deleting the last rows leaves no table to show', async () => {
+    const { createSourceFile } = await import('./source-files')
+    const { sourceFilesTable } = await import('./model-db')
+    await createSourceFile('one.csv', 'Data,Valor\n01/08/2026,-10\n02/08/2026,-20')
+    const ids = (await sourceRowsTable.toArray()).map((row) => row.id)
+
+    await setMarked('source', ids, true)
+    expect(await deleteMarked('source', ids)).toBe(2)
+
+    expect(await sourceRowsTable.count()).toBe(0)
+    expect(await sourceFilesTable.count()).toBe(0)
+  })
+
+  it('stays while any row is left', async () => {
+    const { createSourceFile } = await import('./source-files')
+    const { sourceFilesTable } = await import('./model-db')
+    await createSourceFile('two.csv', 'Data,Valor\n01/08/2026,-10\n02/08/2026,-20')
+    const [first] = (await sourceRowsTable.toArray()).map((row) => row.id)
+
+    await setMarked('source', [first], true)
+    await deleteMarked('source', [first])
+
+    expect(await sourceFilesTable.count()).toBe(1)
+  })
+})

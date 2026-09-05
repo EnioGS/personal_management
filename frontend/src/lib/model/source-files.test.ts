@@ -23,6 +23,8 @@ const catalogue: LabelCatalogue = {
     { id: 'overview', sectionId: 'finances', label: 'Movimentações' },
     { id: 'spending', sectionId: 'finances', label: 'Gastos' },
   ],
+  accounts: [{ id: 'Banco A', label: 'Banco A' }],
+  cards: [{ id: 'Cartão X', label: 'Cartão X' }],
 }
 
 const BANK_CSV = [
@@ -299,5 +301,31 @@ describe('a line added by hand, and a cell corrected', () => {
     const [first] = await rowsOf(sourceId)
 
     await expect(updateSourceValue(first.id, 'source_filename', 'other.csv')).rejects.toThrow(/not editable/)
+  })
+})
+
+describe('account and card, as labels', () => {
+  beforeEach(async () => { await wipeAllData() })
+
+  it('travel with the row into the table it is confirmed to', async () => {
+    const sourceId = await createSourceFile('banco-agosto.csv', BANK_CSV)
+    await assignSourceColumns(sourceId, { Data: 'date', Valor: 'amount' })
+    const [first] = await rowsOf(sourceId)
+    await label(first.id, {
+      sections: ['finances'], screens: ['overview'], category: 'outros', subcategory: 'outros',
+      account: 'Banco A', card: 'Cartão X',
+    })
+
+    await confirmSourceRows(sourceId, catalogue)
+
+    expect((await confirmedRowsTable.toArray())[0].data).toMatchObject({ account: 'Banco A', card: 'Cartão X' })
+  })
+
+  it('are optional: a row with neither is still ready to confirm', async () => {
+    const sourceId = await createSourceFile('banco-agosto.csv', BANK_CSV)
+    const [first] = await rowsOf(sourceId)
+    await label(first.id, { sections: ['finances'], screens: ['overview'], category: 'outros', subcategory: 'outros' })
+
+    expect((await planConfirmation(sourceId, catalogue)).ready).toEqual([first.id])
   })
 })

@@ -84,6 +84,8 @@ function addReadableViews(db: Database, data: DataExportFile) {
       `json_extract(labels, '$.screens') AS "screens"`,
       `json_extract(labels, '$.category') AS "category"`,
       `json_extract(labels, '$.subcategory') AS "subcategory"`,
+      `json_extract(labels, '$.account') AS "account"`,
+      `json_extract(labels, '$.card') AS "card"`,
       '"marked_for_elimination"', '"duplicate_of"', '"imported_amount"',
     ]
     const name = `source__${slug(stored?.originalFilename ?? '')}__${file.id}`
