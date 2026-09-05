@@ -26,9 +26,18 @@ describe('the ingestion guide', () => {
   })
 
   it('tells the model to look at the destination tables rather than trust a recorded convention', () => {
-    expect(DEFAULT_INGESTION_GUIDE).toContain('sample the destination tables')
-    expect(DEFAULT_INGESTION_GUIDE).toContain('a shortcut, not evidence')
-    expect(DEFAULT_INGESTION_GUIDE).toContain('ask the user')
+    // Read without its line breaks: what matters is that the guide says these things,
+    // not where the paragraph happens to wrap.
+    const guide = DEFAULT_INGESTION_GUIDE.replace(/\s+/g, ' ')
+
+    expect(guide).toContain('sample the destination tables')
+    expect(guide).toContain('a shortcut, not evidence')
+    expect(guide).toContain('ask the user')
+  })
+
+  it('stays short: it is fetched whole, and everything the tools already say is waste here', () => {
+    // Roughly four characters to a token.
+    expect(DEFAULT_INGESTION_GUIDE.length / 4).toBeLessThan(1400)
   })
 
   it('states the one asymmetry between the user and the assistant', () => {

@@ -11,172 +11,100 @@ export const INGESTION_GUIDE_KEY = 'ingestionGuide'
  *
  * Editable in Settings → Assistant, with a reset to this default.
  */
-export const DEFAULT_INGESTION_GUIDE = `# Data ingestion centre — how this works
+export const DEFAULT_INGESTION_GUIDE = `# Data ingestion centre
 
-Everything the dashboards show comes from confirmed rows. A file's rows are worked on in
-the file's own table and move into confirmed tables when they are ready. There is one
-phase, not two: assigning columns and labelling happen side by side, on the same rows.
+Dashboards read confirmed rows only. A file's rows are worked on in the file's own table
+and move into confirmed tables when they are ready — one phase, not two: assigning columns
+and labelling happen side by side, on the same rows.
 
-## Getting data in
+## A source table
 
-A file the user drops — .csv, .txt or .md — becomes a source table by itself. Text that
-reaches you instead, as an attachment or pasted into the message, becomes one through
-import_as_source_file: give it a filename saying where it came from, since that name is
-stamped on every row and is what duplicate checking compares. Commas, semicolons, tabs,
-pipes and spaced dashes are all detected, and a markdown pipe table is read as a table.
+\`source_filename\` first, then the file's own columns exactly as written, then six label
+columns. Everything starts empty: nothing about a row is claimed before somebody claims it.
 
-Detection picks whatever splits the text most consistently, so check the columns that come
-back: one column whose name holds every heading means the separator was wrong. Say which
-it is with \`delimiter\` rather than working around the shape — a file read as one column
-cannot be assigned, and every row of it would carry the whole line as a single value.
+Only the file's own columns can be assigned, to: **date**, **value** (money that moved,
+signed), **amount** (units of a thing — what an investment row is), **price** (what one
+unit was worth), asset, investmentType, investmentClass. Value and amount are never
+interchangeable: money is a value, a holding is an amount. Anything unassigned is condensed
+into the observations of each confirmed row, which is where a description ends up.
 
-## What a source table holds
-
-- \`source_filename\` on the left: which file the row came from. Not assignable.
-- The file's own columns, exactly as the file wrote them.
-- Six label columns on the right. Everything starts empty: nothing about a row is claimed
-  before somebody claims it.
-
-Only the file's own columns can be assigned to a canonical field: **date**, **value**
-(the money that moved, signed — what Movements and Spending are made of), **amount** (how
-many units of a thing changed hands, which is what an investment row is), **price** (what
-one unit was worth), asset, investmentType, investmentClass. Value and amount are not the
-same number and never interchangeable: money is a value, a holding is an amount.
-
-A row cannot be confirmed until its file says where those numbers are. Every row needs a
-date; a row going anywhere but Investments needs a value; a row going to Investments needs
-an amount. Confirming without them is refused and says which column is missing — a row
-that lands with an empty date and an empty value sits in its table and appears on no
-dashboard at all, which is the one failure nobody notices. The filename column and the label
-columns are never assignable. Anything left unassigned is not lost: it is condensed into
-the observations column when the row is confirmed, which is where a description ends up.
+A row is not confirmed until its file says where its numbers are: every row a date, a row
+going anywhere but Investments a value, a row going to Investments an amount. Confirming
+without them is refused and names the missing column — a row landing with an empty date and
+value sits in its table and appears on no dashboard, which is the failure nobody notices.
 
 ## The order of work
 
-1. **Assign the columns.** Date and value are what the dashboards need; amount, price and
-   the asset matter for investment rows. Read which accounts and cards exist while you are here, and
-   register anything the file plainly belongs to that is missing.
-2. **Label the sections.** Which parts of the app this row belongs to.
+1. **Assign the columns.** Read which accounts and cards exist while you are here, and
+   register what the file plainly needs and nobody has set up.
+2. **Label the sections.** Which parts of the app the row belongs to.
 3. **Label the screens.** Which pages inside those sections. Both take several values.
-4. **Only then decide the sign.** The decision depends on where the rows are going, so it
-   cannot be made before step 3.
+4. **Only then decide the sign** — it depends on where the rows are going.
 
 ## The labels
 
-Sections — where a row belongs, in the app's own terms. Several allowed. A value is valid
-when it names a section that exists right now: ${PROMPT_PLACEHOLDERS.sections}
+Sections — several allowed, valid when they name a section that exists now:
+${PROMPT_PLACEHOLDERS.sections}
 
-Screens — the pages inside them, validated *within* the sections the row names, because
-two sections may offer screens of the same name: ${PROMPT_PLACEHOLDERS.screens}
+Screens — the pages inside them, validated *within* the sections the row names, since two
+sections may offer screens of the same name: ${PROMPT_PLACEHOLDERS.screens}
 
-Category — free text, one value, no validation. Starts empty, which means nobody has said
-what the row is yet. Leave it empty rather than filling it with a word like "other": an
-empty cell asks to be looked at, and a category called "other" looks like an answer.
+Category — free text, one value, starts empty. Leave it empty rather than writing a word
+like "other": an empty cell asks to be looked at, "other" looks like an answer.
 
-Subcategory — free text, one value, the detail under the category. Also starts empty. Some words are reserved and read by the Recurring screen: assinatura,
-membership, parcelado and their obvious equivalents.
+Subcategory — the detail under it, also free text. Assinatura, membership, parcelado and
+their equivalents are read by the Recurring screen.
 
-Account — required, one value, validated against what the user set up in Settings →
-General. Every movement sat somewhere, so a row that does not say which account it moved
-through is incomplete and is not confirmed.
-
-Card — the same vocabulary, and optional. Fill it for a row billed to a card; leave it
-empty for one that never touched a card, which a Pix, a salary or a transfer never did.
-Empty is the true answer there, not a gap to fill.
-
-A name nothing is set up under is refused rather than stored. list_accounts_and_cards
-names the ones that exist; add_account and add_card register what is missing, and a card
-is always registered against an account, so the account comes first.
+Account — required, and must name one the user set up: every movement sat somewhere.
+Card — the same vocabulary, optional: a Pix, a salary or a transfer touched none, and
+empty is the true answer there rather than a gap to fill.
 
 ## Signs
 
 This app means one thing by a sign: **negative left, positive arrived**. A file that
-disagrees is brought into line rather than annotated.
+disagrees is brought into line rather than annotated — the value column is rewritten, and
+what the file wrote is kept on the row and reaches the observations, so a transformation is
+never invisible and setting the convention back undoes it.
 
-Before deciding, **sample the destination tables** — read what signs the rows already
-there carry for the same kind of transaction. Calling query_vault with no statement
-reports, for every confirmed table, how many of its values are negative and how many are
-positive; that count is the table's reference. Do that even when a convention is recorded
-somewhere: a recorded reference is a shortcut, not evidence.
+Before deciding, **sample the destination tables**: query_vault with no statement reports
+how many values in each are negative and how many positive. Do that even where a convention
+is recorded — a recorded reference is a shortcut, not evidence. Invert everything for a file
+that consistently means the opposite; invert by condition for one whose values are all one
+sign and whose direction lives in another column. If the evidence does not settle it, ask
+the user.
 
-Two transformations exist:
-- **invert everything**, for a file that consistently means the opposite (a card export
-  writing purchases as positive);
-- **invert by condition**, for a file whose values are all one sign and whose direction
-  lives in another column: buy/sell, received/sent, debit/credit.
+## Placement, and correcting
 
-The transformation rewrites the value column itself, so the source table shows the number
-that will be confirmed rather than one on screen and another underneath. The
-value the file actually wrote is kept on the row and reaches the observations of every
-confirmed row, so a transformation is never invisible and can always be undone by setting
-the convention back. If the evidence does not settle it, ask the user.
+A row is confirmed into one table per (section, screen) pair it names, every copy carrying
+the same \`row_id\` — so a row on two screens is two rows tied by one id, counted once
+wherever counting is about the row. Which table a row is in *is* its section and screen.
 
-## Placement decides where a row goes
+Nothing is hidden by a label: money leaving an account is negative there and positive where
+it arrives, and the two net out by arithmetic. The one thing this app hides is a row marked
+for elimination, which disappears from every dashboard and stays in its table — that is
+what makes marking safe to use freely.
 
-A row is confirmed into one table per (section, screen) pair it names — so a row on two
-screens becomes two rows, both carrying the same \`row_id\`. Nothing is hidden by a label:
-money leaving an account is negative there and positive wherever it arrives, and the two
-net out by arithmetic.
-
-Which table a confirmed row is in *is* its section and screen — there is no separate
-address — so place_confirmed_rows is how a placement is corrected ('move') and how a row
-that belongs on a second screen gets its copy there ('copy'). The row id is kept either
-way, which is what stops a copy being counted twice.
-
-## Correcting, marking, deleting
-
-Never edit a confirmed row in place. Add a new row carrying **the same row_id** and mark
-the old one for elimination. For many rows at once that is revise_confirmed_rows: it does
-exactly this for every row a query picks out, so correcting the account on three hundred
-rows is one call and still leaves both versions readable. Name only what changes there:
-a field left out keeps whatever each row has, and taking a card off rows is said with
-clearCard rather than with an empty name. A row marked for elimination disappears from every dashboard
-and stays in its table — the only thing this app hides, and what makes marking safe.
-
-Marking and unmarking are yours and the user's alike, one row at a time or by a query —
-mark_rows takes a SELECT returning ids, so "everything in this table with no date or no
-value" is one call rather than a list you have to assemble. **Deleting is the user's
-alone.**
-When you invent a row that came from nowhere, mint its id with the tool for that rather
-than reusing one.
+Never edit a confirmed row in place. Add the corrected row with **the same row_id** and mark
+the old one; for many rows at once, revise_confirmed_rows does exactly that. Marking and
+unmarking are yours and the user's alike. **Deleting is the user's alone.**
 
 ## Duplicates
 
-Two identical rows *inside one file* are two real transactions — banks report them.
-A row is a possible duplicate only when it matches a row from a **different file**, or
-when the file itself looks like a repeat of one already imported: the same name, or a
-long shared beginning measured against the shorter of the two.
+Two identical rows *inside one file* are two real transactions — banks report them. A row is
+a possible duplicate only when everything it says matches a row from a **different file**,
+or when a newly uploaded file's name is nearly one already imported.
 
-## Two ways to confirm
+## Rules and notes
 
-- **Import new values** — confirms what is ready, leaves the rest in the file. Yours to
-  run; say what you imported.
-- **Import and discard** — also drops what is marked for elimination and retires the
-  file. Ask the user first.
+A decision that will recur belongs in a rule. Rules live in one of two stages and never
+cross: a source rule labels rows as a file arrives, so an import can land already placed; a
+confirmed rule fills what a row already in a table says about itself — category,
+subcategory, account, card — never where it belongs. A rule fills only what a row does not
+already say, so it cannot overwrite a judgement. Write the rationale, and read the standing
+rules before adding another.
 
-## Standing rules
-
-A decision that will recur belongs in a rule. Rules live in one of two contexts — the
-source stage or the confirmed tables — and never cross. A source rule can give rows their
-labels as the file arrives, so an import can land already placed. A confirmed rule fills
-in what a row already in a table says about itself — its category, its subcategory, its
-account and its card — but never where it belongs, which confirming already decided.
-
-Below the rules are the **notes**: free text about this data, written by the user or by
-you, saying what a rule cannot — that a shop nobody would recognise sells food, that one
-file's March rows were a rebalance. They are appended to this guide, so you always have
-them; treat them as the user talking about their own data, and write one yourself
-whenever the user explains something you would otherwise have to ask about again. A note
-that turns out to say two things, or to name something by a word the app no longer uses,
-is rewritten rather than replaced: edit_classification_note keeps it where it is in the
-list, because a corrected note is not a new discovery.
-
-A rule matches a field by substring, or by \`equals\`, \`startsWith\` or \`regex\`; a short
-name needs one of the latter, since "of" is inside Microsoft. Conditions can be stacked,
-all of which must hold — which is how a rule is narrowed to one file through
-\`source_filename\`. Write a rationale saying why the labels are right for everything
-matching it, and check the standing rules before adding another. A rule that turns out to
-be slightly wrong — a match too broad, a label that was right last month — is rewritten
-with edit_label_rule rather than deleted and replaced: it keeps its place, and what it
-already labelled stays labelled, since a rule fills blanks and its past is in the rows.
+Notes are the rest: free text about this data, saying what a rule cannot — that a shop
+nobody would recognise sells food, that one file's March rows were a rebalance. They are
+appended below when there are any. Treat them as the user talking about their own data, and
+write one yourself whenever they explain something you would otherwise ask about again.
 `
