@@ -446,3 +446,37 @@ app?** (a) The table stays under its old name and its rows keep their labels, vi
 an orphan the user can relabel. (b) A migration renames it.
 **Recommendation: (a)** — nothing is lost silently, and the orphan is a visible prompt to
 decide rather than an invisible rewrite.
+
+---
+
+## Status — implemented
+
+Phases 0–8 are done and on `main`. What landed, in the order the plan asked for it:
+
+- **Four labels** (`sections`, `screens`, `category`, `subcategory`), validated the way
+  §1 describes: screens inside the sections the row names, meaning free text defaulting
+  to `outros`. Flow role, settlement channel, spending treatment and recurrence are gone
+  from the model, the tools, the prompts and the dashboards.
+- **One phase.** A file becomes its own table (`source__<file>__<id>`), keeping every
+  column it wrote; only its own columns are assignable; unassigned columns are condensed
+  into one observations column at confirmation. There is no unlabelled pool.
+- **Confirmation copies** a row into one table per (section, screen) pair, every copy
+  carrying the same `row_id`, and the row leaves its source table.
+- **Signs** come from the amount. A file is brought into line wholesale or by a condition
+  on another column, decided after labelling, with the value the file wrote kept in the
+  observations.
+- **SQL** reads everything (`query_vault`); writes go through validating tools, never in
+  place — a correction is a new row with the same `row_id` plus a mark on the old one.
+- **Rules** carry a context, column-scoped conditions and regex validated at save time,
+  and source rules run at upload so an import can land already labelled.
+- **Marking** is a table-wide mode; the assistant marks and unmarks exactly as the user
+  does, and only the user deletes. A marked row is invisible to dashboards and visible in
+  its table — the single exception recorded in adr/0032.
+- **Duplicates** are flagged only across files, or when a filename is very close to one
+  already imported.
+- Export mirrors the database (v8); capital includes investments; README, `samples/`
+  and adr/0018, 0021, 0030 and 0031 were updated or marked superseded.
+
+**Not carried over:** data stored under the old two-phase schema. Dexie v9 clears the
+stores that model needed, and no migration was written — the old rows describe a
+classification this app no longer has. Files are re-imported through the new door.

@@ -285,6 +285,12 @@ export function IngestionPanel() {
         </div>
       )}
 
+      {selectedFile?.looksLikeSourceId !== undefined && (
+        <p className="text-destructive rounded-md border border-dashed p-2 text-xs">
+          {`This file's name is very close to "${sourceFiles.find((file) => file.id === selectedFile.looksLikeSourceId)?.originalFilename ?? 'an earlier import'}" — it may be the same export downloaded twice. Its rows were compared against that one first.`}
+        </p>
+      )}
+
       {message && <p className="bg-muted rounded-md p-2 text-xs">{message}</p>}
 
       {selectedFile && (
