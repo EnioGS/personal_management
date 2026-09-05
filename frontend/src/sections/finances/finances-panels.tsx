@@ -130,9 +130,9 @@ export function OverviewPanel() {
               sparkline={capital.sparkline}
             />
             <StatTile
-              label={t('finances:overview.netMonthlyIncome')}
+              label={t('finances:overview.netCashFlow')}
               value={currency.format(income.current)}
-              indicatorColor={DOMAIN_COLOR.contributions.light}
+              indicatorColor={DOMAIN_COLOR.cashFlow.light}
               deltas={income.deltas}
               sparkline={income.sparkline}
             />
