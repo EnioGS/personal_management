@@ -16,9 +16,16 @@ function ScrollArea({
       className={cn("relative", className)}
       {...props}
     >
+      {/*
+        Radix lays the viewport's content out as `display: table` so that it can measure
+        overflow. A table shrink-wraps its content, which quietly breaks every percentage
+        width inside it — a chat bubble capped at 85% of the width instead grows with its
+        text, and a long unbroken word runs off the side. Forcing the block box back gives
+        those widths something real to be a percentage of.
+      */}
       <ScrollAreaPrimitive.Viewport
         data-slot="scroll-area-viewport"
-        className="size-full rounded-[inherit] transition-[color,box-shadow] outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-1"
+        className="size-full rounded-[inherit] transition-[color,box-shadow] outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-1 [&>div]:block!"
       >
         {children}
       </ScrollAreaPrimitive.Viewport>

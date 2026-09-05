@@ -347,7 +347,7 @@ export function ChatPanel() {
                 <div
                   key={message.id}
                   className={cn(
-                    'flex max-w-[85%] flex-col gap-0.5',
+                    'flex max-w-[85%] min-w-0 flex-col gap-0.5',
                     message.role === 'user' ? 'self-end items-end' : 'self-start items-start',
                   )}
                 >
@@ -356,7 +356,7 @@ export function ChatPanel() {
                   )}
                   <div
                     className={cn(
-                      'rounded-md px-3 py-2 text-sm break-words',
+                      'max-w-full min-w-0 rounded-md px-3 py-2 text-sm break-words',
                       message.isError
                         ? 'bg-destructive/10 text-destructive'
                         : message.role === 'user'
