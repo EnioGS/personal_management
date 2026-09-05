@@ -20,8 +20,30 @@ interface HoldingsPieProps {
   emptyLabel: string
 }
 
-/** How far each ring stands off the centre when its slices are pushed apart. */
-const OFFSET = { parts: 5, classes: 10 }
+/**
+ * How far each ring stands off the centre when its slices are pushed apart. Kept close
+ * together: the two rings are one answer at two depths, and a wide moat between them reads
+ * as two charts sharing a card.
+ */
+const OFFSET = { parts: 6, classes: 8 }
+
+/**
+ * Where to start the ring, so the chart lies along the card rather than across it.
+ *
+ * A pie's circle is bounded by the shorter side of its box, and on a card wider than it is
+ * tall that leaves room to the sides and none above. What decides the shape of the whole
+ * drawing is therefore not the circle but the labels: put them at the top and the chart
+ * grows taller than the card, put them at the sides and it grows into space already there.
+ *
+ * So the ring is turned until the largest slice faces due left, which puts its name out to
+ * the left and everything else's out to the right. ECharts measures from three o'clock and
+ * runs clockwise, hence the sign.
+ */
+function startAngleFor(shares: number[]): number {
+  const largest = shares.indexOf(Math.max(...shares))
+  const before = shares.slice(0, largest).reduce((total, share) => total + share, 0)
+  return (180 + 360 * (before + shares[largest] / 2)) % 360
+}
 
 /**
  * What is held, in two rings: the classes outside, what each is made of inside.
@@ -45,6 +67,8 @@ export function HoldingsPie({ groups, valueFormatter, emptyLabel }: HoldingsPieP
 
   const option = useMemo<EChartsCoreOption>(() => {
     const shade = (color: ThemedColor) => (isDark ? color.dark : color.light)
+    const total = held.reduce((sum, group) => sum + group.value, 0)
+    const startAngle = startAngleFor(held.map((group) => group.value / (total || 1)))
     const foreground = cssValue('--foreground')
     const muted = cssValue('--muted-foreground')
 
@@ -62,7 +86,8 @@ export function HoldingsPie({ groups, valueFormatter, emptyLabel }: HoldingsPieP
         {
           // Inside: what each class is made of, aligned under the arc it belongs to.
           type: 'pie',
-          radius: ['22%', '46%'],
+          radius: ['30%', '54%'],
+          startAngle,
           padAngle: 1.5,
           selectedMode: 'multiple',
           selectedOffset: OFFSET.parts,
@@ -81,7 +106,8 @@ export function HoldingsPie({ groups, valueFormatter, emptyLabel }: HoldingsPieP
         {
           // Outside: the classes, and the only ring that carries names.
           type: 'pie',
-          radius: ['58%', '74%'],
+          radius: ['60%', '80%'],
+          startAngle,
           padAngle: 2,
           selectedMode: 'multiple',
           selectedOffset: OFFSET.classes,
