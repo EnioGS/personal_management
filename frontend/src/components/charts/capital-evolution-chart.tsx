@@ -13,7 +13,22 @@ interface CapitalEvolutionChartProps<T extends Record<string, unknown>> {
   netCashFlowLabel: string
 }
 
-/** Capital, what is held and what each month netted, as lines, over the month's spending as bars. */
+/**
+ * Small enough to be a mark rather than a marker: it says a month was measured here, and
+ * gets out of the way of the line it sits on. No outline, and the line's own colour, so it
+ * reads as a thickening of the line rather than as something sitting on top of it.
+ */
+const dot = (series: string) => ({ r: 1.6, strokeWidth: 0, fill: `var(--color-${series})` })
+
+/**
+ * Capital, what is held and what each month netted, as lines, over the month's spending as
+ * bars.
+ *
+ * The lines are drawn straight from month to month. A monotone curve invents a shape
+ * between two measurements — a smooth rise through a month nothing was measured in — and
+ * on a chart whose whole subject is what happened in each month, that is a claim the data
+ * does not make. The dots say where the measurements actually are.
+ */
 export function CapitalEvolutionChart<T extends Record<string, unknown>>({
   data,
   xKey,
@@ -46,9 +61,9 @@ export function CapitalEvolutionChart<T extends Record<string, unknown>>({
           content={<ChartTooltipContent formatter={(value, name) => [valueFormatter(value as number), name]} />}
         />
         <Bar dataKey="spending" name={spendingLabel} fill="var(--color-spending)" barSize="33.3%" radius={[4, 4, 0, 0]} />
-        <Line dataKey="capital" name={capitalLabel} type="monotone" stroke="var(--color-capital)" strokeWidth={2} dot={false} />
-        <Line dataKey="investments" name={investmentsLabel} type="monotone" stroke="var(--color-investments)" strokeWidth={2} dot={false} />
-        <Line dataKey="income" name={netCashFlowLabel} type="monotone" stroke="var(--color-income)" strokeWidth={2} dot={false} />
+        <Line dataKey="capital" name={capitalLabel} type="linear" stroke="var(--color-capital)" strokeWidth={2} dot={dot('capital')} activeDot={{ r: 4, strokeWidth: 0 }} />
+        <Line dataKey="investments" name={investmentsLabel} type="linear" stroke="var(--color-investments)" strokeWidth={2} dot={dot('investments')} activeDot={{ r: 4, strokeWidth: 0 }} />
+        <Line dataKey="income" name={netCashFlowLabel} type="linear" stroke="var(--color-income)" strokeWidth={2} dot={dot('income')} activeDot={{ r: 4, strokeWidth: 0 }} />
         <ChartLegend content={<ChartLegendContent />} />
       </ComposedChart>
     </ChartContainer>

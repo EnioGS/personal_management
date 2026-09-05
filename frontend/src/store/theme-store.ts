@@ -23,18 +23,29 @@ function readInitialTheme(): Theme {
 
 interface ThemeState {
   theme: Theme
+  /**
+   * Which theme is actually on, "system" resolved.
+   *
+   * CSS reads the class on the root and needs nothing else, but a canvas cannot read a
+   * custom property: anything drawn rather than styled has to be told which colours to
+   * use, and redrawn when the answer changes. This is that signal.
+   */
+  isDark: boolean
   setTheme: (theme: Theme) => void
 }
 
 export const useThemeStore = create<ThemeState>((set) => ({
   theme: readInitialTheme(),
+  isDark: resolveIsDark(readInitialTheme()),
   setTheme: (theme) => {
     localStorage.setItem(THEME_STORAGE_KEY, theme)
     applyTheme(theme)
-    set({ theme })
+    set({ theme, isDark: resolveIsDark(theme) })
   },
 }))
 
 window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
-  if (useThemeStore.getState().theme === 'system') applyTheme('system')
+  if (useThemeStore.getState().theme !== 'system') return
+  applyTheme('system')
+  useThemeStore.setState({ isDark: resolveIsDark('system') })
 })
