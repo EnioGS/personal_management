@@ -266,7 +266,6 @@ export function IngestionPanel() {
         <Button type="button" size="xs" variant="outline" onClick={() => fileInput.current?.click()}>
           <Upload className="mr-1 size-3.5" /> Import a file
         </Button>
-
       </div>
 
       {selectedFile && (
