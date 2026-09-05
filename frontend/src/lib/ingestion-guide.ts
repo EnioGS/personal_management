@@ -24,7 +24,8 @@ columns. Everything starts empty: nothing about a row is claimed before somebody
 
 Only the file's own columns can be assigned, to: **date**, **value** (money that moved,
 signed), **amount** (units of a thing — what an investment row is), **price** (what one
-unit was worth), asset, investmentType, investmentClass. Value and amount are never
+unit was worth), asset, investmentType, investmentClass (renda fixa, renda variável, or a
+cash reserve — the dashboards read all three). Value and amount are never
 interchangeable: money is a value, a holding is an amount. Anything unassigned is condensed
 into the observations of each confirmed row, which is where a description ends up.
 

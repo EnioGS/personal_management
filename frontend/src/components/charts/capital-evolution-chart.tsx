@@ -48,7 +48,7 @@ export function CapitalEvolutionChart<T extends Record<string, unknown>>({
         <Bar dataKey="spending" name={spendingLabel} fill="var(--color-spending)" barSize="33.3%" radius={[4, 4, 0, 0]} />
         <Line dataKey="capital" name={capitalLabel} type="monotone" stroke="var(--color-capital)" strokeWidth={2} dot={false} />
         <Line dataKey="investments" name={investmentsLabel} type="monotone" stroke="var(--color-investments)" strokeWidth={2} dot={false} />
-        <Line dataKey="income" name={netCashFlowLabel} type="monotone" stroke="var(--color-income)" strokeWidth={1.5} strokeDasharray="4 3" dot={false} />
+        <Line dataKey="income" name={netCashFlowLabel} type="monotone" stroke="var(--color-income)" strokeWidth={2} dot={false} />
         <ChartLegend content={<ChartLegendContent />} />
       </ComposedChart>
     </ChartContainer>
