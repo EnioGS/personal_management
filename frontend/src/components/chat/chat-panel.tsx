@@ -13,6 +13,8 @@ import { Textarea } from '@/components/ui/textarea'
 
 const DRAG_THRESHOLD = 4
 const MAX_COMPOSER_LINES = 8
+/** What Send occupies in the composer row: its own width plus the gap beside it. */
+const SEND_IN_ROW_WIDTH = 48
 
 /**
  * Global chat overlay — mounted once at the app root (see App.tsx), not inside
@@ -47,7 +49,8 @@ export function ChatPanel() {
    * width, which is what a message long enough to wrap actually needs.
    */
   const [isOverflowing, setIsOverflowing] = useState(false)
-  const [hasWrapped, setHasWrapped] = useState(false)
+  /** Read inside the measurement, which must know the layout it is measuring against. */
+  const isFloatingRef = useRef(false)
   const [dragOffset, setDragOffset] = useState<number | null>(null)
   const [isDraggingFileOver, setIsDraggingFileOver] = useState(false)
   const dragStartX = useRef(0)
@@ -56,6 +59,23 @@ export function ChatPanel() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const scrollAreaRef = useRef<HTMLDivElement>(null)
   const composerRef = useRef<HTMLTextAreaElement>(null)
+
+  /**
+   * The composer's height at a width it does not currently have.
+   *
+   * Measuring at a hypothetical width is what keeps this stable: the question "does this
+   * message wrap?" is always asked of the row *with* Send in it, whether Send is there or
+   * not. Ask it of the current width instead and the answer changes with the answer —
+   * Send leaves, the box widens, the text fits, Send returns, the text wraps.
+   */
+  function heightAt(composer: HTMLTextAreaElement, width: number): number {
+    const previousWidth = composer.style.width
+    composer.style.width = `${width}px`
+    composer.style.height = 'auto'
+    const height = composer.scrollHeight
+    composer.style.width = previousWidth
+    return height
+  }
 
   function resizeComposer() {
     const composer = composerRef.current
@@ -67,14 +87,19 @@ export function ChatPanel() {
     const lineHeight = Number.parseFloat(styles.lineHeight)
     const verticalPadding = Number.parseFloat(styles.paddingTop) + Number.parseFloat(styles.paddingBottom)
     const verticalBorder = Number.parseFloat(styles.borderTopWidth) + Number.parseFloat(styles.borderBottomWidth)
+    const singleLine = lineHeight + verticalPadding + verticalBorder + 1
     const maxHeight = lineHeight * MAX_COMPOSER_LINES + verticalPadding + verticalBorder
 
-    // Reset before measuring so deleting text immediately shrinks the composer again.
-    composer.style.height = 'auto'
-    const wanted = composer.scrollHeight
+    // The width the row has when Send is in it, whichever way it is laid out now.
+    const narrowWidth = isFloatingRef.current ? composer.clientWidth - SEND_IN_ROW_WIDTH : composer.clientWidth
+    const wraps = heightAt(composer, narrowWidth) > singleLine
+    // The height is measured at the width the box is *about* to have, so growing a line
+    // and giving that line back never both happen on screen.
+    const wanted = heightAt(composer, wraps ? narrowWidth + SEND_IN_ROW_WIDTH : narrowWidth)
+
     composer.style.height = `${Math.min(wanted, maxHeight)}px`
     composer.style.overflowY = wanted > maxHeight ? 'auto' : 'hidden'
-    setIsOverflowing(wanted > lineHeight + verticalPadding + verticalBorder + 1)
+    setIsOverflowing(wraps)
   }
 
   /**
@@ -82,13 +107,11 @@ export function ChatPanel() {
    * round, once it does not — and also while the panel is closed with something written,
    * which is the only way that message could still be sent.
    *
-   * Latched on purpose. Send leaving the row widens the composer, which can let the very
-   * text that pushed it out fit on one line again — which would put Send back, narrow the
-   * composer, and wrap the text again, forever. So once it has gone, it stays gone until
-   * the message does: the state changes when the user does something, never because the
-   * layout changed under it.
+   * There is no latch: the measurement behind it always asks about the row with Send in
+   * it, so erasing back to a message that fits brings Send home, and nothing here can
+   * flip on its own.
    */
-  const isSendFloating = isComposing && (hasWrapped || panelWidth === 0)
+  const isSendFloating = isComposing && (isOverflowing || panelWidth === 0)
 
   useEffect(() => {
     // Scroll only the message list's own viewport directly — `scrollIntoView` walks up
@@ -106,14 +129,7 @@ export function ChatPanel() {
     resizeComposer()
   }, [draft, panelWidth])
 
-  useEffect(() => {
-    if (isOverflowing) setHasWrapped(true)
-  }, [isOverflowing])
-
-  // Cleared or sent: the composer is one line again, and Send comes home.
-  useEffect(() => {
-    if (!isComposing) setHasWrapped(false)
-  }, [isComposing])
+  isFloatingRef.current = isSendFloating
 
   // The conversation comes back by itself: nothing was ever saved by hand, so nothing
   // should have to be reopened by hand either.
@@ -227,9 +243,11 @@ export function ChatPanel() {
       onClick={submitDraft}
       // Beside the panel rather than a grip's width away from it: the grip is centred
       // vertically and this sits at the bottom, so the two never meet.
-      style={{ right: liveWidth + 32 }}
+      style={{ right: liveWidth + 22 }}
       className={cn(
-        'bg-primary text-primary-foreground fixed bottom-5 z-50 flex size-10 items-center justify-center rounded-full shadow-lg',
+        // bottom-3 is the composer's own bottom padding, so the button's lower edge and
+        // the box's lower edge are the same line however tall the message has grown.
+        'bg-primary text-primary-foreground fixed bottom-3 z-50 flex size-10 items-center justify-center rounded-full shadow-lg',
         'transition-[opacity,transform] duration-200 ease-out',
         isSendFloating ? 'scale-100 opacity-100' : 'pointer-events-none scale-50 opacity-0',
         panelWidth === 0 && 'opacity-60',
