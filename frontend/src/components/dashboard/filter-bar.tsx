@@ -59,7 +59,7 @@ export function FilterBar({
           variant={filters.preset === preset ? 'secondary' : 'ghost'}
           onClick={() => setPreset(preset)}
         >
-          {t(`common:dashboard.${preset}` as never)}
+          {t(`common:dashboard.presets.${preset}` as never)}
         </Button>
       ))}
 

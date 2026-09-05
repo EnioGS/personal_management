@@ -85,7 +85,8 @@
     "totalOut": "Total de saídas",
     "spending": "Gastos",
     "inLabel": "Entrada",
-    "outLabel": "Saída"
+    "outLabel": "Saída",
+    "clear": "Limpar"
   },
   "nav": {
     "showLabels": "Mostrar nomes",

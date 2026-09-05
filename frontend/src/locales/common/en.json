@@ -85,7 +85,8 @@
     "totalOut": "Total out",
     "spending": "Spending",
     "inLabel": "In",
-    "outLabel": "Out"
+    "outLabel": "Out",
+    "clear": "Clear"
   },
   "nav": {
     "showLabels": "Show labels",

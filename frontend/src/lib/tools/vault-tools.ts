@@ -178,7 +178,7 @@ async function labelSourceRows(rowIds: number[], values: Record<string, unknown>
 
 export const setLabelsTool: ToolDefinition = {
   name: 'set_labels',
-  description: "Sets labels on source rows by their id. Sections and screens take several values separated by commas and are checked against the app's own navigation — list_label_options says what exists, and a screen is only valid inside a section the row names. Category and subcategory are free text, one value each, and start at 'outros', which means nobody has said anything more precise. Account and card are optional and must name one the user set up in Settings, by its name; they are how a row says which account it moved through or which card it was billed to, and list_label_options names the ones that exist. Fields you leave out keep what they hold.",
+  description: "Sets labels on source rows by their id. Sections and screens take several values separated by commas and are checked against the app's own navigation — list_label_options says what exists, and a screen is only valid inside a section the row names. Category and subcategory are free text, one value each, and start at 'outros', which means nobody has said anything more precise. Account says which account the money moved through and is required before a row can be confirmed; card says which card it was billed to and is optional, since a Pix, a salary or a transfer touched none. Both must name something the user set up in Settings — list_accounts_and_cards has them, add_account and add_card make what is missing. Fields you leave out, or pass empty, keep what they hold; taking a card off a row is said with clearCard: true.",
   parameters: {
     type: 'object',
     properties: {
