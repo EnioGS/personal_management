@@ -22,6 +22,11 @@ export interface Conversation {
   /** When the last message was written, which is what "the last conversation" means. */
   updatedAt: number
   usage?: ConversationUsage
+  /**
+   * Sets of tools this conversation opened. Remembered so a thread that has been working
+   * on an import does not spend a round asking for the same tools in every message.
+   */
+  openToolGroups?: string[]
 }
 
 export type StoredConversation = Conversation & { id: number }

@@ -63,6 +63,8 @@ interface ChatState {
    * current exchange finishes.
    */
   queued: string[]
+  /** Sets of tools this conversation has opened, so it does not ask for them again. */
+  openToolGroups: string[]
   /** The conversation being written to, or null before its first message is sent. */
   conversationId: number | null
   title: string
@@ -165,9 +167,11 @@ export const useChatStore = create<ChatState>((set, get) => {
         model: connection.model,
         messages: apiMessages,
         context: toolContext(attachments),
-        tools: toolsForRequest(),
+        tools: toolsForRequest(get().openToolGroups),
         requestFn,
         onStatus: (status) => set({ status }),
+        openGroups: get().openToolGroups,
+        onGroupsOpened: (groups) => set({ openToolGroups: groups }),
         onUsage: (usage) => {
           const previous = get().usage
           // Prompt and completion tokens are priced differently, so the cost is built
@@ -232,6 +236,7 @@ export const useChatStore = create<ChatState>((set, get) => {
   status: { type: 'idle' },
   usage: { lastMessageTokens: 0, lastMessageRounds: 0, sessionTokens: 0, contextTokens: 0, contextWindow: null, sessionCost: null, lastMessageCost: null },
   queued: [],
+  openToolGroups: [],
   conversationId: null,
   title: UNTITLED,
 
@@ -258,6 +263,7 @@ export const useChatStore = create<ChatState>((set, get) => {
     queued: [],
     conversationId: null,
     title: UNTITLED,
+    openToolGroups: [],
     // The window survives a cleared conversation; what it cost does not.
     usage: { ...get().usage, lastMessageTokens: 0, lastMessageRounds: 0, sessionTokens: 0, contextTokens: 0, sessionCost: null, lastMessageCost: null },
   }),
@@ -273,6 +279,7 @@ export const useChatStore = create<ChatState>((set, get) => {
       messages: conversation.messages,
       attachments: [],
       queued: [],
+      openToolGroups: conversation.openToolGroups ?? [],
       status: { type: 'idle' },
       // Its own totals come back with it; what the last message cost does not, because
       // that message was sent in another sitting.
@@ -323,6 +330,7 @@ async function persist(set: (partial: Partial<ChatState>) => void, get: () => Ch
   const id = await saveConversation(conversationId, {
     title,
     messages,
+    openToolGroups: get().openToolGroups,
     // What it has cost so far travels with it: a conversation reopened tomorrow should
     // not claim to have cost nothing.
     usage: {

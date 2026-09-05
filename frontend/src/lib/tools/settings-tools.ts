@@ -15,7 +15,7 @@ async function cards(): Promise<{ id: number; card: Card }[]> {
 
 export const listAccountsAndCardsTool: ToolDefinition = {
   name: 'list_accounts_and_cards',
-  description: "Lists the accounts and credit cards the user has set up, with the id of each and, for a card, the account it settles against. Every row has to name an account and a card by these names, so read this before labelling anything — and add what is missing rather than labelling a row with a name nothing is called.",
+  description: "Lists the accounts and credit cards the user has set up, with each card's parent account. Every row names an account, so read this before labelling \u2014 and add what is missing rather than inventing a name.",
   parameters: { type: 'object', properties: {}, additionalProperties: false },
   execute: async () => JSON.stringify({
     accounts: (await accounts()).map(({ id, account }) => ({ id, ...account })),
@@ -57,7 +57,7 @@ export const addAccountTool: ToolDefinition = {
 
 export const addCardTool: ToolDefinition = {
   name: 'add_card',
-  description: "Registers a credit card. A card always settles against an account, so the account has to exist first and be named here by its id — list_accounts_and_cards has them, and add_account makes one. The closing and due days are the days of the month the invoice closes and falls due; leave them out if the user has not said. A name that is already taken is refused rather than duplicated.",
+  description: "Registers a credit card. A card settles against an account, so the account must exist and be named here by its id. closingDay and dueDay are days of the month; leave them out if the user has not said. A name already taken is refused.",
   parameters: {
     type: 'object',
     properties: {

@@ -51,9 +51,17 @@ describe('the system prompt', () => {
     }
   })
 
-  it('states the four labels, the sign convention, and who may delete', () => {
-    expect(DEFAULT_SYSTEM_PROMPT).toContain('sections and screens')
-    expect(DEFAULT_SYSTEM_PROMPT).toContain('negative left and positive arrived')
-    expect(DEFAULT_SYSTEM_PROMPT).toContain('only the user deletes marked rows')
+  it('states the two rules that must never bend, and leaves the rest to the guide', () => {
+    const prompt = DEFAULT_SYSTEM_PROMPT.replace(/\s+/g, ' ')
+
+    expect(prompt).toContain('Never edit a confirmed row in place')
+    expect(prompt).toContain('only the user deletes anything')
+    expect(prompt).toContain('read_ingestion_guide')
+  })
+
+  it('is short, because everything it repeats is fetched on demand and paid for twice', () => {
+    // Roughly four characters to a token: a prompt sent with every single request has to
+    // earn its length, and the guide already says what this used to say.
+    expect(DEFAULT_SYSTEM_PROMPT.length / 4).toBeLessThan(320)
   })
 })

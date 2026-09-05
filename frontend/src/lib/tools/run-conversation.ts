@@ -1,6 +1,6 @@
 import { refreshAllLocalStores } from '@/lib/local-store/create-local-list-store'
 import { requestChatMessage, type OpenRouterMessage, type OpenRouterTool } from '@/lib/openrouter'
-import { findTool } from './registry'
+import { findTool, openToolsetTool, toolsForRequest } from './registry'
 import type { ToolContext } from './types'
 
 type RequestFn = typeof requestChatMessage
@@ -42,6 +42,21 @@ export interface RunConversationArgs {
   requestFn?: RequestFn
   onStatus?: (status: ConversationStatus) => void
   onUsage?: (usage: ConversationUsage) => void
+  /** Sets of tools this conversation has already opened, from an earlier message. */
+  openGroups?: string[]
+  /** Told when a set is opened, so the conversation can remember it. */
+  onGroupsOpened?: (groups: string[]) => void
+}
+
+/** The sets an open_toolset result says are now available. */
+function groupsOpenedBy(result: string): string[] {
+  try {
+    const parsed: unknown = JSON.parse(result)
+    const opened = (parsed as { opened?: unknown })?.opened
+    return Array.isArray(opened) ? opened.map(String) : []
+  } catch {
+    return []
+  }
 }
 
 /**
@@ -58,13 +73,19 @@ export async function runConversation({
   requestFn = requestChatMessage,
   onStatus,
   onUsage,
+  openGroups = [],
+  onGroupsOpened,
 }: RunConversationArgs): Promise<string> {
   const conversation = [...messages]
+  // Which sets of tools this exchange has opened. A request carries the core plus these,
+  // so opening one costs a round and then nothing.
+  const opened = new Set(openGroups)
+  let offered = tools
   const usage: ConversationUsage = { rounds: 0, promptTokens: 0, completionTokens: 0, totalTokens: 0, lastPromptTokens: 0 }
 
   for (let iteration = 0; iteration < maxIterations; iteration++) {
     onStatus?.({ type: 'waiting' })
-    const message = await requestFn(apiKey, model, conversation, tools)
+    const message = await requestFn(apiKey, model, conversation, offered)
     if (message.usage) {
       usage.rounds += 1
       usage.promptTokens += message.usage.promptTokens
@@ -85,6 +106,14 @@ export async function runConversation({
       onStatus?.({ type: 'tool', name: toolCall.function.name })
       const result = await executeToolCall(toolCall, context)
       conversation.push({ role: 'tool', content: result, tool_call_id: toolCall.id })
+
+      // Opening a set takes effect from the next round, and is remembered by the caller
+      // so the rest of the conversation does not have to ask again.
+      if (toolCall.function.name === openToolsetTool.name) {
+        for (const group of groupsOpenedBy(result)) opened.add(group)
+        offered = toolsForRequest([...opened])
+        onGroupsOpened?.([...opened])
+      }
     }
   }
 

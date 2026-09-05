@@ -3,7 +3,7 @@ import type { ToolDefinition } from './types'
 
 export const setConversationTitleTool: ToolDefinition = {
   name: 'set_conversation_title',
-  description: "Renames the conversation on screen. It is named automatically from its opening message, so use this only when the user asks for a different name — not on your own initiative, and not because the subject drifted. Keep it short: it is a line in a list, not a summary.",
+  description: "Renames the conversation on screen. It is named automatically from its opening message, so use this only when the user asks for a different name. Keep it short.",
   parameters: {
     type: 'object',
     properties: { title: { type: 'string', description: 'At most a few words.' } },

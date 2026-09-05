@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { findTool, toolRegistry, toolsForRequest } from './registry'
+import { TOOL_GROUPS, findTool, toolRegistry, toolsForRequest } from './registry'
 
 describe('findTool', () => {
   it('finds a registered tool by name', () => {
@@ -78,17 +78,39 @@ describe('what the user can do and the assistant cannot', () => {
   })
 })
 
-describe('toolsForRequest', () => {
-  it('maps the registry to OpenRouter function-tool shape', () => {
-    const tools = toolsForRequest()
-    expect(tools).toHaveLength(toolRegistry.length)
-    expect(tools[0]).toEqual({
+describe('what a request carries', () => {
+  it('is the reading tools and the way to ask for more, not every tool there is', () => {
+    const names = toolsForRequest().map((tool) => tool.function.name)
+
+    expect(names).toContain('open_toolset')
+    expect(names).toContain('query_vault')
+    expect(names).toContain('read_ingestion_guide')
+    // Nothing that writes, until somebody says the work needs it.
+    expect(names).not.toContain('confirm_rows')
+    expect(names).not.toContain('save_label_rule')
+    expect(names.length).toBeLessThan(toolRegistry.length / 2)
+  })
+
+  it('adds a set once it is opened, and only that set', () => {
+    const names = toolsForRequest(['ingesting']).map((tool) => tool.function.name)
+
+    expect(names).toContain('assign_source_columns')
+    expect(names).toContain('confirm_rows')
+    expect(names).not.toContain('save_label_rule')
+  })
+
+  it('names every tool in the registry in exactly one set, or in the core', () => {
+    const grouped = Object.values(TOOL_GROUPS).flatMap((group) => group.tools)
+    const everything = toolsForRequest(Object.keys(TOOL_GROUPS)).map((tool) => tool.function.name)
+
+    expect(new Set(grouped).size).toBe(grouped.length)
+    for (const tool of toolRegistry) expect(everything, tool.name).toContain(tool.name)
+  })
+
+  it('maps a tool to the OpenRouter function shape', () => {
+    expect(toolsForRequest()[0]).toEqual({
       type: 'function',
-      function: {
-        name: toolRegistry[0].name,
-        description: toolRegistry[0].description,
-        parameters: toolRegistry[0].parameters,
-      },
+      function: { name: 'open_toolset', description: expect.any(String), parameters: expect.any(Object) },
     })
   })
 })

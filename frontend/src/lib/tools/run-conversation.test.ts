@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { OpenRouterMessage } from '@/lib/openrouter'
 import { runConversation } from './run-conversation'
+import { toolsForRequest } from './registry'
 import type { ToolContext } from './types'
 
 const context: ToolContext = { attachments: [{ id: 'f1', name: 'notes.txt', type: 'text/plain', content: 'file body' }], translate: (key: string) => key }
@@ -182,5 +183,49 @@ describe('what a message cost', () => {
     await runConversation({ apiKey: 'k', model: 'm', messages: baseMessages, context, requestFn, onUsage: (usage) => seen.push(usage) })
 
     expect(seen).toEqual([])
+  })
+})
+
+describe('opening a set of tools', () => {
+  it('carries it from the next round, and tells the conversation to remember it', async () => {
+    const opened: string[][] = []
+    const requestFn = vi
+      .fn()
+      .mockResolvedValueOnce(toolCallMessage('call_1', 'open_toolset', { groups: ['ingesting'] }))
+      .mockResolvedValueOnce(textMessage('ready'))
+
+    await runConversation({
+      apiKey: 'k',
+      model: 'm',
+      messages: baseMessages,
+      context,
+      tools: toolsForRequest(),
+      requestFn,
+      onGroupsOpened: (groups) => opened.push(groups),
+    })
+
+    expect(opened).toEqual([['ingesting']])
+    // The first request offered the core; the second offers the set as well.
+    const before = (requestFn.mock.calls[0][3] as { function: { name: string } }[]).map((tool) => tool.function.name)
+    const after = (requestFn.mock.calls[1][3] as { function: { name: string } }[]).map((tool) => tool.function.name)
+    expect(before).not.toContain('confirm_rows')
+    expect(after).toContain('confirm_rows')
+  })
+
+  it('starts from the sets a conversation had already opened', async () => {
+    const requestFn = vi.fn().mockResolvedValueOnce(textMessage('done'))
+
+    await runConversation({
+      apiKey: 'k',
+      model: 'm',
+      messages: baseMessages,
+      context,
+      tools: toolsForRequest(['rules']),
+      requestFn,
+      openGroups: ['rules'],
+    })
+
+    const offered = (requestFn.mock.calls[0][3] as { function: { name: string } }[]).map((tool) => tool.function.name)
+    expect(offered).toContain('save_label_rule')
   })
 })

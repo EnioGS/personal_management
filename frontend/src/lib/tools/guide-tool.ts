@@ -7,7 +7,7 @@ import type { ToolDefinition } from './types'
 
 export const readIngestionGuideTool: ToolDefinition = {
   name: 'read_ingestion_guide',
-  description: "Returns the complete guide to importing and labelling: what a source table holds, the order the work is done in, every label and what its values mean, how signs are made to agree, how corrections are made, and which actions belong to the user — followed by the notes written about this particular vault, which say what a rule cannot and outrank your own guesswork. Call it BEFORE doing or explaining anything about importing, assigning columns, labelling, signs, rules or confirming — including when the user simply asks for help with any of that. Read-only.",
+  description: "Returns the guide to importing and labelling \u2014 what a source table holds, the order of the work, every label, how signs are made to agree, how corrections are made, who may delete \u2014 followed by the notes written about this particular vault. Call it BEFORE doing or explaining anything about that work. Read-only.",
   parameters: { type: 'object', properties: {}, additionalProperties: false },
   execute: async (_args, context) => {
     const stored = (await assistantPromptsTable.toArray()).find((row) => (row.data as AssistantPrompt).key === INGESTION_GUIDE_KEY)

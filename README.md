@@ -143,6 +143,14 @@ Two things it optimizes for:
   instead of opening a transaction per row.
 - The chat assistant is a global overlay (`components/chat/`), not a
   section — it stays available regardless of which section/item is active.
+- A request carries only the tools it might need. Every schema is paid for on every round
+  of every message, and 34 of them came to ~7,800 tokens before the user typed anything —
+  so a request carries the core (reading files, SQL, the guide, the label vocabulary,
+  ~1,000 tokens) plus whichever sets this conversation has opened through `open_toolset`,
+  whose description is the menu. An opened set is remembered with the conversation, so it
+  costs one round once rather than every message, and a conversation that never touches
+  the data never pays for the tools that would change it. The system prompt is short for
+  the same reason: what it used to repeat is in the guide, which is fetched on demand.
 - Tools the assistant can call are a flat registry (`lib/tools/registry.ts`):
   adding one is a single new `ToolDefinition` file plus one array entry,
   nothing else changes. Reading is one SQL tool over the browser database, so a

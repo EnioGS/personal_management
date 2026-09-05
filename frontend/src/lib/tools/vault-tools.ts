@@ -24,7 +24,7 @@ import type { ToolDefinition } from './types'
 
 export const queryVaultTool: ToolDefinition = {
   name: 'query_vault',
-  description: "Runs one SELECT against the app's data and returns columns and rows. This is how you read anything: there is a table per uploaded file (source__<file>__<id>), a table per (section, screen) pair holding confirmed rows (confirmed__<section>__<screen>), and label_rules. Call it with no statement to get the schema — every table, its columns, how many rows it holds, and for a confirmed table how its values are signed today, which is the reference any sign decision is measured against. That is the right first call on unfamiliar data. Count and group here rather than reading rows you do not need; at most 200 rows come back and the total is always reported. Reading is all this does: changes go through the other tools.",
+  description: "Runs one SELECT and returns columns and rows \u2014 a table per uploaded file (source__<file>__<id>), one per (section, screen) pair of confirmed rows (confirmed__<section>__<screen>), and label_rules. Call it with no statement for the schema, including how each confirmed table's values are signed today. Count and group here rather than reading rows you do not need: 200 rows come back and the true total is reported. Read-only.",
   parameters: { type: 'object', properties: { statement: { type: 'string', description: 'One SELECT, or WITH … SELECT. Omit to describe the schema instead.' } }, additionalProperties: false },
   execute: async (args) => {
     if (typeof args.statement !== 'string' || !args.statement.trim()) {
@@ -38,7 +38,7 @@ export const queryVaultTool: ToolDefinition = {
 
 export const importAsSourceFileTool: ToolDefinition = {
   name: 'import_as_source_file',
-  description: "Turns text into a new source file, exactly as if it had been dropped on the ingestion centre — it appears in the file list and is worked on the same way. Use it for data that arrives as text rather than as a CSV upload: a .txt or .md the user attached, a table pasted into the message, a statement copied out of a PDF. Pass the text with a header row. Commas, semicolons, tabs, pipes and spaced dashes are all detected, and a markdown pipe table is read as a table — but detection picks whatever splits the file most consistently, so pass `delimiter` when the file separates with something its own values also contain. Check the columns in the result: one column whose name holds every heading means the wrong separator, and the fix is to say which it is rather than to work around the shape. Give it a filename that says where the data came from, since that filename is stamped on every row and is what duplicate checking compares. Nothing is confirmed by this: the rows arrive unlabelled, standing source rules run over them, and the ordinary flow follows.",
+  description: "Turns text into a source file, as if it had been dropped on the ingestion centre: a .txt or .md the user attached, a table pasted into a message, rows copied out of a PDF. Needs a header row. Commas, semicolons, tabs, pipes and spaced dashes are detected and a markdown table is read as one, but detection can be outvoted by values containing the separator \u2014 check the columns that come back, and pass delimiter if one column holds every heading. The filename is stamped on every row and is what duplicate checking compares.",
   parameters: {
     type: 'object',
     properties: {
@@ -81,7 +81,7 @@ async function sourceFileById(sourceId: number): Promise<SourceFile | undefined>
 
 export const assignSourceColumnsTool: ToolDefinition = {
   name: 'assign_source_columns',
-  description: `Says what a file's own columns mean: ${ASSIGNABLE_FIELDS.join(', ')}. Only the file's own columns can be assigned — never source_filename, never a label column — and one field takes one column, so assigning it again moves it. Everything left unassigned is not lost: it is condensed into the observations of each row when it is confirmed. Read the file first; assignment is step one of four, before sections, screens and the sign.`,
+  description: `Says what a file's own columns mean: ${ASSIGNABLE_FIELDS.join(', ')}. Only the file's own columns can be assigned, and one field takes one column — assigning it again moves it. Anything unassigned is condensed into each row's observations at confirmation, so nothing is lost. Step one of four; see the guide.`,
   parameters: {
     type: 'object',
     properties: {
@@ -105,7 +105,7 @@ export const assignSourceColumnsTool: ToolDefinition = {
 
 export const setSignConventionTool: ToolDefinition = {
   name: 'set_sign_convention',
-  description: "Makes a file's values mean what this app means: negative left, positive arrived. It acts on the column assigned to value — the money that moved — and not on amount, which is units of a thing and has no direction. Decide this only after the rows are labelled, because it depends on where they are going, and sample those tables first with query_vault to see what signs comparable rows already carry, whatever convention anyone has recorded. invertAll suits a file that consistently means the opposite, such as a card export writing purchases as positive. invertWhen suits a file whose values are all one sign and whose direction lives in another column: name that column and the entries in it that mean money leaving. What the file wrote is kept in each row's observations, so nothing is lost. If the evidence does not settle it, ask the user rather than guessing.",
+  description: "Makes a file's values mean what this app means: negative left, positive arrived. Acts on the value column only \u2014 amount is units and has no direction. Decide it after the rows are labelled, and sample the destination tables with query_vault first. invertAll for a file that consistently means the opposite; invertWhen for one whose values are all one sign and whose direction lives in another column, naming that column and the entries meaning money left. What the file wrote is kept in the observations. Ask the user if the evidence does not settle it.",
   parameters: {
     type: 'object',
     properties: {
@@ -178,7 +178,7 @@ async function labelSourceRows(rowIds: number[], values: Record<string, unknown>
 
 export const setLabelsTool: ToolDefinition = {
   name: 'set_labels',
-  description: "Sets labels on source rows by their id. Sections and screens take several values separated by commas and are checked against the app's own navigation — list_label_options says what exists, and a screen is only valid inside a section the row names. Category and subcategory are free text, one value each, and start empty, which means nobody has said what the row is yet. Account says which account the money moved through and is required before a row can be confirmed; card says which card it was billed to and is optional, since a Pix, a salary or a transfer touched none. Both must name something the user set up in Settings — list_accounts_and_cards has them, add_account and add_card make what is missing. Fields you leave out, or pass empty, keep what they hold; taking a card off a row is said with clearCard: true.",
+  description: "Sets labels on source rows by id. Sections and screens take several comma-separated values, checked against the app itself (list_label_options), and a screen is only valid inside a section the row names. Category and subcategory are free text, one each, and start empty \u2014 leave them empty rather than writing a word like \"other\". Account is required before a row can be confirmed; card is optional, since a Pix or a salary touched none. Both must name something in Settings (list_accounts_and_cards). Fields left out, or passed empty, keep what they hold; clearCard: true removes a card.",
   parameters: {
     type: 'object',
     properties: {
@@ -202,7 +202,7 @@ export const setLabelsTool: ToolDefinition = {
 
 export const labelRowsByMatchTool: ToolDefinition = {
   name: 'label_rows_by_match',
-  description: "Labels every source row whose chosen field contains a piece of text, in one call. This is the one-off half of labelling: use it when a pattern is real but not worth keeping — save_label_rule is for one that will recur, and is what makes future imports land already labelled. It only fills rows that match; fields you leave out keep what they hold, and it reports how many rows it touched with a sample of what matched, so a match that was wider than you meant is visible immediately.",
+  description: "Labels every source row whose chosen field contains a piece of text, in one call \u2014 the one-off half of labelling, where save_label_rule is for a pattern worth keeping. Only matching rows are touched, and it reports the count with a sample of what matched, so a match wider than you meant shows immediately.",
   parameters: {
     type: 'object',
     properties: {
@@ -243,7 +243,7 @@ export const labelRowsByMatchTool: ToolDefinition = {
 
 export const addSourceRowTool: ToolDefinition = {
   name: 'add_source_row',
-  description: "Adds a row to a file's own table — for a transaction the file left out, or one the user knows about and wants recorded before it appears anywhere. Pass values keyed by the file's own column names; anything you leave out starts empty. The row is unlabelled and gets an id of its own, so it goes through exactly what every other row goes through before it can be confirmed. The user has the same button on the table.",
+  description: "Adds a row to a file's own table, for a transaction the file left out. Values are keyed by the file's own column names; anything left out starts empty. The row is unlabelled and gets an id of its own, so it goes through what every other row does.",
   parameters: {
     type: 'object',
     properties: {
@@ -267,7 +267,7 @@ export const addSourceRowTool: ToolDefinition = {
 
 export const setSourceValuesTool: ToolDefinition = {
   name: 'set_source_values',
-  description: "Corrects a source row's own values, by the file's column names. Use it where the file itself is wrong or unreadable — a date the export mangled, a value split across columns — and not to express meaning: what a row *is* belongs in its labels, and a raw value rewritten to say something is a value nobody can check against the file any more. Editing the value edits what the file said, and the file's sign convention is then re-applied to it. The user edits the same cells by double-clicking them.",
+  description: "Corrects a source row's own values, by the file's column names. For a file that is wrong or unreadable \u2014 a mangled date, a value split across columns \u2014 not for expressing meaning, which belongs in labels: a raw value rewritten to say something can no longer be checked against the file. Editing the value edits what the file said, and the sign convention is re-applied to it.",
   parameters: {
     type: 'object',
     properties: {
@@ -291,7 +291,7 @@ export const setSourceValuesTool: ToolDefinition = {
 
 export const setConfirmedMeaningTool: ToolDefinition = {
   name: 'set_confirmed_meaning',
-  description: "Sets the category and subcategory of rows already in a confirmed table. These are the two labels a row may be given later — a row can be confirmed knowing only where it belongs — so this is an ordinary edit and not a correction: nothing about what the row moved, when, or where it belongs changes. Anything else about a confirmed row is corrected the other way, by adding the corrected row with the same row_id and marking the old one. The user edits these same two cells in the table, so this leaves you no more able than they are.",
+  description: "Sets the category and subcategory of rows already confirmed \u2014 the two labels a row may be given later, since a row can be confirmed knowing only where it belongs. An ordinary edit: nothing about what the row moved, when, or where it belongs changes. Anything else is corrected by adding a row with the same row_id and marking the old one.",
   parameters: {
     type: 'object',
     properties: {
@@ -320,7 +320,7 @@ export const setConfirmedMeaningTool: ToolDefinition = {
 
 export const fillFromObservationsTool: ToolDefinition = {
   name: 'fill_from_observations',
-  description: "Fills in a confirmed row's date or value from the observations, where the file's own columns were kept. Use it for rows confirmed before their file was told which column held the date and which held the money: they are in their table with both empty, invisible to every dashboard, while the values sit in the observations under the file's column names — read one row's observations first to see what those names are. Only empty fields are touched, so it can be run twice safely, and nothing else about the row changes: this extracts a value that was always there rather than correcting one that was wrong.",
+  description: "Fills a confirmed row's date or value from its observations, where the file's own columns were kept \u2014 for rows confirmed before their file said which column held either, which sit in their table invisible to every dashboard. Read one row's observations first to learn the key names. Only empty fields are touched, so it is safe to run twice.",
   parameters: {
     type: 'object',
     properties: {
@@ -348,7 +348,7 @@ export const fillFromObservationsTool: ToolDefinition = {
 
 export const reviseConfirmedRowsTool: ToolDefinition = {
   name: 'revise_confirmed_rows',
-  description: "Corrects many confirmed rows at once, keeping the discipline that makes a correction readable: for every row it touches it adds the corrected row with the same row_id and marks the old one for elimination. Nothing is overwritten and nothing is deleted — a row already on a dashboard is evidence of what the user was told, and both versions stay, the old one invisible to every dashboard and still in its table. Pick the rows with selectIds, which is a SELECT returning an id column, or list them. Name only the fields that change; a field you do not pass, or pass as an empty string, is left exactly as it was. Clearing a card is said out loud with clearCard: true — a row that never touched a card should hold nothing there, but stripping the card off rows that have one is not something a stray empty string should be able to do. What a row moved cannot be changed here at all — money is corrected one row at a time with add_confirmed_row, because a wrong amount is a fact about one transaction and a tool that could rewrite three hundred of them at once would be one mistaken argument away from doing so. Account and card must name something the user set up. Where a row belongs is not changed here — place_confirmed_rows moves a row between tables. A row that is already marked is skipped rather than superseded twice.",
+  description: "Corrects many confirmed rows at once, keeping the discipline: for every row it adds the corrected version with the same row_id and marks the old one. Nothing is overwritten or deleted. Pick rows with selectIds (a SELECT returning an id column) or list them, and name only the fields that change \u2014 one left out, or passed empty, stays as it was. clearCard: true removes a card; an empty name does not. Money cannot be changed here: a wrong amount is a fact about one transaction, corrected with add_confirmed_row. Placement is place_confirmed_rows. Already-marked rows are skipped.",
   parameters: {
     type: 'object',
     properties: {
@@ -399,7 +399,7 @@ export const reviseConfirmedRowsTool: ToolDefinition = {
 
 export const placeConfirmedRowsTool: ToolDefinition = {
   name: 'place_confirmed_rows',
-  description: "Changes which table confirmed rows are in, or puts a copy of them in another one. Which table a row is in *is* its section and screen — there is no separate address — so this is how a placement is corrected, and how a row that turns out to belong on two screens gets its second copy. The row id is kept either way: it is what ties copies of one transaction together and what stops anything counting it twice. Use mode 'move' for a placement that was wrong and 'copy' for one that was incomplete. The user edits the same two cells in the confirmed table.",
+  description: "Changes which table confirmed rows are in, or copies them into another \u2014 a row's section and screen *are* its table. mode 'move' for a placement that was wrong, 'copy' for one that was incomplete. The row id is kept either way, which is what stops a copy being counted twice.",
   parameters: {
     type: 'object',
     properties: {
@@ -446,7 +446,7 @@ async function idsFrom(statement: string): Promise<number[]> {
 
 export const markRowsTool: ToolDefinition = {
   name: 'mark_rows',
-  description: "Marks rows for elimination, or unmarks them, either by id or by a query that picks them out. A marked row disappears from every dashboard and stays in its table — the one thing this app hides, and what makes marking safe to use freely. It works on source rows and confirmed rows alike. You cannot delete anything: removing marked rows is the user's, and the only thing they can do that you cannot. To correct a confirmed row, add the corrected one with the same row_id and mark the old one here.",
+  description: "Marks rows for elimination, or unmarks them, by id or by a query that picks them out. A marked row disappears from every dashboard and stays in its table \u2014 the one thing this app hides, which is what makes marking safe to use freely. Works on source and confirmed rows alike. You cannot delete: that is the user's alone.",
   parameters: {
     type: 'object',
     properties: {
@@ -486,14 +486,14 @@ export const markRowsTool: ToolDefinition = {
 
 export const newRowIdTool: ToolDefinition = {
   name: 'new_row_id',
-  description: "Mints an id for a row that came from nowhere — one you are adding rather than correcting. A correction keeps the id of the row it corrects, so use this only for genuinely new data, and pass the contents the row will hold so the id is derived from them.",
+  description: "Mints an id for a row that came from nowhere. A correction keeps the id of the row it corrects, so this is only for genuinely new data; pass the contents the row will hold.",
   parameters: { type: 'object', properties: { contents: { type: 'object', additionalProperties: true } }, additionalProperties: false },
   execute: async (args) => JSON.stringify({ rowId: newRowId((args.contents ?? {}) as Record<string, unknown>) }),
 }
 
 export const addConfirmedRowTool: ToolDefinition = {
   name: 'add_confirmed_row',
-  description: "Adds a row directly to a confirmed table. Two uses, and no others: correcting a row — pass the row_id of the one you are replacing and mark that one for elimination — or recording something the files never carried. Never edit a row in place; the pair of an added row and a marked one is what keeps the history readable. Money is a row's value, signed the way this app means it — negative left, positive arrived — while amount is units of a thing and price is what one unit was worth.",
+  description: "Adds a row to a confirmed table. Two uses only: correcting a row \u2014 pass the row_id of the one you replace, then mark that one \u2014 or recording something the files never carried. Value is money, signed (negative left, positive arrived); amount is units; price is what one unit was worth.",
   parameters: {
     type: 'object',
     properties: {
@@ -555,7 +555,7 @@ export const addConfirmedRowTool: ToolDefinition = {
 
 export const confirmRowsTool: ToolDefinition = {
   name: 'confirm_rows',
-  description: "Moves a file's labelled rows into the tables their labels name — one copy per (section, screen) pair, all sharing the row's id — and takes them out of the file. Without discardMarked this is the non-destructive half: rows that are unlabelled or marked stay where they are, and you may run it freely, saying afterwards what moved. With discardMarked it also drops what is marked for elimination and retires the file, which is destructive: ask the user first.",
+  description: "Moves a file's ready rows into the tables their labels name \u2014 one copy per (section, screen) pair, all sharing the row's id \u2014 and out of the file. Without discardMarked, rows that are unlabelled or marked stay put and you may run it freely. With it, marked rows are dropped and the file retired: ask the user first. The result says why any row was left behind.",
   parameters: {
     type: 'object',
     properties: {
@@ -606,7 +606,7 @@ async function reasonsRowsWereLeft(sourceId: number, catalogue: LabelCatalogue):
 
 export const dropSourceTableTool: ToolDefinition = {
   name: 'drop_source_table',
-  description: 'Removes an uploaded file that has no rows left. A file still holding rows is refused, and a confirmed table can never be dropped: those are what the dashboards read.',
+  description: "Removes an uploaded file that has no rows left. A file still holding rows is refused, and a confirmed table can never be dropped.",
   parameters: { type: 'object', properties: { sourceId: { type: 'number' } }, required: ['sourceId'], additionalProperties: false },
   execute: async (args) => {
     if (typeof args.sourceId !== 'number') return 'Error: sourceId is required.'
@@ -621,7 +621,7 @@ export const dropSourceTableTool: ToolDefinition = {
 
 export const listLabelOptionsTool: ToolDefinition = {
   name: 'list_label_options',
-  description: "Lists what the closed labels may be set to right now: the app's sections and the screens inside each, with the id to store and the name currently shown, plus the accounts and credit cards the user has set up. These follow the app and the user's own settings, so read them here rather than remembering them, and never invent one. Category and subcategory are free text and need no list.",
+  description: "Lists what the closed labels may be set to now: the app's sections and their screens, with the id to store and the name shown, plus the user's accounts and cards. Read them here rather than remembering them, and never invent one.",
   parameters: { type: 'object', properties: {}, additionalProperties: false },
   execute: async (_args, context) => {
     const catalogue = await loadLabelCatalogue(context.translate)

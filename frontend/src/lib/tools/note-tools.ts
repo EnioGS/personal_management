@@ -4,14 +4,14 @@ import type { ToolDefinition } from './types'
 
 export const listClassificationNotesTool: ToolDefinition = {
   name: 'list_classification_notes',
-  description: "Lists the notes written about this vault's data — what a rule cannot express, such as that a shop nobody would recognise sells food, or that one file's rows for a given month were a rebalance. read_ingestion_guide already returns them; call this when you want them alone, or to check what is written before adding another.",
+  description: "Lists the notes written about this vault's data \u2014 what a rule cannot express, such as a merchant nobody would recognise, or what one file's rows for a month were. read_ingestion_guide already returns them; call this to see them alone, or before adding another.",
   parameters: { type: 'object', properties: { context: { type: 'string', enum: ['source', 'confirmed'] } }, additionalProperties: false },
   execute: async (args) => JSON.stringify(await listClassificationNotes(args.context as RuleContext | undefined)),
 }
 
 export const addClassificationNoteTool: ToolDefinition = {
   name: 'add_classification_note',
-  description: "Writes down something worth knowing next time, in the user's own terms. Use it for what a rule cannot hold: an explanation the user gave you about a merchant, a convention one of their files follows, a judgement they made that you would otherwise have to ask about again. A note is not a rule — it labels nothing by itself — so write one whenever the user tells you something about their data, and quote them rather than paraphrasing your own reasoning back at them. Choose the stage the note is about: 'source' for something that matters while a file is being worked on, 'confirmed' for something about rows already in a table.",
+  description: "Writes down something worth knowing next time, in the user's own terms: an explanation they gave you, a convention one of their files follows, a judgement you would otherwise have to ask about again. A note labels nothing by itself. Choose the stage: 'source' for what matters while a file is worked on, 'confirmed' for rows already in a table. Quote the user rather than paraphrasing your own reasoning back at them.",
   parameters: {
     type: 'object',
     properties: {
@@ -31,7 +31,7 @@ export const addClassificationNoteTool: ToolDefinition = {
 
 export const editClassificationNoteTool: ToolDefinition = {
   name: 'edit_classification_note',
-  description: "Rewrites a note. Use it when what was written turns out to say two things, or to be wrong, or to name something by a word the app no longer uses — redrafting is how prose gets right, and a corrected note keeps its place in the list rather than reappearing as a new discovery. The whole text is replaced, so send the note as it should now read. Rewriting what the user wrote themselves is theirs to ask for; a note you wrote is yours to keep accurate.",
+  description: "Rewrites a note \u2014 when it says two things, or is wrong, or names something by a word the app no longer uses. The whole text is replaced, and the note keeps its place in the list. Rewriting what the user wrote is theirs to ask for.",
   parameters: {
     type: 'object',
     properties: {
@@ -53,7 +53,7 @@ export const editClassificationNoteTool: ToolDefinition = {
 
 export const deleteClassificationNoteTool: ToolDefinition = {
   name: 'delete_classification_note',
-  description: "Removes a note. Like deleting a rule, this needs the user first: a note may be something they told you themselves, and it is theirs to withdraw.",
+  description: "Removes a note. Ask the user first: a note may be something they told you themselves.",
   parameters: {
     type: 'object',
     properties: { noteId: { type: 'number' }, confirmed: { type: 'boolean' } },

@@ -32,7 +32,7 @@ function invalidRegex(rule: LabelRule): string | null {
 
 export const listLabelRulesTool: ToolDefinition = {
   name: 'list_label_rules',
-  description: "Lists the standing rules with their conditions, the labels they set, the rationale each was saved with, and what each has been credited with. Rules belong to one of two stages and never cross: 'source' rules run as a file arrives, so an import can land already labelled; 'confirmed' rules fill in meaning on rows already in a table. Read this before writing a rule — one may already cover the case, and a rule with overridden rows is telling you it was wrong.",
+  description: "Lists the standing rules with their conditions, the labels they set, the rationale each carries and what each has been credited with. Rules belong to one of two stages and never cross: 'source' runs as a file arrives, 'confirmed' fills in what a row already in a table says about itself. Read this before writing another \u2014 one may already cover the case, and a rule with overridden rows is telling you it was wrong.",
   parameters: { type: 'object', properties: { context: { type: 'string', enum: ['source', 'confirmed'] } }, additionalProperties: false },
   execute: async (args) => {
     const rules = await labelRulesWithStats(args.context as RuleContext | undefined)
@@ -51,7 +51,7 @@ export const listLabelRulesTool: ToolDefinition = {
 
 export const saveLabelRuleTool: ToolDefinition = {
   name: 'save_label_rule',
-  description: "Saves a standing rule, and applies it. Save one whenever a pattern will recur — no permission needed, because a rule fills only what a row does not already say, never overwrites a judgement, and the user can read, edit or delete any of them. Choose the stage: 'source' labels rows as a file arrives, which is how an import lands already placed; 'confirmed' fills in category, subcategory, account and card on rows already in a table — where a row belongs is not a rule's business, since confirming already decided it. Match by substring, or by equals, startsWith or regex — a short name needs one of those, since \"of\" is inside Microsoft. Conditions can be stacked, all of which must hold, which is how a rule is narrowed to one file through source_filename. The rationale is required: write why these labels are right for everything matching this, including what you checked and what you left out.",
+  description: "Saves a standing rule and applies it. No permission needed: a rule fills only what a row does not already say, and the user can read, edit or delete any of them. Choose the stage \u2014 'source' labels rows as a file arrives, 'confirmed' fills category, subcategory, account and card on rows already in a table. Match by substring, or equals, startsWith or regex; a short name needs one of the latter, since 'of' is inside Microsoft. Conditions stack, all of which must hold, which is how a rule is narrowed to one file through source_filename. The rationale is required: why these labels are right for everything matching this.",
   parameters: {
     type: 'object',
     properties: {
@@ -135,7 +135,7 @@ export const saveLabelRuleTool: ToolDefinition = {
 
 export const editLabelRuleTool: ToolDefinition = {
   name: 'edit_label_rule',
-  description: "Rewrites a standing rule: the text it looks for, the field it looks in, how it matches, the labels it concludes, or the rationale behind it. Use it when a rule turns out to be slightly wrong — a match too broad, a label that was right last month, a rationale that no longer says why — rather than deleting it and writing another: the rule keeps its place and what it has already labelled stays labelled, because a rule fills blanks and its past is in the rows. Pass only what changes; everything else stays. Rewriting a rule the user wrote is theirs to ask for, but keeping your own accurate is yours. It is applied afterwards unless you say otherwise, which fills what the new version now matches without touching a judgement anyone has made.",
+  description: "Rewrites a standing rule \u2014 the text it looks for, where it looks, how it matches, the labels it concludes, the rationale. Use it rather than deleting and rewriting: the rule keeps its place, and what it already labelled stays labelled. Pass only what changes. Rewriting a rule the user wrote is theirs to ask for; keeping your own accurate is yours. It is applied afterwards unless you say otherwise.",
   parameters: {
     type: 'object',
     properties: {
@@ -213,7 +213,7 @@ export const editLabelRuleTool: ToolDefinition = {
 
 export const applyLabelRulesTool: ToolDefinition = {
   name: 'apply_label_rules',
-  description: 'Runs the standing rules of one stage over the rows it holds, filling only what those rows do not already say. Run it freely — it needs no permission, cannot overwrite a decision and cannot confirm anything. Source rules also run by themselves as a file arrives; this is for after a rule is added or edited, or to catch rows that predate it.',
+  description: "Runs one stage's standing rules over the rows it holds, filling only what those rows do not already say. Run it freely: it needs no permission, cannot overwrite a decision and cannot confirm anything. Source rules also run by themselves as a file arrives; this is for after a rule is added or edited.",
   parameters: { type: 'object', properties: { context: { type: 'string', enum: ['source', 'confirmed'] }, rowIds: { type: 'array', items: { type: 'number' } } }, required: ['context'], additionalProperties: false },
   execute: async (args, context) => {
     const stage: RuleContext = args.context === 'confirmed' ? 'confirmed' : 'source'
@@ -224,7 +224,7 @@ export const applyLabelRulesTool: ToolDefinition = {
 
 export const deleteLabelRuleTool: ToolDefinition = {
   name: 'delete_label_rule',
-  description: 'Removes a standing rule. Rows it already labelled keep their labels — only the standing decision goes. Deleting is the one rule action that needs the user first: creating one is undone from the panel in a click, removing one they wrote is not.',
+  description: "Removes a standing rule. Rows it already labelled keep their labels. Ask the user first: creating a rule is undone in a click, removing one they wrote is not.",
   parameters: { type: 'object', properties: { ruleId: { type: 'number' }, confirmed: { type: 'boolean' } }, required: ['ruleId'], additionalProperties: false },
   execute: async (args) => {
     if (typeof args.ruleId !== 'number') return 'Error: ruleId is required.'
