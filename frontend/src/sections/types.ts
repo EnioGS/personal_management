@@ -20,4 +20,12 @@ export interface AppSection {
   pinned?: boolean
   /** Rendered as a colored logo-style box instead of a plain icon (see activity-bar.tsx). */
   brand?: boolean
+  /**
+   * True when this section's screens hold confirmed rows.
+   *
+   * Only these are labelling vocabulary and only these have tables: Notes, Vault and
+   * Settings are places to work, not places rows go, and offering them as labels would
+   * mean a row could be confirmed into a table nothing will ever read.
+   */
+  holdsData?: boolean
 }

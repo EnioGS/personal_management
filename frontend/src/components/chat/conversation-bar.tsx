@@ -13,11 +13,11 @@ import { cn } from '@/lib/utils'
  *
  * Two things live here. Starting a new conversation, which discards nothing — the one on
  * screen was saved as it happened — and reaching the ones already had, which are only
- * read out of the database when the list is actually opened.
+ * read out of the database when the list is actually opened. The current conversation's
+ * name is not repeated here: it is in the list, under the icon that opens it.
  */
 export function ConversationBar() {
   const { t } = useTranslation('chat')
-  const title = useChatStore((store) => store.title)
   const conversationId = useChatStore((store) => store.conversationId)
   const newConversation = useChatStore((store) => store.newConversation)
   const openConversation = useChatStore((store) => store.openConversation)
@@ -33,21 +33,21 @@ export function ConversationBar() {
   useEffect(() => { void refresh() }, [refresh, conversationId])
 
   return (
-    <div className="flex h-8 shrink-0 items-center gap-1 border-b px-2">
+    <div className="flex h-11 shrink-0 items-center gap-1 border-b px-2">
       <Button
         type="button"
-        size="xs"
         variant="ghost"
         aria-label={t('panel.newConversation')}
         title={t('panel.newConversation')}
         onClick={() => newConversation()}
+        className="size-9 p-0"
       >
         <MessageSquarePlus className="size-4" />
       </Button>
 
       <DropdownMenu onOpenChange={(open) => { if (open) void refresh() }}>
         <DropdownMenuTrigger asChild>
-          <Button type="button" size="xs" variant="ghost" aria-label={t('panel.conversations')} title={t('panel.conversations')}>
+          <Button type="button" variant="ghost" aria-label={t('panel.conversations')} title={t('panel.conversations')} className="size-9 p-0">
             <History className="size-4" />
           </Button>
         </DropdownMenuTrigger>
@@ -84,8 +84,6 @@ export function ConversationBar() {
           )}
         </DropdownMenuContent>
       </DropdownMenu>
-
-      <span className="text-muted-foreground min-w-0 flex-1 truncate px-1 text-xs">{title}</span>
     </div>
   )
 }

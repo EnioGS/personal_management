@@ -8,6 +8,7 @@ export const financesSection: AppSection = {
   id: 'finances',
   labelKey: 'finances:section.label',
   icon: Wallet,
+  holdsData: true,
   items: [
     { id: 'overview', labelKey: 'finances:items.movements', icon: ArrowLeftRight, component: OverviewPanel },
     { id: 'spending', labelKey: 'finances:items.spending', icon: Receipt, component: SpendingPanel },

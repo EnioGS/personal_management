@@ -58,7 +58,9 @@ export function ChatPanel() {
 
   function resizeComposer() {
     const composer = composerRef.current
-    if (!composer) return
+    // A closed panel is a few pixels wide, where the placeholder wraps into a paragraph
+    // and every measurement is a lie. Nothing is measured until the box is really there.
+    if (!composer || composer.clientWidth < 80) return
 
     const styles = window.getComputedStyle(composer)
     const lineHeight = Number.parseFloat(styles.lineHeight)
@@ -74,6 +76,13 @@ export function ChatPanel() {
     setIsOverflowing(wanted > lineHeight + verticalPadding + verticalBorder + 1)
   }
 
+  /**
+   * Where Send is. In the row while the message fits on one line; outside the panel,
+   * round, once it does not — and also while the panel is closed with something written,
+   * which is the only way that message could still be sent.
+   */
+  const isSendFloating = isComposing && (isOverflowing || panelWidth === 0)
+
   useEffect(() => {
     // Scroll only the message list's own viewport directly — `scrollIntoView` walks up
     // and can adjust *every* scrollable ancestor's scroll position along the way,
@@ -84,9 +93,11 @@ export function ChatPanel() {
     viewport?.scrollTo({ top: viewport.scrollHeight, behavior: 'smooth' })
   }, [messages, status])
 
+  // Opening the panel changes the width every measurement depends on, so the height is
+  // recomputed there too rather than only when the text changes.
   useEffect(() => {
     resizeComposer()
-  }, [draft])
+  }, [draft, panelWidth])
 
   // The conversation comes back by itself: nothing was ever saved by hand, so nothing
   // should have to be reopened by hand either.
@@ -189,12 +200,32 @@ export function ChatPanel() {
   const liveWidth = dragOffset !== null ? Math.max(0, Math.min(MAX_PANEL_WIDTH, panelWidth - dragOffset)) : panelWidth
 
   return (
-    // The box's real width is GRIP_WIDTH + liveWidth — content is genuinely that wide
-    // (not a fixed-width panel revealed through a clipping window), so it reflows as
-    // the width changes, and the grip — the box's first GRIP_WIDTH px — is always
-    // on-screen, including when the panel itself is fully closed at liveWidth 0.
-    // overflow-hidden stays as a safety net against any transient horizontal overflow
-    // during the width transition, not as the sizing mechanism itself.
+    <>
+    {/* Outside the panel, and outside the box that clips it: a message written into a
+        panel that is then closed still has somewhere to go — faded but present — and
+        sending it brings the button home. */}
+    <button
+      type="button"
+      aria-label={t('panel.send')}
+      title={t('panel.send')}
+      onClick={submitDraft}
+      style={{ right: GRIP_WIDTH + liveWidth + 12 }}
+      className={cn(
+        'bg-primary text-primary-foreground fixed bottom-5 z-50 flex size-10 items-center justify-center rounded-full shadow-lg',
+        'transition-[opacity,transform] duration-200 ease-out',
+        isSendFloating ? 'scale-100 opacity-100' : 'pointer-events-none scale-50 opacity-0',
+        panelWidth === 0 && 'opacity-60',
+      )}
+    >
+      <SendHorizontal className="size-4" />
+    </button>
+
+    {/* The box's real width is GRIP_WIDTH + liveWidth — content is genuinely that wide
+        (not a fixed-width panel revealed through a clipping window), so it reflows as
+        the width changes, and the grip — the box's first GRIP_WIDTH px — is always
+        on-screen, including when the panel itself is fully closed at liveWidth 0.
+        overflow-hidden stays as a safety net against any transient horizontal overflow
+        during the width transition, not as the sizing mechanism itself. */}
     <div
       className={cn(
         'pointer-events-none fixed inset-y-0 right-0 z-40 flex overflow-hidden',
@@ -202,26 +233,6 @@ export function ChatPanel() {
       )}
       style={{ width: GRIP_WIDTH + liveWidth }}
     >
-      {/* Outside the panel, and staying there: a message written into a panel that is
-          then closed still has somewhere to go, faded but present, and sending it brings
-          the button home. */}
-      <button
-        type="button"
-        aria-label={t('panel.send')}
-        title={t('panel.send')}
-        onClick={submitDraft}
-        className={cn(
-          'bg-primary text-primary-foreground pointer-events-auto absolute bottom-4 left-0 z-20 flex size-10 items-center justify-center rounded-full shadow-lg',
-          'transition-[opacity,transform,scale] duration-200 ease-out',
-          isOverflowing || (panelWidth === 0 && isComposing)
-            ? 'scale-100 opacity-100'
-            : 'pointer-events-none scale-50 opacity-0',
-          panelWidth === 0 && 'opacity-60',
-        )}
-      >
-        <SendHorizontal className="size-4" />
-      </button>
-
       <div
         role="button"
         tabIndex={0}
@@ -359,7 +370,7 @@ export function ChatPanel() {
           {/* Send sits at the left of the row until the message outgrows one line, and
               then leaves the row altogether — see the floating button below, which is the
               same action in the place a wrapped message leaves for it. */}
-          {!isOverflowing && (
+          {!isSendFloating && (
             <Button
               type="submit"
               disabled={!draft.trim() || isSending}
@@ -388,21 +399,26 @@ export function ChatPanel() {
                 }
               }}
               disabled={isSending}
-              className="[field-sizing:fixed] min-h-0 resize-none overflow-y-hidden pr-9 leading-5"
+              className={cn('[field-sizing:fixed] min-h-0 resize-none overflow-y-hidden leading-5', !isComposing && 'pr-9')}
             />
-            <button
-              type="button"
-              aria-label={t('panel.attachButton')}
-              title={t('panel.attachButton')}
-              onClick={() => fileInputRef.current?.click()}
-              className="text-muted-foreground hover:text-foreground absolute right-2 bottom-1.5 rounded-sm p-0.5"
-            >
-              <Paperclip className="size-4" />
-            </button>
+            {/* Only while the box is empty: once there is a message, the width belongs to
+                the message. Files can still be dragged onto the panel. */}
+            {!isComposing && (
+              <button
+                type="button"
+                aria-label={t('panel.attachButton')}
+                title={t('panel.attachButton')}
+                onClick={() => fileInputRef.current?.click()}
+                className="text-muted-foreground hover:text-foreground absolute right-2 bottom-1.5 rounded-sm p-0.5"
+              >
+                <Paperclip className="size-4" />
+              </button>
+            )}
           </div>
         </form>
       </div>
     </div>
+    </>
   )
 }
 
