@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { wipeAllData } from '@/lib/data-file'
-import { addConfirmedRow, updateConfirmedRow } from './confirmed-rows'
+import { addConfirmedRow, placeConfirmedRow, updateConfirmedRow } from './confirmed-rows'
 import { confirmedRowsTable } from './model-db'
 import type { ConfirmedRow } from './types'
 
@@ -44,5 +44,29 @@ describe('editing a confirmed cell', () => {
 
     await updateConfirmedRow(id, 'category', '   ')
     expect((await only()).category).toBe('outros')
+  })
+})
+
+describe('re-placing a confirmed row', () => {
+  beforeEach(async () => { await wipeAllData() })
+
+  it('moves it to the table its new section and screen name, keeping its id', async () => {
+    const id = await addConfirmedRow('finances', 'overview')
+    const { rowId } = await only()
+
+    await placeConfirmedRow(id, { section: 'finances', screen: 'spending' })
+
+    expect(await confirmedRowsTable.count()).toBe(1)
+    expect(await only()).toMatchObject({ section: 'finances', screen: 'spending', rowId })
+  })
+
+  it('copies it into a second table when the row belongs in both, sharing the one id', async () => {
+    const id = await addConfirmedRow('finances', 'overview')
+
+    await placeConfirmedRow(id, { section: 'finances', screen: 'spending' }, 'copy')
+
+    const rows = (await confirmedRowsTable.toArray()).map((row) => row.data as ConfirmedRow)
+    expect(rows.map((row) => row.screen).sort()).toEqual(['overview', 'spending'])
+    expect(new Set(rows.map((row) => row.rowId)).size).toBe(1)
   })
 })

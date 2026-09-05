@@ -15,7 +15,7 @@ import { queryRows } from '@/lib/model/row-query'
 import { ingestionLabelErrors } from '@/lib/model/ingestion'
 import { parsePlacementLabels, resolveAccountLabel, resolveCardLabel, resolveScreenLabel, resolveSectionLabel, screenLabelFor, sectionLabelFor, withDerivedSections, type LabelCatalogue } from '@/lib/model/label-catalogue'
 import { applyLabelRulesToRows } from '@/lib/model/label-rules-repository'
-import { addConfirmedRow, updateConfirmedRow, type ConfirmedEditableColumn } from '@/lib/model/confirmed-rows'
+import { addConfirmedRow, placeConfirmedRow, updateConfirmedRow, type ConfirmedEditableColumn } from '@/lib/model/confirmed-rows'
 import { deleteMarked, toggleMark, type MarkableTable } from '@/lib/model/marking'
 import { sourceRowsTable } from '@/lib/model/model-db'
 import { useAccountsStore, useCardsStore, useConfirmedRowsStore, useSourceFilesStore, useSourceRowsStore } from '@/lib/model/model-stores'
@@ -58,7 +58,7 @@ const LABEL_HINT: Record<LabelColumn, string> = {
   subcategory: 'free text',
 }
 
-const CONFIRMED_COLUMNS = ['row_id', 'date', 'amount', 'account', 'card', 'category', 'subcategory', 'observations', 'source_filename'] as const
+const CONFIRMED_COLUMNS = ['row_id', 'section', 'screen', 'date', 'amount', 'account', 'card', 'category', 'subcategory', 'observations', 'source_filename'] as const
 
 function confirmedTableKey(row: ConfirmedRow): string {
   return `${row.section}/${row.screen}`
@@ -227,6 +227,19 @@ export function IngestionPanel() {
 
   async function editConfirmed(row: StoredRow<ConfirmedRow>, column: ConfirmedEditableColumn, value: string) {
     await updateConfirmedRow(row.id, column, value)
+  }
+
+  /**
+   * Re-placing a confirmed row. Which table it is in is its section and screen, so editing
+   * either of them moves it — the row leaves this table and appears in the one it now
+   * names, keeping the id every copy of it shares.
+   */
+  async function editPlacement(row: StoredRow<ConfirmedRow>, column: 'section' | 'screen', value: string) {
+    const section = column === 'section' ? resolveSectionLabel(catalogue, value) : row.section
+    const screen = column === 'screen' ? resolveScreenLabel(catalogue, value, section ? [section] : undefined) : row.screen
+    if (!section || !screen) { setMessage(`Nothing is called ${value}.`); return }
+    await placeConfirmedRow(row.id, { section, screen })
+    setMessage(`Moved row ${row.rowId} to ${sectionLabelFor(catalogue, section)} · ${screenLabelFor(catalogue, screen)}.`)
   }
 
   async function addLine() {
@@ -513,6 +526,22 @@ export function IngestionPanel() {
                   )}
                 >
                   <td className="text-muted-foreground p-2 font-mono whitespace-nowrap" title="The id every copy of this row shares, fixed for its life.">{row.rowId}</td>
+                  {(['section', 'screen'] as const).map((column) => (
+                    <EditableCell
+                      key={column}
+                      value={column === 'section' ? sectionLabelFor(catalogue, row.section) : screenLabelFor(catalogue, row.screen)}
+                      disabled={marking}
+                      title="Which table this row is in. Change it and the row moves there."
+                      validate={(draft) => {
+                        const section = column === 'section' ? resolveSectionLabel(catalogue, draft) : row.section
+                        const resolved = column === 'section'
+                          ? section
+                          : resolveScreenLabel(catalogue, draft, section ? [section] : undefined)
+                        return resolved ? null : `Nothing is called ${draft}.`
+                      }}
+                      onCommit={(value) => void editPlacement(row, column, value)}
+                    />
+                  ))}
                   <EditableCell
                     className="whitespace-nowrap"
                     value={row.date ? new Date(row.date).toISOString().slice(0, 10) : ''}

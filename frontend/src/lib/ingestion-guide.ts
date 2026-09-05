@@ -104,6 +104,11 @@ screens becomes two rows, both carrying the same \`row_id\`. Nothing is hidden b
 money leaving an account is negative there and positive wherever it arrives, and the two
 net out by arithmetic.
 
+Which table a confirmed row is in *is* its section and screen — there is no separate
+address — so place_confirmed_rows is how a placement is corrected ('move') and how a row
+that belongs on a second screen gets its copy there ('copy'). The row id is kept either
+way, which is what stops a copy being counted twice.
+
 ## Correcting, marking, deleting
 
 Never edit a confirmed row in place. Add a new row carrying **the same row_id** and mark

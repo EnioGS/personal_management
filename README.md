@@ -179,6 +179,10 @@ Two things it optimizes for:
   **subcategory** are free text, one value each, starting at `outros` and editable on
   a confirmed row, since a row can be placed before it is understood. Direction is not
   a label at all: the sign of the amount says it, negative left and positive arrived.
+- A confirmed row's section and screen are not a label beside it — they *are* which
+  table it is in, and both are shown and editable there: change one and the row moves,
+  keeping the id every copy of it shares. `place_confirmed_rows` does the same for the
+  assistant, with a `copy` mode for a row that turns out to belong on a second screen.
 - Confirming a row **copies it into one table per (section, screen) pair it
   names**, every copy carrying the same `row_id` — a hash of the row's contents
   and a random seed, fixed for the row's life even if every value in it later

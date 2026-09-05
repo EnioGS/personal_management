@@ -76,3 +76,26 @@ export async function updateConfirmedRow(rowId: number, column: ConfirmedEditabl
   await confirmedRowsTable.update(rowId, { data: { ...row, ...patch } })
   await refreshAllLocalStores()
 }
+
+/**
+ * Moves a confirmed row to another table, or puts a second copy of it there.
+ *
+ * Which table a row is in *is* its section and screen — there is no separate address —
+ * so changing them is how a row is re-placed. Moving corrects a placement that was
+ * wrong; copying says the row belongs in both, which is what confirming a row labelled
+ * with two screens does in the first place. Either way the `row_id` is kept: it is what
+ * ties every copy of one transaction together, and what stops anything counting it twice.
+ */
+export async function placeConfirmedRow(
+  rowId: number,
+  placement: { section: string; screen: string },
+  mode: 'move' | 'copy' = 'move',
+): Promise<void> {
+  const stored = await confirmedRowsTable.get(rowId)
+  if (!stored) throw new Error(`Confirmed row ${rowId} was not found.`)
+  const row = stored.data as ConfirmedRow
+
+  if (mode === 'copy') await confirmedRowsTable.add({ createdAt: Date.now(), data: { ...row, ...placement } })
+  else await confirmedRowsTable.update(rowId, { data: { ...row, ...placement } })
+  await refreshAllLocalStores()
+}

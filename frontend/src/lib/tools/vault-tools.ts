@@ -1,6 +1,6 @@
 import { buildLabelCatalogue, loadLabelCatalogue } from '@/lib/label-catalogue-source'
 import { describeVault, queryVault } from '@/lib/sql/query-vault'
-import { setConfirmedMeaning } from '@/lib/model/confirmed-rows'
+import { placeConfirmedRow, setConfirmedMeaning } from '@/lib/model/confirmed-rows'
 import { DEFAULT_MEANING, ingestionLabelErrors } from '@/lib/model/ingestion'
 import { parsePlacementLabels, resolveAccountLabel, resolveCardLabel, resolveScreenLabel, resolveSectionLabel, withDerivedSections } from '@/lib/model/label-catalogue'
 import { confirmedRowsTable, sourceFilesTable, sourceRowsTable } from '@/lib/model/model-db'
@@ -304,6 +304,38 @@ export const setConfirmedMeaningTool: ToolDefinition = {
       try { await setConfirmedMeaning(id, meaning); changed += 1 } catch { continue }
     }
     return JSON.stringify({ changed, meaning })
+  },
+}
+
+export const placeConfirmedRowsTool: ToolDefinition = {
+  name: 'place_confirmed_rows',
+  description: "Changes which table confirmed rows are in, or puts a copy of them in another one. Which table a row is in *is* its section and screen — there is no separate address — so this is how a placement is corrected, and how a row that turns out to belong on two screens gets its second copy. The row id is kept either way: it is what ties copies of one transaction together and what stops anything counting it twice. Use mode 'move' for a placement that was wrong and 'copy' for one that was incomplete. The user edits the same two cells in the confirmed table.",
+  parameters: {
+    type: 'object',
+    properties: {
+      rowIds: { type: 'array', items: { type: 'number' }, description: 'The stored ids of the copies to place, not their row_id.' },
+      section: { type: 'string' },
+      screen: { type: 'string' },
+      mode: { type: 'string', enum: ['move', 'copy'] },
+    },
+    required: ['rowIds', 'section', 'screen'],
+    additionalProperties: false,
+  },
+  execute: async (args, context) => {
+    const rowIds = Array.isArray(args.rowIds) ? args.rowIds.filter((id): id is number => typeof id === 'number') : []
+    if (rowIds.length === 0) return 'Error: rowIds are required.'
+
+    const catalogue = await loadLabelCatalogue(context.translate)
+    const section = resolveSectionLabel(catalogue, String(args.section ?? ''))
+    const screen = resolveScreenLabel(catalogue, String(args.screen ?? ''), section ? [section] : undefined)
+    if (!section || !screen) return `Error: ${!section ? 'no section' : 'no screen'} is called that. Call list_label_options for what exists.`
+
+    const mode = args.mode === 'copy' ? 'copy' : 'move'
+    let placed = 0
+    for (const id of rowIds) {
+      try { await placeConfirmedRow(id, { section, screen }, mode); placed += 1 } catch { continue }
+    }
+    return JSON.stringify({ placed, mode, section, screen })
   },
 }
 
