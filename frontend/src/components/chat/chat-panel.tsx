@@ -15,6 +15,8 @@ const DRAG_THRESHOLD = 4
 const MAX_COMPOSER_LINES = 8
 /** What Send occupies in the composer row: its own width plus the gap beside it. */
 const SEND_IN_ROW_WIDTH = 48
+/** The composer row's padding — `p-3` on the form, in pixels. */
+const COMPOSER_PADDING = 12
 
 /**
  * Global chat overlay — mounted once at the app root (see App.tsx), not inside
@@ -51,6 +53,8 @@ export function ChatPanel() {
   const [isOverflowing, setIsOverflowing] = useState(false)
   /** Read inside the measurement, which must know the layout it is measuring against. */
   const isFloatingRef = useRef(false)
+  /** What the box is now, so the round button can sit level with the middle of it. */
+  const [composerHeight, setComposerHeight] = useState(0)
   const [dragOffset, setDragOffset] = useState<number | null>(null)
   const [isDraggingFileOver, setIsDraggingFileOver] = useState(false)
   const dragStartX = useRef(0)
@@ -83,6 +87,12 @@ export function ChatPanel() {
     // and every measurement is a lie. Nothing is measured until the box is really there.
     if (!composer || composer.clientWidth < 80) return
 
+    // Set here rather than in a class: the base Textarea asks the browser to size itself
+    // from its content, and a class that says otherwise only wins if the merge happens to
+    // drop the other one. With both live, the browser grows the box on the keystroke that
+    // wraps and the measurement below shrinks it again a frame later — the flicker.
+    composer.style.setProperty('field-sizing', 'fixed')
+
     const styles = window.getComputedStyle(composer)
     const lineHeight = Number.parseFloat(styles.lineHeight)
     const verticalPadding = Number.parseFloat(styles.paddingTop) + Number.parseFloat(styles.paddingBottom)
@@ -97,9 +107,11 @@ export function ChatPanel() {
     // and giving that line back never both happen on screen.
     const wanted = heightAt(composer, wraps ? narrowWidth + SEND_IN_ROW_WIDTH : narrowWidth)
 
-    composer.style.height = `${Math.min(wanted, maxHeight)}px`
+    const height = Math.min(wanted, maxHeight)
+    composer.style.height = `${height}px`
     composer.style.overflowY = wanted > maxHeight ? 'auto' : 'hidden'
     setIsOverflowing(wraps)
+    setComposerHeight(height)
   }
 
   /**
@@ -242,12 +254,12 @@ export function ChatPanel() {
       title={t('panel.send')}
       onClick={submitDraft}
       // Beside the panel rather than a grip's width away from it: the grip is centred
-      // vertically and this sits at the bottom, so the two never meet.
-      style={{ right: liveWidth + 22 }}
+      // vertically and this sits low, so the two never meet. COMPOSER_PADDING is the
+      // form's own padding: the box's lower edge, from which the button centres itself
+      // on the box however many lines the message has grown to.
+      style={{ right: liveWidth + 22, bottom: COMPOSER_PADDING + Math.max(0, (composerHeight - 40) / 2) }}
       className={cn(
-        // bottom-3 is the composer's own bottom padding, so the button's lower edge and
-        // the box's lower edge are the same line however tall the message has grown.
-        'bg-primary text-primary-foreground fixed bottom-3 z-50 flex size-10 items-center justify-center rounded-full shadow-lg',
+        'bg-primary text-primary-foreground fixed z-50 flex size-10 items-center justify-center rounded-full shadow-lg',
         'transition-[opacity,transform] duration-200 ease-out',
         isSendFloating ? 'scale-100 opacity-100' : 'pointer-events-none scale-50 opacity-0',
         panelWidth === 0 && 'opacity-60',
@@ -435,7 +447,7 @@ export function ChatPanel() {
                 }
               }}
               disabled={isSending}
-              className={cn('[field-sizing:fixed] min-h-0 resize-none overflow-y-hidden leading-5', !isComposing && 'pr-9')}
+              className={cn('min-h-0 resize-none overflow-y-hidden leading-5', !isComposing && 'pr-9')}
             />
             {/* Only while the box is empty: once there is a message, the width belongs to
                 the message. Files can still be dragged onto the panel. */}
