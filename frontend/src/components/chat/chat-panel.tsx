@@ -68,6 +68,10 @@ export function ChatPanel() {
   /** The message as it is now, for the measurements that outlive the render they were made in. */
   const draftRef = useRef(draft)
   draftRef.current = draft
+  /** Box properties that do not change with the message, read once instead of per keystroke. */
+  const metrics = useRef<{ singleLine: number; maxHeight: number } | null>(null)
+  const mirrorDressed = useRef(false)
+  const pendingResize = useRef<number | null>(null)
 
   /**
    * How tall the message would be in a box of a given width.
@@ -83,9 +87,15 @@ export function ChatPanel() {
     const mirror = mirrorRef.current
     if (!composer || !mirror) return 0
 
-    const styles = window.getComputedStyle(composer)
-    for (const property of ['fontFamily', 'fontSize', 'fontWeight', 'lineHeight', 'letterSpacing', 'padding', 'border', 'boxSizing'] as const) {
-      mirror.style[property] = styles[property]
+    // The mirror's type is copied once, not on every keystroke: reading a computed style
+    // forces the browser to resolve style for the page, and the page has a table of a few
+    // thousand cells in it.
+    if (!mirrorDressed.current) {
+      const styles = window.getComputedStyle(composer)
+      for (const property of ['fontFamily', 'fontSize', 'fontWeight', 'lineHeight', 'letterSpacing', 'padding', 'border', 'boxSizing'] as const) {
+        mirror.style[property] = styles[property]
+      }
+      mirrorDressed.current = true
     }
     mirror.style.width = `${width}px`
     // Read from a ref, not from the render that created this function: the resize
@@ -96,7 +106,7 @@ export function ChatPanel() {
     return mirror.scrollHeight
   }, [])
 
-  const resizeComposer = useCallback(() => {
+  const resizeComposerNow = useCallback(() => {
     const composer = composerRef.current
     if (!composer) return
     // Hand the width back to the layout before reading it: what is measured has to be the
@@ -106,12 +116,19 @@ export function ChatPanel() {
     // and every measurement is a lie. Nothing is measured until the box is really there.
     if (composer.clientWidth < 80) return
 
-    const styles = window.getComputedStyle(composer)
-    const lineHeight = Number.parseFloat(styles.lineHeight)
-    const verticalPadding = Number.parseFloat(styles.paddingTop) + Number.parseFloat(styles.paddingBottom)
-    const verticalBorder = Number.parseFloat(styles.borderTopWidth) + Number.parseFloat(styles.borderBottomWidth)
-    const singleLine = lineHeight + verticalPadding + verticalBorder + 1
-    const maxHeight = lineHeight * MAX_COMPOSER_LINES + verticalPadding + verticalBorder
+    // Measured once and kept: these are properties of the box, not of the message, and
+    // asking for them per keystroke is asking the browser to resolve style for the page.
+    if (!metrics.current) {
+      const styles = window.getComputedStyle(composer)
+      const lineHeight = Number.parseFloat(styles.lineHeight)
+      const verticalPadding = Number.parseFloat(styles.paddingTop) + Number.parseFloat(styles.paddingBottom)
+      const verticalBorder = Number.parseFloat(styles.borderTopWidth) + Number.parseFloat(styles.borderBottomWidth)
+      metrics.current = {
+        singleLine: lineHeight + verticalPadding + verticalBorder + 1,
+        maxHeight: lineHeight * MAX_COMPOSER_LINES + verticalPadding + verticalBorder,
+      }
+    }
+    const { singleLine, maxHeight } = metrics.current
 
     // Both widths the row can have, named from the layout rather than from the moment.
     const narrowWidth = isFloatingRef.current ? composer.clientWidth - SEND_IN_ROW_WIDTH : composer.clientWidth
@@ -130,6 +147,22 @@ export function ChatPanel() {
     setIsOverflowing(wraps)
     setComposerHeight(height)
   }, [heightAt])
+
+  /**
+   * At most one measurement a frame.
+   *
+   * Measuring means writing to the DOM and reading a height back, which makes the browser
+   * lay the page out there and then — and the page can hold a table of a few thousand
+   * cells. Once per keystroke that is the whole interaction budget; once per frame is
+   * invisible, and a burst of typing collapses into a single measurement.
+   */
+  const resizeComposer = useCallback(() => {
+    if (pendingResize.current !== null) return
+    pendingResize.current = requestAnimationFrame(() => {
+      pendingResize.current = null
+      resizeComposerNow()
+    })
+  }, [resizeComposerNow])
 
   /**
    * Where Send is. In the row while the message fits on one line; outside the panel,
@@ -179,6 +212,7 @@ export function ChatPanel() {
       // Ignore the height changes this very effect causes; only width matters here.
       if (composer.clientWidth === lastWidth) return
       lastWidth = composer.clientWidth
+      metrics.current = null
       resizeComposer()
     })
     observer.observe(composer)
@@ -473,7 +507,8 @@ export function ChatPanel() {
             <div
               ref={mirrorRef}
               aria-hidden
-              className="pointer-events-none invisible absolute top-0 left-0 -z-10 leading-5 break-words whitespace-pre-wrap"
+              style={{ contain: 'layout style' }}
+              className="pointer-events-none invisible fixed top-0 -left-[9999px] -z-10 leading-5 break-words whitespace-pre-wrap"
             />
             <Textarea
               ref={composerRef}

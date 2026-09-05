@@ -566,8 +566,12 @@ const SourceRowLine = memo(function SourceRowLine({
   return (
     <tr
       {...rowProps(() => void onToggleMark('source', row.id))}
+      // content-visibility lets the browser skip laying out and painting a row that is
+      // scrolled out of sight. With a few thousand rows on screen, every forced layout —
+      // including the one the chat composer does to measure itself — was paying for all
+      // of them; contain-intrinsic-size keeps the scrollbar honest while they are skipped.
       className={cn(
-        'border-b last:border-0',
+        'border-b [content-visibility:auto] [contain-intrinsic-size:auto_2.5rem] last:border-0',
         marking && 'cursor-pointer',
         row.markedForElimination && 'bg-destructive/10 line-through',
       )}
@@ -647,7 +651,7 @@ const ConfirmedRowLine = memo(function ConfirmedRowLine({
     <tr
       {...rowProps(() => void onToggleMark('confirmed', row.id))}
       className={cn(
-        'border-b last:border-0',
+        'border-b [content-visibility:auto] [contain-intrinsic-size:auto_2.5rem] last:border-0',
         marking && 'cursor-pointer',
         row.markedForElimination && 'bg-destructive/10 line-through',
       )}
