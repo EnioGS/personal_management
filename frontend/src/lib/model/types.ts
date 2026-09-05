@@ -105,6 +105,9 @@ export interface ClassificationNote {
   text: string
   createdBy: 'user' | 'assistant'
   createdAt: number
+  /** Set when the note has been redrafted since. The note keeps its place in the list. */
+  editedBy?: 'user' | 'assistant'
+  editedAt?: number
 }
 
 export interface LabelRule {

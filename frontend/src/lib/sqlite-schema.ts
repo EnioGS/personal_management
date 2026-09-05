@@ -134,6 +134,8 @@ export const SQLITE_SCHEMAS: Record<DataTableKey, SqliteTableSchema> = {
       { column: 'text', key: 'text', type: 'text' },
       { column: 'created_by', key: 'createdBy', type: 'text' },
       { column: 'note_created_at', key: 'createdAt', type: 'integer' },
+      { column: 'edited_by', key: 'editedBy', type: 'text' },
+      { column: 'edited_at', key: 'editedAt', type: 'integer' },
     ],
   },
   ingestionAuditEvents: {

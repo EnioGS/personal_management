@@ -166,7 +166,10 @@ Below the rules are the **notes**: free text about this data, written by the use
 you, saying what a rule cannot — that a shop nobody would recognise sells food, that one
 file's March rows were a rebalance. They are appended to this guide, so you always have
 them; treat them as the user talking about their own data, and write one yourself
-whenever the user explains something you would otherwise have to ask about again.
+whenever the user explains something you would otherwise have to ask about again. A note
+that turns out to say two things, or to name something by a word the app no longer uses,
+is rewritten rather than replaced: edit_classification_note keeps it where it is in the
+list, because a corrected note is not a new discovery.
 
 A rule matches a field by substring, or by \`equals\`, \`startsWith\` or \`regex\`; a short
 name needs one of the latter, since "of" is inside Microsoft. Conditions can be stacked,

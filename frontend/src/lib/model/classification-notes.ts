@@ -1,4 +1,4 @@
-import { refreshAllLocalStores } from '@/lib/local-store/create-local-list-store'
+import { refreshLocalStores } from '@/lib/local-store/create-local-list-store'
 import { classificationNotesTable } from './model-db'
 import type { ClassificationNote, RuleContext } from './types'
 
@@ -17,13 +17,34 @@ export async function addClassificationNote(note: Omit<ClassificationNote, 'crea
   const text = note.text.trim()
   if (!text) throw new Error('A note needs something in it.')
   const id = await classificationNotesTable.add({ createdAt: Date.now(), data: { ...note, text, createdAt: Date.now() } })
-  await refreshAllLocalStores()
+  await refreshLocalStores('classificationNotes')
   return id
+}
+
+/**
+ * Rewrites a note.
+ *
+ * A note is prose about the data, and prose is got right by being redrafted — a sentence
+ * that turned out to say two things, a merchant that changed hands, a convention stated
+ * before it was fully understood. Editing it keeps the note where it is in the list
+ * rather than making a correction look like a new discovery, so `createdAt` is untouched
+ * and `editedAt` records that it was gone over.
+ */
+export async function editClassificationNote(id: number, text: string, editedBy: 'user' | 'assistant'): Promise<void> {
+  const trimmed = text.trim()
+  if (!trimmed) throw new Error('A note needs something in it.')
+  const stored = await classificationNotesTable.get(id)
+  if (!stored) throw new Error(`Note ${id} was not found.`)
+
+  await classificationNotesTable.update(id, {
+    data: { ...(stored.data as ClassificationNote), text: trimmed, editedBy, editedAt: Date.now() },
+  })
+  await refreshLocalStores('classificationNotes')
 }
 
 export async function deleteClassificationNote(id: number): Promise<void> {
   await classificationNotesTable.delete(id)
-  await refreshAllLocalStores()
+  await refreshLocalStores('classificationNotes')
 }
 
 /**

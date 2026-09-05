@@ -1,4 +1,4 @@
-import { addClassificationNote, deleteClassificationNote, listClassificationNotes } from '@/lib/model/classification-notes'
+import { addClassificationNote, deleteClassificationNote, editClassificationNote, listClassificationNotes } from '@/lib/model/classification-notes'
 import type { RuleContext } from '@/lib/model/types'
 import type { ToolDefinition } from './types'
 
@@ -26,6 +26,28 @@ export const addClassificationNoteTool: ToolDefinition = {
     const context: RuleContext = args.context === 'source' ? 'source' : 'confirmed'
     const id = await addClassificationNote({ context, text: args.text, createdBy: 'assistant' })
     return JSON.stringify({ id, context, text: args.text.trim() })
+  },
+}
+
+export const editClassificationNoteTool: ToolDefinition = {
+  name: 'edit_classification_note',
+  description: "Rewrites a note. Use it when what was written turns out to say two things, or to be wrong, or to name something by a word the app no longer uses — redrafting is how prose gets right, and a corrected note keeps its place in the list rather than reappearing as a new discovery. The whole text is replaced, so send the note as it should now read. Rewriting what the user wrote themselves is theirs to ask for; a note you wrote is yours to keep accurate.",
+  parameters: {
+    type: 'object',
+    properties: {
+      noteId: { type: 'number' },
+      text: { type: 'string', description: 'The note as it should now read, in full.' },
+    },
+    required: ['noteId', 'text'],
+    additionalProperties: false,
+  },
+  execute: async (args) => {
+    if (typeof args.noteId !== 'number') return 'Error: noteId is required.'
+    if (typeof args.text !== 'string' || !args.text.trim()) return 'Error: a note needs something in it.'
+    try {
+      await editClassificationNote(args.noteId, args.text, 'assistant')
+      return JSON.stringify({ noteId: args.noteId, text: args.text.trim() })
+    } catch (error) { return `Error: ${error instanceof Error ? error.message : 'that note could not be rewritten.'}` }
   },
 }
 

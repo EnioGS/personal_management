@@ -247,6 +247,9 @@ Two things it optimizes for:
   case should be treated. A note labels nothing by itself; it is appended to the ingestion
   guide, which the assistant reads before touching an import, so an explanation given once
   keeps working. Notes belong to a stage the way rules do, and sit below them in the panel.
+  Either of you can redraft one — double-click it, or `edit_classification_note` — and a
+  rewritten note keeps its place in the list, recording who went over it, because prose is
+  got right by redrafting and a correction is not a new discovery.
 - What was worked out once becomes a **standing labelling rule**, and rules belong
   to one of two stages that never cross: a *source* rule runs as a file arrives, so
   an import can land already labelled, and a *confirmed* rule fills in meaning on

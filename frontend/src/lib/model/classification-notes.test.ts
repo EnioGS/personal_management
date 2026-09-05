@@ -4,6 +4,7 @@ import {
   addClassificationNote,
   classificationNotesForPrompt,
   deleteClassificationNote,
+  editClassificationNote,
   listClassificationNotes,
 } from './classification-notes'
 
@@ -41,5 +42,32 @@ describe('notes on how to classify', () => {
     await deleteClassificationNote(id)
 
     expect(await listClassificationNotes()).toEqual([])
+  })
+})
+
+describe('redrafting a note', () => {
+  beforeEach(async () => { await wipeAllData() })
+
+  it('replaces the text and records who went over it, keeping its place in the list', async () => {
+    const first = await addClassificationNote({ context: 'source', text: 'Written first.', createdBy: 'user' })
+    await addClassificationNote({ context: 'source', text: 'Written second.', createdBy: 'assistant' })
+
+    await editClassificationNote(first, '  Charme is a market — groceries.  ', 'assistant')
+
+    const notes = await listClassificationNotes('source')
+    expect(notes.map((note) => note.text)).toEqual(['Charme is a market — groceries.', 'Written second.'])
+    expect(notes[0]).toMatchObject({ createdBy: 'user', editedBy: 'assistant' })
+    expect(notes[0].editedAt).toBeGreaterThan(0)
+  })
+
+  it('refuses to empty a note, which is what deleting is for', async () => {
+    const id = await addClassificationNote({ context: 'confirmed', text: 'Something.', createdBy: 'user' })
+
+    await expect(editClassificationNote(id, '   ', 'user')).rejects.toThrow(/needs something/)
+    expect((await listClassificationNotes())[0].text).toBe('Something.')
+  })
+
+  it('says so when there is no such note', async () => {
+    await expect(editClassificationNote(999, 'anything', 'user')).rejects.toThrow(/was not found/)
   })
 })

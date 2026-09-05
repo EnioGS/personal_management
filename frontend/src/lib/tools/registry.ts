@@ -3,7 +3,7 @@ import { applyLabelRulesTool, deleteLabelRuleTool, listLabelRulesTool, saveLabel
 import { readCsvTool } from './read-csv'
 import { readIngestionGuideTool } from './guide-tool'
 import { setConversationTitleTool } from './conversation-tools'
-import { addClassificationNoteTool, deleteClassificationNoteTool, listClassificationNotesTool } from './note-tools'
+import { addClassificationNoteTool, deleteClassificationNoteTool, editClassificationNoteTool, listClassificationNotesTool } from './note-tools'
 import { readTextFileTool } from './read-text-file'
 import { addAccountTool, addCardTool, listAccountsAndCardsTool } from './settings-tools'
 import type { ToolDefinition } from './types'
@@ -64,6 +64,7 @@ export const toolRegistry: ToolDefinition[] = [
   deleteLabelRuleTool,
   listClassificationNotesTool,
   addClassificationNoteTool,
+  editClassificationNoteTool,
   deleteClassificationNoteTool,
   setConversationTitleTool,
 ]
