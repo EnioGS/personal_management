@@ -62,15 +62,21 @@ export type IngestionTargetField =
   | 'value'
   /** How much of a thing changed hands: units of an investment, not money. */
   | 'amount'
-  | 'asset'
   /** What one unit was worth. `amount` x `price` is the money an investment row moved. */
   | 'price'
-  | 'investmentType'
-  | 'investmentClass'
 
 export interface IngestionRowLabels {
   sections?: string[]
   screens?: string[]
+  /**
+   * What the row is, by nature rather than by purpose: renda fixa, a proceeds payment,
+   * a cash reserve.
+   *
+   * Category says what it is for and subcategory the detail under it; this says what kind
+   * of thing it is, which is the question a balance is sliced by. The Investments
+   * dashboards read it, and nothing stops any other screen using it.
+   */
+  class?: string
   category?: string
   subcategory?: string
   /** Which of the user's accounts this row belongs to, by the name it was set up under. */
@@ -233,14 +239,13 @@ export interface ConfirmedRow {
   value?: number
   /** Everything the file said that no column was assigned to, including what it came from. */
   observations: string
+  /** What kind of thing the row is — see `IngestionRowLabels`. */
+  class?: string
   category: string
   subcategory: string
-  asset?: string
-  /** Units of the asset, for an investment row. */
+  /** Units of the thing, for an investment row. */
   amount?: number
   price?: number
-  investmentType?: string
-  investmentClass?: string
   /** The account and card labels the row was confirmed with, by name. */
   account?: string
   card?: string

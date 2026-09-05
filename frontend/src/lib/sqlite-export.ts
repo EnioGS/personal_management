@@ -120,9 +120,11 @@ function queryAll(db: Database, sql: string): (string | number | null)[][] {
 }
 
 /**
- * Older .db exports legitimately lack columns added after their creation. Select
- * NULL for those fields so they remain importable; the application's normal model
- * migration can then fill any required metadata such as investmentClass.
+ * Older .db exports legitimately lack columns added after their creation, and carry
+ * columns since retired. Select NULL for what is missing and ignore what is not asked
+ * for, so a file exported by any version of this app opens in this one — the class label
+ * arrives empty on rows written before it existed, and the model migration fills what it
+ * can. The export always writes today's schema, so a file makes the round trip complete.
  */
 function selectCompatibleRows(db: Database, schema: (typeof SQLITE_SCHEMAS)[DataTableKey]): (string | number | null)[][] {
   const available = new Set(queryAll(db, `PRAGMA table_info("${schema.sqlName}")`).map((row) => String(row[1])))

@@ -50,7 +50,7 @@ export async function addConfirmedRow(section: string, screen: string): Promise<
 }
 
 /** The cells a person may edit in a confirmed table, and how each reads what was typed. */
-export const CONFIRMED_EDITABLE = ['date', 'value', 'category', 'subcategory', 'account', 'card', 'observations'] as const
+export const CONFIRMED_EDITABLE = ['date', 'value', 'class', 'category', 'subcategory', 'account', 'card', 'observations'] as const
 export type ConfirmedEditableColumn = (typeof CONFIRMED_EDITABLE)[number]
 
 /**
@@ -72,7 +72,7 @@ export async function updateConfirmedRow(rowId: number, column: ConfirmedEditabl
     : column === 'observations' ? { observations: value }
     // Emptied means emptied, for all of them: an account or a card a row never had, and
     // a category nobody has decided on yet.
-    : column === 'account' || column === 'card' ? { [column]: value.trim() || undefined }
+    : column === 'account' || column === 'card' || column === 'class' ? { [column]: value.trim() || undefined }
     : { [column]: value.trim() }
 
   await confirmedRowsTable.update(rowId, { data: { ...row, ...patch } })
@@ -152,6 +152,8 @@ export async function fillFromObservations(
 export interface ConfirmedRevision {
   account?: string
   card?: string | null
+  /** What kind of thing the row is. `null` clears it. */
+  class?: string | null
   category?: string
   subcategory?: string
   date?: number

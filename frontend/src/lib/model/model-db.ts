@@ -227,6 +227,41 @@ db.version(14).stores({}).upgrade(async (tx) => {
   })
 })
 
+/**
+ * The investment-only columns give way to one label every table has.
+ *
+ * `asset`, `investmentType` and `investmentClass` were columns only investment rows ever
+ * filled, and only investment screens ever read — so a row could not be moved between
+ * tables without leaving part of its meaning behind, and the words on it could not be
+ * queried the way every other label can. `class` replaces all three: what kind of thing
+ * the row is, on every row, beside category and subcategory.
+ *
+ * The old class is carried over rather than discarded, since it was the one of the three
+ * that said what a row is; an asset name lives on in the subcategory, which is where the
+ * files had been putting it anyway. Assignments pointing at a target that no longer exists
+ * are dropped, or the file would keep offering a column nothing can receive.
+ */
+db.version(15).stores({}).upgrade(async (tx) => {
+  const retired = ['asset', 'investmentType', 'investmentClass']
+
+  await tx.table('confirmedRows').toCollection().modify((row: { data?: Record<string, unknown> }) => {
+    const data = row.data
+    if (!data) return
+    const carried = [data.investmentClass, data.investmentType].find((value) => typeof value === 'string' && value.trim())
+    if (carried && !data.class) data.class = carried
+    if (!data.subcategory && typeof data.asset === 'string' && data.asset.trim()) data.subcategory = data.asset
+    for (const field of retired) delete data[field]
+  })
+
+  await tx.table('sourceFiles').toCollection().modify((row: { data?: { assignments?: Record<string, unknown> } }) => {
+    const assignments = row.data?.assignments
+    if (!assignments) return
+    for (const [column, target] of Object.entries(assignments)) {
+      if (typeof target === 'string' && retired.includes(target)) delete assignments[column]
+    }
+  })
+})
+
 export const accountsTable = db.accounts
 export const cardsTable = db.cards
 export const budgetsTable = db.budgets

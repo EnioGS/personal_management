@@ -25,7 +25,9 @@ export function asTransaction(row: ConfirmedRow): Transaction {
   const price = typeof row.price === 'number' ? Math.abs(row.price) : units > 0 ? money / units : money
   return {
     date: Number.isFinite(row.date) ? (row.date as number) : 0,
-    asset: row.asset ?? row.category,
+    // What the position is in: the row's own name for the thing, which is its subcategory
+    // ("tesouro - IPCA+") before it is the broad label above it.
+    asset: row.subcategory.trim() || row.class?.trim() || row.category,
     type: investmentKind(row),
     quantity: units > 0 ? units : money > 0 && price > 0 ? money / price : 0,
     price,
@@ -46,7 +48,7 @@ const SELL_WORDS = ['sell', 'sale', 'venda', 'resgate', 'saque', 'withdraw']
 const CLASS_PHRASES = /fixed income|variable income|renda fixa|renda vari[áa]vel/g
 
 function investmentKind(row: ConfirmedRow): Transaction['type'] {
-  const text = `${row.investmentType ?? ''} ${row.subcategory} ${row.category}`.toLowerCase().replace(CLASS_PHRASES, ' ')
+  const text = `${row.subcategory} ${row.category}`.toLowerCase().replace(CLASS_PHRASES, ' ')
   if (INCOME_WORDS.some((word) => text.includes(word))) return 'income'
   if (SELL_WORDS.some((word) => text.includes(word))) return 'sell'
   return 'buy'
@@ -54,20 +56,20 @@ function investmentKind(row: ConfirmedRow): Transaction['type'] {
 
 /** What the class tests need, which a confirmed row and a dashboard entry both carry. */
 interface ClassifiableRow {
-  investmentClass?: string
+  class?: string
   category: string
-  subcategory: string
 }
 
 /**
- * Where a row may say what class it is.
+ * Where a row says what kind of thing it is.
  *
- * A file with a class column has it in `investmentClass`; a file without one is labelled
- * by hand, and the label that carries the class is whichever of category and subcategory
- * the user put it in. All three are read, so neither way of saying it is the wrong way.
+ * The class label answers exactly this, and the category is read with it because a row
+ * labelled before there was a class label put the answer there. The subcategory is not
+ * read: it names the particular thing, and a paper called "tesouro - reserva" would
+ * otherwise be counted as the cash reserve.
  */
 function classText(row: ClassifiableRow): string {
-  return `${row.investmentClass ?? ''} ${row.category} ${row.subcategory}`.toLowerCase()
+  return `${row.class ?? ''} ${row.category}`.toLowerCase()
 }
 
 /** True when the row's class text names fixed income, whatever language it was written in. */

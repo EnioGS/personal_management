@@ -42,25 +42,26 @@ const UNASSIGNED = '__unassigned__'
 const NO_SELECTION = '__none__'
 
 /** The label columns every table carries, in the order they are read. */
-const LABEL_COLUMNS = ['account', 'card', 'sections', 'screens', 'category', 'subcategory'] as const
+const LABEL_COLUMNS = ['account', 'card', 'sections', 'screens', 'class', 'category', 'subcategory'] as const
 type LabelColumn = (typeof LABEL_COLUMNS)[number]
 
 /** The ones that are free text, never validated, and default rather than start empty. */
-const MEANING_COLUMNS = ['category', 'subcategory'] as const
+const MEANING_COLUMNS = ['class', 'category', 'subcategory'] as const
 
-/** Card is the one placement label a row may honestly leave empty — not every row has one. */
-const OPTIONAL_COLUMNS = ['card'] as const
+/** The labels a row may honestly leave empty: not every row touched a card, and not every row is a kind of thing. */
+const OPTIONAL_COLUMNS = ['card', 'class'] as const
 
 const LABEL_HINT: Record<LabelColumn, string> = {
   account: 'one of your accounts, by the name it was set up under',
   card: 'one of your credit cards — empty when the row never touched one',
   sections: "the app's sections — several allowed, separated by commas",
   screens: 'the screens inside those sections — several allowed',
+  class: 'what kind of thing it is — free text, and what a balance is sliced by',
   category: 'free text',
   subcategory: 'free text',
 }
 
-const CONFIRMED_COLUMNS = ['row_id', 'section', 'screen', 'date', 'value', 'account', 'card', 'category', 'subcategory', 'observations'] as const
+const CONFIRMED_COLUMNS = ['row_id', 'section', 'screen', 'date', 'value', 'account', 'card', 'class', 'category', 'subcategory', 'observations'] as const
 
 function confirmedTableKey(row: ConfirmedRow): string {
   return `${row.section}/${row.screen}`
@@ -699,8 +700,8 @@ const ConfirmedRowLine = memo(function ConfirmedRowLine({
           onCommit={(value) => void onEdit(row, column, value)}
         />
       ))}
-      {(['category', 'subcategory'] as const).map((column) => (
-        <EditableCell key={column} value={row[column]} disabled={marking} onCommit={(value) => void onEdit(row, column, value)} />
+      {(['class', 'category', 'subcategory'] as const).map((column) => (
+        <EditableCell key={column} value={row[column] ?? ''} disabled={marking} onCommit={(value) => void onEdit(row, column, value)} />
       ))}
       <EditableCell
         className="max-w-[28rem] truncate"

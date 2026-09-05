@@ -86,3 +86,26 @@ describe('the exported .db', () => {
     expect(restored.tables.confirmedRows[0].data).toMatchObject({ rowId: 'def', value: -5 })
   })
 })
+
+describe('a file exported by an older version', () => {
+  it('opens here, its missing columns empty and its retired ones ignored', async () => {
+    const SQL = await initSqlJs({ locateFile: () => sqlWasmUrl })
+    const db = new SQL.Database()
+    // The confirmed table as it stood before `class`, with the three investment columns
+    // that have since been retired.
+    db.run('CREATE TABLE "confirmed_rows" (id INTEGER PRIMARY KEY, created_at INTEGER NOT NULL, row_id TEXT, section TEXT, screen TEXT, confirmed_at INTEGER, date INTEGER, value REAL, observations TEXT, category TEXT, subcategory TEXT, asset TEXT, amount REAL, price REAL, investment_type TEXT, investment_class TEXT, account TEXT, card TEXT, marked_for_elimination INTEGER)')
+    db.run(`INSERT INTO "confirmed_rows" (created_at, row_id, section, screen, category, subcategory, asset, investment_class) VALUES (1, 'a1', 'finances', 'investments', 'tesouro', 'IPCA+', 'PETR4', 'Renda Fixa')`)
+    db.run('CREATE TABLE "_export_meta" (version INTEGER, exported_at INTEGER)')
+    db.run(`INSERT INTO "_export_meta" VALUES (${DATA_EXPORT_VERSION}, 1)`)
+    const bytes = db.export()
+    db.close()
+
+    const parsed = await parseSqliteFile(bytes)
+    const data = (parsed.tables.confirmedRows ?? [])[0]?.data as Record<string, unknown>
+
+    expect(data).toMatchObject({ rowId: 'a1', category: 'tesouro', subcategory: 'IPCA+' })
+    // The retired columns are not read, and the label that did not exist yet arrives empty.
+    expect(data).not.toHaveProperty('asset')
+    expect(data.class ?? null).toBeNull()
+  })
+})

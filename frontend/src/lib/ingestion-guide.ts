@@ -19,13 +19,12 @@ and labelling happen side by side, on the same rows.
 
 ## A source table
 
-\`source_filename\` first, then the file's own columns exactly as written, then six label
+\`source_filename\` first, then the file's own columns exactly as written, then seven label
 columns. Everything starts empty: nothing about a row is claimed before somebody claims it.
 
 Only the file's own columns can be assigned, to: **date**, **value** (money that moved,
 signed), **amount** (units of a thing — what an investment row is), **price** (what one
-unit was worth), asset, investmentType, investmentClass (renda fixa, renda variável, or a
-cash reserve — the dashboards read all three). Value and amount are never
+unit was worth). Value and amount are never
 interchangeable: money is a value, a holding is an amount. Anything unassigned is condensed
 into the observations of each confirmed row, which is where a description ends up.
 
@@ -49,6 +48,11 @@ ${PROMPT_PLACEHOLDERS.sections}
 
 Screens — the pages inside them, validated *within* the sections the row names, since two
 sections may offer screens of the same name: ${PROMPT_PLACEHOLDERS.screens}
+
+Class — free text: what kind of thing the row is, which is what a balance is sliced by —
+renda fixa, renda variável, cash reserve. Optional, but the Investments dashboards read it,
+so an investment row without one is money nobody can place. What the thing *is*, never
+where it came from: interest arriving in cash is class \`cash reserve\`, not \`proceeds\`.
 
 Category — free text, one value, starts empty. Leave it empty rather than writing a word
 like "other": an empty cell asks to be looked at, "other" looks like an answer.

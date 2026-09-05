@@ -28,6 +28,7 @@ interface Draft {
   sections: string
   screens: string
   category: string
+  class: string
   subcategory: string
   account: string
   card: string
@@ -44,6 +45,7 @@ function emptyDraft(context: RuleContext): Draft {
     sections: '',
     screens: '',
     category: '',
+    class: '',
     subcategory: '',
     account: '',
     card: '',
@@ -56,6 +58,7 @@ function describeLabels(rule: StoredRule): string {
   if (rule.labels.sections?.length) parts.push(`sections: ${rule.labels.sections.join(', ')}`)
   if (rule.labels.screens?.length) parts.push(`screens: ${rule.labels.screens.join(', ')}`)
   if (rule.labels.category) parts.push(`category: ${rule.labels.category}`)
+  if (rule.labels.class) parts.push(`class: ${rule.labels.class}`)
   if (rule.labels.subcategory) parts.push(`subcategory: ${rule.labels.subcategory}`)
   if (rule.labels.account) parts.push(`account: ${rule.labels.account}`)
   if (rule.labels.card) parts.push(`card: ${rule.labels.card}`)
@@ -105,6 +108,7 @@ export function LabellingRules({ context }: { context: RuleContext }) {
       sections: (rule.labels.sections ?? []).join(', '),
       screens: (rule.labels.screens ?? []).join(', '),
       category: rule.labels.category ?? '',
+      class: rule.labels.class ?? '',
       subcategory: rule.labels.subcategory ?? '',
       account: rule.labels.account ?? '',
       card: rule.labels.card ?? '',
@@ -142,6 +146,7 @@ export function LabellingRules({ context }: { context: RuleContext }) {
       ...(sections.values.length ? { sections: sections.values } : {}),
       ...(screens.values.length ? { screens: screens.values } : {}),
       ...(draft.category.trim() ? { category: draft.category.trim() } : {}),
+      ...(draft.class.trim() ? { class: draft.class.trim() } : {}),
       ...(draft.subcategory.trim() ? { subcategory: draft.subcategory.trim() } : {}),
       ...(account ? { account } : {}),
       ...(card ? { card } : {}),
@@ -201,6 +206,7 @@ export function LabellingRules({ context }: { context: RuleContext }) {
             <Input value={draft.sections} placeholder="sections" className="h-7 w-40 text-xs" onChange={(event) => setDraft({ ...draft, sections: event.target.value })} />
             <Input value={draft.screens} placeholder="screens" className="h-7 w-40 text-xs" onChange={(event) => setDraft({ ...draft, screens: event.target.value })} />
             <Input value={draft.category} placeholder="category" className="h-7 w-32 text-xs" onChange={(event) => setDraft({ ...draft, category: event.target.value })} />
+            <Input value={draft.class} placeholder="class" className="h-7 w-28 text-xs" onChange={(event) => setDraft({ ...draft, class: event.target.value })} />
             <Input value={draft.subcategory} placeholder="subcategory" className="h-7 w-32 text-xs" onChange={(event) => setDraft({ ...draft, subcategory: event.target.value })} />
             <Input value={draft.account} placeholder="account" className="h-7 w-32 text-xs" onChange={(event) => setDraft({ ...draft, account: event.target.value })} />
             <Input value={draft.card} placeholder="card" className="h-7 w-32 text-xs" onChange={(event) => setDraft({ ...draft, card: event.target.value })} />

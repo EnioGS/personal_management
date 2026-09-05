@@ -5,7 +5,7 @@ import type { IngestionRowLabels, LabelRule } from './types'
 export type StoredRule = LabelRule & { id: number }
 
 /** The labels a rule can set. Placement first, meaning second. */
-const LABEL_KEYS: (keyof IngestionRowLabels)[] = ['sections', 'screens', 'category', 'subcategory', 'account', 'card']
+const LABEL_KEYS: (keyof IngestionRowLabels)[] = ['sections', 'screens', 'class', 'category', 'subcategory', 'account', 'card']
 
 /**
  * Whether one condition holds.

@@ -5,6 +5,9 @@
 Accepted. Supersedes the two-phase workflow of adr/0030 and the label set of adr/0031;
 what those record about provenance, user-confirmed movement and standing rules stands.
 
+> The label set described here is extended by adr/0036: `class` joins them,
+> and the investment-only columns are retired.
+
 ## Context
 
 Seven labels were too many, and four of them were doing work the data already did. Flow

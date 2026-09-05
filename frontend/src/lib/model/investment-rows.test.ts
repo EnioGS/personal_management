@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { asTransaction, investmentRowsOf, isFixedIncome, isVariableIncome } from './investment-rows'
+import { asTransaction, investmentRowsOf, isCashReserve, isFixedIncome, isVariableIncome } from './investment-rows'
 import type { StoredRow } from '@/lib/local-store/create-local-table'
 import type { ConfirmedRow } from './types'
 
@@ -29,18 +29,19 @@ describe('reading a confirmed row as a portfolio transaction', () => {
     expect(asTransaction(row({ amount: -3, price: -20 }))).toMatchObject({ quantity: 3, price: 20 })
   })
 
-  it('reads the kind from whatever the file called it, in either language', () => {
-    expect(asTransaction(row({ investmentType: 'Compra' })).type).toBe('buy')
-    expect(asTransaction(row({ investmentType: 'Venda' })).type).toBe('sell')
-    expect(asTransaction(row({ investmentType: 'Dividendos' })).type).toBe('income')
+  it('reads the kind from whatever the row was labelled, in either language', () => {
+    expect(asTransaction(row({ subcategory: 'Compra' })).type).toBe('buy')
+    expect(asTransaction(row({ subcategory: 'Venda' })).type).toBe('sell')
+    expect(asTransaction(row({ subcategory: 'Dividendos' })).type).toBe('income')
     expect(asTransaction(row({ subcategory: 'rendimento' })).type).toBe('income')
     // An investment row that says nothing is a purchase, which is what one usually is.
     expect(asTransaction(row()).type).toBe('buy')
   })
 
-  it('takes the asset from the row, falling back to what the row is about', () => {
-    expect(asTransaction(row({ asset: 'PETR4' })).asset).toBe('PETR4')
-    expect(asTransaction(row({ asset: undefined, category: 'tesouro' })).asset).toBe('tesouro')
+  it('names the position after the thing itself, and then after what kind it is', () => {
+    expect(asTransaction(row({ subcategory: 'tesouro - IPCA+' })).asset).toBe('tesouro - IPCA+')
+    expect(asTransaction(row({ subcategory: '', class: 'renda fixa' })).asset).toBe('renda fixa')
+    expect(asTransaction(row({ subcategory: '', category: 'tesouro' })).asset).toBe('tesouro')
   })
 })
 
@@ -51,11 +52,17 @@ describe('which rows are investments at all', () => {
     expect(investmentRowsOf(rows).map((entry) => entry.id)).toEqual([1])
   })
 
-  it('reads the class from the words the file used, and calls neither when it says neither', () => {
-    expect(isFixedIncome(row({ investmentClass: 'Renda Fixa' }))).toBe(true)
-    expect(isVariableIncome(row({ investmentClass: 'renda variável' }))).toBe(true)
+  it('reads the kind of thing off the class label, or off the category it was once put in', () => {
+    expect(isFixedIncome(row({ class: 'Renda Fixa' }))).toBe(true)
+    expect(isVariableIncome(row({ class: 'renda variável' }))).toBe(true)
+    expect(isCashReserve(row({ category: 'cash' }))).toBe(true)
     expect(isFixedIncome(row())).toBe(false)
     expect(isVariableIncome(row())).toBe(false)
+  })
+
+  it('does not read the subcategory, which names the thing rather than its kind', () => {
+    // A paper called "tesouro - reserva 2029" is fixed income, not the cash reserve.
+    expect(isCashReserve(row({ class: 'fixed income', subcategory: 'tesouro - reserva 2029' }))).toBe(false)
   })
 })
 

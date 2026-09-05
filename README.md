@@ -48,7 +48,8 @@ Two things it optimizes for:
 │   │   ├── locales/common/    # shared strings not owned by one section
 │   │   ├── lib/
 │   │   │   ├── local-store/              # generic Dexie-table + Zustand-store factories
-│   │   │   ├── model/                    # accounts/cards, source files, confirmed rows, rules — see adr/0022 and adr/0032
+│   │   │   ├── model/                    # accounts/cards, source files, confirmed rows, rules — see adr/0022,
+│   │   │   │                             # adr/0032 and adr/0036 (the seven labels)
 │   │   │   ├── dashboard/                # date-range presets, capital evolution and its KPI
 │   │   │   │                             # comparisons, movements analytics — see adr/0033
 │   │   │   ├── table-schema.ts           # column schema driving tables, CSV, and the draft-row inputs

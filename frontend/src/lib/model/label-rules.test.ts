@@ -100,3 +100,21 @@ describe('a rule that says nothing about a label', () => {
     expect(stats).toMatchObject({ applied: 2, confirmedRespected: 1, overridden: 1 })
   })
 })
+
+describe('the class label', () => {
+  it('is a label a rule can fill, like every other', () => {
+    const applied = applyLabelRules({}, [rule({ contains: 'tesouro', labels: { class: 'renda fixa' } })], () => 'TESOURO IPCA 2029')
+
+    expect(applied.labels.class).toBe('renda fixa')
+  })
+
+  it('is left alone when the row already says what kind of thing it is', () => {
+    const applied = applyLabelRules(
+      { class: 'cash reserve' },
+      [rule({ contains: 'tesouro', labels: { class: 'renda fixa' } })],
+      () => 'TESOURO IPCA 2029',
+    )
+
+    expect(applied.labels.class).toBe('cash reserve')
+  })
+})

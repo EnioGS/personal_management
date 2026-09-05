@@ -14,7 +14,7 @@ import type { ConfirmedRow, IngestionTargetField, SourceFile, SourceRow } from '
 export const SOURCE_FILENAME_COLUMN = 'source_filename'
 
 /** Canonical fields a source column can be assigned to. Placement is a label, not a column. */
-export const ASSIGNABLE_FIELDS: IngestionTargetField[] = ['date', 'value', 'amount', 'asset', 'price', 'investmentType', 'investmentClass']
+export const ASSIGNABLE_FIELDS: IngestionTargetField[] = ['date', 'value', 'amount', 'price']
 
 /** The screen whose rows are holdings rather than money: what it needs assigned differs. */
 const INVESTMENTS_SCREEN = 'investments'
@@ -525,13 +525,11 @@ export async function confirmSourceRows(sourceId: number, catalogue: LabelCatalo
       date: parseDateValue(canonicalValue(row, file, 'date')) ?? undefined,
       value: value ?? undefined,
       observations: observationsFor(row, file, row.importedValue),
+      class: row.labels.class?.trim() || undefined,
       category: row.labels.category?.trim() ?? '',
       subcategory: row.labels.subcategory?.trim() ?? '',
-      asset: canonicalValue(row, file, 'asset') || undefined,
       amount: parseNumberValue(canonicalValue(row, file, 'amount')) ?? undefined,
       price: parseNumberValue(canonicalValue(row, file, 'price')) ?? undefined,
-      investmentType: canonicalValue(row, file, 'investmentType') || undefined,
-      investmentClass: canonicalValue(row, file, 'investmentClass') || undefined,
       account: row.labels.account?.trim() || undefined,
       card: row.labels.card?.trim() || undefined,
     }

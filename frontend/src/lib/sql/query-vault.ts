@@ -90,7 +90,7 @@ export async function buildVaultSnapshot(): Promise<VaultSnapshot> {
         marked_for_elimination: data.markedForElimination ? 1 : 0,
         duplicate_of: data.duplicateOf ?? null,
       }))
-    const columns = ['id', 'row_id', 'source_filename', ...file.originalColumns, 'sections', 'screens', 'category', 'subcategory', 'account', 'card', 'marked_for_elimination', 'duplicate_of']
+    const columns = ['id', 'row_id', 'source_filename', ...file.originalColumns, 'sections', 'screens', 'class', 'category', 'subcategory', 'account', 'card', 'marked_for_elimination', 'duplicate_of']
     const name = sourceTableName(file, stored.id)
     createAndFill(db, name, rows, columns)
     tables.push({ name, columns, rows: rows.length })
@@ -115,13 +115,11 @@ export async function buildVaultSnapshot(): Promise<VaultSnapshot> {
       date: data.date ?? null,
       value: data.value ?? null,
       observations: data.observations,
+      class: data.class ?? null,
       category: data.category,
       subcategory: data.subcategory,
-      asset: data.asset ?? null,
       amount: data.amount ?? null,
       price: data.price ?? null,
-      investment_type: data.investmentType ?? null,
-      investment_class: data.investmentClass ?? null,
       account: data.account ?? null,
       card: data.card ?? null,
       marked_for_elimination: data.markedForElimination ? 1 : 0,

@@ -357,6 +357,7 @@ export const reviseConfirmedRowsTool: ToolDefinition = {
       account: { type: 'string' },
       card: { type: 'string', description: "One of the user's cards, by name. Leave it out to keep whatever each row has." },
       clearCard: { type: 'boolean', description: 'Removes the card from every row selected. Say this only when you mean it: the rows that had one lose it.' },
+      class: { type: 'string', description: 'What kind of thing the row is (renda fixa, cash reserve). Empty string clears it.' },
       category: { type: 'string' },
       subcategory: { type: 'string' },
       reason: { type: 'string', description: 'Why, for the user. Not stored on the row.' },
@@ -388,6 +389,9 @@ export const reviseConfirmedRowsTool: ToolDefinition = {
       if (!card) return `Error: no card is called "${args.card}". Call list_accounts_and_cards, or add_card first.`
       revision.card = card
     }
+    // Emptying is meaningful here and nowhere else in this tool: a class is optional, so
+    // "" means the row has none, while an account or a card must name something real.
+    if (typeof args.class === 'string') revision.class = args.class.trim() || null
     if (typeof args.category === 'string') revision.category = args.category.trim()
     if (typeof args.subcategory === 'string') revision.subcategory = args.subcategory.trim()
 
@@ -493,7 +497,7 @@ export const newRowIdTool: ToolDefinition = {
 
 export const addConfirmedRowTool: ToolDefinition = {
   name: 'add_confirmed_row',
-  description: "Adds a row to a confirmed table. Two uses only: correcting a row \u2014 pass the row_id of the one you replace, then mark that one \u2014 or recording something the files never carried. Value is money, signed (negative left, positive arrived); amount is units; price is what one unit was worth.",
+  description: "Adds a row to a confirmed table. Two uses only: correcting a row \u2014 pass the row_id of the one you replace, then mark that one \u2014 or recording something the files never carried. Value is money, signed (negative left, positive arrived); amount is units; price is what one unit was worth; class is what kind of thing it is.",
   parameters: {
     type: 'object',
     properties: {
@@ -502,9 +506,9 @@ export const addConfirmedRowTool: ToolDefinition = {
       screen: { type: 'string' },
       date: { type: 'string', description: 'Any readable date; day-first is understood.' },
       value: { type: 'number', description: 'Money that moved, signed: negative left, positive arrived.' },
-      amount: { type: 'number', description: 'Units of the asset, for an investment row. Not money.' },
+      amount: { type: 'number', description: 'Units of the thing, for an investment row. Not money.' },
       price: { type: 'number', description: 'What one unit was worth.' },
-      asset: { type: 'string' },
+      class: { type: 'string', description: 'What kind of thing it is: renda fixa, renda variável, cash reserve.' },
       observations: { type: 'string' },
       category: { type: 'string' },
       subcategory: { type: 'string' },
@@ -530,7 +534,7 @@ export const addConfirmedRowTool: ToolDefinition = {
       value: typeof args.value === 'number' ? args.value : undefined,
       amount: typeof args.amount === 'number' ? args.amount : undefined,
       price: typeof args.price === 'number' ? args.price : undefined,
-      asset: typeof args.asset === 'string' && args.asset.trim() ? args.asset.trim() : undefined,
+      class: typeof args.class === 'string' && args.class.trim() ? args.class.trim() : undefined,
       // Where the row came from belongs in the observations with everything else a file
       // said; there is no column of its own repeating it.
       observations: withObservation(

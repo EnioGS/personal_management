@@ -142,3 +142,18 @@ describe('rowToSqlValues / sqlValuesToRow round-trip', () => {
     expect(columnNames(SQLITE_SCHEMAS.allocationTargets)).toEqual(['id', 'created_at', 'asset', 'target_percent'])
   })
 })
+
+describe('the columns a confirmed row exports', () => {
+  const columns = SQLITE_SCHEMAS.confirmedRows.columns.map((column) => column.column)
+
+  it('carries the class label, beside the two labels it belongs with', () => {
+    expect(columns).toContain('class')
+    expect(columns.indexOf('class')).toBe(columns.indexOf('category') - 1)
+  })
+
+  it('no longer carries the columns only investment rows ever filled', () => {
+    expect(columns).not.toContain('asset')
+    expect(columns).not.toContain('investment_type')
+    expect(columns).not.toContain('investment_class')
+  })
+})

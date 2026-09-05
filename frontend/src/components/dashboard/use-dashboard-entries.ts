@@ -13,6 +13,7 @@ export interface FilteredEntry {
   date: number
   /** Money that moved, signed the way the app means it: negative left, positive arrived. */
   value: number
+  /** What the row is for, and the detail under it. */
   category: string
   subcategory: string
   /** Which account the money moved through, and which card it was billed to. */
@@ -24,12 +25,11 @@ export interface FilteredEntry {
   sourceFilename: string
   /** The most description-like thing the file said — see `describeRow`. */
   description: string
-  asset?: string
-  /** Units of the asset, for an investment row. */
+  /** What kind of thing the row is: renda fixa, a cash reserve, a proceeds payment. */
+  class?: string
+  /** Units of the thing, for an investment row. */
   amount?: number
   price?: number
-  investmentType?: string
-  investmentClass?: string
 }
 
 interface FilterParams {
@@ -71,11 +71,9 @@ export function filterConfirmedRows({ rows, filters, screen }: FilterParams): Fi
       observations: row.observations,
       description: describeRow(row.observations),
       sourceFilename: sourceFilenameOf(row.observations),
-      asset: row.asset,
+      class: row.class,
       amount: row.amount,
       price: row.price,
-      investmentType: row.investmentType,
-      investmentClass: row.investmentClass,
     })
   }
   return result
