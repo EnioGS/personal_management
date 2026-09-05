@@ -135,6 +135,22 @@
 }
 
 /*
+ * A surface that scrolls without saying so.
+ *
+ * For a screen whose whole content scrolls — where the bar would run the full height at
+ * the window's edge and read as the browser's own, which this app does not have. The
+ * scrolling itself is untouched: wheel, trackpad, keyboard and touch all work. Boxes
+ * *inside* a screen keep their bars, since there the bar says which box is scrolling.
+ */
+.scrollbar-hidden {
+  scrollbar-width: none;
+}
+
+.scrollbar-hidden::-webkit-scrollbar {
+  display: none;
+}
+
+/*
  * A ThemedColor (light/dark hex) resolved against the current theme outside of a
  * chart — every user sets --entity-light/--entity-dark inline (see
  * components/dashboard/category-pill.tsx and ranked-bar-list.tsx), and these two

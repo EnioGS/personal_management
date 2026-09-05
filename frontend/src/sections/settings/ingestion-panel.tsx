@@ -298,7 +298,7 @@ export function IngestionPanel() {
 
   return (
     <div
-      className={cn('flex h-full flex-col gap-3 overflow-auto p-4', isDropTarget && 'bg-accent/40')}
+      className={cn('scrollbar-hidden flex h-full flex-col gap-3 overflow-auto p-4', isDropTarget && 'bg-accent/40')}
       onDragOver={(event) => { event.preventDefault(); setIsDropTarget(true) }}
       onDragLeave={() => setIsDropTarget(false)}
       onDrop={handleDrop}
