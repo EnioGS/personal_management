@@ -1,9 +1,9 @@
-import { buildLabelCatalogue, loadLabelCatalogue } from '@/lib/label-catalogue-source'
+import { loadLabelCatalogue } from '@/lib/label-catalogue-source'
 import { describeVault, queryVault } from '@/lib/sql/query-vault'
 import { placeConfirmedRow, setConfirmedMeaning } from '@/lib/model/confirmed-rows'
 import { SOURCE_FILENAME_KEY, withObservation } from '@/lib/model/observations'
 import { DEFAULT_MEANING, ingestionLabelErrors } from '@/lib/model/ingestion'
-import { parsePlacementLabels, resolveAccountLabel, resolveCardLabel, resolveScreenLabel, resolveSectionLabel, withDerivedSections } from '@/lib/model/label-catalogue'
+import { parsePlacementLabels, placementsOf, resolveAccountLabel, resolveCardLabel, resolveScreenLabel, resolveSectionLabel, withDerivedSections, type LabelCatalogue } from '@/lib/model/label-catalogue'
 import { confirmedRowsTable, sourceFilesTable, sourceRowsTable } from '@/lib/model/model-db'
 import { newRowId } from '@/lib/model/row-id'
 import { applyLabelRulesToRows } from '@/lib/model/label-rules-repository'
@@ -448,15 +448,35 @@ export const confirmRowsTool: ToolDefinition = {
   },
   execute: async (args, context) => {
     if (typeof args.sourceId !== 'number') return 'Error: sourceId is required.'
-    const catalogue = buildLabelCatalogue(context.translate)
+    // Loaded, not built: a catalogue without the user's accounts and cards says no
+    // account is called anything, and every row is judged unlabelled.
+    const catalogue = await loadLabelCatalogue(context.translate)
     try {
       const plan = await planConfirmation(args.sourceId, catalogue)
       if (args.discardMarked === true && args.confirmed !== true) {
         return JSON.stringify({ confirmed: false, plan: { ready: plan.ready.length, incomplete: plan.incomplete.length, marked: plan.marked.length }, next: 'This also drops the marked rows and retires the file. Tell the user exactly what that moves, and call again with confirmed: true once they agree.' })
       }
-      return JSON.stringify(await confirmSourceRows(args.sourceId, catalogue, { discardMarked: args.discardMarked === true }))
+      const result = await confirmSourceRows(args.sourceId, catalogue, { discardMarked: args.discardMarked === true })
+      // A count of what did not move says nothing about why, and "confirmed: 0" with no
+      // reason is the least useful thing this could say. The reasons come back with it.
+      return JSON.stringify({ ...result, blocking: await reasonsRowsWereLeft(args.sourceId, catalogue) })
     } catch (error) { return `Error: ${error instanceof Error ? error.message : 'could not confirm those rows.'}` }
   },
+}
+
+/** What is still missing from the rows a file could not confirm, counted by reason. */
+async function reasonsRowsWereLeft(sourceId: number, catalogue: LabelCatalogue): Promise<Record<string, number>> {
+  const reasons: Record<string, number> = {}
+  for (const stored of await sourceRowsTable.toArray()) {
+    const row = stored.data as SourceRow
+    if (row.sourceId !== sourceId || row.markedForElimination) continue
+    const errors = ingestionLabelErrors(row.labels, catalogue)
+    const placed = placementsOf(row.labels, catalogue).length > 0
+    for (const error of errors.length > 0 ? errors : placed ? [] : ['The section and screen it names are not a pair the app has.']) {
+      reasons[error] = (reasons[error] ?? 0) + 1
+    }
+  }
+  return reasons
 }
 
 export const dropSourceTableTool: ToolDefinition = {

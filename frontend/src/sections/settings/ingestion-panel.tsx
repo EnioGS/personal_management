@@ -390,7 +390,9 @@ export function IngestionPanel() {
             <thead className="sticky top-0">
               {/* Assignment sits on a line of its own above the names: it is a statement
                   about the column, not part of what the column is called. */}
-              <tr className="[&>th]:bg-muted/40">
+              {/* The colour of the control strip above, mixed rather than faded: a sticky
+                  header at 40% opacity is a header the rows scroll through. */}
+              <tr className="[&>th]:[background-color:color-mix(in_oklab,var(--muted)_40%,var(--background))]">
                 <th colSpan={3} className="px-2 py-1" />
                 {selectedFile.originalColumns.map((column) => (
                   <th key={column} className="px-2 py-1 text-left font-normal">
