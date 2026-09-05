@@ -119,6 +119,16 @@
   * {
     @apply border-border outline-ring/50;
   }
+  /*
+   * The page itself never scrolls: the shell is exactly the viewport, and everything
+   * long inside it — a table, a message list, a dropdown — scrolls in its own box. A
+   * page-level scrollbar here would only ever mean something had overflowed by
+   * accident, and it would sit outside the surface it appeared to belong to.
+   */
+  html,
+  body {
+    @apply overflow-hidden overscroll-none;
+  }
   body {
     @apply bg-background text-foreground;
   }
