@@ -17,7 +17,14 @@ export interface CapitalEvolutionPoint {
    * investment, each month's net added to the last month's total.
    */
   capital: number
-  /** The same running total for investments alone — what is held rather than spent. */
+  /**
+   * What is held in investments rather than in the accounts, as a positive quantity.
+   *
+   * The rows are written from the account's point of view — an aplicação is money leaving
+   * it, a resgate money coming back — so what is *held* is the negative of their running
+   * sum. Inverted here rather than in the rows themselves: the tables keep saying what the
+   * broker said.
+   */
   investments: number
   /** What the month itself netted across the accounts. Not cumulative. */
   income: number
@@ -90,7 +97,7 @@ export function capitalEvolution(sources: CapitalSources, range: DateRange): Cap
     const income = movements.get(month) ?? 0
     const invested = investments.get(month) ?? 0
     capital = roundCurrency(capital + income + invested)
-    held = roundCurrency(held + invested)
+    held = roundCurrency(held - invested)
 
     const start = monthStart(month)
     const end = Date.parse(`${nextMonth(month)}-01`) - DAY_MS

@@ -37,6 +37,11 @@ movements answer *how much left*.
 Capital therefore measures **change since the data begins** — the accounts have
 no opening balance, because no statement carries one.
 
+**Holdings are shown as what is held.** Investment rows are written from the
+account's point of view — an aplicação is money leaving it, a resgate money
+coming back — so the investments series inverts their running sum. The tables
+keep saying what the broker said; only the line and its tile read the other way.
+
 **Every KPI carries two comparisons, both calendar-real**
 (`lib/dashboard/capital-metric.ts`): against last month, and against the first
 month the tile's own sparkline draws. The tile is then self-contained — the
