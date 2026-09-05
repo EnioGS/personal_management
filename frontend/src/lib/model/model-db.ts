@@ -1,4 +1,5 @@
 import Dexie, { type EntityTable } from 'dexie'
+import { withObservation } from './observations'
 import type { LocalRow } from '@/lib/local-store/create-local-table'
 
 /**
@@ -236,10 +237,12 @@ db.version(14).stores({}).upgrade(async (tx) => {
  * queried the way every other label can. `class` replaces all three: what kind of thing
  * the row is, on every row, beside category and subcategory.
  *
- * The old class is carried over rather than discarded, since it was the one of the three
- * that said what a row is; an asset name lives on in the subcategory, which is where the
- * files had been putting it anyway. Assignments pointing at a target that no longer exists
- * are dropped, or the file would keep offering a column nothing can receive.
+ * Nothing a row said is thrown away. The old class becomes the new one, since it was the
+ * one of the three that said what a row is. An asset name moves into the subcategory when
+ * that is empty — it names the particular thing, which is what a subcategory is for — and
+ * into the observations when it is not, because the observations are where this app keeps
+ * every fact that has no column of its own. Assignments pointing at a target that no
+ * longer exists are dropped, or the file would keep offering a column nothing can receive.
  */
 db.version(15).stores({}).upgrade(async (tx) => {
   const retired = ['asset', 'investmentType', 'investmentClass']
@@ -249,7 +252,14 @@ db.version(15).stores({}).upgrade(async (tx) => {
     if (!data) return
     const carried = [data.investmentClass, data.investmentType].find((value) => typeof value === 'string' && value.trim())
     if (carried && !data.class) data.class = carried
-    if (!data.subcategory && typeof data.asset === 'string' && data.asset.trim()) data.subcategory = data.asset
+
+    const asset = typeof data.asset === 'string' ? data.asset.trim() : ''
+    if (asset && !data.subcategory) data.subcategory = asset
+    else if (asset) data.observations = withObservation(String(data.observations ?? '{}'), 'asset', asset)
+
+    const type = typeof data.investmentType === 'string' ? data.investmentType.trim() : ''
+    if (type && type !== data.class) data.observations = withObservation(String(data.observations ?? '{}'), 'investment_type', type)
+
     for (const field of retired) delete data[field]
   })
 

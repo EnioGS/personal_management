@@ -271,11 +271,20 @@ describe('what counts as a duplicate', () => {
 })
 
 describe('observationsFor', () => {
-  it('keeps everything no column was assigned to, the filename included, and never an empty value', () => {
+  it('keeps every column no column was assigned to, the filename and the empty cells included', () => {
     const file = { assignments: { Data: 'date' } } as unknown as SourceFile
     const row = { values: { source_filename: 'banco.csv', Data: '01/08/2026', Descrição: 'MERCADO', Tipo: '' } } as unknown as SourceRow
 
-    expect(JSON.parse(observationsFor(row, file))).toEqual({ source_filename: 'banco.csv', Descrição: 'MERCADO' })
+    // Tipo is empty on this row and kept anyway: the file having nothing to say there is
+    // itself something the file said, and it is only visible if the column comes along.
+    expect(JSON.parse(observationsFor(row, file))).toEqual({ source_filename: 'banco.csv', Descrição: 'MERCADO', Tipo: '' })
+  })
+
+  it('leaves out a column with no name, which is not a column', () => {
+    const file = { assignments: {} } as unknown as SourceFile
+    const row = { values: { '': 'stray', Descrição: 'MERCADO' } } as unknown as SourceRow
+
+    expect(JSON.parse(observationsFor(row, file))).toEqual({ Descrição: 'MERCADO' })
   })
 })
 

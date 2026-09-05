@@ -346,7 +346,10 @@ export function observationsFor(row: SourceRow, file: SourceFile, importedValue?
   const assigned = new Set(Object.keys(file.assignments))
   const parts: Record<string, string> = {}
   for (const [column, value] of Object.entries(row.values)) {
-    if (assigned.has(column) || value === '') continue
+    // Every column the file wrote and nothing was assigned to, empty ones included: a
+    // blank cell under a named column says the file had nothing to say there, which is
+    // itself something the file said. A column with no name is not a column.
+    if (assigned.has(column) || !column.trim()) continue
     parts[column] = value
   }
   if (importedValue !== undefined) parts.value_as_imported = importedValue
