@@ -248,7 +248,7 @@ export function ChatPanel() {
           togglePanel()
         }}
         className={cn(
-          'pointer-events-auto absolute top-1/2 left-0 z-10 flex h-8 w-5 -translate-y-1/2 cursor-grab touch-none items-center justify-center rounded-l-md border border-r-0 select-none active:cursor-grabbing',
+          'pointer-events-auto absolute top-1/2 left-0 z-10 flex h-16 w-10 -translate-y-1/2 cursor-grab touch-none items-center justify-center rounded-l-md border border-r-0 select-none active:cursor-grabbing',
           hasUnread ? 'bg-brand' : 'bg-border',
         )}
       >
@@ -256,7 +256,7 @@ export function ChatPanel() {
       </div>
 
       <div
-        className="pointer-events-auto relative ml-5 flex h-full min-w-0 flex-1 flex-col border-l bg-sidebar shadow-lg"
+        className="pointer-events-auto relative ml-10 flex h-full min-w-0 flex-1 flex-col border-l bg-sidebar shadow-lg"
         onClick={markInteracted}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
