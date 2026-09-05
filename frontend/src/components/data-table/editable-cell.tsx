@@ -52,9 +52,11 @@ export function EditableCell({ value, onCommit, validate, missing, readOnly, dis
       title={title ?? error ?? undefined}
       onDoubleClick={() => { if (!readOnly && !disabled && draft === null) setDraft(value) }}
       className={cn(
-        'p-0 align-middle',
-        error ? 'text-destructive ring-destructive ring-1 ring-inset' : missing ? 'ring-1 ring-amber-500 ring-inset' : '',
-        draft !== null && !error && 'ring-ring ring-1 ring-inset',
+        // A hairline at half opacity, and corners barely rounded: the cell has to say
+        // "look at me" without shouting over the data it is drawn around.
+        'rounded-[3px] p-0 align-middle',
+        error ? 'text-destructive/90 ring-destructive/50 ring-[0.5px] ring-inset' : missing ? 'ring-[0.5px] ring-amber-500/50 ring-inset' : '',
+        draft !== null && !error && 'ring-ring/60 ring-[0.5px] ring-inset',
         !readOnly && !disabled && draft === null && 'hover:bg-muted/40',
         className,
       )}
