@@ -61,6 +61,17 @@ export function isVariableIncome(row: ClassifiableRow): boolean {
   return text.includes('variable') || text.includes('variável') || text.includes('variavel')
 }
 
+/**
+ * True when the row names money held as money: the reserve, kept liquid on purpose.
+ *
+ * It is a holding like any other and says so on its own row — not whatever is left in the
+ * accounts after the investments are counted, which is a different quantity entirely.
+ */
+export function isCashReserve(row: ClassifiableRow): boolean {
+  const text = `${row.investmentClass ?? ''} ${row.subcategory}`.toLowerCase()
+  return text.includes('cash') || text.includes('caixa') || text.includes('reserva') || text.includes('liquidez')
+}
+
 export function investmentRowsOf(rows: StoredRow<ConfirmedRow>[]): StoredRow<ConfirmedRow>[] {
   return rows.filter((row) => row.screen === INVESTMENTS_SCREEN && !row.markedForElimination)
 }

@@ -87,18 +87,20 @@ export function OverviewPanel() {
   const accounts = useMemo(() => accountsWithCards(movements, spending), [movements, spending])
   const incomeSources = useMemo(() => incomeByCategory(movements), [movements])
   const biggest = useMemo(() => largestMovements(movements), [movements])
-  const split = useMemo(() => holdingsSplit(capital.current, investmentHistory), [capital, investmentHistory])
-  const capitalSlices = useMemo(
+  const split = useMemo(() => holdingsSplit(investmentHistory), [investmentHistory])
+  // The three classes are always named, holding anything or not: a legend that appears
+  // and disappears with the data is a legend nobody can learn.
+  const holdingSlices = useMemo(
     () => [
-      { key: 'cash', label: t('finances:overview.cashReserve'), value: split.cash, color: DOMAIN_COLOR.balance },
       { key: 'fixedIncome', label: t('investments:items.fixedIncome'), value: split.fixedIncome, color: DOMAIN_COLOR.fixedIncome },
       { key: 'variableIncome', label: t('investments:items.variableIncome'), value: split.variableIncome, color: DOMAIN_COLOR.variableIncome },
+      { key: 'cash', label: t('finances:overview.cashReserve'), value: split.cash, color: DOMAIN_COLOR.balance },
       // Only when there is any: a slice for money nobody has classed is a prompt to class
       // it, and an empty one would be a prompt to do nothing.
       ...(split.unclassified > 0
         ? [{ key: 'unclassified', label: t('finances:overview.unclassifiedHoldings'), value: split.unclassified, color: DOMAIN_COLOR.contributions }]
         : []),
-    ].filter((slice) => slice.value > 0),
+    ],
     [split, t],
   )
   const spendingCategories = useMemo(
@@ -154,7 +156,7 @@ export function OverviewPanel() {
               them, where a treemap has room to be read. */}
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
             <div className="flex flex-col gap-3 lg:col-span-2">
-              <DashboardCard title={t('finances:overview.capitalEvolution')} className="h-[320px]" bodyClassName="p-2">
+              <DashboardCard className="h-[320px]" bodyClassName="p-2">
                 {capitalData.length === 0 ? (
                   <p className="text-muted-foreground flex h-full items-center justify-center text-xs">{t('finances:overview.noEntries')}</p>
                 ) : (
@@ -166,11 +168,12 @@ export function OverviewPanel() {
                     capitalLabel={t('finances:overview.capitalEvolution')}
                     spendingLabel={t('common:dashboard.spending')}
                     investmentsLabel={t('finances:overview.investments')}
+                    netCashFlowLabel={t('finances:overview.netCashFlow')}
                   />
                 )}
               </DashboardCard>
 
-              <DashboardCard title={t('finances:overview.cashFlow')} className="h-[300px]" bodyClassName="p-2">
+              <DashboardCard className="h-[300px]" bodyClassName="p-2">
                 {flow.length === 0 ? (
                   <p className="text-muted-foreground flex h-full items-center justify-center text-xs">{t('finances:overview.noEntries')}</p>
                 ) : (
@@ -194,7 +197,7 @@ export function OverviewPanel() {
             </div>
 
             <div className="flex flex-col gap-3">
-              <DashboardCard title={t('finances:overview.spendingCategories')} className="h-[320px]">
+              <DashboardCard className="h-[320px]">
                 <RankedBarList
                   items={spendingCategories}
                   valueFormatter={(v) => currency.format(v)}
@@ -203,12 +206,8 @@ export function OverviewPanel() {
                 />
               </DashboardCard>
 
-              <DashboardCard title={t('finances:overview.whatCapitalIsKeptAs')} className="h-[300px]" bodyClassName="p-2">
-                {capitalSlices.length === 0 ? (
-                  <p className="text-muted-foreground flex h-full items-center justify-center text-xs">{t('finances:overview.noEntries')}</p>
-                ) : (
-                  <AppPieChart data={capitalSlices} />
-                )}
+              <DashboardCard className="h-[300px]" bodyClassName="p-2">
+                <AppPieChart data={holdingSlices} />
               </DashboardCard>
             </div>
           </div>

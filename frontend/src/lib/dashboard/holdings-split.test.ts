@@ -19,29 +19,34 @@ function investment(overrides: Partial<FilteredEntry>): FilteredEntry {
 }
 
 describe('holdingsSplit', () => {
-  it('holds what was placed, and calls the rest cash', () => {
-    expect(holdingsSplit(10_000, [
+  it('splits the holdings by the class each row names', () => {
+    expect(holdingsSplit([
       investment({ value: -3000, investmentClass: 'Renda Fixa' }),
       investment({ value: -2000, investmentClass: 'renda variável' }),
-    ])).toEqual({ fixedIncome: 3000, variableIncome: 2000, unclassified: 0, cash: 5000 })
+      investment({ value: -800, investmentClass: 'Reserva de emergência' }),
+    ])).toEqual({ fixedIncome: 3000, variableIncome: 2000, cash: 800, unclassified: 0 })
+  })
+
+  it('takes the cash reserve from the rows, never from what is left in the accounts', () => {
+    expect(holdingsSplit([investment({ value: -3000, investmentClass: 'Renda Fixa' })]).cash).toBe(0)
   })
 
   it('nets a redemption against what is held in that class', () => {
-    const split = holdingsSplit(10_000, [
+    const split = holdingsSplit([
       investment({ value: -3000, investmentClass: 'Renda Fixa' }),
       investment({ value: 1200, investmentClass: 'Renda Fixa' }),
     ])
-    expect(split).toMatchObject({ fixedIncome: 1800, cash: 8200 })
+    expect(split).toMatchObject({ fixedIncome: 1800 })
   })
 
   it('keeps money nobody classed apart, rather than guessing at it', () => {
-    expect(holdingsSplit(5000, [investment({ value: -500 })])).toMatchObject({ unclassified: 500, cash: 4500 })
+    expect(holdingsSplit([investment({ value: -500 })])).toMatchObject({ unclassified: 500 })
   })
 
-  it('draws nothing negative: a class redeemed to nothing is nothing, and so is capital below zero', () => {
-    expect(holdingsSplit(-6577, [
+  it('draws nothing negative: a class redeemed to nothing is nothing', () => {
+    expect(holdingsSplit([
       investment({ value: -1000, investmentClass: 'Renda Fixa' }),
       investment({ value: 1000, investmentClass: 'Renda Fixa' }),
-    ])).toEqual({ fixedIncome: 0, variableIncome: 0, unclassified: 0, cash: 0 })
+    ])).toEqual({ fixedIncome: 0, variableIncome: 0, cash: 0, unclassified: 0 })
   })
 })

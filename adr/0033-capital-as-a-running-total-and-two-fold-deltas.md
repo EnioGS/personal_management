@@ -75,6 +75,13 @@ label the payment carried, so `isSpendingRow` excludes it — matched by a
 positive value and a "Pagamento recebido" description. Refunds, IOF returned
 and credit adjustments stay: those give money back on something bought.
 
+**The cash reserve is a holding, not a remainder.** It comes from the investment
+rows that name it (`isCashReserve`), like fixed and variable income do — never
+from capital less what is invested, which is a different quantity: money not yet
+placed is not a reserve. All three classes appear in the pie's legend whether or
+not they hold anything, since a legend that comes and goes with the data cannot
+be learned.
+
 ## Consequences
 
 - A tile needs three months of data to show both comparisons and two to show
