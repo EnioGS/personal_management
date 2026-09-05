@@ -219,9 +219,11 @@ Two things it optimizes for:
 - Dates and amounts are read the way statements write them, not the way a parser
   wishes they did: `15/08/2025` is day-first, `87,40` and `1.234,56` are numbers,
   and whichever of `.` or `,` comes last is the decimal point.
-- Duplicate flagging is narrow on purpose: two identical rows *inside one file*
-  are two real transactions, so a row is only ever flagged against a row from a
-  **different** file, or when a newly uploaded file's name is very close to one
+- Duplicate flagging is narrow on purpose. Two identical rows *inside one file* are two
+  real transactions, so a row is only ever flagged against a row from a **different**
+  file — and only when everything it says matches, the date and the money and every other
+  column the file wrote, since two payments of the same size on the same day are not the
+  same payment. A file is also flagged or when a newly uploaded file's name is very close to one
   already imported (measured against the shorter name). A flag is advisory and
   removes nothing.
 - **Marking for elimination** is a table-wide mode rather than a per-row control:

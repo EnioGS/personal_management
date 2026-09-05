@@ -249,10 +249,15 @@ describe('what counts as a duplicate', () => {
     expect(flagged.every((entry) => !entry.row.markedForElimination)).toBe(true)
   })
 
-  it('compares on the date and the amount once the file says which columns those are', () => {
+  it('compares everything the row carries, not only the day and the money', () => {
     const assignments = { Data: 'date', Valor: 'value' } as const
-    expect(rowSignature({ Data: '01/08/2026', Valor: '-10,00', Descrição: 'A' }, assignments))
-      .toBe(rowSignature({ Data: '01/08/2026', Valor: '10,00', Descrição: 'B' }, assignments))
+    const row = { Data: '01/08/2026', Valor: '-10,00', Descrição: 'MERCADO' }
+
+    // Two transactions of the same size on the same day are not the same transaction.
+    expect(rowSignature(row, assignments)).not.toBe(rowSignature({ ...row, Descrição: 'PADARIA' }, assignments))
+    // The same row written differently still is: dates, money, spacing and case are how
+    // the same thing gets written twice.
+    expect(rowSignature(row, assignments)).toBe(rowSignature({ Data: '2026-08-01', Valor: '10.00', Descrição: '  mercado ' }, assignments))
   })
 
   it('flags a file whose name is nearly one already imported, against the shorter name', async () => {
@@ -433,5 +438,42 @@ describe('what a row claims before anyone has looked at it', () => {
     await confirmSourceRows(sourceId, catalogue)
 
     expect((await confirmedRowsTable.toArray())[0].data).toMatchObject({ category: '', subcategory: '' })
+  })
+})
+
+describe('what makes two rows the same row', () => {
+  beforeEach(async () => { await wipeAllData() })
+
+  const august = [
+    'Data,Descrição,Valor',
+    '01/08/2026,MERCADO SAO JORGE,"-284,90"',
+    '02/08/2026,PADARIA,"-284,90"',
+  ].join('\n')
+
+  it('is everything they say, so same-day same-amount rows are left alone', async () => {
+    const first = await createSourceFile('banco-agosto.csv', august, { scanDuplicates: false })
+    // A different file, same amounts and dates, different transactions entirely.
+    const second = await createSourceFile('cartao-agosto.csv', [
+      'Data,Descrição,Valor',
+      '01/08/2026,POSTO IPIRANGA,"-284,90"',
+      '02/08/2026,FARMACIA,"-284,90"',
+    ].join('\n'), { scanDuplicates: false })
+    await assignSourceColumns(first, { Data: 'date', Valor: 'value' })
+    await assignSourceColumns(second, { Data: 'date', Valor: 'value' })
+
+    await flagCrossFileDuplicates(first, second)
+
+    expect((await rowsOf(second)).every((entry) => entry.row.duplicateOf === undefined)).toBe(true)
+  })
+
+  it('and the same rows in another file are still caught', async () => {
+    const first = await createSourceFile('banco-agosto.csv', august, { scanDuplicates: false })
+    const again = await createSourceFile('banco-agosto (1).csv', august, { scanDuplicates: false })
+    await assignSourceColumns(first, { Data: 'date', Valor: 'value' })
+    await assignSourceColumns(again, { Data: 'date', Valor: 'value' })
+
+    await flagCrossFileDuplicates(first, again)
+
+    expect((await rowsOf(again)).every((entry) => entry.row.duplicateOf)).toBe(true)
   })
 })

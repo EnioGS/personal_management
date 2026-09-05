@@ -3,7 +3,7 @@ import { parseDateValue } from '@/lib/parse-date'
 import { parseNumberValue } from '@/lib/parse-number'
 import { placementsOf, type LabelCatalogue } from './label-catalogue'
 import { ingestionLabelErrors } from './ingestion'
-import { sourceFilenameOf } from './observations'
+import { SOURCE_FILENAME_KEY, readObservations, sourceFilenameOf } from './observations'
 import type { LocalRow } from '@/lib/local-store/create-local-table'
 import { confirmedRowsTable, ingestionAuditEventsTable, sourceFilesTable, sourceRowsTable } from './model-db'
 import { newRowId } from './row-id'
@@ -97,18 +97,37 @@ export function filenameSimilarity(left: string, right: string): number {
  * fallback for a file nobody has assigned yet.
  */
 export function rowSignature(values: Record<string, string>, assignments: Record<string, IngestionTargetField>): string {
-  const of = (field: IngestionTargetField) => {
-    const column = Object.entries(assignments).find(([, target]) => target === field)?.[0]
-    return column ? values[column] : undefined
-  }
-  const date = parseDateValue(of('date'))
-  const value = parseNumberValue(of('value'))
-  if (date !== null && value !== null) return `${date}|${Math.abs(value).toFixed(2)}`
-  return Object.entries(values)
-    .filter(([column]) => column !== SOURCE_FILENAME_COLUMN)
+  const columnOf = (field: IngestionTargetField) => Object.entries(assignments).find(([, target]) => target === field)?.[0]
+  const dateColumn = columnOf('date')
+  const valueColumn = columnOf('value')
+
+  // The date and the value are read rather than compared as text, so 01/08/2026 and
+  // 2026-08-01 are the same day and "1.234,56" is the same money as "1234.56".
+  const date = parseDateValue(dateColumn ? values[dateColumn] : undefined)
+  const value = parseNumberValue(valueColumn ? values[valueColumn] : undefined)
+  const rest = Object.entries(values)
+    .filter(([column]) => column !== SOURCE_FILENAME_COLUMN && column !== dateColumn && column !== valueColumn)
     .sort(([left], [right]) => left.localeCompare(right))
-    .map(([column, value]) => `${column}=${value.trim().toLowerCase()}`)
+    .map(([column, cell]) => `${column}=${normalise(cell)}`)
     .join('|')
+
+  return `${date ?? ''}|${value === null ? '' : Math.abs(value).toFixed(2)}|${rest}`
+}
+
+/** The same signature for a row already confirmed: its date, its money, and what its file said. */
+export function confirmedRowSignature(row: ConfirmedRow): string {
+  const rest = Object.entries(readObservations(row.observations))
+    .filter(([key]) => key !== SOURCE_FILENAME_KEY && key !== 'value_as_imported')
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([key, cell]) => `${key}=${normalise(cell)}`)
+    .join('|')
+
+  return `${row.date ?? ''}|${row.value === undefined ? '' : Math.abs(row.value).toFixed(2)}|${rest}`
+}
+
+/** Spacing and case are how the same text is written twice, not how two things differ. */
+function normalise(value: string): string {
+  return value.trim().replace(/\s+/g, ' ').toLowerCase()
 }
 
 /**
@@ -149,9 +168,7 @@ export async function flagCrossFileDuplicates(...sourceIds: number[]): Promise<{
     const row = stored.data as ConfirmedRow
     // Which file a confirmed row came from is in its observations, where the file's own
     // name was condensed along with everything else no column was assigned to.
-    if (typeof row.date === 'number' && typeof row.value === 'number') {
-      remember(`${row.date}|${Math.abs(row.value).toFixed(2)}`, sourceFilenameOf(row.observations), row.rowId)
-    }
+    remember(confirmedRowSignature(row), sourceFilenameOf(row.observations), row.rowId)
   }
 
   let flagged = 0
