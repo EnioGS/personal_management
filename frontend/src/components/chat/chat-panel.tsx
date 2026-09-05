@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ChangeEvent, type DragEvent, type PointerEvent } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type ChangeEvent, type DragEvent, type PointerEvent } from 'react'
 import { GripVertical, Hourglass, Paperclip, SendHorizontal, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { MessageContent } from './message-content'
@@ -63,35 +63,41 @@ export function ChatPanel() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const scrollAreaRef = useRef<HTMLDivElement>(null)
   const composerRef = useRef<HTMLTextAreaElement>(null)
+  const mirrorRef = useRef<HTMLDivElement>(null)
 
   /**
-   * The composer's height at a width it does not currently have.
+   * How tall the message would be in a box of a given width.
    *
-   * Measuring at a hypothetical width is what keeps this stable: the question "does this
-   * message wrap?" is always asked of the row *with* Send in it, whether Send is there or
-   * not. Ask it of the current width instead and the answer changes with the answer —
-   * Send leaves, the box widens, the text fits, Send returns, the text wraps.
+   * Measured in a hidden mirror rather than in the textarea, because the textarea's own
+   * height is the thing being decided: measuring it means measuring the layout it is
+   * currently in, and the layout depends on the answer. The mirror is out of flow and
+   * takes whatever width it is told, so the same question always gets the same answer —
+   * which is what stops the box growing a line and giving it back a frame later.
    */
-  function heightAt(composer: HTMLTextAreaElement, width: number): number {
-    const previousWidth = composer.style.width
-    composer.style.width = `${width}px`
-    composer.style.height = 'auto'
-    const height = composer.scrollHeight
-    composer.style.width = previousWidth
-    return height
+  function heightAt(width: number): number {
+    const composer = composerRef.current
+    const mirror = mirrorRef.current
+    if (!composer || !mirror) return 0
+
+    const styles = window.getComputedStyle(composer)
+    for (const property of ['fontFamily', 'fontSize', 'fontWeight', 'lineHeight', 'letterSpacing', 'padding', 'border', 'boxSizing'] as const) {
+      mirror.style[property] = styles[property]
+    }
+    mirror.style.width = `${width}px`
+    // The zero-width space keeps a trailing newline — and an empty box — measurable.
+    mirror.textContent = `${draft}\u200b`
+    return mirror.scrollHeight
   }
 
   function resizeComposer() {
     const composer = composerRef.current
+    if (!composer) return
+    // Hand the width back to the layout before reading it: what is measured has to be the
+    // width the row really gives the box now, not the one this function pinned last time.
+    composer.style.width = ''
     // A closed panel is a few pixels wide, where the placeholder wraps into a paragraph
     // and every measurement is a lie. Nothing is measured until the box is really there.
-    if (!composer || composer.clientWidth < 80) return
-
-    // Set here rather than in a class: the base Textarea asks the browser to size itself
-    // from its content, and a class that says otherwise only wins if the merge happens to
-    // drop the other one. With both live, the browser grows the box on the keystroke that
-    // wraps and the measurement below shrinks it again a frame later — the flicker.
-    composer.style.setProperty('field-sizing', 'fixed')
+    if (composer.clientWidth < 80) return
 
     const styles = window.getComputedStyle(composer)
     const lineHeight = Number.parseFloat(styles.lineHeight)
@@ -100,16 +106,20 @@ export function ChatPanel() {
     const singleLine = lineHeight + verticalPadding + verticalBorder + 1
     const maxHeight = lineHeight * MAX_COMPOSER_LINES + verticalPadding + verticalBorder
 
-    // The width the row has when Send is in it, whichever way it is laid out now.
+    // Both widths the row can have, named from the layout rather than from the moment.
     const narrowWidth = isFloatingRef.current ? composer.clientWidth - SEND_IN_ROW_WIDTH : composer.clientWidth
-    const wraps = heightAt(composer, narrowWidth) > singleLine
-    // The height is measured at the width the box is *about* to have, so growing a line
-    // and giving that line back never both happen on screen.
-    const wanted = heightAt(composer, wraps ? narrowWidth + SEND_IN_ROW_WIDTH : narrowWidth)
+    const wideWidth = narrowWidth + SEND_IN_ROW_WIDTH
+    const wraps = heightAt(narrowWidth) > singleLine
+    const wanted = heightAt(wraps ? wideWidth : narrowWidth)
 
     const height = Math.min(wanted, maxHeight)
     composer.style.height = `${height}px`
     composer.style.overflowY = wanted > maxHeight ? 'auto' : 'hidden'
+    // The width it is about to have, set now: the frame between deciding and re-rendering
+    // then shows the box the message was measured against rather than the one it is
+    // leaving. The next pass hands the width back to the layout.
+    const target = wraps ? wideWidth : narrowWidth
+    if (target !== composer.clientWidth) composer.style.width = `${target}px`
     setIsOverflowing(wraps)
     setComposerHeight(height)
   }
@@ -135,11 +145,11 @@ export function ChatPanel() {
     viewport?.scrollTo({ top: viewport.scrollHeight, behavior: 'smooth' })
   }, [messages, status])
 
-  // Opening the panel changes the width every measurement depends on, so the height is
-  // recomputed there too rather than only when the text changes.
-  useEffect(() => {
+  // Before the paint, not after it: a height computed once the frame is already on
+  // screen is a height the user watches change.
+  useLayoutEffect(() => {
     resizeComposer()
-  }, [draft, panelWidth])
+  }, [draft, panelWidth, isSendFloating])
 
   isFloatingRef.current = isSendFloating
 
@@ -434,6 +444,13 @@ export function ChatPanel() {
           {/* The clip lives inside the box it acts on, in the placeholder's own colour:
               attaching a file is part of writing the message, not a control beside it. */}
           <div className="relative min-w-0 flex-1">
+            {/* Out of flow, invisible, and the same shape as the box: what the message
+                would look like at a width the box does not have yet. */}
+            <div
+              ref={mirrorRef}
+              aria-hidden
+              className="pointer-events-none invisible absolute top-0 left-0 -z-10 leading-5 break-words whitespace-pre-wrap"
+            />
             <Textarea
               ref={composerRef}
               rows={1}
