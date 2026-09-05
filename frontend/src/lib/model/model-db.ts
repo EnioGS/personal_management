@@ -20,6 +20,7 @@ const db = new Dexie('app-model-db') as Dexie & {
   sourceFiles: EntityTable<LocalRow, 'id'>
   sourceRows: EntityTable<LocalRow, 'id'>
   confirmedRows: EntityTable<LocalRow, 'id'>
+  classificationNotes: EntityTable<LocalRow, 'id'>
 }
 
 db.version(1).stores({
@@ -121,12 +122,23 @@ db.version(9).stores({
   categories: null,
 })
 
+/**
+ * Notes on how to classify, which are not rules.
+ *
+ * A rule matches text and fills labels; a note says something a rule cannot — "Charme is
+ * a market, so it is food", "anything from the broker file in March was a rebalance" —
+ * and is read by the assistant as context before it labels anything. Neither replaces
+ * the other: the rule acts, the note explains.
+ */
+db.version(10).stores({ classificationNotes: '++id, createdAt' })
+
 export const accountsTable = db.accounts
 export const cardsTable = db.cards
 export const budgetsTable = db.budgets
 export const allocationTargetsTable = db.allocationTargets
 export const ingestionAuditEventsTable = db.ingestionAuditEvents
 export const labelRulesTable = db.labelRules
+export const classificationNotesTable = db.classificationNotes
 export const sourceFilesTable = db.sourceFiles
 export const sourceRowsTable = db.sourceRows
 export const confirmedRowsTable = db.confirmedRows

@@ -39,6 +39,7 @@ function emptyTables(): DataExportFile['tables'] {
     sourceRows: [],
     confirmedRows: [],
     labelRules: [],
+    classificationNotes: [],
     ingestionAuditEvents: [],
     notes: [],
     assistantPrompts: [],

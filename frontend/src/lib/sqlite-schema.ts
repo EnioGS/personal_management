@@ -127,6 +127,15 @@ export const SQLITE_SCHEMAS: Record<DataTableKey, SqliteTableSchema> = {
       { column: 'rule_created_at', key: 'createdAt', type: 'integer' },
     ],
   },
+  classificationNotes: {
+    sqlName: 'classification_notes',
+    columns: [
+      { column: 'context', key: 'context', type: 'text' },
+      { column: 'text', key: 'text', type: 'text' },
+      { column: 'created_by', key: 'createdBy', type: 'text' },
+      { column: 'note_created_at', key: 'createdAt', type: 'integer' },
+    ],
+  },
   ingestionAuditEvents: {
     sqlName: 'ingestion_audit_events',
     columns: [

@@ -88,6 +88,22 @@ export interface IngestionRowLabels {
 /** Which stage a rule belongs to: files being worked on, or rows already confirmed. */
 export type RuleContext = 'source' | 'confirmed'
 
+/**
+ * Something worth knowing when labelling, written by the user or the assistant.
+ *
+ * Not a rule: a rule matches text and fills labels, and everything it cannot express —
+ * that a shop nobody recognises sells food, that one file's March rows were a
+ * rebalance, that transfers to a particular name are rent — has nowhere to go. A note
+ * is that place. The assistant is given the notes of a stage before it labels anything
+ * in it, and treats them as the user talking about their own data.
+ */
+export interface ClassificationNote {
+  context: RuleContext
+  text: string
+  createdBy: 'user' | 'assistant'
+  createdAt: number
+}
+
 export interface LabelRule {
   /** Where this rule runs. A rule never crosses from one stage to the other. */
   context: RuleContext

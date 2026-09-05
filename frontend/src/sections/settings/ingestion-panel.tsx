@@ -34,6 +34,7 @@ import {
 } from '@/lib/model/source-files'
 import type { ConfirmedRow, IngestionRowLabels, IngestionTargetField, SourceFile, SourceRow } from '@/lib/model/types'
 import { cn } from '@/lib/utils'
+import { ClassificationNotes } from './classification-notes'
 import { LabellingRules } from './labelling-rules'
 
 const UNASSIGNED = '__unassigned__'
@@ -587,10 +588,16 @@ export function IngestionPanel() {
       {/* §1.6.1: the rules of a stage are shown only while a table of that stage is
           selected — set apart below the table, because it is a different subject. */}
       {(selectedFile || selectedConfirmed) && (
-        <div className="mt-8 border-t pt-6">
-          {selectedFile && <LabellingRules context="source" />}
-          {selectedConfirmed && <LabellingRules context="confirmed" />}
-        </div>
+        <>
+          <div className="mt-8 border-t pt-6">
+            {selectedFile && <LabellingRules context="source" />}
+            {selectedConfirmed && <LabellingRules context="confirmed" />}
+          </div>
+          {/* Below the rules, and separate from them: what a rule cannot say. */}
+          <div className="mt-8 border-t pt-6">
+            <ClassificationNotes context={selectedConfirmed ? 'confirmed' : 'source'} />
+          </div>
+        </>
       )}
     </div>
   )
