@@ -1,6 +1,6 @@
 import { Cell, Pie, PieChart } from 'recharts'
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart'
-import { chartSafeKey, type ThemedColor } from './chart-colors'
+import { chartSafeKey, tintedColor, type ThemedColor } from './chart-colors'
 
 export interface HoldingsRing {
   key: string
@@ -73,7 +73,7 @@ export function HoldingsPie({ groups, valueFormatter, emptyLabel }: HoldingsPieP
     ...classes.map((group) => [group.fillKey, { label: group.label, theme: group.color }]),
     ...parts.map((child) => [
       child.fillKey,
-      { label: child.label, theme: tinted(child.parent.color, child.tint) },
+      { label: child.label, theme: tintedColor(child.parent.color, child.tint) },
     ]),
   ])
 
@@ -136,15 +136,5 @@ export function HoldingsPie({ groups, valueFormatter, emptyLabel }: HoldingsPieP
         <tspan x={x} dy="1.2em" className="fill-muted-foreground">{valueFormatter(payload.value ?? 0)}</tspan>
       </text>
     )
-  }
-}
-
-/** The same hue, lightened a step per rank, so a class reads as one family of slices. */
-function tinted(color: ThemedColor, step: number): ThemedColor {
-  if (step === 0) return color
-  const mix = Math.min(0.55, step * 0.22)
-  return {
-    light: `color-mix(in oklab, ${color.light} ${Math.round((1 - mix) * 100)}%, white)`,
-    dark: `color-mix(in oklab, ${color.dark} ${Math.round((1 - mix) * 100)}%, black)`,
   }
 }

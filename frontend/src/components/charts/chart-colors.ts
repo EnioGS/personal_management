@@ -63,6 +63,34 @@ export function colorForKey(key: string): ThemedColor {
 }
 
 /**
+ * The colour for a place in a ranked list, rather than for a name.
+ *
+ * A hash gives an entity the same colour wherever it appears, which is right for a chart
+ * read against another chart — and wrong for a list read top to bottom, where the only
+ * thing that matters is that no row wears its neighbour's colour. Walking the palette by
+ * position guarantees that; past its eight slots the colours repeat, but never adjacently.
+ */
+export function colorForRank(rank: number): ThemedColor {
+  return CATEGORICAL_PALETTE[rank % CATEGORICAL_PALETTE.length]
+}
+
+/**
+ * The same colour, a step lighter — for the parts of a thing, which belong to it.
+ *
+ * Shade rather than hue: the parts of one category are one family, and a new hue per part
+ * would say they were unrelated. Capped well short of the surface so the last part of a
+ * long list is still a colour and not a smudge.
+ */
+export function tintedColor(color: ThemedColor, step: number): ThemedColor {
+  if (step <= 0) return color
+  const kept = Math.round(Math.max(0.45, 1 - step * 0.18) * 100)
+  return {
+    light: `color-mix(in oklab, ${color.light} ${kept}%, white)`,
+    dark: `color-mix(in oklab, ${color.dark} ${kept}%, black)`,
+  }
+}
+
+/**
  * A CSS-custom-property-safe id for an arbitrary series key (a category, an account
  * name...). `components/ui/chart.tsx` themes a series by emitting `--color-<key>` and
  * referencing it back as `var(--color-<key>)` — valid only when `<key>` is a bare CSS

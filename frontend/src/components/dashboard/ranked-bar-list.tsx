@@ -1,6 +1,6 @@
 import { useState, type CSSProperties } from 'react'
 import { ChevronRight } from 'lucide-react'
-import { colorForKey } from '@/components/charts/chart-colors'
+import { colorForKey, colorForRank, tintedColor, type ThemedColor } from '@/components/charts/chart-colors'
 import { cn } from '@/lib/utils'
 
 export interface RankedBarItem {
@@ -39,8 +39,18 @@ export function RankedBarList({ items, valueFormatter, emptyLabel, variant = 'in
 
   return (
     <div className={variant === 'underlined' ? 'flex h-full flex-col gap-3 overflow-y-auto pr-2' : 'flex h-full flex-col gap-2.5 overflow-y-auto'}>
-      {sorted.map((item) => {
-        if (variant === 'underlined') return <UnderlinedRow key={item.key} item={item} max={max} valueFormatter={valueFormatter} />
+      {sorted.map((item, rank) => {
+        if (variant === 'underlined') {
+          return (
+            <UnderlinedRow
+              key={item.key}
+              item={item}
+              color={colorForRank(rank)}
+              share={Math.max(0, item.value) / max}
+              valueFormatter={valueFormatter}
+            />
+          )
+        }
 
         const color = colorForKey(item.key)
         const share = total > 0 ? (item.value / total) * 100 : 0
@@ -72,25 +82,39 @@ function formatComparison(comparison: number | undefined): { label: string; clas
   }
 }
 
+/** How far a child's track is inset from its parent's: the rule, plus the padding after it. */
+const CHILD_INDENT_PX = 13
+
 /**
  * A row of the roomier variant, and whatever it is made of.
  *
  * The breakdown is folded away rather than absent: a category is the question most of
- * the time, and its subcategories are the follow-up. Opening one indents its parts
- * under it and scales their bars against the parent, so the widths read as shares of
- * what was clicked rather than of the panel.
+ * the time, and its subcategories are the follow-up. Opening one indents its parts under
+ * it, in shades of the category's own colour — they belong to it, so they are not given
+ * hues of their own.
+ *
+ * A part's bar ends where its share of the category's bar ends, never further: a
+ * subcategory holding all of its category draws a bar finishing exactly under the
+ * category's, which is what "all of it" looks like. The indent makes that arithmetic
+ * rather than a proportion — the child's track is `CHILD_INDENT_PX` shorter than the
+ * parent's, so the same fraction of it would overshoot — hence the `calc`, which takes
+ * the fraction of the parent's bar and then gives back the indent the child never had.
  */
-function UnderlinedRow({ item, max, valueFormatter, depth = 0 }: {
+function UnderlinedRow({ item, color, share, valueFormatter }: {
   item: RankedBarItem
-  max: number
+  color: ThemedColor
+  /** How much of this row's own track the bar fills, from 0 to 1. */
+  share: number
   valueFormatter: (value: number) => string
-  depth?: number
 }) {
   const [open, setOpen] = useState(false)
-  const color = colorForKey(item.key)
   const comparison = formatComparison(item.comparison)
   const children = item.children ?? []
-  const childMax = Math.max(...children.map((child) => Math.max(child.value, 0)), 1)
+
+  const childWidth = (value: number): string => {
+    const fraction = item.value > 0 ? Math.min(1, Math.max(0, value) / item.value) : 0
+    return `calc(${(fraction * share * 100).toFixed(3)}% - ${(fraction * (1 - share) * CHILD_INDENT_PX).toFixed(2)}px)`
+  }
 
   const row = (
     <div className="grid grid-cols-[minmax(0,1fr)_5rem_3.5rem] items-start gap-x-2 text-xs">
@@ -101,12 +125,7 @@ function UnderlinedRow({ item, max, valueFormatter, depth = 0 }: {
           )}
           <span className="min-w-0 break-words" title={item.label}>{item.label || '—'}</span>
         </span>
-        <div className="bg-muted mt-1 h-[3px] overflow-hidden rounded-full">
-          <div
-            className="entity-fill h-full rounded-full"
-            style={{ width: `${(Math.max(item.value, 0) / max) * 100}%`, '--entity-light': color.light, '--entity-dark': color.dark } as CSSProperties}
-          />
-        </div>
+        <Bar width={`${(share * 100).toFixed(3)}%`} color={color} />
       </div>
       <span className="pt-0.5 text-right tabular-nums">{valueFormatter(item.value)}</span>
       <span className={`mr-[5px] pt-0.5 text-right tabular-nums whitespace-nowrap ${comparison.className}`}>{comparison.label}</span>
@@ -114,7 +133,7 @@ function UnderlinedRow({ item, max, valueFormatter, depth = 0 }: {
   )
 
   return (
-    <div className={depth > 0 ? 'text-muted-foreground' : undefined}>
+    <div>
       {children.length > 0 ? (
         <button type="button" className="w-full cursor-pointer text-left" aria-expanded={open} onClick={() => setOpen(!open)}>
           {row}
@@ -124,11 +143,34 @@ function UnderlinedRow({ item, max, valueFormatter, depth = 0 }: {
       )}
       {open && children.length > 0 && (
         <div className="mt-3 flex flex-col gap-3 border-l pl-3">
-          {children.map((child) => (
-            <UnderlinedRow key={child.key} item={child} max={childMax} valueFormatter={valueFormatter} depth={depth + 1} />
-          ))}
+          {children.map((child, rank) => {
+            const childComparison = formatComparison(child.comparison)
+            return (
+              <div key={child.key} className="grid grid-cols-[minmax(0,1fr)_5rem_3.5rem] items-start gap-x-2 text-xs">
+                <div className="text-muted-foreground min-w-0">
+                  <span className="block min-w-0 break-words leading-4" title={child.label}>{child.label || '—'}</span>
+                  <Bar width={childWidth(child.value)} color={tintedColor(color, rank)} />
+                </div>
+                <span className="text-muted-foreground pt-0.5 text-right tabular-nums">{valueFormatter(child.value)}</span>
+                <span className={`mr-[5px] pt-0.5 text-right tabular-nums whitespace-nowrap ${childComparison.className}`}>
+                  {childComparison.label}
+                </span>
+              </div>
+            )
+          })}
         </div>
       )}
+    </div>
+  )
+}
+
+function Bar({ width, color }: { width: string; color: ThemedColor }) {
+  return (
+    <div className="bg-muted mt-1 h-[3px] overflow-hidden rounded-full">
+      <div
+        className="entity-fill h-full rounded-full"
+        style={{ width, '--entity-light': color.light, '--entity-dark': color.dark } as CSSProperties}
+      />
     </div>
   )
 }
