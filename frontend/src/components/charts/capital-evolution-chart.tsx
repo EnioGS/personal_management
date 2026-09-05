@@ -33,7 +33,7 @@ export function CapitalEvolutionChart<T extends Record<string, unknown>>({
     investments: { label: investmentsLabel, theme: DOMAIN_COLOR.variableIncome },
     // The month's own net, drawn against the totals it accumulates into: the same
     // quantity as the cash flow chart's middle bar, and the same colour.
-    income: { label: netCashFlowLabel, theme: DOMAIN_COLOR.contributions },
+    income: { label: netCashFlowLabel, theme: DOMAIN_COLOR.cashFlow },
   }
 
   return (

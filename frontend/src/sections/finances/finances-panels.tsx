@@ -98,7 +98,7 @@ export function OverviewPanel() {
       // Only when there is any: a slice for money nobody has classed is a prompt to class
       // it, and an empty one would be a prompt to do nothing.
       ...(split.unclassified > 0
-        ? [{ key: 'unclassified', label: t('finances:overview.unclassifiedHoldings'), value: split.unclassified, color: DOMAIN_COLOR.contributions }]
+        ? [{ key: 'unclassified', label: t('finances:overview.unclassifiedHoldings'), value: split.unclassified, color: DOMAIN_COLOR.unclassified }]
         : []),
     ],
     [split, t],
@@ -188,7 +188,7 @@ export function OverviewPanel() {
                     netLabel={t('finances:overview.netCashFlow')}
                     positiveColor={DOMAIN_COLOR.balance}
                     negativeColor={DIVERGING_PAIR.negative}
-                    netColor={DOMAIN_COLOR.contributions}
+                    netColor={DOMAIN_COLOR.cashFlow}
                     xFormatter={formatMonthLabel}
                     valueFormatter={(value) => currency.format(value)}
                   />

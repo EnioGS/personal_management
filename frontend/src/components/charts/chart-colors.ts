@@ -102,4 +102,15 @@ export const DOMAIN_COLOR = {
   contributions: CATEGORICAL_PALETTE[5],
   cards: CATEGORICAL_PALETTE[6],
   dividends: CATEGORICAL_PALETTE[7],
+  /**
+   * What a month netted — the tile, the line on the capital chart, the middle bar on the
+   * cash flow chart: one quantity, one colour, wherever Movements draws it.
+   *
+   * It shares its slot with fixed income, which is a holding rather than a flow and never
+   * shares a chart with it; the two meet only across cards, where each carries its own
+   * legend.
+   */
+  cashFlow: CATEGORICAL_PALETTE[4],
+  /** Holdings nobody has classed — a colour that is plainly not one of the classes. */
+  unclassified: CATEGORICAL_PALETTE[6],
 } as const

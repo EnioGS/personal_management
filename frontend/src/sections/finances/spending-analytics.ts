@@ -78,7 +78,11 @@ export function averageSpendByCategory(rows: FilteredEntry[], selectedMonths: st
         }
       })
 
-  return averaged(totals)
+  // A category that gave more back than it took over the period is not a spending
+  // category: refunds, credit adjustments and anything else labelled from the money's
+  // point of view rather than the purchase's. It is left off rather than drawn as a
+  // negative bar among the things that were actually bought.
+  return averaged(totals).filter((category) => category.value > 0)
 }
 
 interface Aggregate {

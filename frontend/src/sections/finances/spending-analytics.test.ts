@@ -120,6 +120,14 @@ describe('the line that settles the card bill', () => {
     expect(averageSpendByCategory(rows, ['2026-01']).map((category) => [category.label, category.value])).toEqual([['food', 70]])
   })
 
+  it('leaves out a category that gave more back than it took', () => {
+    const givingBack = [
+      entry({ category: 'food', value: -100, date: Date.UTC(2026, 0, 1) }),
+      entry({ category: 'transfer', description: 'Ajuste a crédito', value: 40, date: Date.UTC(2026, 0, 2) }),
+    ]
+    expect(averageSpendByCategory(givingBack, ['2026-01']).map((category) => category.label)).toEqual(['food'])
+  })
+
   it('is kept out of the rows the spending screens count', () => {
     expect(outgoingSpending(rows)).toHaveLength(2)
   })
