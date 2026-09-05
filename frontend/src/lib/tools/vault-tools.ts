@@ -1,6 +1,7 @@
 import { buildLabelCatalogue } from '@/lib/label-catalogue-source'
 import { describeVault, queryVault } from '@/lib/sql/query-vault'
-import { ingestionLabelErrors } from '@/lib/model/ingestion'
+import { setConfirmedMeaning } from '@/lib/model/confirmed-rows'
+import { DEFAULT_MEANING, ingestionLabelErrors } from '@/lib/model/ingestion'
 import { parsePlacementLabels, resolveScreenLabel, resolveSectionLabel, withDerivedSections } from '@/lib/model/label-catalogue'
 import { confirmedRowsTable, sourceFilesTable, sourceRowsTable } from '@/lib/model/model-db'
 import { newRowId } from '@/lib/model/row-id'
@@ -17,7 +18,7 @@ import type { ToolDefinition } from './types'
 
 export const queryVaultTool: ToolDefinition = {
   name: 'query_vault',
-  description: "Runs one SELECT against the app's data and returns columns and rows. This is how you read anything: there is a table per uploaded file (source__<file>__<id>), a table per (section, screen) pair holding confirmed rows (confirmed__<section>__<screen>), and label_rules. Call it with no statement to get the schema — every table, its columns and how many rows it holds — which is the right first call on unfamiliar data. Count and group here rather than reading rows you do not need; at most 200 rows come back and the total is always reported. Reading is all this does: changes go through the other tools.",
+  description: "Runs one SELECT against the app's data and returns columns and rows. This is how you read anything: there is a table per uploaded file (source__<file>__<id>), a table per (section, screen) pair holding confirmed rows (confirmed__<section>__<screen>), and label_rules. Call it with no statement to get the schema — every table, its columns, how many rows it holds, and for a confirmed table how its amounts are signed today, which is the reference any sign decision is measured against. That is the right first call on unfamiliar data. Count and group here rather than reading rows you do not need; at most 200 rows come back and the total is always reported. Reading is all this does: changes go through the other tools.",
   parameters: { type: 'object', properties: { statement: { type: 'string', description: 'One SELECT, or WITH … SELECT. Omit to describe the schema instead.' } }, additionalProperties: false },
   execute: async (args) => {
     if (typeof args.statement !== 'string' || !args.statement.trim()) {
@@ -170,6 +171,35 @@ export const labelRowsByMatchTool: ToolDefinition = {
 
     const results = await labelSourceRows(matched.map((row) => row.id), args, context.translate)
     return JSON.stringify({ matched: matched.length, sample: matched.slice(0, 5).map((row) => row.text), rows: results.slice(0, 5) })
+  },
+}
+
+export const setConfirmedMeaningTool: ToolDefinition = {
+  name: 'set_confirmed_meaning',
+  description: "Sets the category and subcategory of rows already in a confirmed table. These are the two labels a row may be given later — a row can be confirmed knowing only where it belongs — so this is an ordinary edit and not a correction: nothing about what the row moved, when, or where it belongs changes. Anything else about a confirmed row is corrected the other way, by adding the corrected row with the same row_id and marking the old one. The user edits these same two cells in the table, so this leaves you no more able than they are.",
+  parameters: {
+    type: 'object',
+    properties: {
+      rowIds: { type: 'array', items: { type: 'number' } },
+      category: { type: 'string' },
+      subcategory: { type: 'string' },
+    },
+    required: ['rowIds'],
+    additionalProperties: false,
+  },
+  execute: async (args) => {
+    const rowIds = Array.isArray(args.rowIds) ? args.rowIds.filter((id): id is number => typeof id === 'number') : []
+    if (rowIds.length === 0) return 'Error: rowIds are required.'
+    const meaning = {
+      ...(typeof args.category === 'string' ? { category: args.category.trim() || DEFAULT_MEANING } : {}),
+      ...(typeof args.subcategory === 'string' ? { subcategory: args.subcategory.trim() || DEFAULT_MEANING } : {}),
+    }
+    if (Object.keys(meaning).length === 0) return 'Error: pass a category, a subcategory, or both.'
+    let changed = 0
+    for (const id of rowIds) {
+      try { await setConfirmedMeaning(id, meaning); changed += 1 } catch { continue }
+    }
+    return JSON.stringify({ changed, meaning })
   },
 }
 

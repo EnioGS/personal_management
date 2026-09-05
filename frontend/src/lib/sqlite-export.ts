@@ -45,9 +45,63 @@ export async function buildSqliteFile(data: DataExportFile): Promise<Uint8Array>
       }
     }
 
+    addReadableViews(db, data)
     return db.export()
   } finally {
     db.close()
+  }
+}
+
+/** SQLite identifiers, and the slug a file's name becomes in one. */
+function slug(text: string): string {
+  return text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 40) || 'file'
+}
+
+function literal(value: string): string {
+  return `'${value.replace(/'/g, "''")}'`
+}
+
+/**
+ * One named view per uploaded file and per (section, screen) pair.
+ *
+ * The canonical tables above are what an import reads, and they are shaped the way the
+ * browser stores things: a file's own columns live as JSON in `values_json`, because
+ * every file has different ones. That is honest storage and miserable to read. So the
+ * export also carries a view per file under a name anyone would recognise —
+ * `source__nubank_2026_09_08__3` — with the file's own columns as real columns, and one
+ * per confirmed table. Views hold no data, cost nothing, and are ignored on import, so
+ * the file stays a faithful copy of the database while being worth opening.
+ */
+function addReadableViews(db: Database, data: DataExportFile) {
+  for (const file of data.tables.sourceFiles ?? []) {
+    const stored = file.data as { originalFilename?: string; originalColumns?: string[] } | undefined
+    const columns = stored?.originalColumns ?? []
+    const projected = [
+      '"id"', '"row_id"', '"source_id"',
+      `json_extract(values_json, '$.source_filename') AS "source_filename"`,
+      ...columns.map((column) => `json_extract(values_json, ${literal(`$."${column}"`)}) AS "${column.replace(/"/g, '""')}"`),
+      `json_extract(labels, '$.sections') AS "sections"`,
+      `json_extract(labels, '$.screens') AS "screens"`,
+      `json_extract(labels, '$.category') AS "category"`,
+      `json_extract(labels, '$.subcategory') AS "subcategory"`,
+      '"marked_for_elimination"', '"duplicate_of"', '"imported_amount"',
+    ]
+    const name = `source__${slug(stored?.originalFilename ?? '')}__${file.id}`
+    db.run(`CREATE VIEW "${name}" AS SELECT ${projected.join(', ')} FROM "source_rows" WHERE source_id = ${file.id}`)
+  }
+
+  const placements = new Set<string>()
+  for (const row of data.tables.confirmedRows ?? []) {
+    const stored = row.data as { section?: string; screen?: string } | undefined
+    if (!stored?.section || !stored.screen) continue
+    placements.add(`${stored.section}\u0000${stored.screen}`)
+  }
+  for (const placement of placements) {
+    const [section, screen] = placement.split('\u0000')
+    db.run(
+      `CREATE VIEW "confirmed__${slug(section)}__${slug(screen)}" AS SELECT * FROM "confirmed_rows" `
+      + `WHERE section = ${literal(section)} AND screen = ${literal(screen)}`,
+    )
   }
 }
 

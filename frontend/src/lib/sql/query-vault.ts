@@ -43,9 +43,21 @@ function createAndFill(db: Database, table: string, rows: Record<string, unknown
   }
 }
 
+export interface VaultTable {
+  name: string
+  columns: string[]
+  rows: number
+  /**
+   * For a confirmed table: how its amounts are signed today. This is the reference a
+   * sign decision is measured against — recorded from the data itself rather than
+   * declared somewhere that can go stale.
+   */
+  signs?: { negative: number; positive: number }
+}
+
 export interface VaultSnapshot {
   db: Database
-  tables: { name: string; columns: string[]; rows: number }[]
+  tables: VaultTable[]
 }
 
 /** Builds the queryable picture of the vault as it stands right now. */
@@ -53,7 +65,7 @@ export async function buildVaultSnapshot(): Promise<VaultSnapshot> {
   sqlJs ??= initSqlJs({ locateFile: () => sqlWasmUrl })
   const SQL = await sqlJs
   const db = new SQL.Database()
-  const tables: VaultSnapshot['tables'] = []
+  const tables: VaultTable[] = []
 
   const [files, sourceRows, confirmedRows, rules] = await Promise.all([
     sourceFilesTable.toArray(), sourceRowsTable.toArray(), confirmedRowsTable.toArray(), labelRulesTable.toArray(),
@@ -107,7 +119,15 @@ export async function buildVaultSnapshot(): Promise<VaultSnapshot> {
       investment_class: data.investmentClass ?? null,
       marked_for_elimination: data.markedForElimination ? 1 : 0,
     })), confirmedColumns)
-    tables.push({ name, columns: confirmedColumns, rows: rows.length })
+    tables.push({
+      name,
+      columns: confirmedColumns,
+      rows: rows.length,
+      signs: {
+        negative: rows.filter(({ data }) => typeof data.amount === 'number' && data.amount < 0).length,
+        positive: rows.filter(({ data }) => typeof data.amount === 'number' && data.amount > 0).length,
+      },
+    })
   }
 
   const ruleColumns = ['id', 'name', 'context', 'field', 'contains', 'match_mode', 'labels', 'rationale', 'created_by']
@@ -157,7 +177,7 @@ export async function queryVault(statement: string): Promise<QueryResult> {
 }
 
 /** What tables exist and what they hold — the schema, read from the data itself. */
-export async function describeVault(): Promise<VaultSnapshot['tables']> {
+export async function describeVault(): Promise<VaultTable[]> {
   const snapshot = await buildVaultSnapshot()
   try {
     return snapshot.tables

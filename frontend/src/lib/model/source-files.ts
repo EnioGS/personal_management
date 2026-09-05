@@ -166,7 +166,9 @@ export async function assignSourceColumns(sourceId: number, assignments: Record<
 
   const updated: SourceFile = { ...file, assignments: next }
   await sourceFilesTable.update(sourceId, { data: updated })
-  // What a row is compared on has just changed, so what looks like a duplicate has too.
+  // Which column holds the amount may have just changed, and with it what the sign
+  // convention applies to; what a row is compared on has changed too.
+  await rewriteAmounts(sourceId, updated)
   await flagCrossFileDuplicates(sourceId)
   return updated
 }
@@ -176,7 +178,52 @@ export async function setSignConvention(sourceId: number, convention: SourceFile
   if (!stored) throw new Error(`Source file ${sourceId} was not found.`)
   const updated: SourceFile = { ...(stored.data as SourceFile), signConvention: convention }
   await sourceFilesTable.update(sourceId, { data: updated })
+  await rewriteAmounts(sourceId, updated)
   return updated
+}
+
+/** Which of the file's columns carries a given canonical field, if any. */
+function columnFor(file: SourceFile, field: IngestionTargetField): string | undefined {
+  return Object.entries(file.assignments).find(([, target]) => target === field)?.[0]
+}
+
+/**
+ * Rewrites the amount column so the table says what the app means.
+ *
+ * The transformation is applied to the data, not kept as a note beside it: a source table
+ * read by eye, by SQL or by the assistant shows one amount, and it is the one that will
+ * be confirmed. What the file actually wrote is kept on the row so the transformation can
+ * always be undone, re-applied after an assignment changes, and recorded in the
+ * observations of every confirmed row.
+ */
+export async function rewriteAmounts(sourceId: number, file: SourceFile): Promise<void> {
+  const amountColumn = columnFor(file, 'amount')
+  for (const stored of await sourceRowsTable.toArray()) {
+    const row = stored.data as SourceRow
+    if (row.sourceId !== sourceId) continue
+
+    // Without an amount column there is nothing to transform, so anything previously
+    // rewritten goes back to what the file said.
+    if (!amountColumn) {
+      if (row.importedAmount === undefined) continue
+      const restored = { ...row, values: { ...row.values }, importedAmount: undefined }
+      await sourceRowsTable.update(stored.id, { data: restored satisfies SourceRow })
+      continue
+    }
+
+    const imported = row.importedAmount ?? row.values[amountColumn] ?? ''
+    const next: SourceRow = { ...row, values: { ...row.values } }
+    if (file.signConvention.kind === 'asImported') {
+      next.values[amountColumn] = imported
+      next.importedAmount = undefined
+    } else {
+      const transformed = applySignConvention(parseNumberValue(imported), file.signConvention, { ...row.values, [amountColumn]: imported })
+      next.values[amountColumn] = transformed === null ? imported : String(transformed)
+      next.importedAmount = imported
+    }
+    if (next.values[amountColumn] === row.values[amountColumn] && next.importedAmount === row.importedAmount) continue
+    await sourceRowsTable.update(stored.id, { data: next })
+  }
 }
 
 /** What the file's amount column looks like — the evidence a sign decision is made from. */
@@ -184,14 +231,14 @@ export async function amountShapeOf(sourceId: number) {
   const stored = await sourceFilesTable.get(sourceId)
   if (!stored) throw new Error(`Source file ${sourceId} was not found.`)
   const file = stored.data as SourceFile
-  const amountColumn = Object.entries(file.assignments).find(([, target]) => target === 'amount')?.[0]
+  const amountColumn = columnFor(file, 'amount')
   if (!amountColumn) return { amountColumn: null, shape: null }
   const rows = (await sourceRowsTable.toArray()).map((row) => row.data as SourceRow).filter((row) => row.sourceId === sourceId)
   return { amountColumn, shape: shapeOfAmounts(rows.map((row) => row.values[amountColumn])) }
 }
 
 function canonicalValue(row: SourceRow, file: SourceFile, field: IngestionTargetField): string | undefined {
-  const column = Object.entries(file.assignments).find(([, target]) => target === field)?.[0]
+  const column = columnFor(file, field)
   return column ? row.values[column] : undefined
 }
 
@@ -204,9 +251,7 @@ export function observationsFor(row: SourceRow, file: SourceFile, importedAmount
   const assigned = new Set(Object.keys(file.assignments))
   const parts: Record<string, string> = {}
   for (const [column, value] of Object.entries(row.values)) {
-    // The filename is a column of the confirmed row in its own right; repeating it here
-    // would put the same fact in two places.
-    if (assigned.has(column) || column === SOURCE_FILENAME_COLUMN || value === '') continue
+    if (assigned.has(column) || value === '') continue
     parts[column] = value
   }
   if (importedAmount !== undefined) parts.amount_as_imported = importedAmount
@@ -269,16 +314,14 @@ export async function confirmSourceRows(sourceId: number, catalogue: LabelCatalo
     const placements = placementsOf(row.labels, catalogue)
     if (placements.length === 0) { result.leftBehind += 1; continue }
 
-    const importedAmount = canonicalValue(row, file, 'amount')
-    const amount = applySignConvention(parseNumberValue(importedAmount), file.signConvention, row.values)
-    const changed = file.signConvention.kind !== 'asImported'
+    const amount = parseNumberValue(canonicalValue(row, file, 'amount'))
     const base = {
       rowId: row.rowId,
       sourceFilename: row.values[SOURCE_FILENAME_COLUMN] ?? file.originalFilename,
       confirmedAt,
       date: parseDateValue(canonicalValue(row, file, 'date')) ?? undefined,
       amount: amount ?? undefined,
-      observations: observationsFor(row, file, changed ? importedAmount : undefined),
+      observations: observationsFor(row, file, row.importedAmount),
       category: row.labels.category?.trim() || DEFAULT_MEANING,
       subcategory: row.labels.subcategory?.trim() || DEFAULT_MEANING,
       asset: canonicalValue(row, file, 'asset') || undefined,

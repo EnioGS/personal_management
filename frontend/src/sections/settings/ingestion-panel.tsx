@@ -12,9 +12,10 @@ import { refreshAllLocalStores } from '@/lib/local-store/create-local-list-store
 import type { StoredRow } from '@/lib/local-store/create-local-table'
 import { buildLabelCatalogue } from '@/lib/label-catalogue-source'
 import { queryRows } from '@/lib/model/row-query'
-import { ingestionLabelErrors } from '@/lib/model/ingestion'
+import { DEFAULT_MEANING, ingestionLabelErrors } from '@/lib/model/ingestion'
 import { parsePlacementLabels, resolveScreenLabel, resolveSectionLabel, screenLabelFor, sectionLabelFor, withDerivedSections, type LabelCatalogue } from '@/lib/model/label-catalogue'
 import { applyLabelRulesToRows } from '@/lib/model/label-rules-repository'
+import { setConfirmedMeaning } from '@/lib/model/confirmed-rows'
 import { deleteMarked, toggleMark, type MarkableTable } from '@/lib/model/marking'
 import { sourceRowsTable } from '@/lib/model/model-db'
 import { useConfirmedRowsStore, useSourceFilesStore, useSourceRowsStore } from '@/lib/model/model-stores'
@@ -28,8 +29,6 @@ import {
   planConfirmation,
   setSignConvention,
 } from '@/lib/model/source-files'
-import { applySignConvention } from '@/lib/model/sign-convention'
-import { parseNumberValue } from '@/lib/parse-number'
 import type { ConfirmedRow, IngestionRowLabels, IngestionTargetField, SourceFile, SourceRow } from '@/lib/model/types'
 import { cn } from '@/lib/utils'
 import { LabellingRules } from './labelling-rules'
@@ -40,6 +39,9 @@ const NO_SELECTION = '__none__'
 /** The label columns every table carries, in the order they are read. */
 const LABEL_COLUMNS = ['sections', 'screens', 'category', 'subcategory'] as const
 type LabelColumn = (typeof LABEL_COLUMNS)[number]
+
+/** The two that are free text, never validated, and default rather than start empty. */
+const MEANING_COLUMNS = ['category', 'subcategory'] as const
 
 const LABEL_HINT: Record<LabelColumn, string> = {
   sections: "the app's sections — several allowed, separated by commas",
@@ -78,6 +80,10 @@ export function IngestionPanel() {
   const [sort, setSort] = useState<ColumnSort | null>(null)
   const [filters, setFilters] = useState<ColumnFilter[]>([])
   const [amountShape, setAmountShape] = useState<Awaited<ReturnType<typeof amountShapeOf>> | null>(null)
+  // What is being typed in a label cell, before it is a label. A value nothing is called
+  // is kept here and shown red rather than dropped, so a typo is visible instead of
+  // silently discarded — and the row keeps the labels it already had until it is fixed.
+  const [drafts, setDrafts] = useState<Record<string, string>>({})
   const fileInput = useRef<HTMLInputElement>(null)
   const catalogue = useMemo(() => buildLabelCatalogue((key) => String(t(key as never))), [t])
   const { marking, setMarking, rowProps } = useMarkMode()
@@ -149,18 +155,29 @@ export function IngestionPanel() {
     }
   }
 
-  async function editLabel(row: StoredRow<SourceRow>, column: LabelColumn, value: string) {
-    let labels: IngestionRowLabels = { ...row.labels }
+  /** What a cell's text resolves to, and what in it nothing is called. Computed per keystroke. */
+  function readLabelCell(row: StoredRow<SourceRow>, column: LabelColumn, value: string) {
+    const labels: IngestionRowLabels = { ...row.labels }
     if (column === 'sections') {
-      labels.sections = parsePlacementLabels(value, (text) => resolveSectionLabel(catalogue, text)).values
-    } else if (column === 'screens') {
-      labels.screens = parsePlacementLabels(value, (text) => resolveScreenLabel(catalogue, text, labels.sections)).values
-      labels = withDerivedSections(labels, catalogue)
-    } else {
-      labels[column] = value
+      const parsed = parsePlacementLabels(value, (text) => resolveSectionLabel(catalogue, text))
+      return { labels: { ...labels, sections: parsed.values }, unknown: parsed.unknown }
     }
+    if (column === 'screens') {
+      const parsed = parsePlacementLabels(value, (text) => resolveScreenLabel(catalogue, text, labels.sections))
+      return { labels: withDerivedSections({ ...labels, screens: parsed.values }, catalogue), unknown: parsed.unknown }
+    }
+    return { labels: { ...labels, [column]: value }, unknown: [] as string[] }
+  }
+
+  async function editLabel(row: StoredRow<SourceRow>, column: LabelColumn, value: string) {
+    const { labels } = readLabelCell(row, column, value)
     await sourceRowsTable.update(row.id, { data: { ...stripStored(row), labels } satisfies SourceRow })
     await refreshAllLocalStores()
+  }
+
+  /** Category and subcategory are the labels §1.5 says may be added later, so they stay editable here. */
+  async function editConfirmedMeaning(row: StoredRow<ConfirmedRow>, column: 'category' | 'subcategory', value: string) {
+    await setConfirmedMeaning(row.id, { [column]: value.trim() || DEFAULT_MEANING })
   }
 
   async function removeMarked(table: MarkableTable) {
@@ -332,6 +349,8 @@ export function IngestionPanel() {
             </thead>
             <tbody>
               {sourceWindow.visible.map((row) => {
+                // What still stands between this row and a table, said in words rather
+                // than only in colour.
                 const errors = ingestionLabelErrors(row.labels, catalogue)
                 return (
                   <tr
@@ -343,26 +362,42 @@ export function IngestionPanel() {
                       row.markedForElimination && 'bg-destructive/10 line-through',
                     )}
                   >
-                    <td className="text-muted-foreground p-2 whitespace-nowrap">{row.values[SOURCE_FILENAME_COLUMN]}</td>
+                    <td className="text-muted-foreground p-2 whitespace-nowrap" title={errors.join(' ')}>{row.values[SOURCE_FILENAME_COLUMN]}</td>
                     <td className="p-2 whitespace-nowrap" title={row.duplicateOf ? `Matches ${row.duplicateOf}, which came from another file.` : undefined}>
                       {row.duplicateOf ? <span className="text-destructive">duplicate?</span> : ''}
                     </td>
                     {selectedFile.originalColumns.map((column) => (
-                      <td key={column} className="p-2">
-                        {selectedFile.assignments[column] === 'amount'
-                          ? formatSignedAmount(row, selectedFile)
-                          : row.values[column]}
+                      <td key={column} className="p-2" title={selectedFile.assignments[column] === 'amount' && row.importedAmount !== undefined ? `The file wrote ${row.importedAmount}` : undefined}>
+                        {row.values[column]}
                       </td>
                     ))}
-                    {LABEL_COLUMNS.map((column) => (
-                      <td key={column} className="p-2">
-                        <Input
-                          defaultValue={labelText(row.labels, column, catalogue)}
-                          onBlur={(event) => void editLabel(row, column, event.target.value)}
-                          className={cn('h-6 w-36 text-[11px]', errors.some((error) => error.includes(column)) && 'border-destructive text-destructive')}
-                        />
-                      </td>
-                    ))}
+                    {LABEL_COLUMNS.map((column) => {
+                      const key = `${row.id}:${column}`
+                      const typed = drafts[key]
+                      const text = typed ?? labelText(row.labels, column, catalogue)
+                      const unknown = typed === undefined ? [] : readLabelCell(row, column, typed).unknown
+                      const missing = MEANING_COLUMNS.includes(column as never) ? false : (row.labels[column] ?? []).length === 0
+                      return (
+                        <td key={column} className="p-2">
+                          <Input
+                            value={text}
+                            title={unknown.length > 0 ? `Nothing is called ${unknown.join(', ')}.` : undefined}
+                            onChange={(event) => setDrafts((current) => ({ ...current, [key]: event.target.value }))}
+                            onBlur={(event) => {
+                              void editLabel(row, column, event.target.value)
+                              // The text stays on screen while it names nothing, so the mistake
+                              // is visible; once it resolves, the stored labels take over.
+                              if (unknown.length === 0) setDrafts(({ [key]: _cleared, ...rest }) => rest)
+                            }}
+                            className={cn(
+                              'h-6 w-36 text-[11px]',
+                              unknown.length > 0 && 'border-destructive text-destructive',
+                              unknown.length === 0 && missing && 'border-amber-500',
+                            )}
+                          />
+                        </td>
+                      )
+                    })}
                   </tr>
                 )
               })}
@@ -401,8 +436,15 @@ export function IngestionPanel() {
                 >
                   <td className="p-2 whitespace-nowrap">{row.date ? new Date(row.date).toISOString().slice(0, 10) : ''}</td>
                   <td className="p-2 text-right tabular-nums">{row.amount ?? ''}</td>
-                  <td className="p-2">{row.category}</td>
-                  <td className="p-2">{row.subcategory}</td>
+                  {(['category', 'subcategory'] as const).map((column) => (
+                    <td key={column} className="p-2">
+                      <Input
+                        defaultValue={row[column]}
+                        onBlur={(event) => void editConfirmedMeaning(row, column, event.target.value)}
+                        className="h-6 w-32 text-[11px]"
+                      />
+                    </td>
+                  ))}
                   <td className="text-muted-foreground max-w-[28rem] truncate p-2" title={row.observations}>{row.observations}</td>
                   <td className="text-muted-foreground p-2 whitespace-nowrap">{row.sourceFilename}</td>
                 </tr>
@@ -413,7 +455,9 @@ export function IngestionPanel() {
         </div>
       )}
 
-      <LabellingRules context={selectedConfirmed ? 'confirmed' : 'source'} />
+      {/* §1.6.1: the rules of a stage are shown only while a table of that stage is selected. */}
+      {selectedFile && <LabellingRules context="source" />}
+      {selectedConfirmed && <LabellingRules context="confirmed" />}
     </div>
   )
 }
@@ -424,14 +468,6 @@ function stripStored<T>(row: StoredRow<T>): T {
   void id
   void createdAt
   return rest as T
-}
-
-/** What the amount will be once the file's convention is made to agree with ours. */
-function formatSignedAmount(row: SourceRow, file: SourceFile): string {
-  const column = Object.entries(file.assignments).find(([, target]) => target === 'amount')?.[0]
-  if (!column) return ''
-  const amount = applySignConvention(parseNumberValue(row.values[column]), file.signConvention, row.values)
-  return amount === null || amount === undefined ? row.values[column] : String(amount)
 }
 
 function sourceCellValue(row: StoredRow<SourceRow>, field: string, catalogue: LabelCatalogue): unknown {

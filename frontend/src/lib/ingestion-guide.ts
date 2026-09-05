@@ -59,7 +59,9 @@ This app means one thing by a sign: **negative left, positive arrived**. A file 
 disagrees is brought into line rather than annotated.
 
 Before deciding, **sample the destination tables** — read what signs the rows already
-there carry for the same kind of transaction. Do that even when a convention is recorded
+there carry for the same kind of transaction. Calling query_vault with no statement
+reports, for every confirmed table, how many of its amounts are negative and how many are
+positive; that count is the table's reference. Do that even when a convention is recorded
 somewhere: a recorded reference is a shortcut, not evidence.
 
 Two transformations exist:
@@ -68,8 +70,11 @@ Two transformations exist:
 - **invert by condition**, for a file whose amounts are all one sign and whose direction
   lives in another column: buy/sell, received/sent, debit/credit.
 
-The value the file actually wrote is kept in the observations of every confirmed row, so
-a transformation is never invisible. If the evidence does not settle it, ask the user.
+The transformation rewrites the amount column itself, so the source table shows the
+amount that will be confirmed rather than one value on screen and another underneath. The
+value the file actually wrote is kept on the row and reaches the observations of every
+confirmed row, so a transformation is never invisible and can always be undone by setting
+the convention back. If the evidence does not settle it, ask the user.
 
 ## Placement decides where a row goes
 

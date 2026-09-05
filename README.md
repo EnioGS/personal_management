@@ -145,8 +145,11 @@ Two things it optimizes for:
   uploaded files with their assignments, the rows still being worked on, the
   confirmed rows, standing rules, notes, budgets, the assistant's prompts and its
   API keys, and the interface preferences (theme, language) that live outside
-  Dexie. The export mirrors the database rather than a shape of its own, so the
-  `.db` is worth opening in a SQLite browser. Clearing the data is narrower on
+  Dexie. The export mirrors the database rather than a shape of its own, and adds a
+  named view per uploaded file (`source__nubank_2026_09_08__3`) and per confirmed table
+  (`confirmed__finances__spending`) with the file's own columns as real columns — so the
+  `.db` is worth opening in a SQLite browser, while the canonical tables are still what
+  an import reads. Clearing the data is narrower on
   purpose — it keeps the accounts and cards, which are configuration rather than
   transactions.
 - Accounts and cards are user data, not compile-time constants (`lib/model/`,
@@ -160,20 +163,25 @@ Two things it optimizes for:
   class); everything unassigned is condensed into one observations column when the
   row is confirmed, so nothing is dropped and no column has to be invented.
 - Four labels, not seven: **sections** and **screens** say where a row belongs and
-  are validated against the app's own navigation — a screen only counts inside a
-  section the row names — while **category** and **subcategory** are free text,
-  one value each, starting at `outros`. Direction is not a label at all: the sign
-  of the amount says it, negative left and positive arrived.
+  are validated against the app's own navigation as they are typed — a screen only
+  counts inside a section the row names, and a value nothing is called stays in the
+  cell in red rather than being silently dropped — while **category** and
+  **subcategory** are free text, one value each, starting at `outros` and editable on
+  a confirmed row, since a row can be placed before it is understood. Direction is not
+  a label at all: the sign of the amount says it, negative left and positive arrived.
 - Confirming a row **copies it into one table per (section, screen) pair it
   names**, every copy carrying the same `row_id` — a hash of the row's contents
   and a random seed, fixed for the row's life even if every value in it later
   changes. The row leaves the file it came from, so a file empties as it is dealt
   with. Anything counting across screens counts each `row_id` once.
 - A file's signs are made to agree with ours explicitly, and only after the rows
-  are labelled — the decision depends on where they are going. A file may be
-  inverted wholesale, or inverted by a condition on another column (`buy`/`sell`,
-  `debit`/`credit`); the value the file actually wrote is kept in the confirmed
-  row's observations, so a transformation is never invisible.
+  are labelled — the decision depends on where they are going, and `query_vault`
+  reports how each confirmed table's amounts are signed today so the decision is made
+  against evidence. A file may be inverted wholesale, or inverted by a condition on
+  another column (`buy`/`sell`, `debit`/`credit`). The transformation rewrites the
+  amount column itself, so the table shows what will be confirmed; the value the file
+  wrote is kept on the row, reaches the confirmed row's observations, and comes back
+  the moment the convention is set to "as imported".
 - Dates and amounts are read the way statements write them, not the way a parser
   wishes they did: `15/08/2025` is day-first, `87,40` and `1.234,56` are numbers,
   and whichever of `.` or `,` comes last is the decimal point.
@@ -198,7 +206,9 @@ Two things it optimizes for:
   rows already in a table. A rule matches by substring, `equals`, `startsWith` or
   regex (validated when it is saved, not when it runs), stacks conditions that must
   all hold, fills only labels a row does not already have, and carries a rationale
-  saying why those labels are right for everything matching it.
+  saying why those labels are right for everything matching it. The panel shows the
+  rules of a stage only while a table of that stage is open, and the user writes one
+  there through the same validation the assistant's tool applies.
 - The assistant reads with SQL and writes through a small set of validating tools:
   it assigns columns, sets the sign convention, labels rows one by one or by a
   match, marks and unmarks, and confirms what is ready. Retiring a file along with

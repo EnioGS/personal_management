@@ -168,6 +168,12 @@ export interface SourceRow {
   markedForElimination?: boolean
   appliedRuleIds?: number[]
   /**
+   * What the file wrote in the amount column, kept when a sign convention rewrote it.
+   * The rewrite happens in the data rather than beside it, so this is what makes it
+   * reversible — and what reaches the observations of every confirmed row.
+   */
+  importedAmount?: string
+  /**
    * The `row_id` of a row from **another** file that this one looks like. Advisory and
    * nothing more: it removes nothing by itself. Two identical rows inside one file are
    * two real transactions — banks report them — so only a match across files is

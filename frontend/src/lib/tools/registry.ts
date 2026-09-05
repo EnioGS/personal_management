@@ -14,6 +14,7 @@ import {
   markRowsTool,
   newRowIdTool,
   queryVaultTool,
+  setConfirmedMeaningTool,
   setLabelsTool,
   setSignConventionTool,
 } from './vault-tools'
@@ -33,6 +34,7 @@ export const toolRegistry: ToolDefinition[] = [
   setSignConventionTool,
   setLabelsTool,
   labelRowsByMatchTool,
+  setConfirmedMeaningTool,
   markRowsTool,
   newRowIdTool,
   addConfirmedRowTool,

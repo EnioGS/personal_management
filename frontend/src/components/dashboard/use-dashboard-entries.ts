@@ -89,7 +89,9 @@ export function describeRow(observations: string): string {
 
   let best = ''
   for (const [column, value] of Object.entries(parsed as Record<string, unknown>)) {
-    if (typeof value !== 'string' || column === 'amount_as_imported') continue
+    // Neither the filename nor the amount the file wrote describes anything: the row
+    // carries both in columns of its own.
+    if (typeof value !== 'string' || column === 'amount_as_imported' || column === 'source_filename') continue
     const text = value.trim()
     if (!text || !/\p{L}{3}/u.test(text)) continue
     if (text.length > best.length) best = text

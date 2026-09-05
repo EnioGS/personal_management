@@ -1,5 +1,19 @@
 import { monthKey } from '@/lib/aggregations'
 
+/**
+ * Words that say a charge repeats, in either language.
+ *
+ * Recurrence stopped being a label anyone applies, so it is read from the meaning labels
+ * instead: a row called "assinatura" is a subscription whether or not three months of it
+ * have been imported yet. Everything else has to earn the description by repeating.
+ */
+export const RECURRING_WORDS = ['assinatura', 'assinaturas', 'membership', 'mensalidade', 'parcelado', 'parcela', 'subscription', 'recorrente']
+
+export function declaresRecurrence(...text: (string | undefined)[]): boolean {
+  const haystack = text.filter(Boolean).join(' ').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+  return RECURRING_WORDS.some((word) => haystack.includes(word))
+}
+
 export interface RecurringCandidate {
   category: string
   /** Average of the matched amounts — individual charges vary slightly (fees, rounding). */

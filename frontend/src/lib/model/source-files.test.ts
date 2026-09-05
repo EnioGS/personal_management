@@ -119,16 +119,23 @@ describe('confirming', () => {
     await confirmSourceRows(sourceId, catalogue)
 
     const confirmed = (await confirmedRowsTable.toArray())[0].data as ConfirmedRow
-    expect(JSON.parse(confirmed.observations)).toEqual({ Descrição: 'MERCADO SAO JORGE', Tipo: 'D' })
+    expect(JSON.parse(confirmed.observations)).toEqual({
+      source_filename: 'banco-agosto.csv',
+      Descrição: 'MERCADO SAO JORGE',
+      Tipo: 'D',
+    })
     expect(confirmed.amount).toBe(-284.9)
     expect(confirmed.date).toBe(Date.UTC(2026, 7, 2))
   })
 
-  it('keeps the amount the file wrote whenever the sign was changed', async () => {
+  it('rewrites the amount column itself, and keeps what the file wrote', async () => {
     const sourceId = await readyFile()
     await setSignConvention(sourceId, { kind: 'invertAll' })
     const rows = await rowsOf(sourceId)
     await label(rows[0].id, { sections: ['finances'], screens: ['overview'], category: 'salário', subcategory: 'outros' })
+
+    // The rewrite lands in the data, so the table itself shows what will be confirmed.
+    expect((await rowsOf(sourceId))[0].row).toMatchObject({ values: { Valor: '-3500' }, importedAmount: '3.500,00' })
 
     await confirmSourceRows(sourceId, catalogue)
 
@@ -137,9 +144,19 @@ describe('confirming', () => {
     expect(JSON.parse(confirmed.observations).amount_as_imported).toBe('3.500,00')
   })
 
+  it('puts the amounts back when the convention is set to what the file wrote', async () => {
+    const sourceId = await readyFile()
+    await setSignConvention(sourceId, { kind: 'invertAll' })
+    await setSignConvention(sourceId, { kind: 'asImported' })
+
+    expect((await rowsOf(sourceId))[0].row).toMatchObject({ values: { Valor: '3.500,00' } })
+    expect((await rowsOf(sourceId))[0].row.importedAmount).toBeUndefined()
+  })
+
   it('reads direction from another column when that is where the file put it', async () => {
     const sourceId = await readyFile()
     await setSignConvention(sourceId, { kind: 'invertWhen', column: 'Tipo', values: ['D'] })
+    expect((await rowsOf(sourceId)).map((entry) => entry.row.values.Valor)).toEqual(['3500', '-284.9'])
     for (const { id } of await rowsOf(sourceId)) {
       await label(id, { sections: ['finances'], screens: ['overview'], category: 'outros', subcategory: 'outros' })
     }
@@ -201,10 +218,10 @@ describe('what counts as a duplicate', () => {
 })
 
 describe('observationsFor', () => {
-  it('keeps only what no column was assigned to, and never an empty value', () => {
+  it('keeps everything no column was assigned to, the filename included, and never an empty value', () => {
     const file = { assignments: { Data: 'date' } } as unknown as SourceFile
-    const row = { values: { Data: '01/08/2026', Descrição: 'MERCADO', Tipo: '' } } as unknown as SourceRow
+    const row = { values: { source_filename: 'banco.csv', Data: '01/08/2026', Descrição: 'MERCADO', Tipo: '' } } as unknown as SourceRow
 
-    expect(JSON.parse(observationsFor(row, file))).toEqual({ Descrição: 'MERCADO' })
+    expect(JSON.parse(observationsFor(row, file))).toEqual({ source_filename: 'banco.csv', Descrição: 'MERCADO' })
   })
 })

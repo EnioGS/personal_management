@@ -7,7 +7,7 @@ import { FilterBar } from '@/components/dashboard/filter-bar'
 import { useDashboardFilters } from '@/components/dashboard/dashboard-filters'
 import { useDashboardEntries } from '@/components/dashboard/use-dashboard-entries'
 import { formatDateLabel, formatMonthLabel, monthKey } from '@/lib/aggregations'
-import { detectRecurringEntries } from '@/lib/model/recurring'
+import { declaresRecurrence, detectRecurringEntries } from '@/lib/model/recurring'
 import { FinanceTableDrawer } from './finance-table-drawer'
 
 const currency = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
@@ -36,9 +36,15 @@ export function RecurringPanel() {
     () => entries.filter((entry) => entry.amount < 0).map((entry) => ({ ...entry, amount: -entry.amount })),
     [entries],
   )
-  // Recurrence is no longer a label anyone applies, so it is entirely detected: what
-  // repeated month after month is what this screen is about.
-  const candidates = useMemo(() => detectRecurringEntries(outgoing), [outgoing])
+  const candidates = useMemo(() => {
+    // A row that calls itself a subscription is one from its first month; everything else
+    // has to repeat before this screen will say so. Recurrence is not a label anyone
+    // applies any more, so this is where those two readings meet.
+    const declared = detectRecurringEntries(outgoing.filter((entry) => declaresRecurrence(entry.category, entry.subcategory, entry.description)), 1)
+    const detected = detectRecurringEntries(outgoing)
+    const key = (candidate: { category: string; averageAmount: number }) => `${candidate.category}\u0000${Math.round(candidate.averageAmount)}`
+    return [...new Map([...declared, ...detected].map((candidate) => [key(candidate), candidate])).values()]
+  }, [outgoing])
   const monthlyTotal = candidates.reduce((total, candidate) => total + candidate.averageAmount, 0)
   const largest = candidates.reduce((largestAmount, candidate) => Math.max(largestAmount, candidate.averageAmount), 0)
   const latestMonth = outgoing.length > 0 ? monthKey(Math.max(...outgoing.map((entry) => entry.date))) : new Date().toISOString().slice(0, 7)

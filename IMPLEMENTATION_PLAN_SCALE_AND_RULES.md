@@ -477,6 +477,34 @@ Phases 0–8 are done and on `main`. What landed, in the order the plan asked fo
 - Export mirrors the database (v8); capital includes investments; README, `samples/`
   and adr/0018, 0021, 0030 and 0031 were updated or marked superseded.
 
+### Second pass — oversights found re-reading §1, §1b and §1c
+
+- §1.4's *"this includes the `source_file` column content"* — the filename had been left
+  out of the condensed observations. It is back in.
+- Q12's *"B, but with a catch"* — the sign transformation had been applied at
+  confirmation rather than to the data. It now **rewrites the amount column in the source
+  table**, keeping what the file wrote on the row, so SQL, the screen and the confirmation
+  all read one value. Setting the convention back to "as imported" restores it.
+- The label spec's *"showing in red on the cell, at the text input time"* — validation
+  ran on blur and silently discarded anything unrecognised. It now runs per keystroke and
+  **keeps what was typed**, red, until it names something.
+- §1.6.1 — the rules panel showed one stage's rules whatever was selected; it now shows a
+  stage's rules only while a table of that stage is open, and nothing when none is.
+- §1.7 with §4's parity rule — the user could only read and delete rules. The panel now
+  has the same rule-writing the assistant's tool has, with the same validation.
+- §1.5's *"can be added later"* — category and subcategory are now editable on confirmed
+  rows, by the user in the table and by the assistant through `set_confirmed_meaning`.
+- Q4's *"add the adopted references for each table"* — `query_vault`'s schema call now
+  reports, per confirmed table, how many of its amounts are negative and how many
+  positive: the reference, read from the data rather than declared.
+- Q6's reserved words — `assinatura`, `membership`, `parcelado` and their equivalents are
+  now read by the Recurring screen, which treats such a row as recurring from its first
+  month while everything else still has to repeat.
+- §5.1/§5.3's *"distinct and easy to recognise names"* — the exported `.db` now carries a
+  named view per uploaded file and per confirmed table, with the file's own columns as
+  real columns. Storage stays one Dexie store per kind (a store per file would mean a
+  schema migration per upload); the names are real everywhere the data is read.
+
 **Not carried over:** data stored under the old two-phase schema. Dexie v9 clears the
 stores that model needed, and no migration was written — the old rows describe a
 classification this app no longer has. Files are re-imported through the new door.

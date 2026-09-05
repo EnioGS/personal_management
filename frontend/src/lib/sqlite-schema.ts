@@ -84,6 +84,7 @@ export const SQLITE_SCHEMAS: Record<DataTableKey, SqliteTableSchema> = {
       { column: 'marked_for_elimination', key: 'markedForElimination', type: 'boolean' },
       { column: 'applied_rule_ids', key: 'appliedRuleIds', type: 'json' },
       { column: 'duplicate_of', key: 'duplicateOf', type: 'text' },
+      { column: 'imported_amount', key: 'importedAmount', type: 'text' },
     ],
   },
   confirmedRows: {
