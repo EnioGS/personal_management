@@ -6,6 +6,7 @@ import { DIVERGING_PAIR, DOMAIN_COLOR } from '@/components/charts/chart-colors'
 import { DivergingBarChart } from '@/components/charts/diverging-bar-chart'
 import { CategoryPill } from '@/components/dashboard/category-pill'
 import { DashboardCard } from '@/components/dashboard/dashboard-card'
+import { NestedBarList } from '@/components/dashboard/nested-bar-list'
 import { RankedBarList } from '@/components/dashboard/ranked-bar-list'
 import { StatTile } from '@/components/dashboard/stat-tile'
 import { FilterBar } from '@/components/dashboard/filter-bar'
@@ -15,14 +16,13 @@ import { formatDateLabel, formatMonthLabel, groupByKey } from '@/lib/aggregation
 import { capitalEvolution } from '@/lib/dashboard/capital-evolution'
 import { capitalMetric } from '@/lib/dashboard/capital-metric'
 import {
-  balanceByAccount,
+  accountsWithCards,
   incomeByCategory,
   largestMovements,
   monthlyAverages,
   monthlyFlow,
   monthsOfRunway,
   savingsRate,
-  spendByCard,
 } from '@/lib/dashboard/movements-analytics'
 import { averageSpendByCategory, categorySpendChanges, frequentDescriptions, outgoingSpending, spendingByMonth } from './spending-analytics'
 import { FinanceTableDrawer } from './finance-table-drawer'
@@ -86,9 +86,8 @@ export function OverviewPanel() {
     () => monthsOfRunway(capital.current, capitalData.map((point) => point.spending)),
     [capital, capitalData],
   )
-  const accounts = useMemo(() => balanceByAccount(movements), [movements])
+  const accounts = useMemo(() => accountsWithCards(movements, spending), [movements, spending])
   const incomeSources = useMemo(() => incomeByCategory(movements), [movements])
-  const cards = useMemo(() => spendByCard(spending), [spending])
   const biggest = useMemo(() => largestMovements(movements), [movements])
   const spendingCategories = useMemo(
     () => averageSpendByCategory(spending, capitalData.map((point) => point.month)),
@@ -173,7 +172,7 @@ export function OverviewPanel() {
           {/* Below the fold: the same period, read three ways — what the months look
               like, where the money sits, and which rows account for most of it. */}
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
-            <DashboardCard title={t('finances:overview.inAndOut')} className="h-[300px] lg:col-span-2" bodyClassName="p-2">
+            <DashboardCard title={t('finances:overview.cashFlow')} className="h-[300px] lg:col-span-2" bodyClassName="p-2">
               {flow.length === 0 ? (
                 <p className="text-muted-foreground flex h-full items-center justify-center text-xs">{t('finances:overview.noEntries')}</p>
               ) : (
@@ -184,8 +183,11 @@ export function OverviewPanel() {
                   negativeKey="outgoing"
                   positiveLabel={t('finances:overview.arrived')}
                   negativeLabel={t('finances:overview.left')}
+                  netKey="net"
+                  netLabel={t('finances:overview.netCashFlow')}
                   positiveColor={DOMAIN_COLOR.balance}
                   negativeColor={DIVERGING_PAIR.negative}
+                  netColor={DOMAIN_COLOR.contributions}
                   xFormatter={formatMonthLabel}
                   valueFormatter={(value) => currency.format(value)}
                 />
@@ -207,33 +209,27 @@ export function OverviewPanel() {
           </div>
 
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
-            <DashboardCard title={t('finances:overview.accounts')} className="h-[260px]">
-              <RankedBarList
-                items={accounts}
+            <DashboardCard title={t('finances:overview.accountsAndCards')} className="h-[320px] lg:col-span-2" bodyClassName="p-3">
+              <NestedBarList
+                groups={accounts}
                 valueFormatter={(v) => currency.format(v)}
                 emptyLabel={t('finances:overview.noEntries')}
+                childEmptyLabel={t('finances:overview.noCardSpend')}
               />
             </DashboardCard>
 
-            <DashboardCard title={t('finances:overview.incomeSources')} className="h-[260px]">
+            <DashboardCard title={t('finances:overview.incomeSources')} className="h-[320px]">
               <RankedBarList
                 items={incomeSources}
                 valueFormatter={(v) => currency.format(v)}
                 emptyLabel={t('finances:overview.noEntries')}
-              />
-            </DashboardCard>
-
-            <DashboardCard title={t('finances:overview.byCard')} className="h-[260px]">
-              <RankedBarList
-                items={cards}
-                valueFormatter={(v) => currency.format(v)}
-                emptyLabel={t('finances:overview.noCardSpend')}
+                variant="underlined"
               />
             </DashboardCard>
           </div>
 
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
-            <DashboardCard title={t('finances:overview.averageMonth')} className="h-[260px]" bodyClassName="p-3">
+            <DashboardCard title={t('finances:overview.averageMonth')} className="h-[420px]" bodyClassName="p-3">
               <div className="flex h-full flex-col justify-center gap-3">
                 <AverageLine label={t('finances:overview.arrived')} value={currency.format(averages.incoming)} />
                 <AverageLine label={t('finances:overview.left')} value={currency.format(averages.outgoing)} />
@@ -241,7 +237,7 @@ export function OverviewPanel() {
               </div>
             </DashboardCard>
 
-            <DashboardCard title={t('finances:overview.largestMovements')} className="h-[260px] lg:col-span-2" bodyClassName="overflow-auto p-0">
+            <DashboardCard title={t('finances:overview.largestMovements')} className="h-[420px] lg:col-span-2" bodyClassName="overflow-auto p-0">
               {biggest.length === 0 ? (
                 <p className="text-muted-foreground flex h-full items-center justify-center text-xs">{t('finances:overview.noEntries')}</p>
               ) : (

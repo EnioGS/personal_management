@@ -1,6 +1,6 @@
 import { Bar, BarChart, CartesianGrid, ReferenceLine, XAxis, YAxis } from 'recharts'
 import { ChartContainer, ChartLegend, ChartLegendContent, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart'
-import { DIVERGING_PAIR, type ThemedColor } from './chart-colors'
+import { DIVERGING_PAIR, DOMAIN_COLOR, type ThemedColor } from './chart-colors'
 
 interface DivergingBarChartProps<T extends Record<string, unknown>> {
   data: T[]
@@ -11,6 +11,10 @@ interface DivergingBarChartProps<T extends Record<string, unknown>> {
   negativeKey: Extract<keyof T, string>
   positiveLabel: string
   negativeLabel: string
+  /** Optional third bar between the two: the signed net of them, drawn as it is. */
+  netKey?: Extract<keyof T, string>
+  netLabel?: string
+  netColor?: ThemedColor
   xFormatter?: (value: string | number) => string
   /** Formats a bar's absolute value for the tooltip (the sign is already shown by position). */
   valueFormatter?: (value: number) => string
@@ -24,6 +28,9 @@ interface DivergingBarChartProps<T extends Record<string, unknown>> {
  * not two unrelated series sharing an axis. One axis, one zero baseline: `negativeKey`
  * is negated here so it renders as a real diverging bar rather than a second stacked
  * series, and the tooltip/axis show the original positive magnitude back.
+ *
+ * An optional `netKey` sits between them, signed rather than negated: the answer the two
+ * magnitudes are asked for, without the reader doing the subtraction.
  */
 export function DivergingBarChart<T extends Record<string, unknown>>({
   data,
@@ -32,6 +39,9 @@ export function DivergingBarChart<T extends Record<string, unknown>>({
   negativeKey,
   positiveLabel,
   negativeLabel,
+  netKey,
+  netLabel,
+  netColor = DOMAIN_COLOR.balance,
   xFormatter,
   valueFormatter,
   positiveColor = DIVERGING_PAIR.positive,
@@ -42,7 +52,15 @@ export function DivergingBarChart<T extends Record<string, unknown>>({
   const config: ChartConfig = {
     [positiveKey]: { label: positiveLabel, theme: positiveColor },
     [negativeKey]: { label: negativeLabel, theme: negativeColor },
+    ...(netKey ? { [netKey]: { label: netLabel ?? netKey, theme: netColor } } : {}),
   }
+
+  // The net is the one bar whose sign is the point, so it keeps it: above the line the
+  // month kept money, below it the month lost some. The other two are magnitudes, and
+  // their side of the baseline already says which is which.
+  const labelFor = (name: string) => (name === positiveKey ? positiveLabel : name === netKey ? (netLabel ?? name) : negativeLabel)
+  const formatValue = (value: number, name: string) =>
+    valueFormatter ? valueFormatter(name === netKey ? value : Math.abs(value)) : String(name === netKey ? value : Math.abs(value))
 
   return (
     <ChartContainer config={config} className="aspect-auto h-full w-full">
@@ -59,14 +77,12 @@ export function DivergingBarChart<T extends Record<string, unknown>>({
         <ChartTooltip
           content={
             <ChartTooltipContent
-              formatter={(value, name) => [
-                valueFormatter ? valueFormatter(Math.abs(value as number)) : String(Math.abs(value as number)),
-                ` ${name === positiveKey ? positiveLabel : negativeLabel}`,
-              ]}
+              formatter={(value, name) => [formatValue(value as number, name as string), ` ${labelFor(name as string)}`]}
             />
           }
         />
         <Bar dataKey={positiveKey} fill={`var(--color-${positiveKey})`} radius={[4, 4, 0, 0]} />
+        {netKey && <Bar dataKey={netKey} fill={`var(--color-${netKey})`} radius={2} />}
         <Bar dataKey={negativeKey} fill={`var(--color-${negativeKey})`} radius={[0, 0, 4, 4]} />
         <ChartLegend content={<ChartLegendContent />} />
       </BarChart>

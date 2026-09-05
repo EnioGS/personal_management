@@ -1,11 +1,14 @@
 import { monthKey } from '@/lib/aggregations'
 import { UNLABELLED_LABEL, type FilteredEntry } from '@/components/dashboard/use-dashboard-entries'
+import type { NestedBarGroup } from '@/components/dashboard/nested-bar-list'
 
-/** A month of money in and money out, both as the quantities they are. */
+/** A month of money in and money out, both as the quantities they are, and their net. */
 export interface MonthlyFlow {
   month: string
   incoming: number
   outgoing: number
+  /** Signed: what the month added to the accounts, or took from them. */
+  net: number
   [key: string]: string | number
 }
 
@@ -18,18 +21,20 @@ export interface RankedItem {
 const named = (value: string | undefined) => value?.trim() || UNLABELLED_LABEL
 
 /**
- * What arrived and what left, month by month.
+ * What arrived, what left, and what the difference came to, month by month.
  *
- * Kept apart rather than netted: two months can net the same while one earned twice as
- * much and spent twice as much, and that is the more interesting fact about them.
+ * The two halves are kept apart rather than only netted: two months can net the same
+ * while one earned twice as much and spent twice as much, and that is the more
+ * interesting fact about them. The net rides alongside so the answer is there too.
  */
 export function monthlyFlow(rows: FilteredEntry[]): MonthlyFlow[] {
   const months = new Map<string, MonthlyFlow>()
   for (const row of rows) {
     const month = monthKey(row.date)
-    const flow = months.get(month) ?? { month, incoming: 0, outgoing: 0 }
+    const flow = months.get(month) ?? { month, incoming: 0, outgoing: 0, net: 0 }
     if (row.value >= 0) flow.incoming += row.value
     else flow.outgoing += -row.value
+    flow.net += row.value
     months.set(month, flow)
   }
   return [...months.values()].sort((left, right) => left.month.localeCompare(right.month))
@@ -48,15 +53,6 @@ export function savingsRate(rows: FilteredEntry[]): number | null {
   return (incoming - outgoing) / incoming
 }
 
-/** Where the money sits: each account's own running balance from the rows it carries. */
-export function balanceByAccount(rows: FilteredEntry[]): RankedItem[] {
-  const totals = new Map<string, number>()
-  for (const row of rows) totals.set(named(row.account), (totals.get(named(row.account)) ?? 0) + row.value)
-  return [...totals.entries()]
-    .map(([label, value]) => ({ key: label, label, value }))
-    .sort((left, right) => right.value - left.value)
-}
-
 /** What money came in for, by category — the other half of the spending breakdown. */
 export function incomeByCategory(rows: FilteredEntry[]): RankedItem[] {
   const totals = new Map<string, number>()
@@ -69,20 +65,43 @@ export function incomeByCategory(rows: FilteredEntry[]): RankedItem[] {
     .sort((left, right) => right.value - left.value)
 }
 
-/** What was billed to each card, as the quantity that left. */
-export function spendByCard(rows: FilteredEntry[]): RankedItem[] {
-  const totals = new Map<string, number>()
-  for (const row of rows) {
+/**
+ * Every account with the cards billed to it underneath.
+ *
+ * The two questions are one question — an account's balance and what its cards took out
+ * of it belong side by side — so they are answered from the two ledgers at once: the
+ * balance from the movements, the card totals from the itemised spending rows, which are
+ * the only place a card is named. An account nobody has spent on still appears, with
+ * nothing under it, because a balance is an answer on its own.
+ */
+export function accountsWithCards(movements: FilteredEntry[], spending: FilteredEntry[]): NestedBarGroup[] {
+  const balances = new Map<string, number>()
+  for (const row of movements) balances.set(named(row.account), (balances.get(named(row.account)) ?? 0) + row.value)
+
+  const cards = new Map<string, Map<string, number>>()
+  for (const row of spending) {
     if (row.value >= 0 || !row.card?.trim()) continue
-    totals.set(row.card.trim(), (totals.get(row.card.trim()) ?? 0) - row.value)
+    const account = named(row.account)
+    if (!balances.has(account)) balances.set(account, 0)
+    const byCard = cards.get(account) ?? new Map<string, number>()
+    byCard.set(row.card.trim(), (byCard.get(row.card.trim()) ?? 0) - row.value)
+    cards.set(account, byCard)
   }
-  return [...totals.entries()]
-    .map(([label, value]) => ({ key: label, label, value }))
+
+  return [...balances.entries()]
+    .map(([label, value]) => ({
+      key: label,
+      label,
+      value,
+      children: [...(cards.get(label) ?? new Map()).entries()]
+        .map(([card, spent]) => ({ key: card, label: card, value: spent as number }))
+        .sort((left, right) => right.value - left.value),
+    }))
     .sort((left, right) => right.value - left.value)
 }
 
-/** The rows worth looking at first: the largest movements either way. */
-export function largestMovements(rows: FilteredEntry[], limit = 8): FilteredEntry[] {
+/** The rows worth looking at first: the largest movements either way, most of them. */
+export function largestMovements(rows: FilteredEntry[], limit = 40): FilteredEntry[] {
   return [...rows].sort((left, right) => Math.abs(right.value) - Math.abs(left.value)).slice(0, limit)
 }
 

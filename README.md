@@ -25,7 +25,8 @@ Two things it optimizes for:
 │   │   │   ├── charts/        # thin Recharts wrappers (line/bar/pie/diverging-bar) + the shared color palette
 │   │   │   ├── data-table/    # table workspace (selector + "+ Nova tabela") with an inline draft row + CSV
 │   │   │   ├── dashboard/     # filter bar, stat tile (two deltas + sparkline), dashboard card,
-│   │   │   │                  # ranked bar list, category pill (Finances Overview and beyond)
+│   │   │   │                  # ranked and nested bar lists,
+│   │   │   │                  # category pill (Finances Overview and beyond)
 │   │   │   ├── chat/          # global chat panel (mounted at app root, not a section)
 │   │   │   └── layout/        # activity-bar / secondary-bar / app-shell / chart-table-panel
 │   │   ├── sections/          # feature registry — the extensibility mechanism
