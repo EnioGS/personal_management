@@ -38,12 +38,13 @@ export const queryVaultTool: ToolDefinition = {
 
 export const importAsSourceFileTool: ToolDefinition = {
   name: 'import_as_source_file',
-  description: "Turns text into a new source file, exactly as if it had been dropped on the ingestion centre — it appears in the file list and is worked on the same way. Use it for data that arrives as text rather than as a CSV upload: a .txt or .md the user attached, a table pasted into the message, a statement copied out of a PDF. Pass the text with a header row; commas, semicolons and tabs are all detected, and a markdown pipe table is read as a table. Give it a filename that says where the data came from, since that filename is stamped on every row and is what duplicate checking compares. Nothing is confirmed by this: the rows arrive unlabelled, standing source rules run over them, and the ordinary flow follows.",
+  description: "Turns text into a new source file, exactly as if it had been dropped on the ingestion centre — it appears in the file list and is worked on the same way. Use it for data that arrives as text rather than as a CSV upload: a .txt or .md the user attached, a table pasted into the message, a statement copied out of a PDF. Pass the text with a header row. Commas, semicolons, tabs, pipes and spaced dashes are all detected, and a markdown pipe table is read as a table — but detection picks whatever splits the file most consistently, so pass `delimiter` when the file separates with something its own values also contain. Check the columns in the result: one column whose name holds every heading means the wrong separator, and the fix is to say which it is rather than to work around the shape. Give it a filename that says where the data came from, since that filename is stamped on every row and is what duplicate checking compares. Nothing is confirmed by this: the rows arrive unlabelled, standing source rules run over them, and the ordinary flow follows.",
   parameters: {
     type: 'object',
     properties: {
       filename: { type: 'string', description: 'What to call it, e.g. "nubank-2026-09.csv". A name that says where it came from.' },
       content: { type: 'string', description: 'The text itself: a header row and the rows under it.' },
+      delimiter: { type: 'string', description: 'What separates the columns, when detection would get it wrong — e.g. " - " for "Date - Type - Asset".' },
     },
     required: ['filename', 'content'],
     additionalProperties: false,
@@ -52,7 +53,8 @@ export const importAsSourceFileTool: ToolDefinition = {
     if (typeof args.filename !== 'string' || !args.filename.trim()) return 'Error: a filename is required — every row is stamped with it.'
     if (typeof args.content !== 'string' || !args.content.trim()) return 'Error: content is required.'
     try {
-      const sourceId = await createSourceFile(args.filename.trim(), args.content)
+      const delimiter = typeof args.delimiter === 'string' && args.delimiter ? args.delimiter : undefined
+      const sourceId = await createSourceFile(args.filename.trim(), args.content, { delimiter })
       const file = await sourceFileById(sourceId)
       const applied = await applyLabelRulesToRows('source', context.translate)
       const rows = (await sourceRowsTable.toArray()).filter((row) => (row.data as SourceRow).sourceId === sourceId).length
@@ -61,6 +63,10 @@ export const importAsSourceFileTool: ToolDefinition = {
         filename: file?.originalFilename,
         columns: file?.originalColumns,
         rows,
+        // Said back so a wrong separator is caught here rather than three steps later.
+        note: (file?.originalColumns.length ?? 0) === 1
+          ? 'Only one column was found. If the text really has more, pass delimiter — the file separates with something detection did not try, or with something its own values contain.'
+          : undefined,
         labelledByRules: applied.rowsTouched,
         looksLikeSourceId: file?.looksLikeSourceId ?? null,
       })

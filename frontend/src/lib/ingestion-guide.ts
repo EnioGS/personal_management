@@ -22,8 +22,13 @@ phase, not two: assigning columns and labelling happen side by side, on the same
 A file the user drops — .csv, .txt or .md — becomes a source table by itself. Text that
 reaches you instead, as an attachment or pasted into the message, becomes one through
 import_as_source_file: give it a filename saying where it came from, since that name is
-stamped on every row and is what duplicate checking compares. Separators are detected, and
-a markdown pipe table is read as a table.
+stamped on every row and is what duplicate checking compares. Commas, semicolons, tabs,
+pipes and spaced dashes are all detected, and a markdown pipe table is read as a table.
+
+Detection picks whatever splits the text most consistently, so check the columns that come
+back: one column whose name holds every heading means the separator was wrong. Say which
+it is with \`delimiter\` rather than working around the shape — a file read as one column
+cannot be assigned, and every row of it would carry the whole line as a single value.
 
 ## What a source table holds
 

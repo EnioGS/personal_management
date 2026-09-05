@@ -38,14 +38,29 @@ export function fromMarkdownTable(text: string): string {
 }
 
 /**
+ * What a file might have used to separate its columns, in the order they are tried.
+ *
+ * The first four are what exports come out as. The spaced ones are what a person writes:
+ * a statement typed or pasted as "Date - Type - Asset - Value" is a table, and refusing
+ * to see it because nobody wrote commas would be pedantry. They are spaced on purpose —
+ * a bare hyphen would split dates and negative numbers.
+ */
+const DELIMITERS_TO_GUESS = [',', ';', '\t', '|', ' - ', ' | ', ' — ']
+
+/**
  * Reads a file's text into columns and rows.
  *
- * The delimiter is detected rather than demanded: exports come out comma-separated,
- * semicolon-separated (anywhere the comma is a decimal point) and tab-separated, and
- * which one a file used is not something anyone should have to say.
+ * The delimiter is detected rather than demanded: which one a file used is not something
+ * anyone should have to say. `delimiter` says it anyway, for the file whose own values
+ * contain whatever it separates with — detection picks whatever splits the file most
+ * consistently, and a description holding a dash can outvote the truth.
  */
-export function parseSourceCsv(rawCsv: string): { columns: string[]; rows: Record<string, string>[] } {
-  const parsed = Papa.parse<Record<string, string>>(fromMarkdownTable(rawCsv), { header: true, skipEmptyLines: true })
+export function parseSourceCsv(rawCsv: string, delimiter?: string): { columns: string[]; rows: Record<string, string>[] } {
+  const parsed = Papa.parse<Record<string, string>>(fromMarkdownTable(rawCsv), {
+    header: true,
+    skipEmptyLines: true,
+    ...(delimiter ? { delimiter } : { delimitersToGuess: DELIMITERS_TO_GUESS }),
+  })
   // "Could not auto-detect a delimiter" is a note, not a failure: a single-column file
   // has no delimiter to find, and the parse is still right.
   const fatal = parsed.errors.filter((error) => error.type !== 'Delimiter')
@@ -160,9 +175,9 @@ export async function flagCrossFileDuplicates(...sourceIds: number[]): Promise<{
 export async function createSourceFile(
   originalFilename: string,
   rawCsv: string,
-  options: { scanDuplicates?: boolean } = {},
+  options: { scanDuplicates?: boolean; delimiter?: string } = {},
 ): Promise<number> {
-  const parsed = parseSourceCsv(rawCsv)
+  const parsed = parseSourceCsv(rawCsv, options.delimiter)
   // A table with a header and nothing under it is not data. Refusing it here is clearer
   // than creating a file that would be retired a moment later for being empty.
   if (parsed.rows.length === 0) throw new Error('This file has a header row and no rows under it.')

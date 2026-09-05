@@ -387,3 +387,29 @@ describe('scanning many files at once', () => {
     expect((await rowsOf(repeated)).map((entry) => entry.row.duplicateOf)).toEqual([undefined, undefined])
   })
 })
+
+describe('text that separates its columns with something other than a comma', () => {
+  beforeEach(async () => { await wipeAllData() })
+
+  it('reads a table written the way a person writes one', async () => {
+    const sourceId = await createSourceFile('resgate.txt', [
+      'Date - Type - Asset - Value - Quantity',
+      '04/02/2026 - resgate - Tesouro Selic 2029 - 1.234,56 - 1',
+      '05/02/2026 - resgate - Tesouro IPCA 2035 - 2.000,00 - 2',
+    ].join('\n'))
+
+    const file = (await sourceFilesTable.get(sourceId))!.data as SourceFile
+    expect(file.originalColumns).toEqual(['Date', 'Type', 'Asset', 'Value', 'Quantity'])
+    expect((await rowsOf(sourceId))[0].row.values).toMatchObject({ Asset: 'Tesouro Selic 2029', Value: '1.234,56' })
+  })
+
+  it('takes the separator it is told, for a file whose values hold the one it uses', async () => {
+    const sourceId = await createSourceFile('resgate.txt', [
+      'Date;Asset;Value',
+      '04/02/2026;Tesouro Selic 2029 - resgate;1.234,56',
+    ].join('\n'), { delimiter: ';' })
+
+    expect(((await sourceFilesTable.get(sourceId))!.data as SourceFile).originalColumns).toEqual(['Date', 'Asset', 'Value'])
+    expect((await rowsOf(sourceId))[0].row.values.Asset).toBe('Tesouro Selic 2029 - resgate')
+  })
+})
