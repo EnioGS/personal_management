@@ -397,43 +397,41 @@ export function IngestionPanel() {
                       {row.duplicateOf ? <span className="text-destructive">duplicate?</span> : ''}
                     </td>
                     {selectedFile.originalColumns.map((column) => (
-                      <td key={column} className="p-0 align-middle">
-                        <EditableCell
-                          value={row.values[column] ?? ''}
-                          disabled={marking}
-                          title={selectedFile.assignments[column] === 'amount' && row.importedAmount !== undefined ? `The file wrote ${row.importedAmount}` : undefined}
-                          onCommit={(value) => void editSourceValue(row, column, value)}
-                        />
-                      </td>
+                      <EditableCell
+                        key={column}
+                        value={row.values[column] ?? ''}
+                        disabled={marking}
+                        title={selectedFile.assignments[column] === 'amount' && row.importedAmount !== undefined ? `The file wrote ${row.importedAmount}` : undefined}
+                        onCommit={(value) => void editSourceValue(row, column, value)}
+                      />
                     ))}
                     {LABEL_COLUMNS.map((column) => {
                       const key = `${row.id}:${column}`
                       const text = drafts[key] ?? labelText(row.labels, column, catalogue)
                       const missing = MEANING_COLUMNS.includes(column as never) ? false : (row.labels[column] ?? []).length === 0
                       return (
-                        <td key={column} className="p-0 align-middle">
-                          <EditableCell
-                            value={text}
-                            disabled={marking}
-                            missing={missing}
-                            validate={(draft) => {
-                              const unknown = readLabelCell(row, column, draft).unknown
-                              return unknown.length > 0 ? `Nothing is called ${unknown.join(', ')}.` : null
-                            }}
-                            onCommit={(value) => {
-                              void editLabel(row, column, value)
-                              // What was typed stays on screen while it names nothing, so the
-                              // mistake is visible; once it resolves, the labels take over.
-                              const unknown = readLabelCell(row, column, value).unknown
-                              setDrafts((current) => {
-                                const next = { ...current }
-                                if (unknown.length > 0) next[key] = value
-                                else delete next[key]
-                                return next
-                              })
-                            }}
-                          />
-                        </td>
+                        <EditableCell
+                          key={column}
+                          value={text}
+                          disabled={marking}
+                          missing={missing}
+                          validate={(draft) => {
+                            const unknown = readLabelCell(row, column, draft).unknown
+                            return unknown.length > 0 ? `Nothing is called ${unknown.join(', ')}.` : null
+                          }}
+                          onCommit={(value) => {
+                            void editLabel(row, column, value)
+                            // What was typed stays on screen while it names nothing, so the
+                            // mistake is visible; once it resolves, the labels take over.
+                            const unknown = readLabelCell(row, column, value).unknown
+                            setDrafts((current) => {
+                              const next = { ...current }
+                              if (unknown.length > 0) next[key] = value
+                              else delete next[key]
+                              return next
+                            })
+                          }}
+                        />
                       )
                     })}
                   </tr>
@@ -479,33 +477,27 @@ export function IngestionPanel() {
                   )}
                 >
                   <td className="text-muted-foreground p-2 font-mono whitespace-nowrap" title="The id every copy of this row shares, fixed for its life.">{row.rowId}</td>
-                  <td className="p-0 align-middle whitespace-nowrap">
-                    <EditableCell
-                      value={row.date ? new Date(row.date).toISOString().slice(0, 10) : ''}
-                      disabled={marking}
-                      onCommit={(value) => void editConfirmed(row, 'date', value)}
-                    />
-                  </td>
-                  <td className="p-0 align-middle tabular-nums">
-                    <EditableCell
-                      value={row.amount === undefined ? '' : String(row.amount)}
-                      disabled={marking}
-                      onCommit={(value) => void editConfirmed(row, 'amount', value)}
-                    />
-                  </td>
+                  <EditableCell
+                    className="whitespace-nowrap"
+                    value={row.date ? new Date(row.date).toISOString().slice(0, 10) : ''}
+                    disabled={marking}
+                    onCommit={(value) => void editConfirmed(row, 'date', value)}
+                  />
+                  <EditableCell
+                    className="tabular-nums"
+                    value={row.amount === undefined ? '' : String(row.amount)}
+                    disabled={marking}
+                    onCommit={(value) => void editConfirmed(row, 'amount', value)}
+                  />
                   {(['category', 'subcategory'] as const).map((column) => (
-                    <td key={column} className="p-0 align-middle">
-                      <EditableCell value={row[column]} disabled={marking} onCommit={(value) => void editConfirmed(row, column, value)} />
-                    </td>
+                    <EditableCell key={column} value={row[column]} disabled={marking} onCommit={(value) => void editConfirmed(row, column, value)} />
                   ))}
-                  <td className="max-w-[28rem] p-0 align-middle">
-                    <EditableCell
-                      value={row.observations}
-                      disabled={marking}
-                      className="truncate"
-                      onCommit={(value) => void editConfirmed(row, 'observations', value)}
-                    />
-                  </td>
+                  <EditableCell
+                    className="max-w-[28rem] truncate"
+                    value={row.observations}
+                    disabled={marking}
+                    onCommit={(value) => void editConfirmed(row, 'observations', value)}
+                  />
                   <td className="text-muted-foreground p-2 whitespace-nowrap">{row.sourceFilename}</td>
                 </tr>
               ))}
