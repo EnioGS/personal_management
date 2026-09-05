@@ -142,6 +142,9 @@ export interface LabelRule {
   rationale?: string
   createdBy: 'user' | 'assistant'
   createdAt: number
+  /** Set when the rule has been rewritten since. It keeps its place in the list. */
+  editedBy?: 'user' | 'assistant'
+  editedAt?: number
 }
 
 /** Append-only trace of user/assistant classification actions. */

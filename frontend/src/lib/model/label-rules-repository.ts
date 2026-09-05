@@ -1,4 +1,5 @@
 import { loadLabelCatalogue } from '@/lib/label-catalogue-source'
+import { refreshLocalStores } from '@/lib/local-store/create-local-list-store'
 import type { LocalRow } from '@/lib/local-store/create-local-table'
 import { withDerivedSections } from './label-catalogue'
 import { resolveConfirmedField, resolveSourceField } from './ingestion-fields'
@@ -15,16 +16,31 @@ export async function listLabelRules(context?: RuleContext): Promise<StoredRule[
 }
 
 export async function saveLabelRule(rule: LabelRule): Promise<number> {
-  return labelRulesTable.add({ createdAt: Date.now(), data: rule })
+  const id = await labelRulesTable.add({ createdAt: Date.now(), data: rule })
+  await refreshLocalStores('labelRules')
+  return id
 }
 
-export async function updateLabelRule(id: number, rule: LabelRule): Promise<void> {
-  await labelRulesTable.update(id, { data: rule })
+/**
+ * Rewrites a rule.
+ *
+ * A standing rule is a sentence about the data — the text it looks for, where it looks,
+ * what it concludes — and any of those can turn out to be slightly wrong: a match too
+ * broad, a label that was right last month, a rationale that no longer says why. Rewriting
+ * keeps the rule where it is, and what it has already labelled stays labelled: a rule
+ * fills blanks, so its past is in the rows, not in itself.
+ */
+export async function updateLabelRule(id: number, rule: LabelRule, editedBy?: 'user' | 'assistant'): Promise<void> {
+  await labelRulesTable.update(id, {
+    data: editedBy ? { ...rule, editedBy, editedAt: Date.now() } : rule,
+  })
+  await refreshLocalStores('labelRules')
 }
 
 /** Removing a rule leaves the rows it labelled exactly as they are; only the standing decision goes. */
 export async function deleteLabelRule(id: number): Promise<void> {
   await labelRulesTable.delete(id)
+  await refreshLocalStores('labelRules')
 }
 
 export interface RuleRunResult {

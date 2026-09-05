@@ -175,5 +175,8 @@ A rule matches a field by substring, or by \`equals\`, \`startsWith\` or \`regex
 name needs one of the latter, since "of" is inside Microsoft. Conditions can be stacked,
 all of which must hold — which is how a rule is narrowed to one file through
 \`source_filename\`. Write a rationale saying why the labels are right for everything
-matching it, and check the standing rules before adding another.
+matching it, and check the standing rules before adding another. A rule that turns out to
+be slightly wrong — a match too broad, a label that was right last month — is rewritten
+with edit_label_rule rather than deleted and replaced: it keeps its place, and what it
+already labelled stays labelled, since a rule fills blanks and its past is in the rows.
 `

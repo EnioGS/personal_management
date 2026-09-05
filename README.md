@@ -258,7 +258,10 @@ Two things it optimizes for:
   all hold, fills only labels a row does not already have, and carries a rationale
   saying why those labels are right for everything matching it. The panel shows the
   rules of a stage only while a table of that stage is open, and the user writes one
-  there through the same validation the assistant's tool applies.
+  there through the same validation the assistant's tool applies. Either of you can
+  rewrite a rule as well — double-click it, or `edit_label_rule` — and it keeps its place
+  and its authorship, recording who went over it; what it already labelled stays
+  labelled, because a rule fills blanks and its past is in the rows.
 - The assistant reads with SQL and writes through a small set of validating tools:
   it assigns columns, sets the sign convention, labels rows one by one or by a
   match, marks and unmarks, and confirms what is ready. Retiring a file along with

@@ -1,5 +1,5 @@
 import type { OpenRouterTool } from '@/lib/openrouter'
-import { applyLabelRulesTool, deleteLabelRuleTool, listLabelRulesTool, saveLabelRuleTool } from './label-rule-tools'
+import { applyLabelRulesTool, deleteLabelRuleTool, editLabelRuleTool, listLabelRulesTool, saveLabelRuleTool } from './label-rule-tools'
 import { readCsvTool } from './read-csv'
 import { readIngestionGuideTool } from './guide-tool'
 import { setConversationTitleTool } from './conversation-tools'
@@ -60,6 +60,7 @@ export const toolRegistry: ToolDefinition[] = [
   dropSourceTableTool,
   listLabelRulesTool,
   saveLabelRuleTool,
+  editLabelRuleTool,
   applyLabelRulesTool,
   deleteLabelRuleTool,
   listClassificationNotesTool,

@@ -38,6 +38,7 @@ describe('findTool', () => {
       'drop_source_table',
       'list_label_rules',
       'save_label_rule',
+      'edit_label_rule',
       'apply_label_rules',
       'delete_label_rule',
       'list_classification_notes',

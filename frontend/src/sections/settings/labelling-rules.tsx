@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Plus, Trash2 } from 'lucide-react'
+import { Pencil, Plus, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { loadLabelCatalogue } from '@/lib/label-catalogue-source'
 import { parsePlacementLabels, resolveAccountLabel, resolveCardLabel, resolveScreenLabel, resolveSectionLabel, withDerivedSections } from '@/lib/model/label-catalogue'
-import { applyLabelRulesToRows, deleteLabelRule, labelRulesWithStats, saveLabelRule } from '@/lib/model/label-rules-repository'
+import { applyLabelRulesToRows, deleteLabelRule, labelRulesWithStats, saveLabelRule, updateLabelRule } from '@/lib/model/label-rules-repository'
 import { useLabelRulesStore } from '@/lib/model/model-stores'
 import type { IngestionRowLabels, LabelRule, RuleContext } from '@/lib/model/types'
 import type { RuleStats, StoredRule } from '@/lib/model/label-rules'
@@ -19,6 +19,8 @@ const MATCH_LABEL: Record<NonNullable<StoredRule['match']>, string> = {
 }
 
 interface Draft {
+  /** Set while an existing rule is being rewritten; absent while one is being written. */
+  id?: number
   name: string
   field: string
   contains: string
@@ -91,10 +93,29 @@ export function LabellingRules({ context }: { context: RuleContext }) {
     await refresh()
   }
 
+  /** Loads a rule into the form, so rewriting one reads as editing rather than retyping. */
+  function edit(rule: StoredRule) {
+    setError(null)
+    setDraft({
+      id: rule.id,
+      name: rule.name ?? '',
+      field: rule.field,
+      contains: rule.contains,
+      match: rule.match ?? 'contains',
+      sections: (rule.labels.sections ?? []).join(', '),
+      screens: (rule.labels.screens ?? []).join(', '),
+      category: rule.labels.category ?? '',
+      subcategory: rule.labels.subcategory ?? '',
+      account: rule.labels.account ?? '',
+      card: rule.labels.card ?? '',
+      rationale: rule.rationale ?? '',
+    })
+  }
+
   /**
-   * Saving a rule by hand. The assistant writes these too, through a tool that validates
-   * the same things — a rule needs a rationale, a usable pattern and labels that name
-   * something, whoever is writing it.
+   * Saving a rule by hand, whether it is new or being rewritten. The assistant writes
+   * these too, through tools that validate the same things — a rule needs a rationale, a
+   * usable pattern and labels that name something, whoever is writing it.
    */
   async function save() {
     if (!draft) return
@@ -127,7 +148,8 @@ export function LabellingRules({ context }: { context: RuleContext }) {
     }, catalogue)
     if (Object.keys(labels).length === 0) { setError('A rule has to set at least one label.'); return }
 
-    await saveLabelRule({
+    const existing = draft.id === undefined ? undefined : withStats.find(({ rule }) => rule.id === draft.id)?.rule
+    const rule: LabelRule = {
       context,
       name: draft.name.trim() || undefined,
       field: draft.field.trim() || 'description',
@@ -135,9 +157,13 @@ export function LabellingRules({ context }: { context: RuleContext }) {
       match: draft.match,
       labels,
       rationale: draft.rationale.trim(),
-      createdBy: 'user',
-      createdAt: Date.now(),
-    } satisfies LabelRule)
+      // A rewritten rule keeps who wrote it and when: the correction is recorded beside
+      // that rather than in place of it.
+      createdBy: existing?.createdBy ?? 'user',
+      createdAt: existing?.createdAt ?? Date.now(),
+    }
+    if (draft.id === undefined) await saveLabelRule(rule)
+    else await updateLabelRule(draft.id, rule, 'user')
     await applyLabelRulesToRows(context, (key) => String(t(key as never)))
     setDraft(null)
     setError(null)
@@ -182,7 +208,7 @@ export function LabellingRules({ context }: { context: RuleContext }) {
           <Input value={draft.rationale} placeholder="why these labels are right for everything matching this" className="h-7 text-xs" onChange={(event) => setDraft({ ...draft, rationale: event.target.value })} />
           {error && <p className="text-destructive">{error}</p>}
           <div className="flex gap-2">
-            <Button type="button" size="xs" onClick={() => void save()}>Save and apply</Button>
+            <Button type="button" size="xs" onClick={() => void save()}>{draft.id === undefined ? 'Save and apply' : 'Save changes and apply'}</Button>
             <Button type="button" size="xs" variant="ghost" onClick={() => { setDraft(null); setError(null) }}>Cancel</Button>
           </div>
         </div>
@@ -198,18 +224,23 @@ export function LabellingRules({ context }: { context: RuleContext }) {
         <div className="divide-y rounded-md border">
           {withStats.map(({ rule, stats }) => (
             <div key={rule.id} className="flex items-start justify-between gap-3 p-3 text-xs">
-              <div className="min-w-0">
+              <div className="min-w-0" onDoubleClick={() => edit(rule)}>
                 <p className="font-medium">{rule.name || rule.contains}</p>
                 <p className="text-muted-foreground">{describeConditions(rule)}</p>
                 <p>{describeLabels(rule)}</p>
                 {rule.rationale && <p className="text-muted-foreground mt-1 italic">{rule.rationale}</p>}
                 <p className="text-muted-foreground mt-1">
-                  {`by ${rule.createdBy} · ${stats.applied} labelled · ${stats.confirmedRespected} kept · ${stats.overridden} overridden`}
+                  {`by ${rule.createdBy}${rule.editedBy ? `, edited by ${rule.editedBy}` : ''} · ${stats.applied} labelled · ${stats.confirmedRespected} kept · ${stats.overridden} overridden`}
                 </p>
               </div>
-              <Button type="button" size="xs" variant="ghost" onClick={() => void remove(rule.id)} aria-label="Delete rule">
-                <Trash2 className="size-3.5" />
-              </Button>
+              <div className="flex shrink-0 gap-1">
+                <Button type="button" size="xs" variant="ghost" onClick={() => edit(rule)} aria-label="Edit rule">
+                  <Pencil className="size-3.5" />
+                </Button>
+                <Button type="button" size="xs" variant="ghost" className="text-destructive" onClick={() => void remove(rule.id)} aria-label="Delete rule">
+                  <Trash2 className="size-3.5" />
+                </Button>
+              </div>
             </div>
           ))}
         </div>

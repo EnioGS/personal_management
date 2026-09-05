@@ -1,6 +1,6 @@
 import { loadLabelCatalogue } from '@/lib/label-catalogue-source'
 import { parsePlacementLabels, resolveAccountLabel, resolveCardLabel, resolveScreenLabel, resolveSectionLabel, withDerivedSections } from '@/lib/model/label-catalogue'
-import { applyLabelRulesToRows, deleteLabelRule, labelRulesWithStats, saveLabelRule } from '@/lib/model/label-rules-repository'
+import { applyLabelRulesToRows, deleteLabelRule, labelRulesWithStats, listLabelRules, saveLabelRule, updateLabelRule } from '@/lib/model/label-rules-repository'
 import type { IngestionRowLabels, LabelRule, RuleContext } from '@/lib/model/types'
 import type { ToolDefinition } from './types'
 
@@ -130,6 +130,84 @@ export const saveLabelRuleTool: ToolDefinition = {
     const ruleId = await saveLabelRule(rule)
     const applied = args.applyNow === false ? null : await applyLabelRulesToRows(stage, context.translate)
     return JSON.stringify({ ruleId, saved: rule, applied })
+  },
+}
+
+export const editLabelRuleTool: ToolDefinition = {
+  name: 'edit_label_rule',
+  description: "Rewrites a standing rule: the text it looks for, the field it looks in, how it matches, the labels it concludes, or the rationale behind it. Use it when a rule turns out to be slightly wrong — a match too broad, a label that was right last month, a rationale that no longer says why — rather than deleting it and writing another: the rule keeps its place and what it has already labelled stays labelled, because a rule fills blanks and its past is in the rows. Pass only what changes; everything else stays. Rewriting a rule the user wrote is theirs to ask for, but keeping your own accurate is yours. It is applied afterwards unless you say otherwise, which fills what the new version now matches without touching a judgement anyone has made.",
+  parameters: {
+    type: 'object',
+    properties: {
+      ruleId: { type: 'number' },
+      name: { type: 'string' },
+      field: { type: 'string' },
+      contains: { type: 'string' },
+      match: { type: 'string', enum: [...MATCH_MODES] },
+      caseSensitive: { type: 'boolean' },
+      sections: { type: 'string' },
+      screens: { type: 'string' },
+      category: { type: 'string' },
+      subcategory: { type: 'string' },
+      account: { type: 'string' },
+      card: { type: 'string' },
+      rationale: { type: 'string' },
+      applyNow: { type: 'boolean' },
+    },
+    required: ['ruleId'],
+    additionalProperties: false,
+  },
+  execute: async (args, context) => {
+    if (typeof args.ruleId !== 'number') return 'Error: ruleId is required.'
+    const existing = (await listLabelRules()).find((rule) => rule.id === args.ruleId)
+    if (!existing) return `Error: no rule has id ${args.ruleId}. Call list_label_rules for the ones that do.`
+
+    const catalogue = await loadLabelCatalogue(context.translate)
+    const text = (field: string) => (typeof args[field] === 'string' ? (args[field] as string) : undefined)
+    const sections = text('sections') === undefined ? undefined : parsePlacementLabels(text('sections')!, (value) => resolveSectionLabel(catalogue, value))
+    const screens = text('screens') === undefined
+      ? undefined
+      : parsePlacementLabels(text('screens')!, (value) => resolveScreenLabel(catalogue, value, sections?.values ?? existing.labels.sections))
+    const account = text('account') ? resolveAccountLabel(catalogue, text('account')!) : undefined
+    const card = text('card') ? resolveCardLabel(catalogue, text('card')!) : undefined
+    const unknown = [
+      ...(sections?.unknown ?? []),
+      ...(screens?.unknown ?? []),
+      ...(text('account') && !account ? [text('account')!] : []),
+      ...(text('card') && !card ? [text('card')!] : []),
+    ]
+    if (unknown.length > 0) return `Error: nothing is called ${unknown.join(', ')}. Call list_label_options for what exists.`
+
+    // Everything not mentioned is the rule as it was: an edit says what changes.
+    const labels: IngestionRowLabels = withDerivedSections({
+      ...existing.labels,
+      ...(sections ? { sections: sections.values } : {}),
+      ...(screens ? { screens: screens.values } : {}),
+      ...(text('category') ? { category: text('category') } : {}),
+      ...(text('subcategory') ? { subcategory: text('subcategory') } : {}),
+      ...(account ? { account } : {}),
+      ...(card ? { card } : {}),
+    }, catalogue)
+
+    const rewritten: LabelRule = {
+      ...existing,
+      name: text('name')?.trim() || existing.name,
+      field: text('field')?.trim() || existing.field,
+      contains: text('contains')?.trim() || existing.contains,
+      match: MATCH_MODES.includes(args.match as never) ? (args.match as LabelRule['match']) : existing.match,
+      caseSensitive: typeof args.caseSensitive === 'boolean' ? args.caseSensitive : existing.caseSensitive,
+      labels,
+      rationale: text('rationale')?.trim() || existing.rationale,
+    }
+    const bad = invalidRegex(rewritten)
+    if (bad) return `Error: ${bad}`
+
+    await updateLabelRule(args.ruleId, rewritten, 'assistant')
+    const applied = args.applyNow === false ? null : await applyLabelRulesToRows(existing.context, context.translate)
+    // Read back rather than echoed: the stamp saying who rewrote it is put on by the
+    // store, and reporting the version that was sent would leave that out.
+    const stored = (await listLabelRules()).find((rule) => rule.id === args.ruleId)
+    return JSON.stringify({ ruleId: args.ruleId, rule: stored, applied })
   },
 }
 

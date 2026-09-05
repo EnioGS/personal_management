@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { wipeAllData } from '@/lib/data-file'
 import { labelRulesTable, sourceRowsTable } from '@/lib/model/model-db'
 import type { LabelRule, SourceRow } from '@/lib/model/types'
-import { applyLabelRulesTool, deleteLabelRuleTool, listLabelRulesTool, saveLabelRuleTool } from './label-rule-tools'
+import { applyLabelRulesTool, deleteLabelRuleTool, editLabelRuleTool, listLabelRulesTool, saveLabelRuleTool } from './label-rule-tools'
 
 const context = { attachments: [], translate: (key: string) => key } as never
 
@@ -66,5 +66,53 @@ describe('standing rules through the assistant', () => {
 
   it('runs the standing rules over waiting rows on its own', async () => {
     expect(JSON.parse(await applyLabelRulesTool.execute({ context: 'source' }, context))).toMatchObject({ rowsTouched: 0 })
+  })
+})
+
+describe('rewriting a rule', () => {
+  beforeEach(async () => { await wipeAllData() })
+
+  async function savedRule() {
+    await saveLabelRuleTool.execute({
+      context: 'source', name: 'Netflix', contains: 'netflix', category: 'assinaturas',
+      rationale: 'A monthly subscription; the name never means anything else.',
+    }, context)
+    return (await labelRulesTable.toArray())[0]
+  }
+
+  it('changes what it was given and keeps everything else, including who wrote it', async () => {
+    const rule = await savedRule()
+
+    const result = JSON.parse(await editLabelRuleTool.execute({ ruleId: rule.id, contains: 'netflix.com', match: 'startsWith' }, context))
+
+    expect(result.rule).toMatchObject({
+      contains: 'netflix.com',
+      match: 'startsWith',
+      name: 'Netflix',
+      labels: { category: 'assinaturas' },
+      createdBy: 'assistant',
+      editedBy: 'assistant',
+    })
+  })
+
+  it('keeps the labels it was not asked about', async () => {
+    const rule = await savedRule()
+
+    await editLabelRuleTool.execute({ ruleId: rule.id, subcategory: 'streaming' }, context)
+
+    expect((await labelRulesTable.get(rule.id))!.data).toMatchObject({
+      labels: { category: 'assinaturas', subcategory: 'streaming' },
+    })
+  })
+
+  it('refuses a pattern that cannot compile, leaving the rule as it was', async () => {
+    const rule = await savedRule()
+
+    expect(await editLabelRuleTool.execute({ ruleId: rule.id, contains: 'net(flix', match: 'regex' }, context)).toContain('not a usable regular expression')
+    expect((await labelRulesTable.get(rule.id))!.data).toMatchObject({ contains: 'netflix' })
+  })
+
+  it('says so when there is no such rule', async () => {
+    expect(await editLabelRuleTool.execute({ ruleId: 999, contains: 'x' }, context)).toContain('no rule has id 999')
   })
 })

@@ -125,6 +125,8 @@ export const SQLITE_SCHEMAS: Record<DataTableKey, SqliteTableSchema> = {
       // Not 'created_at': every table already has one of its own for the stored row, and
       // two columns of one name is not a table SQLite will create.
       { column: 'rule_created_at', key: 'createdAt', type: 'integer' },
+      { column: 'edited_by', key: 'editedBy', type: 'text' },
+      { column: 'edited_at', key: 'editedAt', type: 'integer' },
     ],
   },
   classificationNotes: {
