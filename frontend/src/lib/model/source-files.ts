@@ -14,7 +14,26 @@ import type { ConfirmedRow, IngestionTargetField, SourceFile, SourceRow } from '
 export const SOURCE_FILENAME_COLUMN = 'source_filename'
 
 /** Canonical fields a source column can be assigned to. Placement is a label, not a column. */
-export const ASSIGNABLE_FIELDS: IngestionTargetField[] = ['date', 'value', 'amount', 'price']
+/**
+ * What a file's columns may be assigned to.
+ *
+ * `value` is not offered any more, though files assigned before this still honour it: the
+ * money a row moved is `amount` x `price`, which is one rule for every screen instead of
+ * two. A row that is one of something — a payment, a transfer, a salary — has an amount of
+ * one, and its price is the money. A row that is several of something says how many.
+ */
+export const ASSIGNABLE_FIELDS: IngestionTargetField[] = ['date', 'price', 'amount']
+
+/**
+ * The column holding the money, whatever it was called when the file was assigned.
+ *
+ * Price today, value on a file assigned before the two became one. Everything that reads
+ * money from a file goes through here, so a legacy assignment keeps working and a new one
+ * does not have to know it was ever different.
+ */
+function moneyColumn(file: SourceFile): string | undefined {
+  return columnFor(file, 'price') ?? columnFor(file, 'value')
+}
 
 /** The screen whose rows are holdings rather than money: what it needs assigned differs. */
 const INVESTMENTS_SCREEN = 'investments'
@@ -99,7 +118,7 @@ export function filenameSimilarity(left: string, right: string): number {
 export function rowSignature(values: Record<string, string>, assignments: Record<string, IngestionTargetField>): string {
   const columnOf = (field: IngestionTargetField) => Object.entries(assignments).find(([, target]) => target === field)?.[0]
   const dateColumn = columnOf('date')
-  const valueColumn = columnOf('value')
+  const valueColumn = columnOf('price') ?? columnOf('value')
 
   // The date and the value are read rather than compared as text, so 01/08/2026 and
   // 2026-08-01 are the same day and "1.234,56" is the same money as "1234.56".
@@ -291,7 +310,7 @@ function columnFor(file: SourceFile, field: IngestionTargetField): string | unde
  * observations of every confirmed row.
  */
 export async function rewriteAmounts(sourceId: number, file: SourceFile): Promise<void> {
-  const valueColumn = columnFor(file, 'value')
+  const valueColumn = moneyColumn(file)
   const updates: LocalRow[] = []
   for (const stored of await sourceRowsTable.toArray()) {
     const row = stored.data as SourceRow
@@ -326,7 +345,7 @@ export async function amountShapeOf(sourceId: number) {
   const stored = await sourceFilesTable.get(sourceId)
   if (!stored) throw new Error(`Source file ${sourceId} was not found.`)
   const file = stored.data as SourceFile
-  const valueColumn = columnFor(file, 'value')
+  const valueColumn = moneyColumn(file)
   if (!valueColumn) return { amountColumn: null, shape: null }
   const rows = (await sourceRowsTable.toArray()).map((row) => row.data as SourceRow).filter((row) => row.sourceId === sourceId)
   return { amountColumn: valueColumn, shape: shapeOfAmounts(rows.map((row) => row.values[valueColumn])) }
@@ -373,13 +392,18 @@ export function missingAssignments(row: SourceRow, file: SourceFile, catalogue: 
   if (!columnFor(file, 'date')) {
     missing.push(`Assign one of "${file.originalFilename}"'s columns to date: a row without one is on no dashboard, whatever else it says.`)
   }
-  if (placements.some((placement) => placement.screen !== INVESTMENTS_SCREEN) && !columnFor(file, 'value')) {
-    missing.push(`Assign the column holding the money to value: rows going to ${placements.map((placement) => placement.screen).filter((screen) => screen !== INVESTMENTS_SCREEN).join(', ')} are made of it.`)
+  if (!moneyColumn(file)) {
+    missing.push(`Assign the column holding the money to price: every row is made of it, and a row that is one of something has an amount of one.`)
   }
   if (placements.some((placement) => placement.screen === INVESTMENTS_SCREEN) && !columnFor(file, 'amount')) {
-    missing.push('Assign the column holding how many units were bought or sold to amount: an investment row is a quantity of something, and price is what one unit was worth.')
+    missing.push('Assign the column holding how many units were bought or sold to amount: an investment row is a quantity of something, and price is what one of them cost.')
   }
   return missing
+}
+
+/** Money to the cent; a unit price times a quantity is where the dust comes from. */
+function roundMoney(value: number): number {
+  return Math.round((value + Number.EPSILON) * 100) / 100
 }
 
 /** A row is ready when nothing is missing from it and its labels name somewhere to go. */
@@ -435,7 +459,7 @@ export async function updateSourceValue(rowId: number, column: string, value: st
   if (column === SOURCE_FILENAME_COLUMN) throw new Error('Where a row came from is not editable.')
 
   const file = (await sourceFilesTable.get(row.sourceId))?.data as SourceFile | undefined
-  const isValue = file ? columnFor(file, 'value') === column : false
+  const isValue = file ? moneyColumn(file) === column : false
   await sourceRowsTable.update(rowId, {
     data: { ...row, values: { ...row.values, [column]: value }, importedValue: isValue ? undefined : row.importedValue } satisfies SourceRow,
   })
@@ -521,18 +545,23 @@ export async function confirmSourceRows(sourceId: number, catalogue: LabelCatalo
     if (!isReady(row, file, catalogue)) { result.leftBehind += 1; continue }
     const placements = placementsOf(row.labels, catalogue)
 
-    const value = parseNumberValue(canonicalValue(row, file, 'value'))
+    // The money a row moved is what one of it cost times how many there were. A file that
+    // says nothing about quantity is describing one thing, so its amount is one and the
+    // money is the price itself — which is every movement and every purchase ever made.
+    const price = parseNumberValue(canonicalValue(row, file, 'price') ?? canonicalValue(row, file, 'value'))
+    const units = parseNumberValue(canonicalValue(row, file, 'amount')) ?? 1
+    const value = price === null ? null : roundMoney(price * units)
     const base = {
       rowId: row.rowId,
       confirmedAt,
       date: parseDateValue(canonicalValue(row, file, 'date')) ?? undefined,
       value: value ?? undefined,
       observations: observationsFor(row, file, row.importedValue),
+      amount: units,
+      price: price ?? undefined,
       class: row.labels.class?.trim() || undefined,
       category: row.labels.category?.trim() ?? '',
       subcategory: row.labels.subcategory?.trim() ?? '',
-      amount: parseNumberValue(canonicalValue(row, file, 'amount')) ?? undefined,
-      price: parseNumberValue(canonicalValue(row, file, 'price')) ?? undefined,
       account: row.labels.account?.trim() || undefined,
       card: row.labels.card?.trim() || undefined,
     }

@@ -13,7 +13,7 @@ describe('confirming through the assistant', () => {
   it('knows the accounts the user set up, so a labelled row is not judged unlabelled', async () => {
     await accountsTable.add({ createdAt: 1, data: { name: 'Conta principal', kind: 'checking' } })
     const sourceId = await createSourceFile('nubank.csv', 'Data,Valor\n01/08/2026,-10')
-    await assignSourceColumnsTool.execute({ sourceId, assignments: { Data: 'date', Valor: 'value' } }, context)
+    await assignSourceColumnsTool.execute({ sourceId, assignments: { Data: 'date', Valor: 'price' } }, context)
     const [row] = await sourceRowsTable.toArray()
 
     await setLabelsTool.execute({
@@ -46,7 +46,7 @@ describe('confirming through the assistant', () => {
     const result = JSON.parse(await confirmRowsTool.execute({ sourceId }, context))
 
     expect(result.confirmed).toBe(0)
-    expect(Object.keys(result.blocking).join(' ')).toContain('to value')
+    expect(Object.keys(result.blocking).join(' ')).toContain('to price')
     expect(await confirmedRowsTable.count()).toBe(0)
   })
 })

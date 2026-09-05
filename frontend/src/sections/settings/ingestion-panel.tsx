@@ -9,6 +9,7 @@ import { ColumnSortMenu, type ColumnSort } from '@/components/data-table/column-
 import { useMarkMode } from '@/components/data-table/use-mark-mode'
 import { useProgressiveRows } from '@/components/data-table/use-progressive-rows'
 import { refreshLocalStores } from '@/lib/local-store/create-local-list-store'
+import { INVESTMENTS_SCREEN } from '@/lib/model/investment-rows'
 import type { StoredRow } from '@/lib/local-store/create-local-table'
 import { buildLabelCatalogue } from '@/lib/label-catalogue-source'
 import { queryRows } from '@/lib/model/row-query'
@@ -63,6 +64,19 @@ const LABEL_HINT: Record<LabelColumn, string> = {
 
 const CONFIRMED_COLUMNS = ['row_id', 'section', 'screen', 'date', 'value', 'amount', 'price', 'account', 'card', 'class', 'category', 'subcategory', 'observations'] as const
 
+/**
+ * What the simplified view puts away.
+ *
+ * The observations everywhere: they are the whole file kept verbatim, which is a thing to
+ * consult rather than to read past. And the two numbers only an investment row fills —
+ * elsewhere they are a column of ones and a column repeating the money beside it.
+ */
+function hiddenColumns(simplified: boolean, tableKey: string | null): Set<string> {
+  if (!simplified) return new Set()
+  const investments = tableKey?.endsWith(`/${INVESTMENTS_SCREEN}`) ?? false
+  return new Set(investments ? ['observations'] : ['observations', 'amount', 'price'])
+}
+
 function confirmedTableKey(row: ConfirmedRow): string {
   return `${row.section}/${row.screen}`
 }
@@ -90,6 +104,8 @@ export function IngestionPanel() {
   const [isDropTarget, setIsDropTarget] = useState(false)
   const [sort, setSort] = useState<ColumnSort | null>(null)
   const [filters, setFilters] = useState<ColumnFilter[]>([])
+  // On by default: the columns it hides are the ones most tables have nothing to say in.
+  const [simplified, setSimplified] = useState(true)
   const [amountShape, setAmountShape] = useState<Awaited<ReturnType<typeof amountShapeOf>> | null>(null)
   // What is being typed in a label cell, before it is a label. A value nothing is called
   // is kept here and shown red rather than dropped, so a typo is visible instead of
@@ -127,6 +143,7 @@ export function IngestionPanel() {
   }, [catalogue, confirmedRows])
   const selectedFile = sourceFiles.find((file) => `source:${file.id}` === selected)
   const selectedConfirmed = selected.startsWith('confirmed:') ? selected.slice('confirmed:'.length) : null
+  const hidden = useMemo(() => hiddenColumns(simplified, selectedConfirmed), [simplified, selectedConfirmed])
 
   // A selection that disappears — the last file was confirmed away — must not leave the
   // screen pointing at nothing; the next thing there is is selected instead.
@@ -475,11 +492,16 @@ export function IngestionPanel() {
           markedCount={tableRows.filter((row) => row.markedForElimination).length}
           summary={`${confirmedWindow.shown} of ${confirmedWindow.total} row(s)`}
           onScroll={confirmedWindow.onScroll}
+          actions={
+            <Button type="button" size="xs" variant={simplified ? 'secondary' : 'ghost'} onClick={() => setSimplified(!simplified)}>
+              Simplified view
+            </Button>
+          }
         >
           <table className="w-full text-xs">
             <thead className="sticky top-0">
               <tr className="[&>th]:bg-muted">
-                {CONFIRMED_COLUMNS.map((column) => (
+                {CONFIRMED_COLUMNS.filter((column) => !hidden.has(column)).map((column) => (
                   <th key={column} className="p-2 text-left font-medium">
                     <span className="flex items-center gap-1">
                       <ColumnSortMenu field={confirmedField(column)} label={column} sort={sort} onSort={setSort} />
@@ -494,6 +516,7 @@ export function IngestionPanel() {
                 <ConfirmedRowLine
                   key={row.id}
                   row={row}
+                  hidden={hidden}
                   catalogue={catalogue}
                   marking={marking}
                   rowProps={rowProps}
@@ -633,6 +656,7 @@ const SourceRowLine = memo(function SourceRowLine({
  */
 const ConfirmedRowLine = memo(function ConfirmedRowLine({
   row,
+  hidden,
   catalogue,
   marking,
   rowProps,
@@ -641,6 +665,7 @@ const ConfirmedRowLine = memo(function ConfirmedRowLine({
   onEditPlacement,
 }: {
   row: StoredRow<ConfirmedRow>
+  hidden: Set<string>
   catalogue: LabelCatalogue
   marking: boolean
   rowProps: (toggle: () => void) => { 'data-markable': true; onClick: () => void }
@@ -683,7 +708,7 @@ const ConfirmedRowLine = memo(function ConfirmedRowLine({
       {/* Money, then units, then what a unit was worth: the three numbers a row moves.
           An investment row is the one that fills all three, and it could not be checked
           from here while two of them were only in the export. */}
-      {(['value', 'amount', 'price'] as const).map((column) => (
+      {(['value', 'amount', 'price'] as const).filter((column) => !hidden.has(column)).map((column) => (
         <EditableCell
           key={column}
           className="tabular-nums"
@@ -709,12 +734,14 @@ const ConfirmedRowLine = memo(function ConfirmedRowLine({
       {(['class', 'category', 'subcategory'] as const).map((column) => (
         <EditableCell key={column} value={row[column] ?? ''} disabled={marking} onCommit={(value) => void onEdit(row, column, value)} />
       ))}
-      <EditableCell
-        className="max-w-[28rem] truncate"
-        value={row.observations}
-        disabled={marking}
-        onCommit={(value) => void onEdit(row, 'observations', value)}
-      />
+      {!hidden.has('observations') && (
+        <EditableCell
+          className="max-w-[28rem] truncate"
+          value={row.observations}
+          disabled={marking}
+          onCommit={(value) => void onEdit(row, 'observations', value)}
+        />
+      )}
     </tr>
   )
 })

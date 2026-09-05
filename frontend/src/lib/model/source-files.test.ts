@@ -88,7 +88,7 @@ describe('confirming', () => {
 
   async function readyFile() {
     const sourceId = await createSourceFile('banco-agosto.csv', BANK_CSV)
-    await assignSourceColumns(sourceId, { Data: 'date', Valor: 'value' })
+    await assignSourceColumns(sourceId, { Data: 'date', Valor: 'price' })
     return sourceId
   }
 
@@ -218,7 +218,7 @@ describe('a file with nothing left in it', () => {
 
   it('is retired once its last row has been confirmed', async () => {
     const sourceId = await createSourceFile('one-row.csv', 'Data,Valor\n01/08/2026,-10')
-    await assignSourceColumns(sourceId, { Data: 'date', Valor: 'value' })
+    await assignSourceColumns(sourceId, { Data: 'date', Valor: 'price' })
     const [only] = await rowsOf(sourceId)
     await label(only.id, { sections: ['finances'], screens: ['overview'], category: 'outros', subcategory: 'outros', account: 'Banco A', card: 'Cartão X' })
 
@@ -239,9 +239,9 @@ describe('what counts as a duplicate', () => {
 
   it('is a row that matches one from another file, flagged and nothing more', async () => {
     const august = await createSourceFile('banco-agosto.csv', BANK_CSV)
-    await assignSourceColumns(august, { Data: 'date', Valor: 'value' })
+    await assignSourceColumns(august, { Data: 'date', Valor: 'price' })
     const september = await createSourceFile('banco-setembro.csv', BANK_CSV)
-    await assignSourceColumns(september, { Data: 'date', Valor: 'value' })
+    await assignSourceColumns(september, { Data: 'date', Valor: 'price' })
 
     const flagged = (await rowsOf(september)).filter((entry) => entry.row.duplicateOf)
     expect(flagged).toHaveLength(2)
@@ -250,7 +250,7 @@ describe('what counts as a duplicate', () => {
   })
 
   it('compares everything the row carries, not only the day and the money', () => {
-    const assignments = { Data: 'date', Valor: 'value' } as const
+    const assignments = { Data: 'date', Valor: 'price' } as const
     const row = { Data: '01/08/2026', Valor: '-10,00', Descrição: 'MERCADO' }
 
     // Two transactions of the same size on the same day are not the same transaction.
@@ -305,7 +305,7 @@ describe('a line added by hand, and a cell corrected', () => {
 
   it('re-applies the file\'s sign convention to an amount typed by hand', async () => {
     const sourceId = await createSourceFile('banco-agosto.csv', BANK_CSV)
-    await assignSourceColumns(sourceId, { Valor: 'value' })
+    await assignSourceColumns(sourceId, { Valor: 'price' })
     await setSignConvention(sourceId, { kind: 'invertAll' })
     const [first] = await rowsOf(sourceId)
 
@@ -327,7 +327,7 @@ describe('account and card, as labels', () => {
 
   it('travel with the row into the table it is confirmed to', async () => {
     const sourceId = await createSourceFile('banco-agosto.csv', BANK_CSV)
-    await assignSourceColumns(sourceId, { Data: 'date', Valor: 'value' })
+    await assignSourceColumns(sourceId, { Data: 'date', Valor: 'price' })
     const [first] = await rowsOf(sourceId)
     await label(first.id, {
       sections: ['finances'], screens: ['overview'], category: 'outros', subcategory: 'outros',
@@ -341,7 +341,7 @@ describe('account and card, as labels', () => {
 
   it('hold a row back when it names no account, and let one through with no card', async () => {
     const sourceId = await createSourceFile('banco-agosto.csv', BANK_CSV)
-    await assignSourceColumns(sourceId, { Data: 'date', Valor: 'value' })
+    await assignSourceColumns(sourceId, { Data: 'date', Valor: 'price' })
     const [first, second] = await rowsOf(sourceId)
     await label(first.id, { sections: ['finances'], screens: ['overview'], category: 'outros', subcategory: 'outros' })
     // No card, and that is a complete answer: this row never touched one.
@@ -383,8 +383,8 @@ describe('scanning many files at once', () => {
   it('flags across files in one pass, exactly as scanning them one by one would', async () => {
     const august = await createSourceFile('banco-agosto.csv', BANK_CSV, { scanDuplicates: false })
     const september = await createSourceFile('banco-setembro.csv', BANK_CSV, { scanDuplicates: false })
-    await assignSourceColumns(august, { Data: 'date', Valor: 'value' })
-    await assignSourceColumns(september, { Data: 'date', Valor: 'value' })
+    await assignSourceColumns(august, { Data: 'date', Valor: 'price' })
+    await assignSourceColumns(september, { Data: 'date', Valor: 'price' })
 
     // Nothing was scanned on the way in; one pass settles both files.
     await flagCrossFileDuplicates(august, september)
@@ -395,7 +395,7 @@ describe('scanning many files at once', () => {
 
   it('still compares a row only against other files, however many are scanned together', async () => {
     const repeated = await createSourceFile('repeat.csv', 'Data,Valor\n01/08/2026,10\n01/08/2026,10', { scanDuplicates: false })
-    await assignSourceColumns(repeated, { Data: 'date', Valor: 'value' })
+    await assignSourceColumns(repeated, { Data: 'date', Valor: 'price' })
 
     await flagCrossFileDuplicates(repeated)
 
@@ -440,7 +440,7 @@ describe('what a row claims before anyone has looked at it', () => {
 
   it('and a row confirmed without one arrives with it empty, not with a word nobody chose', async () => {
     const sourceId = await createSourceFile('banco-agosto.csv', BANK_CSV)
-    await assignSourceColumns(sourceId, { Data: 'date', Valor: 'value' })
+    await assignSourceColumns(sourceId, { Data: 'date', Valor: 'price' })
     const [first] = await rowsOf(sourceId)
     await label(first.id, { sections: ['finances'], screens: ['overview'], account: 'Banco A' })
 
@@ -467,8 +467,8 @@ describe('what makes two rows the same row', () => {
       '01/08/2026,POSTO IPIRANGA,"-284,90"',
       '02/08/2026,FARMACIA,"-284,90"',
     ].join('\n'), { scanDuplicates: false })
-    await assignSourceColumns(first, { Data: 'date', Valor: 'value' })
-    await assignSourceColumns(second, { Data: 'date', Valor: 'value' })
+    await assignSourceColumns(first, { Data: 'date', Valor: 'price' })
+    await assignSourceColumns(second, { Data: 'date', Valor: 'price' })
 
     await flagCrossFileDuplicates(first, second)
 
@@ -478,11 +478,48 @@ describe('what makes two rows the same row', () => {
   it('and the same rows in another file are still caught', async () => {
     const first = await createSourceFile('banco-agosto.csv', august, { scanDuplicates: false })
     const again = await createSourceFile('banco-agosto (1).csv', august, { scanDuplicates: false })
-    await assignSourceColumns(first, { Data: 'date', Valor: 'value' })
-    await assignSourceColumns(again, { Data: 'date', Valor: 'value' })
+    await assignSourceColumns(first, { Data: 'date', Valor: 'price' })
+    await assignSourceColumns(again, { Data: 'date', Valor: 'price' })
 
     await flagCrossFileDuplicates(first, again)
 
     expect((await rowsOf(again)).every((entry) => entry.row.duplicateOf)).toBe(true)
+  })
+})
+
+describe('the money a row moved', () => {
+  beforeEach(async () => { await wipeAllData() })
+
+  const investing: LabelCatalogue = {
+    ...catalogue,
+    screens: [...catalogue.screens, { id: 'investments', sectionId: 'finances', label: 'Investimentos' }],
+  }
+
+  async function confirmOne(csv: string, assignments: Record<string, string>, screens: string[], usedCatalogue = catalogue) {
+    const sourceId = await createSourceFile('arquivo.csv', csv)
+    await assignSourceColumns(sourceId, assignments as never)
+    const [row] = await sourceRowsTable.toArray()
+    await sourceRowsTable.update(row.id, {
+      data: { ...(row.data as SourceRow), labels: { sections: ['finances'], screens, account: 'Banco A' } },
+    })
+    await confirmSourceRows(sourceId, usedCatalogue)
+    return (await confirmedRowsTable.toArray()).map((stored) => stored.data as ConfirmedRow)[0]
+  }
+
+  it('is the price when the file counts one of something, which is most rows', async () => {
+    const confirmed = await confirmOne('Data,Valor\n01/08/2026,"-284,90"', { Data: 'date', Valor: 'price' }, ['overview'])
+
+    expect(confirmed).toMatchObject({ value: -284.9, price: -284.9, amount: 1 })
+  })
+
+  it('is the price times the quantity when the file says how many', async () => {
+    const confirmed = await confirmOne(
+      'Data,Quantidade,Preco\n01/08/2026,3,"-50,25"',
+      { Data: 'date', Quantidade: 'amount', Preco: 'price' },
+      ['investments'],
+      investing,
+    )
+
+    expect(confirmed).toMatchObject({ value: -150.75, price: -50.25, amount: 3 })
   })
 })

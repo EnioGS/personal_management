@@ -45,6 +45,18 @@ into `class`, moves an `asset` into an empty `subcategory`, drops the three
 fields, and clears any file assignment pointing at a target that no longer
 exists.
 
+**The money a row moved is `amount` x `price`, on every screen.** `value` is no
+longer offered as an assignment — a file assigned before this still honours it —
+because two rules for money was one too many: a row that is one of something has
+an amount of one and a price that is the money, which is every payment and
+transfer ever made, and a row that is several says how many. Every screen now
+requires a date and a price; Investments requires an amount as well. `value`
+stays on the confirmed row as the product, so nothing that reads money changed.
+
+**Every column a file wrote reaches the observations**, empty cells included: a
+blank under a named column says the file had nothing to say there, which is
+itself something the file said. A column with no name is not a column.
+
 ## Consequences
 
 - A `.db` written by any earlier version still opens: the importer selects NULL
