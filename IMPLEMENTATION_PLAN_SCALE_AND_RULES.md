@@ -500,6 +500,8 @@ Phases 0–8 are done and on `main`. What landed, in the order the plan asked fo
 - Q6's reserved words — `assinatura`, `membership`, `parcelado` and their equivalents are
   now read by the Recurring screen, which treats such a row as recurring from its first
   month while everything else still has to repeat.
+- Q2's *"lets add to all confirmed tables one column named `row_id`"* — the id was in the
+  data and in SQL but nowhere on screen. Both tables now show it.
 - §5.1/§5.3's *"distinct and easy to recognise names"* — the exported `.db` now carries a
   named view per uploaded file and per confirmed table, with the file's own columns as
   real columns. Storage stays one Dexie store per kind (a store per file would mean a

@@ -50,7 +50,7 @@ const LABEL_HINT: Record<LabelColumn, string> = {
   subcategory: 'free text',
 }
 
-const CONFIRMED_COLUMNS = ['date', 'amount', 'category', 'subcategory', 'observations', 'source_filename'] as const
+const CONFIRMED_COLUMNS = ['row_id', 'date', 'amount', 'category', 'subcategory', 'observations', 'source_filename'] as const
 
 function confirmedTableKey(row: ConfirmedRow): string {
   return `${row.section}/${row.screen}`
@@ -316,6 +316,7 @@ export function IngestionPanel() {
             <thead className="bg-muted/60 sticky top-0">
               <tr>
                 <th className="p-2 text-left font-medium">{SOURCE_FILENAME_COLUMN}</th>
+                <th className="p-2 text-left font-medium">row_id</th>
                 <th className="p-2 text-left font-medium">duplicate?</th>
                 {selectedFile.originalColumns.map((column) => (
                   <th key={column} className="p-2 text-left font-medium">
@@ -363,6 +364,7 @@ export function IngestionPanel() {
                     )}
                   >
                     <td className="text-muted-foreground p-2 whitespace-nowrap" title={errors.join(' ')}>{row.values[SOURCE_FILENAME_COLUMN]}</td>
+                    <td className="text-muted-foreground p-2 font-mono whitespace-nowrap" title="Fixed at import; every copy this row is confirmed into keeps it.">{row.rowId}</td>
                     <td className="p-2 whitespace-nowrap" title={row.duplicateOf ? `Matches ${row.duplicateOf}, which came from another file.` : undefined}>
                       {row.duplicateOf ? <span className="text-destructive">duplicate?</span> : ''}
                     </td>
@@ -416,8 +418,8 @@ export function IngestionPanel() {
                   <th key={column} className="p-2 text-left font-medium">
                     <span className="flex items-center gap-1">
                       {column}
-                      <ColumnSortMenu field={column === 'source_filename' ? 'sourceFilename' : column} label={column} sort={sort} onSort={setSort} />
-                      <ColumnFilterMenu field={column === 'source_filename' ? 'sourceFilename' : column} label={column} filters={filters} onChange={setFilters} />
+                      <ColumnSortMenu field={confirmedField(column)} label={column} sort={sort} onSort={setSort} />
+                      <ColumnFilterMenu field={confirmedField(column)} label={column} filters={filters} onChange={setFilters} />
                     </span>
                   </th>
                 ))}
@@ -434,6 +436,7 @@ export function IngestionPanel() {
                     row.markedForElimination && 'bg-destructive/10 line-through',
                   )}
                 >
+                  <td className="text-muted-foreground p-2 font-mono whitespace-nowrap" title="The id every copy of this row shares, fixed for its life.">{row.rowId}</td>
                   <td className="p-2 whitespace-nowrap">{row.date ? new Date(row.date).toISOString().slice(0, 10) : ''}</td>
                   <td className="p-2 text-right tabular-nums">{row.amount ?? ''}</td>
                   {(['category', 'subcategory'] as const).map((column) => (
@@ -470,8 +473,16 @@ function stripStored<T>(row: StoredRow<T>): T {
   return rest as T
 }
 
+/** The confirmed columns are shown snake_case, the way SQL sees them; sorting reads the stored field. */
+function confirmedField(column: string): string {
+  if (column === 'source_filename') return 'sourceFilename'
+  if (column === 'row_id') return 'rowId'
+  return column
+}
+
 function sourceCellValue(row: StoredRow<SourceRow>, field: string, catalogue: LabelCatalogue): unknown {
   if ((LABEL_COLUMNS as readonly string[]).includes(field)) return labelText(row.labels, field as LabelColumn, catalogue)
   if (field === SOURCE_FILENAME_COLUMN) return row.values[SOURCE_FILENAME_COLUMN]
+  if (field === 'row_id') return row.rowId
   return row.values[field]
 }
