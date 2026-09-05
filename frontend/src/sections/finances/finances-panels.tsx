@@ -30,6 +30,11 @@ import { FinanceTableDrawer } from './finance-table-drawer'
 const currency = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
 /** Changes sit under the number in a quarter of its space: R$ 1,2 mil reads at a glance where the cents do not. */
 const compactCurrency = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', notation: 'compact', maximumFractionDigits: 1 })
+/** The screens the Movements dashboard reads. Spending rows are copies of movements. */
+const MOVEMENTS_SCREEN = 'movements'
+const SPENDING_SCREEN = 'spending'
+const INVESTMENTS_SCREEN = 'investments'
+
 /** A comparison names the month it compares against, and four months apart the year is never in doubt. */
 const shortMonth = new Intl.DateTimeFormat('pt-BR', { month: 'short', timeZone: 'UTC' })
 
