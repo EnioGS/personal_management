@@ -48,329 +48,365 @@
 >
 > This questions phase is important to prevent later on, when you finish, having to finetune and adjust small things here and there
 
+
+## 1b. Clarifications and additions, verbatim
+
+> What does "SQL against the .db" mean at runtime? here I was imprecise. I dont mean that we should implement sqlite for the runtime. it should remain as only the exporting file format. I meant to allow the agent to send direct sql queries to the database on the browser
+>
+> Q2 — Where does a confirmed row live, when screens are multi-valued? for lines with multiple tables, lets duplicate the rows and put that same row into their specific tables. lets add to all confirmed tables one column named 'row_id' which is a hash id that should be different for all rows, but be the same for rows that have been duplicated. this is true for rows belonging to two icons in two or more options, and rows in the same icons but two or more options (and of course rows that belong to one icon and one option. the hash is generated for those too just in case later we duplicated them.
+>
+> Q3 — Is destination table still a label? I dont get it... the values in labels 1 and 2 decide to which label they belong to, right?
+>
+> Q4 — Card files invert the sign. this is more important that I thought. a simple per source sign convention is not enough because later in another credit card we might have exported files that dont follow this convention. I think we should allow the model, per source file, using the context provided by its filename and the general descriptions of all transactions on all lines, allowing the model to query for each confirmed table a big sample of the values there, so it can itself decide if it should alter the sign of all values of a column based on the reference we adopt on the current 'accepted' tables (the same is true not just for credit cards)
+> we should include all of this on the description and instructions it has for this phase
+> also, we should add to the description for the adopted references for each table, and, and instruct it for if we do not provide the reference for the table it needs, to sample the table and find out. actuially the instructions should instruct it to sample the table regardless
+>
+> But this question opened my eyes to something more importtant: we should make it follow an order for labeling after assigning columns:
+> 1 - assign the columns
+> 2 - label label 1
+> 3 - then label 2
+> 4 - then decide the signal of the values based on the tables it is going to be put in.
+> One other thing that should be inputed as description is that: the current source file can use multiple conventions for signed values and we should adapt them to our own by changing the signs of the values provided. the change made can be a global change, inverting all signs, this is mainly for data that follow the oposite convention, but is clearly using a convention for the sign, and we can selectively change the signs of some values in the case of a source file that uses only positive or negative values, and in another column or somewhere else, lists a per line 'buy/sell' or a per line 'received/sent' anything equivalent. if you are not sure after consulting all outside information, ask the user for help
+>
+> Q5 — Transfers. I dont get it. savings transfers do move capital. they move capital from the bank checkings account to the savings. if I got what you meant: the capital evolution measurements address this by adding all the money from the bank account including the money sent to the savings account to the money in the savings account. I decided to exclude label 3 (which from what I remember is where this transfers came from) because labeling one thing transfer would make it invisible, which is dangerous. in other words: if anything leaves an account, it counts as negative money, which can be compensated later by the income on another account equal to what left on the other. here is a key design decision: leaving things invisible by default is dangerous
+>
+> Q6 — Recurring, with no recurrence label. this will be better addressed later, but it is a combination of A and B. assinatura, membership, parcelado and similars are to be protected words for the labels, and we also are going to try to predict future expenses based on how frequently they happened
+>
+> Q7 — Does a confirmed row leave its source table? A, it moves. but dont forget that all unasiggned columns that are originally from the source files are condensed to one column with the contents of all the other cells on that line, as I previously observed
+>
+> Q8 — Export format. B
+>
+> Q9 — Deleting a confirmed row. I think I specified this: flagging it for elimination is the behaviour, both users and assistants can do that. but user can delete (permanently) the rows marked for elimination
+>
+> Q10 — May the assistant confirm rows? it can freely do that. although we should still keep two different buttons for two operations (the user can do both, but the second one, that discards things should instruct the agent to ask for permission):
+> 1 - non destructive: equivalent in spirit to our current 'import new values'
+> 2 - destructive: Import and discard
+>
+> Also, I remember we added logic for automatic duplicate flagging: keep it, but make sure that this part of the code takes into consideration that one line can only be duplicate if either:
+> it has the same values as another one from a different source file (since multiple transactions on the same file reported by the bank are to be taken as 2 different transactions
+> or if a source file with name very similar to one already currently imported is uploaded. (similar because files with the names for example Nubank_2026-09-08 (1).csv and Nubank_2026-09-08.csv are duplicates. so exact source file name are likely duplicates, and files that share a significantly big common substring are also likely duplicates (Calculating 'significantly big' in proportion to the smaller source filename)
+>
+> also: I forgot to say: users and agents can mark rows for deletion but they can also unmark them.
+
 ## 2. What changes, in one page
 
 **The label set shrinks from seven to four.** Flow role, settlement channel, spending
-treatment and recurrence are removed. Direction comes from the sign of the amount.
-What remains is two *placement* labels, validated against the app itself, and two
-*meaning* labels, free text:
+treatment and recurrence are gone. Nothing is ever made invisible by a label: money that
+leaves an account counts as leaving, and the arrival on the other side counts as
+arriving. What remains is two *placement* labels, validated against the app itself, and
+two *meaning* labels, free text:
 
 | Label | Values | Required | Notes |
 | --- | --- | --- | --- |
-| Section | many, free text, validated globally | yes | the app's sections |
-| Screen | many, free text, validated **within the chosen sections** | yes | what each section offers |
-| Category | one, free text, no validation | defaults to `outros` | the generic bucket |
-| Subcategory | one, free text, no validation | defaults to `outros` | the detail under it |
+| Section | many, free text, validated globally | yes, starts NULL | the app's sections |
+| Screen | many, free text, validated **within the row's sections** | yes, starts NULL | local to the section |
+| Category | one, free text, unvalidated | defaults to `outros` | the generic bucket |
+| Subcategory | one, free text, unvalidated | defaults to `outros` | the detail under it |
 
-**Ingestion stops having two phases.** A file is loaded as its own table, carrying its
-own columns plus `source_filename` on the left and the four label columns on the right.
-Assignment and labelling happen there, together. The "Imported, unlabelled" pool
-disappears; a row leaves its source table only when it is confirmed.
+**Direction comes from the sign of the amount**, and making the file's sign convention
+agree with ours is an explicit, reasoned step in the import — not a guess.
 
-**Rules gain a context.** Rules for source tables run during import; rules for confirmed
-tables run over confirmed rows. A rule is never bound to one table — it may be *narrowed*
-by the labels a row carries. Rules gain column-scoped conditions and regex.
+**Ingestion stops having two phases.** A file loads as its own table carrying
+`source_filename`, its own columns, and the four label columns. Assignment and labelling
+happen there. "Imported, unlabelled" disappears.
 
-**Deleting is nobody's power, marking is everybody's.** Both the user and the assistant
-mark rows for elimination; only the user presses *Delete marked lines*. Marking is a
-property of every table, not a button in one column.
+**Confirming duplicates a row into every table it belongs to**, joined by a shared
+`row_id`, and the row leaves its source table with its unassigned columns condensed into
+one description column.
 
-**Storage becomes queryable.** Each uploaded file is its own table in the browser
-database, named after the file, and the assistant reads the vault through SQL instead of
-through a growing catalogue of bespoke read tools.
+**Rules gain a context** (source or confirmed), column-scoped conditions and regex, and
+can pre-fill labels at import.
 
-Every phase below starts with the same preamble and ends with tests. Phases are ordered
-so the app is runnable at every commit.
+**Marking for elimination is everybody's; deleting is the user's.** Both mark and unmark;
+only the user removes what is marked, permanently.
+
+**The assistant reads the browser database with SQL**, and writes only through validated
+functions.
+
+Every phase starts with the same preamble and ends with tests. Phases are ordered so the
+app runs at every commit.
 
 ---
 
 ## Phase 0 — decisions and groundwork
 
 **Before starting: commit outstanding work; read this whole phase; re-read the verbatim
-request above; if something it asks for belongs here and is missing, add it here first.**
+request and clarifications above; if something they ask for belongs here and is missing,
+add it here first.**
 
-1. Answer the open questions in section 4. Nothing below is built until they are settled,
-   because several phases change shape depending on the answers.
-2. Record the outcome as `adr/0032-one-phase-ingestion-and-four-labels.md`, superseding
-   the relevant parts of adr/0030 and adr/0031 (rename those to `-SUPERSEDED-` where the
-   whole decision is replaced, not merely refined).
-3. Take a full export (`.db`) of the current vault as a fixture, so migrations can be
-   tested against real data rather than invented rows.
+1. Settle the open questions in section 4.
+2. Record `adr/0032-one-phase-ingestion-and-four-labels.md`, superseding adr/0030 and
+   adr/0031 where the decision is replaced rather than refined, and stating the design
+   principle behind the removals: **nothing is made invisible by a label**.
+3. Export the current vault as a `.db` fixture, so migrations are tested against real
+   data.
 
-**Test:** the suite, lint, typecheck and build pass unchanged — this phase writes no code.
+**Test:** suite, lint, typecheck, build unchanged — this phase writes no code.
 
 ---
 
 ## Phase 1 — the four-label model
 
-**Before starting: commit; read the whole phase; re-read the verbatim request; fold in
-anything of it that belongs here and is missing.**
+**Before starting: commit; read the whole phase; re-read the verbatim request and
+clarifications; fold in anything of them that belongs here and is missing.**
 
 ### 1.1 Types and vocabulary
-- `IngestionRowLabels` and `EntryLabels` become `{ sections: string[]; screens: string[];
-  category: string; subcategory: string }`. Note the rename from `subsections` to
-  `screens`, which is what everything already calls them in prose.
-- Delete `FlowRole`, `SettlementChannel`, `SpendingTreatment`, `RecurrenceLabel` and
-  their entries in `label-vocabulary.ts`. That file then holds nothing but helpers; fold
-  what survives into `label-catalogue.ts` and delete it.
-- `categoryId` (a foreign key into `categories`) becomes a plain string on the row.
-  The `categories` store is then unused — remove it, its Dexie store, its export table
-  and `category-vocabulary.ts`.
+- `IngestionRowLabels` / `EntryLabels` become
+  `{ sections: string[]; screens: string[]; category: string; subcategory: string }`.
+- Delete `FlowRole`, `SettlementChannel`, `SpendingTreatment`, `RecurrenceLabel` and the
+  whole of `label-vocabulary.ts`; what survives moves into `label-catalogue.ts`.
+- `categoryId` becomes the plain string `category`. The `categories` store, its Dexie
+  table, its export table and `category-vocabulary.ts` are removed.
+- Reserved subcategory words — `assinatura`, `membership`, `parcelado` and their
+  synonyms — live in one exported list, used by the Recurring screen and stated in the
+  guide. (Frequency-based prediction is deliberately out of scope here.)
 
 ### 1.2 Validation
-- Required: at least one section, at least one screen, and every named value must exist
-  in the catalogue. Category and subcategory are never invalid and never empty (they
-  default to `outros`).
-- Screens are validated **within the row's sections**: a screen that exists only under a
-  section the row does not name is an error, with a message that says so.
-- Delete the conditional spending rules entirely.
+- Required: at least one section and one screen, every value known to the catalogue.
+- A screen is validated **within the row's sections**: a screen that exists only under a
+  section the row does not name is an error naming both.
+- Category and subcategory are never invalid and never blank; they default to `outros`.
 
-### 1.3 Direction from the amount
-- A new `lib/model/row-direction.ts`: `directionOf(amount, convention)` where the
-  convention is per source table (see Q4). Default: negative is outflow.
-- Everything that consumed `flowRole` reads this instead.
+### 1.3 Direction and sign
+- `directionOf(amount)`: negative leaves, positive arrives. No flow role, no exceptions.
+- Capital is the sum of signed amounts across every confirmed row: a transfer out of
+  checking is negative there and positive in savings, and nets to zero by arithmetic
+  rather than by being hidden.
 
 ### 1.4 Dashboards
-- `FilteredEntry` loses `flowRole` and `spendingTreatment`, keeps `screens`, gains
-  `category`/`subcategory`.
-- Capital evolution: sum signed amounts of rows not on the investments screen, cards
-  excluded as today. Transfers are handled per Q5.
-- Spending: rows on the spending screen; a negative amount is a refund and subtracts.
-- Recurring: the detector loses its `recurrence === 'recurring'` shortcut and returns to
-  pattern detection alone (see Q6).
-- Investments: unchanged except for label names.
+- `FilteredEntry` loses `flowRole`, `spendingTreatment`, `recurrence`; keeps `screens`;
+  gains `category` and `subcategory`.
+- Spending: rows on a spending screen; negative amounts subtract as refunds.
+- Recurring: pattern detection plus the reserved words.
+- Investments: unchanged apart from label names.
 
 ### 1.5 Migration
-- Dexie version bump: rewrite stored `IngestionRow.labels` and `entryLabels` into the new
-  shape — keep sections/screens, map `categoryId` to the category's name, set
-  subcategory to `outros`, drop the removed fields.
-- Export version bump with an upgrade path from the current version.
+- Dexie and export version bumps rewriting stored labels into the new shape: keep
+  sections and screens, resolve `categoryId` to its name, set subcategory to `outros`,
+  drop the removed fields.
 
-**Test:** unit tests for the new validation (including a screen valid only under another
-section), `directionOf` across both conventions, the migration against the Phase 0
-fixture, and updated dashboard tests. Full suite, lint, typecheck, build.
+**Test:** validation (including a screen valid only under another section), `directionOf`,
+capital netting across two accounts, the migration against the Phase 0 fixture, updated
+dashboard tests.
 
 ---
 
 ## Phase 2 — one table per source file
 
-**Before starting: commit; read the whole phase; re-read the verbatim request; fold in
-anything of it that belongs here and is missing.**
+**Before starting: commit; read the whole phase; re-read the verbatim request and
+clarifications; fold in anything of them that belongs here and is missing.**
 
 ### 2.1 Storage
-- Each uploaded file becomes a Dexie table named `source__<slug of filename>__<n>`,
-  created at upload (Dexie needs a version bump per new store — use a single dynamic
-  store keyed by source id if that proves unworkable; decide during implementation and
-  record why).
-- Each row holds: `source_filename`, every original column verbatim, the four label
-  columns, and its own state (`marked_for_elimination`, `confirmed_at`, `rule_ids`).
-- Assignment metadata (which original column means date, amount, …) stays with the
-  source record, not on the rows.
+- Every uploaded file becomes its own table in the browser database, named recognisably
+  after the file (`source__nubank_2026_09_08__3`).
+- A row holds: `row_id` (stable, unique, shared by copies made at confirmation),
+  `source_filename`, every original column verbatim, the four label columns, and its own
+  state (`marked_for_elimination`, `duplicate_of`, `rule_ids`).
+- Assignment lives on the source record, not the rows.
 
 ### 2.2 The screen
-- The ingestion centre lists source tables and confirmed tables in one selector; the
-  "Imported, unlabelled" entry is gone, and so is its dataset.
-- A source table renders: `source_filename`, the original columns with their assignment
-  cell above each, then the four label columns. Only original columns offer an
-  assignment; `source_filename` and the label columns are not assignable.
-- Labels are edited in place, exactly as the worklist does today, with red cells for a
-  value the catalogue does not have.
+- One selector lists source tables and confirmed tables; the unlabelled pool is gone.
+- A source table renders `source_filename`, the original columns each with an assignment
+  cell above it, then the four label columns. **Only original columns are assignable** —
+  never `source_filename`, never a label column.
+- Labels are edited in place, invalid values shown red at typing time.
 
 ### 2.3 Confirming
-- One action per source table: confirm the rows whose required labels are complete. They
-  are written into the confirmed table their labels select (Q3), and leave the source
-  table (Q7).
-- `description` is not stored: the confirmed view composes it from every unassigned
-  column of the source row, `source_filename` included, in a compact JSON-like form.
+- Two actions, both available to user and assistant, mirroring today's pair:
+  **Import new values** (non-destructive: confirms what is ready, leaves the rest) and
+  **Import and discard** (destructive: also drops what is marked, and retires the file).
+  The assistant may run the first freely and must ask before the second.
+- A confirmed row is written into **one table per (section, screen) pair it names**, each
+  copy carrying the same `row_id`. Copies are independent after confirmation; `row_id`
+  is what relates them.
+- The row leaves its source table.
+- `description` is composed at confirmation from every unassigned original column plus
+  `source_filename`, in a compact JSON-like form, and stored as one column.
 
-### 2.4 Removals
-- Delete the staged-row model (`ingestionRows` as a pool), `stage`/`promote` as separate
-  steps, the `duplicate?`/`ready` source marks that no longer apply, and every screen
-  and tool that only served the two-phase flow.
+### 2.4 Duplicate flagging, narrowed
+- A row may be flagged a duplicate only when it matches a row **from a different source
+  file** — two identical rows inside one file are two real transactions.
+- A newly uploaded file whose name is the same as, or shares a long common substring
+  with, an already-imported one (measured against the shorter name) is flagged as a
+  likely repeat of that file, and its rows are compared against it first.
+- Marks remain advisory: they never remove anything by themselves.
 
-**Test:** upload → assign → label → confirm, end to end, against the sample files in
-`samples/`. Confirm that an unassigned column reaches the confirmed description, that
-label columns cannot be assigned, and that a partially labelled row is not confirmable.
-
----
-
-## Phase 3 — SQL over the vault
-
-**Before starting: commit; read the whole phase; re-read the verbatim request; fold in
-anything of it that belongs here and is missing.**
-
-- `lib/sql/query-vault.ts`: builds an in-memory SQLite (sql.js, already a dependency)
-  from the Dexie stores on demand, runs a **read-only** statement, returns rows plus the
-  columns and a row count. Rebuilt per call from live data; cached only within one call.
-- One tool, `query_vault`, replacing the bespoke readers (`read_ingestion_table`,
-  `query_ingestion_rows`, `count_ingestion_rows`, `group_ingestion_rows`,
-  `list_ingestion_datasets`, `read_ingestion_provenance`, `find_ingestion_duplicates`).
-  Its description carries the schema, the table naming convention, and the rule that
-  only `SELECT` runs.
-- Writes stay in typed functions, because they validate: labelling, marking, confirming,
-  rules. Nothing writes through SQL (Q1).
-- Dropping a table is allowed only for a source table with no rows (5.4); a `DROP` is
-  refused otherwise, and never touches a confirmed table.
-- Export/import: the `.db` gains the source tables under their real names, and the
-  importer restores them; the exporter stops flattening everything into fixed stores
-  (Q8).
-
-**Test:** a query returning rows, a rejected write, a rejected drop of a non-empty table,
-an accepted drop of an empty one, and an export/import round trip that preserves source
-tables, labels, rules and settings.
+**Test:** upload → assign → label → confirm end to end over `samples/`; a row on two
+screens producing two copies with one `row_id`; unassigned columns reaching the
+description; identical rows within one file not flagged; a near-identical filename
+flagged.
 
 ---
 
-## Phase 4 — rules with a context
+## Phase 3 — making the file's signs agree with ours
 
-**Before starting: commit; read the whole phase; re-read the verbatim request; fold in
-anything of it that belongs here and is missing.**
+**Before starting: commit; read the whole phase; re-read the verbatim request and
+clarifications; fold in anything of them that belongs here and is missing.**
 
-- `LabelRule` gains `context: 'source' | 'confirmed'` and keeps `where` conditions, each
-  with `field`, `match: contains | equals | startsWith | regex`, and `caseSensitive`.
-- Source rules run at upload, so a row can *start* with sections and screens already set
-  rather than NULL (requirement 3). Confirmed rules run over confirmed rows on demand.
-- A rule is never bound to one table; narrowing is done with conditions on labels
-  (`screens contains investments`).
-- Regex is compiled once, guarded by try/catch, and reported as invalid at save time
-  rather than at match time.
-- The rules panel shows only the rules of the context currently selected, and nothing
-  when the selection has no context.
-- Rule statistics keep their current meaning: a rule may claim a row only where the user
-  confirmed it with the rule's labels intact.
+### 3.1 The order of work
+The import has an order, stated in the guide and in the tool descriptions, and the tools
+report where a source is in it:
+1. assign the columns;
+2. label the sections;
+3. label the screens;
+4. **only then** decide the sign, because the decision depends on the tables the rows are
+   going to.
+
+### 3.2 The decision
+- The reference convention of each confirmed table is recorded and readable, and the
+  assistant is told to **sample the destination table regardless** — a stated reference is
+  a shortcut, not a substitute for looking.
+- Two transformations are supported, stored on the source and applied when rows are
+  confirmed, leaving the original column untouched:
+  - **invert everything**, for a file that uses the opposite convention consistently;
+  - **invert by condition**, for a file whose values are all one sign and whose direction
+    lives in another column (`buy`/`sell`, `received`/`sent`, `debit`/`credit`).
+- The source table shows both the original value and the resulting signed amount, so the
+  transformation is visible rather than implied.
+- When the evidence is inconclusive, the assistant asks the user rather than guessing;
+  this is stated in the tool description and the guide.
+
+**Test:** a card file inverted globally; a file with a `buy/sell` column inverted
+conditionally; the original column unchanged in both; the ordering reported correctly;
+a sampling call returning what a table's existing signs look like.
+
+---
+
+## Phase 4 — SQL over the browser database
+
+**Before starting: commit; read the whole phase; re-read the verbatim request and
+clarifications; fold in anything of them that belongs here and is missing.**
+
+- Runtime storage stays Dexie/IndexedDB. SQLite remains the export format only.
+- `query_vault` builds an in-memory SQLite from the live Dexie stores per call, runs one
+  **read-only** statement, and returns columns, rows and a count. Its description carries
+  the schema, the table naming convention, and the sampling guidance from Phase 3.
+- It replaces `read_ingestion_table`, `query_ingestion_rows`, `count_ingestion_rows`,
+  `group_ingestion_rows`, `list_ingestion_datasets`, `read_ingestion_provenance` and
+  `find_ingestion_duplicates`, which are deleted.
+- Writes stay in typed functions, because they validate. `drop_source_table` removes an
+  **empty source table** only, and never a confirmed one.
+
+**Test:** a select returning rows; a rejected write; a rejected drop of a non-empty or
+confirmed table; an accepted drop of an empty source table.
+
+---
+
+## Phase 5 — rules with a context
+
+**Before starting: commit; read the whole phase; re-read the verbatim request and
+clarifications; fold in anything of them that belongs here and is missing.**
+
+- `LabelRule` gains `context: 'source' | 'confirmed'`; conditions keep `field`,
+  `caseSensitive` and gain `match: contains | equals | startsWith | regex`.
+- Source rules run at upload so rows can *start* labelled rather than NULL; confirmed
+  rules run over confirmed rows on demand.
+- No rule is bound to one table: narrowing is done with conditions on labels.
+- Regex is validated at save time, never at match time.
+- The rules panel shows only the rules of the selected context, and nothing when the
+  selection has none.
+- Attribution keeps its meaning: a rule claims a row only where it was confirmed with the
+  rule's own labels intact.
 
 **Test:** a source rule pre-filling labels at upload; a confirmed rule narrowed by
 labels; an invalid regex refused at save; the panel showing the right set per selection.
 
 ---
 
-## Phase 5 — marking for elimination, everywhere
+## Phase 6 — marking for elimination, everywhere
 
-**Before starting: commit; read the whole phase; re-read the verbatim request; fold in
-anything of it that belongs here and is missing.**
+**Before starting: commit; read the whole phase; re-read the verbatim request and
+clarifications; fold in anything of them that belongs here and is missing.**
 
-- A reusable table behaviour: a *Mark for elimination* checkbox above every table. While
-  it is on, clicking a row toggles its mark; clicking anything that is not a row turns it
-  off. Marked rows are visibly distinct.
-- `Delete marked lines` is a button only the user has. It removes the marked rows from a
-  source table; in a confirmed table it flags them deleted rather than erasing them (Q9).
-- The assistant's `mark_rows` matches the user's power exactly, and no tool deletes.
-- Remove the per-row `eliminate` link and the `discard`/`restore` vocabulary that this
-  replaces.
+- A reusable table behaviour, on **every** table: a *Mark for elimination* checkbox above
+  it. While on, clicking a row toggles its mark — marking and unmarking alike; clicking
+  anything that is not a row turns the mode off. Marked rows are visibly distinct.
+- **Delete marked lines** is the user's alone and removes them permanently.
+- The assistant's `mark_rows` matches the user exactly, marking and unmarking, and no
+  tool deletes.
+- The per-row `eliminate` link and the discard/restore vocabulary it replaces are removed.
 
-**Test:** marking and unmarking through the behaviour; deletion removing source rows and
-flagging confirmed ones; the assistant marking but being unable to delete.
+**Test:** marking, unmarking, and the mode turning itself off; deletion removing rows;
+the assistant marking and unmarking but unable to delete.
 
 ---
 
-## Phase 6 — tools, prompts, and parity
+## Phase 7 — tools, prompts and parity
 
-**Before starting: commit; read the whole phase; re-read the verbatim request; fold in
-anything of it that belongs here and is missing.**
+**Before starting: commit; read the whole phase; re-read the verbatim request and
+clarifications; fold in anything of them that belongs here and is missing.**
 
-- Audit every tool against the new model. Expected final set: `query_vault`,
-  `assign_source_columns`, `set_labels`, `label_rows_by_match`, `mark_rows`,
-  `save_label_rule` / `list_label_rules` / `apply_label_rules` / `delete_label_rule`,
-  `confirm_rows` (if Q10 says the assistant may confirm), `read_ingestion_guide`,
-  `list_label_options`, plus the file readers. Everything else is deleted, not deprecated.
-- Rewrite the ingestion guide for the one-phase flow and the four labels, keeping the
+- Expected final tool set: `query_vault`, `assign_source_columns`, `set_sign_convention`,
+  `set_labels`, `label_rows_by_match`, `mark_rows`, `confirm_rows`, `drop_source_table`,
+  the four rule tools, `read_ingestion_guide`, `list_label_options`, and the file
+  readers. Everything else is deleted.
+- The guide is rewritten for: the one-phase flow, the four labels, the ordered work of
+  Phase 3, sampling a destination table before deciding a sign, asking when unsure, the
+  narrowed duplicate rules, and the two confirmation actions with their different
+  permissions.
+- The system prompt's ingestion paragraph is rewritten to match, keeping the
   `{{sections}}`/`{{screens}}` placeholders and their enforcement.
-- Rewrite the system prompt's ingestion paragraph.
-- Write a parity test listing what the user can do and what the assistant can do, so the
-  one asymmetry (deleting marked lines) is asserted rather than assumed.
+- A parity test asserts the only asymmetry: deleting marked lines.
 
-**Test:** registry test for the exact tool list; guide tests for the placeholders and the
-four labels; a prompt test asserting the removed labels are not mentioned anywhere.
+**Test:** registry test for the exact list; guide tests for placeholders, the four
+labels, the ordering and the sign guidance; a prompt test asserting no removed label is
+mentioned anywhere.
 
 ---
 
-## Phase 7 — sweep
+## Phase 8 — sweep
 
-**Before starting: commit; read the whole phase; re-read the verbatim request; fold in
-anything of it that belongs here and is missing.**
+**Before starting: commit; read the whole phase; re-read the verbatim request and
+clarifications; fold in anything of them that belongs here and is missing.**
 
-- Grep for every removed concept (`flowRole`, `settlementChannel`, `spendingTreatment`,
-  `recurrence`, `categoryId`, `stage`, `promote`, `worklist`, `discard`) and remove what
-  survives in code, comments, translations and docs.
-- Delete files nothing imports.
-- Update `README.md` and the ADRs.
-- Re-run the sample-file walkthrough from `samples/README.md` end to end and correct it
-  where the flow has changed.
+- Grep out every removed concept: `flowRole`, `settlementChannel`, `spendingTreatment`,
+  `recurrence`, `categoryId`, `stage`, `promote`, `worklist`, `discard`, `subsections`.
+- Delete files nothing imports; update README and ADRs; rewrite `samples/README.md` for
+  the one-phase flow.
 
-**Test:** full suite, lint, typecheck, production build, and a manual pass through the
-four sample files.
+**Test:** full suite, lint, typecheck, production build, and a manual pass over the four
+sample files.
 
 ---
 
 ## 4. Open questions
 
-Each needs an answer before Phase 1. Options first, recommendation last.
+**Q11 — May SQL write anything?** Marking a row deleted is allowed for the assistant, and
+SQL is the natural way to express it. (a) SQL is read-only; marking, labelling and
+confirming stay typed tools that validate. (b) A whitelist of statements is applied back
+to Dexie (`UPDATE … SET marked_for_elimination`, `DROP TABLE` of an empty source table).
+**Recommendation: (a)** — a label written through SQL skips catalogue validation, and
+write-back from an in-memory copy is where silent corruption lives.
 
-**Q1 — What does "run SQL against the .db" mean at runtime?**
-The browser database is Dexie/IndexedDB; SQLite exists only as the export format.
-(a) Build an in-memory SQLite from Dexie for each query, read-only, and keep writes in
-typed functions. (b) Move the whole runtime to sql.js persisted into IndexedDB, and write
-through SQL too. (c) Keep a structured query API and drop the SQL idea.
-**Recommendation: (a)** — real SQL for reading, no rewrite of the storage layer, and
-writes keep the validation that makes labels trustworthy.
+**Q12 — Where does a sign transformation live?** (a) Stored on the source and applied when
+rows are confirmed, original column untouched, both values visible. (b) The values in the
+source table are rewritten in place.
+**Recommendation: (a)** — the original stays comparable with the file it came from, which
+is what duplicate detection and any later re-check depend on.
 
-**Q2 — Where does a confirmed row live?**
-Screens are multi-valued, so a row can name two. (a) One confirmed table per *section*,
-with screens as views over it. (b) One confirmed table per *screen*, duplicating a row
-that names two. (c) A single confirmed table; every screen is a view.
-**Recommendation: (c)** — one row, one home, and the labels decide what reads it. It also
-makes "rules for confirmed tables, narrowed by labels" natural, which is what you asked
-for.
+**Q13 — Does capital now include investments?** With sign-based accounting, buying an
+investment is negative in checking and positive in the investment table, so summing
+everything gives total capital without special cases — but position value (quantity ×
+price) is a different quantity from cash moved. (a) Capital sums every confirmed row, and
+the investments screen keeps position maths separately. (b) Capital excludes investment
+screens and adds position value, as today.
+**Recommendation: (a)** — it follows your principle, and the two numbers stay distinct
+and honest: money moved, and what holdings are worth.
 
-**Q3 — Is the destination table still a label?**
-If Q2 is (c), the destination is implied. (a) Remove it entirely. (b) Keep it as an
-optional override.
-**Recommendation: (a)** — one fewer required field, and screens already say where a row
-belongs.
+**Q14 — What is `row_id` made of?** (a) A random id per source row at import, copied to
+every confirmation copy. (b) A content hash of the row's values.
+**Recommendation: (a)** — a content hash would make two genuinely distinct transactions
+with identical values share an id, which is exactly the case your duplicate rule says to
+treat as two real rows.
 
-**Q4 — Card files invert the sign.**
-A bank export writes a purchase as negative; a card export writes the same purchase as
-positive. Deciding direction from the sign alone will read every card charge as income.
-(a) A per-source *sign convention* set during assignment (`negative is outflow` /
-`positive is outflow`), defaulting from a quick scan of the file. (b) Always treat card
-files as inverted, detected by the assigned columns. (c) Ignore it and let labels carry
-the meaning.
-**Recommendation: (a)** — explicit, visible on the source table, and settable by the
-assistant with a reason.
+**Q15 — What names do confirmed tables take, and when do they appear?** (a) One table per
+(section, screen) pair, created on first confirmation, named
+`confirmed__<section>__<screen>`. (b) All pairs created up front from the catalogue.
+**Recommendation: (a)** — no empty tables for screens nobody uses, and new screens work
+without a migration.
 
-**Q5 — Transfers between your own accounts.**
-Flow role is what currently keeps a savings transfer from moving total capital. Without
-it: (a) a reserved screen (`transfers`) that capital ignores. (b) a reserved category
-name. (c) accept that transfers move capital.
-**Recommendation: (a)** — it is a placement decision, and placement is what survives.
-
-**Q6 — Recurring, without a recurrence label.**
-(a) Pattern detection only, as it was before the label existed. (b) A reserved
-subcategory (`assinatura`, `parcelado`) that the Recurring screen reads.
-**Recommendation: (b)** — you are already labelling subscriptions by name, and this
-keeps the screen meaningful without reviving a fifth label.
-
-**Q7 — Does a confirmed row leave its source table?**
-(a) It moves: the source table empties as work is done, and confirmed rows live in one
-place. (b) It stays and is marked confirmed, so the file remains whole.
-**Recommendation: (a)**, with `source_filename` and the unassigned columns travelling
-with the row, so provenance survives without keeping two copies.
-
-**Q8 — Export format.**
-(a) Keep the current fixed-store export and add source tables as extra tables.
-(b) Export whatever tables exist, generically, so the file mirrors the database.
-**Recommendation: (b)** — it is what makes the `.db` genuinely inspectable, which is the
-point of 5.3, with a small header table recording the version.
-
-**Q9 — Deleting a confirmed row.**
-(a) Flag it deleted (today's behaviour), reversible. (b) Remove it outright.
-**Recommendation: (a)** — the button says "delete marked lines", and a flag is what makes
-that safe to press.
-
-**Q10 — May the assistant confirm rows?**
-Today it may stage but not promote. In a one-phase flow, confirming is the only move.
-(a) User only. (b) Assistant may confirm rows whose labels it did not itself invent.
-(c) Assistant may confirm freely.
-**Recommendation: (a)** — it is the last point at which a mistake is cheap, and you have
-said the two roles differ only in deletion; confirming would be the second difference,
-deliberately.
+**Q16 — What happens to a screen's table when the screen is renamed or removed from the
+app?** (a) The table stays under its old name and its rows keep their labels, visible as
+an orphan the user can relabel. (b) A migration renames it.
+**Recommendation: (a)** — nothing is lost silently, and the orphan is a visible prompt to
+decide rather than an invisible rewrite.
