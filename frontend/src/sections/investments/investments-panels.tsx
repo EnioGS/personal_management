@@ -5,6 +5,9 @@ import { colorForKey, DOMAIN_COLOR, MAX_CATEGORICAL_SERIES } from '@/components/
 import { AppLineChart } from '@/components/charts/line-chart'
 import { AppPieChart } from '@/components/charts/pie-chart'
 import { DashboardCard } from '@/components/dashboard/dashboard-card'
+import { FilterBar } from '@/components/dashboard/filter-bar'
+import { resolveFilterRange, useDashboardFilters } from '@/components/dashboard/dashboard-filters'
+import { isWithinRange } from '@/lib/dashboard/date-range'
 import { RankedBarList } from '@/components/dashboard/ranked-bar-list'
 import { StatTile } from '@/components/dashboard/stat-tile'
 import { bucketByMonth, foldTopCategories, formatDateLabel, formatMonthLabel, runningPositionOverTime } from '@/lib/aggregations'
@@ -42,7 +45,17 @@ export function OverviewPanel() {
  */
 export function InvestmentsPanel() {
   const { t } = useTranslation(['investments', 'common'])
-  const investmentRows = useInvestmentRows()
+  const { filters, setPreset, setCustomFrom, setCustomTo, toggleCategory, clearCategories } = useDashboardFilters()
+  const all = useInvestmentRows()
+  // Scoped like every other screen: the period on the bar above is what the numbers are
+  // about, so a position here is what the chosen window bought and sold.
+  const investmentRows = useMemo(() => {
+    const range = resolveFilterRange(filters)
+    return all.filter((row) => (
+      (typeof row.date !== 'number' || isWithinRange(row.date, range))
+      && (filters.categories.length === 0 || filters.categories.includes(row.category))
+    ))
+  }, [all, filters])
   const transactions = useMemo(() => investmentRows.map(asTransaction), [investmentRows])
   // Contributions and dividends are the same ledger read two ways — money put in, and
   // money the holdings paid out.
@@ -67,6 +80,14 @@ export function InvestmentsPanel() {
 
   return (
     <div className="flex h-full flex-col">
+      <FilterBar
+        filters={filters}
+        setPreset={setPreset}
+        setCustomFrom={setCustomFrom}
+        setCustomTo={setCustomTo}
+        toggleCategory={toggleCategory}
+        clearCategories={clearCategories}
+      />
       <div className="min-h-0 flex-1">
         
             <div className="h-full overflow-auto p-4">

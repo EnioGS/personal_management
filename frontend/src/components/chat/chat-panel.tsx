@@ -72,6 +72,8 @@ export function ChatPanel() {
   const metrics = useRef<{ singleLine: number; maxHeight: number } | null>(null)
   const mirrorDressed = useRef(false)
   const pendingResize = useRef<number | null>(null)
+  /** The width the last measurement ran at, so the observer can tell its own echo apart. */
+  const lastMeasuredWidth = useRef(0)
 
   /**
    * How tall the message would be in a box of a given width.
@@ -109,9 +111,6 @@ export function ChatPanel() {
   const resizeComposerNow = useCallback(() => {
     const composer = composerRef.current
     if (!composer) return
-    // Hand the width back to the layout before reading it: what is measured has to be the
-    // width the row really gives the box now, not the one this function pinned last time.
-    composer.style.width = ''
     // A closed panel is a few pixels wide, where the placeholder wraps into a paragraph
     // and every measurement is a lie. Nothing is measured until the box is really there.
     if (composer.clientWidth < 80) return
@@ -139,11 +138,12 @@ export function ChatPanel() {
     const height = Math.min(wanted, maxHeight)
     composer.style.height = `${height}px`
     composer.style.overflowY = wanted > maxHeight ? 'auto' : 'hidden'
-    // The width it is about to have, set now: the frame between deciding and re-rendering
-    // then shows the box the message was measured against rather than the one it is
-    // leaving. The next pass hands the width back to the layout.
-    const target = wraps ? wideWidth : narrowWidth
-    if (target !== composer.clientWidth) composer.style.width = `${target}px`
+    // Nothing is written to the width here. Pinning it changed the box's own size, which
+    // woke the observer below, which measured again, which handed the width back, which
+    // woke it again — a measurement every frame for as long as the app was open, and the
+    // reason it felt slow with nothing in it at all. The mirror already measures the
+    // width the box is about to have, so the height is right without touching it.
+    lastMeasuredWidth.current = composer.clientWidth
     setIsOverflowing(wraps)
     setComposerHeight(height)
   }, [heightAt])
@@ -207,12 +207,11 @@ export function ChatPanel() {
   useEffect(() => {
     const composer = composerRef.current
     if (!composer || typeof ResizeObserver === 'undefined') return
-    let lastWidth = composer.clientWidth
     const observer = new ResizeObserver(() => {
-      // Ignore the height changes this very effect causes; only width matters here.
-      if (composer.clientWidth === lastWidth) return
-      lastWidth = composer.clientWidth
-      metrics.current = null
+      // Only a width the measurement did not produce is worth measuring again: its own
+      // height changes come back here too, and answering them is how a loop starts.
+      if (composer.clientWidth === lastMeasuredWidth.current) return
+      lastMeasuredWidth.current = composer.clientWidth
       resizeComposer()
     })
     observer.observe(composer)
