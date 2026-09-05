@@ -88,6 +88,18 @@
 >
 > also: I forgot to say: users and agents can mark rows for deletion but they can also unmark them.
 
+## 1c. Answers to the open questions, verbatim
+
+> Q11 — May SQL write? - yes, but in a customized way:
+> - instruct the agent to add new lines, instead of patching (is patching the correct word?), and to mark the old lines to elimination (Key things: marked to elimination lines are to be invisible to the all dashboards, showing only on the tables. (this is an exception to the principle of invisibility is dangerous). instruct the model everywhere appropriate (being redundant here is a feature, but do it in moderation) to conserve the hash for that line. and the model can create new lines out of thin air, but in that case, give it a special function that when used, creates a hash based on the current contents of the line it intends to create)
+> Q12 — Where does a sign transformation live? B, but with a catch: the original value must be one of the data that is recorded on the condensed values of all original lines to one column (and the column is the 'observations' column or however it is currently named I dont get it).
+> Q13 — Does capital now include investments? yes. and this was always the plan. but a key distinction: the capital is a word that represents in general 'all money or things of value i have' so in movements, it is expressed in the Current capital box, and as the current green line on 'capital evolution' for example.
+> Q14 — What is row_id made of? it should be a hash, but we should take steps to differentiate identical rows on the same source file, asigning them to different hashes, the hash can include a random seed when it is calculated. but the calculated hash, once it is assigned, cannot be changed even when the row content is partially or totally changed.
+> Q15 — Confirmed table names and creation. A
+> Q16 — A screen gets renamed or removed from the app; what happens to its table? A in general, but with some caveats: if we just rename the suboption, but the content is to remain the same, then we change the table name. it depends. but one key detail: if a model creates or removes a table:
+> - it cannot remove a table that is the one used for any of the current dashboards.
+> - it will only create the table if its convenient for it for some reason, the tables are at least for now, not going to be used as data sources for us for now
+
 ## 2. What changes, in one page
 
 **The label set shrinks from seven to four.** Flow role, settlement channel, spending
@@ -120,8 +132,11 @@ can pre-fill labels at import.
 **Marking for elimination is everybody's; deleting is the user's.** Both mark and unmark;
 only the user removes what is marked, permanently.
 
-**The assistant reads the browser database with SQL**, and writes only through validated
-functions.
+**The assistant reads and writes the browser database with SQL**, under one discipline:
+it never edits a row in place. It adds a corrected row carrying the same `row_id` and
+marks the old one for elimination. A row marked for elimination is invisible to every
+dashboard and visible in its table — the single, deliberate exception to "nothing is
+made invisible".
 
 Every phase starts with the same preamble and ends with tests. Phases are ordered so the
 app runs at every commit.
@@ -169,9 +184,13 @@ clarifications; fold in anything of them that belongs here and is missing.**
 
 ### 1.3 Direction and sign
 - `directionOf(amount)`: negative leaves, positive arrives. No flow role, no exceptions.
-- Capital is the sum of signed amounts across every confirmed row: a transfer out of
-  checking is negative there and positive in savings, and nets to zero by arithmetic
-  rather than by being hidden.
+- **Capital is everything of value you hold.** It is the sum of signed amounts across
+  every confirmed row, counted once per `row_id` however many tables the row was copied
+  into, investments included: money leaving checking for savings is negative there and
+  positive here, and nets to zero by arithmetic rather than by being hidden. This is the
+  number in *Current capital* and the green line in *Capital evolution*.
+- Rows marked for elimination are excluded from every dashboard while remaining in their
+  table.
 
 ### 1.4 Dashboards
 - `FilteredEntry` loses `flowRole`, `spendingTreatment`, `recurrence`; keeps `screens`;
@@ -199,7 +218,10 @@ clarifications; fold in anything of them that belongs here and is missing.**
 ### 2.1 Storage
 - Every uploaded file becomes its own table in the browser database, named recognisably
   after the file (`source__nubank_2026_09_08__3`).
-- A row holds: `row_id` (stable, unique, shared by copies made at confirmation),
+- `row_id` is a hash taken at import from the row's contents **plus a random seed**, so
+  two identical rows in one file get different ids; once assigned it never changes, even
+  if every value in the row is later edited. Copies made at confirmation share it.
+- A row holds: `row_id`,
   `source_filename`, every original column verbatim, the four label columns, and its own
   state (`marked_for_elimination`, `duplicate_of`, `rule_ids`).
 - Assignment lives on the source record, not the rows.
@@ -256,13 +278,15 @@ report where a source is in it:
 - The reference convention of each confirmed table is recorded and readable, and the
   assistant is told to **sample the destination table regardless** — a stated reference is
   a shortcut, not a substitute for looking.
-- Two transformations are supported, stored on the source and applied when rows are
-  confirmed, leaving the original column untouched:
+- The amount column is **rewritten in place** by the transformation, and the value the
+  file actually carried is preserved in the condensed observations column, so nothing is
+  lost and the two never disagree.
+- Two transformations are supported:
   - **invert everything**, for a file that uses the opposite convention consistently;
   - **invert by condition**, for a file whose values are all one sign and whose direction
     lives in another column (`buy`/`sell`, `received`/`sent`, `debit`/`credit`).
-- The source table shows both the original value and the resulting signed amount, so the
-  transformation is visible rather than implied.
+- The source table shows the resulting signed amount; the value as imported stays
+  readable in the observations column.
 - When the evidence is inconclusive, the assistant asks the user rather than guessing;
   this is stated in the tool description and the guide.
 
@@ -277,15 +301,25 @@ a sampling call returning what a table's existing signs look like.
 **Before starting: commit; read the whole phase; re-read the verbatim request and
 clarifications; fold in anything of them that belongs here and is missing.**
 
-- Runtime storage stays Dexie/IndexedDB. SQLite remains the export format only.
-- `query_vault` builds an in-memory SQLite from the live Dexie stores per call, runs one
-  **read-only** statement, and returns columns, rows and a count. Its description carries
+- Runtime storage stays Dexie/IndexedDB. SQLite remains the export format only; the
+  assistant's SQL runs against an in-memory database built from the live stores.
+- `query_vault` runs a **read** statement and returns columns, rows and a count.
+- `write_vault` runs a **write** under the one discipline that makes it safe: rows are
+  never edited in place. A correction is a new row carrying the same `row_id` plus a
+  mark for elimination on the old one, so history is additive and nothing disappears.
+  `INSERT` and `UPDATE ... SET marked_for_elimination` are accepted; `DELETE` is not.
+- `new_row_id` mints an id for a row invented from nothing, hashed from the contents it
+  is about to hold. A corrected row reuses the id it corrects — stated in the tool
+  descriptions and the guide, deliberately more than once. Its description carries
   the schema, the table naming convention, and the sampling guidance from Phase 3.
 - It replaces `read_ingestion_table`, `query_ingestion_rows`, `count_ingestion_rows`,
   `group_ingestion_rows`, `list_ingestion_datasets`, `read_ingestion_provenance` and
   `find_ingestion_duplicates`, which are deleted.
-- Writes stay in typed functions, because they validate. `drop_source_table` removes an
-  **empty source table** only, and never a confirmed one.
+- Labelling, confirming and rule application stay typed functions, because they validate
+  against the catalogue; SQL is for reading and for the add-and-mark discipline above.
+- `drop_source_table` removes an **empty source table** only. A table any dashboard reads
+  is never removable. The assistant may create a table when it has a reason to, and
+  nothing the app draws reads from tables it created.
 
 **Test:** a select returning rows; a rejected write; a rejected drop of a non-empty or
 confirmed table; an accepted drop of an empty source table.
@@ -370,6 +404,8 @@ sample files.
 ---
 
 ## 4. Open questions
+
+**Answered — kept for the record.**
 
 **Q11 — May SQL write anything?** Marking a row deleted is allowed for the assistant, and
 SQL is the natural way to express it. (a) SQL is read-only; marking, labelling and
