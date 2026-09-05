@@ -253,6 +253,9 @@ export function ChatPanel() {
     if (!draft.trim() || isSending) return
     void sendMessage(draft.trim())
     setDraft('')
+    // Sent from the closed panel, the message and its reply would land out of sight and
+    // the panel would look like it had swallowed them. Sending opens it.
+    if (panelWidth === 0) togglePanel()
   }
 
   // While actively dragging, track the pointer directly instead of the (not-yet-committed)
@@ -278,7 +281,9 @@ export function ChatPanel() {
         'bg-primary text-primary-foreground fixed z-50 flex size-10 items-center justify-center rounded-full shadow-lg',
         'transition-[opacity,transform] duration-200 ease-out',
         isSendFloating ? 'scale-100 opacity-100' : 'pointer-events-none scale-50 opacity-0',
-        panelWidth === 0 && 'opacity-60',
+        // Only while it is actually showing: written unconditionally, this fade wins over
+        // the opacity-0 above and leaves the button on screen, smaller, after a send.
+        isSendFloating && panelWidth === 0 && 'opacity-60',
       )}
     >
       <SendHorizontal className="size-4" />
