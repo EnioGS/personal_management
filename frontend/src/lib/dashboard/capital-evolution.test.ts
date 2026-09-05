@@ -25,16 +25,17 @@ describe('capitalEvolution', () => {
     expect(points[0]).toMatchObject({ capital: 715.1, income: 715.1, spending: 284.9 })
   })
 
-  it('reports holdings as what is held, which is the opposite sign to what the rows say', () => {
+  it('reports holdings as what is held, in capital as well, which is the opposite sign to what the rows say', () => {
     const points = capitalEvolution({
       movements: [on(0, 5, 1000)],
       // An aplicação: money left the account for the fund, so the row is negative.
       investments: [on(1, 1, -500)],
     }, range)
 
-    // Five hundred is held, not lost — the line reads +500 while the row reads -500. The
-    // walk runs to the last month with anything in it, which is February here.
-    expect(points.map((point) => [point.capital, point.investments])).toEqual([[1000, 0], [500, 500]])
+    // Five hundred is held, not lost — the line reads +500 while the row reads -500, and
+    // capital counts the holding rather than the money's absence. The walk runs to the last
+    // month with anything in it, which is February here.
+    expect(points.map((point) => [point.capital, point.investments])).toEqual([[1000, 0], [1500, 500]])
   })
 
   it('uses history before the window to open at the right number', () => {

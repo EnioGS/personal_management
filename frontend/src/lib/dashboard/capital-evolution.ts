@@ -13,8 +13,8 @@ export interface CapitalEntry {
 export interface CapitalEvolutionPoint {
   month: string
   /**
-   * Everything held, accumulated from the first month there is: every movement and every
-   * investment, each month's net added to the last month's total.
+   * Everything held, accumulated from the first month there is: what the accounts did and
+   * what is held in investments, each month's net added to the last month's total.
    */
   capital: number
   /**
@@ -63,9 +63,12 @@ function sumByMonth(entries: CapitalEntry[], keep: (value: number) => boolean = 
 /**
  * Month by month, what was held and what moved.
  *
- * Capital is everything of value held, so it is the running total of every movement and
- * every investment from the first month there is — each month's net added to the last
- * month's total.
+ * Capital is everything of value held, so it is the running total of what the accounts did
+ * and what is held in investments, from the first month there is — each month's net added
+ * to the last month's total. Both halves read the investment rows the same way: they are
+ * written from the account's point of view, an aplicação leaving it and a resgate coming
+ * back, so money placed in a fund is subtracted from them to become a holding rather than
+ * a loss. Placing money moves it between two of your own pockets; it does not spend it.
  *
  * The movements are the whole story of the accounts, spending included: a card bill and a
  * Pix both leave as movements, and what left is already netted off by summing a month's
@@ -96,7 +99,7 @@ export function capitalEvolution(sources: CapitalSources, range: DateRange): Cap
   while (month <= last) {
     const income = movements.get(month) ?? 0
     const invested = investments.get(month) ?? 0
-    capital = roundCurrency(capital + income + invested)
+    capital = roundCurrency(capital + income - invested)
     held = roundCurrency(held - invested)
 
     const start = monthStart(month)
