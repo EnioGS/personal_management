@@ -35,25 +35,37 @@ interface LabelLineProps {
 }
 
 const RADIAN = Math.PI / 180
-/** How far a slice sits out from the centre. The outer ring travels further, being further out. */
-const EXPLODE = { parts: 4, classes: 7 }
+/** How far each ring stands off the centre. The outer one goes further, being further out. */
+const PUSH = { parts: 4, classes: 14 }
+/** Half the angle taken out of each slice's ends, which is what parts it from its neighbour. */
+const GAP_DEGREES = 1.6
 
 /**
- * Pushes a slice out along its own middle, away from the centre.
+ * Pushes a slice away from the centre — outward everywhere at once, not off to one side.
  *
- * Which is what an exploded pie is: not slices with gaps between them, but slices that
- * have each moved outward, the gaps being what is left behind. Every slice leaves in a
- * different direction, so the ring comes apart into the things it was made of.
+ * Moving a slice along its own middle is the textbook explosion, and it is wrong for a
+ * ring: a slice covering most of the circle has a middle like any other, so the whole ring
+ * slides off in that direction instead of opening up. What is wanted is the slice further
+ * out than it was, at every angle it spans — which is its radii grown rather than its
+ * centre moved.
+ *
+ * That alone would leave the ring continuous, since neighbours still meet where they met,
+ * so a little is taken off each end. The two together are what reads as a ring coming
+ * apart into the things it is made of; the gap is clamped for a thin slice, which has no
+ * angle to spare.
  */
-function exploded(offset: number) {
-  return function ExplodedSector(props: unknown) {
-    const sector = props as { cx: number; cy: number; midAngle: number }
-    const angle = -sector.midAngle * RADIAN
+function spread(push: number) {
+  return function SpreadSector(props: unknown) {
+    const sector = props as { startAngle: number; endAngle: number; innerRadius: number; outerRadius: number }
+    const span = Math.abs(sector.endAngle - sector.startAngle)
+    const gap = Math.min(GAP_DEGREES, span / 4) * Math.sign(sector.endAngle - sector.startAngle || 1)
     return (
       <Sector
         {...(props as object)}
-        cx={sector.cx + Math.cos(angle) * offset}
-        cy={sector.cy + Math.sin(angle) * offset}
+        startAngle={sector.startAngle + gap}
+        endAngle={sector.endAngle - gap}
+        innerRadius={sector.innerRadius + push}
+        outerRadius={sector.outerRadius + push}
       />
     )
   }
@@ -75,11 +87,10 @@ const LABEL_FLOOR = 0.04
  * each one is. Naming them too would be four labels for two facts, and on a card this
  * size they would collide before they explained anything.
  *
- * Both rings are exploded: every slice has moved out along its own middle, so the gaps
- * between them are what each one left behind rather than a stroke drawn between them.
- * That is what makes a ring read as several things instead of one striped thing, and it
- * keeps a slice's angle exactly where it was, which is what lets the inner pieces stay
- * legible as parts of the arc above them.
+ * Both rings are pushed away from the centre and parted at the ends — see `spread`. That
+ * is what makes a ring read as several things instead of one striped thing, and because
+ * every slice keeps the angle it had, the inner pieces stay legible as parts of the arc
+ * above them.
  */
 export function HoldingsPie({ groups, valueFormatter, emptyLabel }: HoldingsPieProps) {
   const held = groups.filter((group) => group.value > 0)
@@ -116,11 +127,11 @@ export function HoldingsPie({ groups, valueFormatter, emptyLabel }: HoldingsPieP
           data={parts}
           dataKey="value"
           nameKey="fillKey"
-          outerRadius="50%"
+          outerRadius="42%"
           cornerRadius={2}
           stroke="none"
           isAnimationActive={false}
-          shape={exploded(EXPLODE.parts)}
+          shape={spread(PUSH.parts)}
         >
           {parts.map((child) => (
             <Cell key={child.key} fill={`var(--color-${child.fillKey})`} />
@@ -131,12 +142,12 @@ export function HoldingsPie({ groups, valueFormatter, emptyLabel }: HoldingsPieP
           data={classes}
           dataKey="value"
           nameKey="fillKey"
-          innerRadius="59%"
-          outerRadius="76%"
+          innerRadius="56%"
+          outerRadius="72%"
           cornerRadius={2}
           stroke="none"
           isAnimationActive={false}
-          shape={exploded(EXPLODE.classes)}
+          shape={spread(PUSH.classes)}
           labelLine={LeaderLine}
           label={SliceLabel}
         >
@@ -152,11 +163,11 @@ export function HoldingsPie({ groups, valueFormatter, emptyLabel }: HoldingsPieP
   function LeaderLine(props: unknown) {
     const { points, percent, midAngle = 0 } = props as LabelLineProps
     if (percent < LABEL_FLOOR || !points || points.length < 2) return <g />
-    // Recharts measured the line against the ring as it would have been drawn unexploded,
-    // so the whole line travels the same distance the slice did.
+    // Recharts measured the line against the ring where it would have drawn it, so the
+    // line moves out along the same radius the slice did.
     const angle = -midAngle * RADIAN
-    const dx = Math.cos(angle) * EXPLODE.classes
-    const dy = Math.sin(angle) * EXPLODE.classes
+    const dx = Math.cos(angle) * PUSH.classes
+    const dy = Math.sin(angle) * PUSH.classes
     return (
       <polyline
         points={points.map((point) => `${point.x + dx},${point.y + dy}`).join(' ')}
@@ -171,9 +182,9 @@ export function HoldingsPie({ groups, valueFormatter, emptyLabel }: HoldingsPieP
     const { cx, cy, midAngle, outerRadius, percent, payload } = props as LabelProps
     if (percent < LABEL_FLOOR) return null
 
-    // The slice moved out, so its name moves with it; otherwise the line would point at
-    // where the slice used to be.
-    const radius = outerRadius + EXPLODE.classes + 14
+    // The ring stands further out than recharts drew it, so the name stands out with it;
+    // otherwise the line would point at where the slice would have been.
+    const radius = outerRadius + PUSH.classes + 12
     const x = cx + radius * Math.cos(-midAngle * RADIAN)
     const y = cy + radius * Math.sin(-midAngle * RADIAN)
     const onTheRight = x >= cx
