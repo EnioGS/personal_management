@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { wipeAllData } from '@/lib/data-file'
 import { addConfirmedRow, placeConfirmedRow, updateConfirmedRow } from './confirmed-rows'
 import { confirmedRowsTable } from './model-db'
+import { sourceFilenameOf } from './observations'
 import type { ConfirmedRow } from './types'
 
 async function only(): Promise<ConfirmedRow> {
@@ -20,9 +21,9 @@ describe('a row added by hand', () => {
     expect(row.rowId).toMatch(/^[0-9a-f]{16}$/)
   })
 
-  it('says where it came from rather than borrowing a filename', async () => {
+  it('says where it came from in the observations, where every row keeps that', async () => {
     await addConfirmedRow('finances', 'overview')
-    expect((await only()).sourceFilename).toBe('added by hand')
+    expect(sourceFilenameOf((await only()).observations)).toBe('added by hand')
   })
 })
 

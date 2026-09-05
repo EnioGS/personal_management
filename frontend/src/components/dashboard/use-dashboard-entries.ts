@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import type { StoredRow } from '@/lib/local-store/create-local-table'
 import { useConfirmedRowsStore } from '@/lib/model/model-stores'
+import { sourceFilenameOf } from '@/lib/model/observations'
 import type { ConfirmedRow } from '@/lib/model/types'
 import { isWithinRange } from '@/lib/dashboard/date-range'
 import { resolveFilterRange, type DashboardFilters } from './dashboard-filters'
@@ -16,9 +17,10 @@ export interface FilteredEntry {
   subcategory: string
   /** Everything the source file said that no column was assigned to. */
   observations: string
+  /** Which file the row came from — read out of the observations, where it is kept. */
+  sourceFilename: string
   /** The most description-like thing the file said — see `describeRow`. */
   description: string
-  sourceFilename: string
   asset?: string
   quantity?: number
   price?: number
@@ -62,7 +64,7 @@ export function filterConfirmedRows({ rows, filters, screen }: FilterParams): Fi
       subcategory: row.subcategory,
       observations: row.observations,
       description: describeRow(row.observations),
-      sourceFilename: row.sourceFilename,
+      sourceFilename: sourceFilenameOf(row.observations),
       asset: row.asset,
       quantity: row.quantity,
       price: row.price,

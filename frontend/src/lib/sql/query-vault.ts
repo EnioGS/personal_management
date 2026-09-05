@@ -1,6 +1,7 @@
 import initSqlJs, { type Database } from 'sql.js'
 import sqlWasmUrl from 'sql.js/dist/sql-wasm.wasm?url'
 import { confirmedRowsTable, labelRulesTable, sourceFilesTable, sourceRowsTable } from '@/lib/model/model-db'
+import { sourceFilenameOf } from '@/lib/model/observations'
 import type { ConfirmedRow, SourceFile, SourceRow } from '@/lib/model/types'
 
 /**
@@ -108,7 +109,9 @@ export async function buildVaultSnapshot(): Promise<VaultSnapshot> {
       row_id: data.rowId,
       section: data.section,
       screen: data.screen,
-      source_filename: data.sourceFilename,
+      // Derived, not stored: the filename lives in the observations, and a query should
+      // not have to dig it out of JSON to group by where a row came from.
+      source_filename: sourceFilenameOf(data.observations),
       date: data.date ?? null,
       amount: data.amount ?? null,
       observations: data.observations,

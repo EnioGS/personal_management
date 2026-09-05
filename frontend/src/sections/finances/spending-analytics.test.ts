@@ -12,9 +12,9 @@ function entry(overrides: Partial<FilteredEntry>): FilteredEntry {
     amount: -100,
     category: 'Food',
     subcategory: 'outros',
-    observations: '{}',
-    description: 'Market',
+    observations: '{"source_filename":"nubank.csv"}',
     sourceFilename: 'nubank.csv',
+    description: 'Market',
     ...overrides,
   }
 }

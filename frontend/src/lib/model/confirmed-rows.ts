@@ -2,6 +2,7 @@ import { refreshAllLocalStores } from '@/lib/local-store/create-local-list-store
 import { parseDateValue } from '@/lib/parse-date'
 import { parseNumberValue } from '@/lib/parse-number'
 import { DEFAULT_MEANING } from './ingestion'
+import { SOURCE_FILENAME_KEY } from './observations'
 import { confirmedRowsTable } from './model-db'
 import { newRowId } from './row-id'
 import type { ConfirmedRow } from './types'
@@ -38,9 +39,9 @@ export async function addConfirmedRow(section: string, screen: string): Promise<
       rowId: newRowId({ section, screen, addedAt: now }),
       section,
       screen,
-      sourceFilename: 'added by hand',
       confirmedAt: now,
-      observations: '{}',
+      // Provenance goes where every row's provenance goes: into the condensed column.
+      observations: JSON.stringify({ [SOURCE_FILENAME_KEY]: 'added by hand' }),
       category: DEFAULT_MEANING,
       subcategory: DEFAULT_MEANING,
     } satisfies ConfirmedRow,

@@ -1,6 +1,7 @@
 import { buildLabelCatalogue, loadLabelCatalogue } from '@/lib/label-catalogue-source'
 import { describeVault, queryVault } from '@/lib/sql/query-vault'
 import { placeConfirmedRow, setConfirmedMeaning } from '@/lib/model/confirmed-rows'
+import { SOURCE_FILENAME_KEY, withObservation } from '@/lib/model/observations'
 import { DEFAULT_MEANING, ingestionLabelErrors } from '@/lib/model/ingestion'
 import { parsePlacementLabels, resolveAccountLabel, resolveCardLabel, resolveScreenLabel, resolveSectionLabel, withDerivedSections } from '@/lib/model/label-catalogue'
 import { confirmedRowsTable, sourceFilesTable, sourceRowsTable } from '@/lib/model/model-db'
@@ -407,11 +408,16 @@ export const addConfirmedRowTool: ToolDefinition = {
       rowId: String(args.rowId),
       section,
       screen,
-      sourceFilename: typeof args.sourceFilename === 'string' ? args.sourceFilename : 'added by the assistant',
       confirmedAt: Date.now(),
       date: parseDateValue(args.date) ?? undefined,
       amount: typeof args.amount === 'number' ? args.amount : undefined,
-      observations: typeof args.observations === 'string' ? args.observations : '',
+      // Where the row came from belongs in the observations with everything else a file
+      // said; there is no column of its own repeating it.
+      observations: withObservation(
+        typeof args.observations === 'string' && args.observations.trim() ? args.observations : '{}',
+        SOURCE_FILENAME_KEY,
+        typeof args.sourceFilename === 'string' && args.sourceFilename.trim() ? args.sourceFilename.trim() : 'added by the assistant',
+      ),
       category: typeof args.category === 'string' && args.category.trim() ? args.category.trim() : 'outros',
       subcategory: typeof args.subcategory === 'string' && args.subcategory.trim() ? args.subcategory.trim() : 'outros',
       account: typeof args.account === 'string' ? resolveAccountLabel(catalogue, args.account) : undefined,

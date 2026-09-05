@@ -197,7 +197,6 @@ export interface ConfirmedRow {
   rowId: string
   section: string
   screen: string
-  sourceFilename: string
   confirmedAt: number
   date?: number
   /** Signed the way this app means it: negative leaves, positive arrives. */

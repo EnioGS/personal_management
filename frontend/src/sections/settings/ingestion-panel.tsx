@@ -58,7 +58,7 @@ const LABEL_HINT: Record<LabelColumn, string> = {
   subcategory: 'free text',
 }
 
-const CONFIRMED_COLUMNS = ['row_id', 'section', 'screen', 'date', 'amount', 'account', 'card', 'category', 'subcategory', 'observations', 'source_filename'] as const
+const CONFIRMED_COLUMNS = ['row_id', 'section', 'screen', 'date', 'amount', 'account', 'card', 'category', 'subcategory', 'observations'] as const
 
 function confirmedTableKey(row: ConfirmedRow): string {
   return `${row.section}/${row.screen}`
@@ -577,7 +577,6 @@ export function IngestionPanel() {
                     disabled={marking}
                     onCommit={(value) => void editConfirmed(row, 'observations', value)}
                   />
-                  <td className="text-muted-foreground p-2 whitespace-nowrap">{row.sourceFilename}</td>
                 </tr>
               ))}
             </tbody>
@@ -667,9 +666,7 @@ function stripStored<T>(row: StoredRow<T>): T {
 
 /** The confirmed columns are shown snake_case, the way SQL sees them; sorting reads the stored field. */
 function confirmedField(column: string): string {
-  if (column === 'source_filename') return 'sourceFilename'
-  if (column === 'row_id') return 'rowId'
-  return column
+  return column === 'row_id' ? 'rowId' : column
 }
 
 function sourceCellValue(row: StoredRow<SourceRow>, field: string, catalogue: LabelCatalogue): unknown {

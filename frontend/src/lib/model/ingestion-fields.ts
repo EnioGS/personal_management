@@ -1,3 +1,4 @@
+import { sourceFilenameOf } from './observations'
 import { SOURCE_FILENAME_COLUMN } from './source-files'
 import type { ConfirmedRow, SourceRow } from './types'
 
@@ -27,7 +28,7 @@ export function resolveConfirmedField(row: ConfirmedRow, field: string): unknown
   switch (field) {
     case 'sections': case 'section': return row.section
     case 'screens': case 'screen': return row.screen
-    case 'source': case SOURCE_FILENAME_COLUMN: return row.sourceFilename
+    case 'source': case SOURCE_FILENAME_COLUMN: return sourceFilenameOf(row.observations)
     case 'marked_for_elimination': return row.markedForElimination ? 'yes' : 'no'
     default: return (row as unknown as Record<string, unknown>)[field]
   }

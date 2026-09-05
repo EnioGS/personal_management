@@ -40,7 +40,7 @@ function exportFile(): DataExportFile {
         id: 1,
         createdAt: 1,
         data: {
-          rowId: 'def', section: 'finances', screen: 'spending', sourceFilename: 'x.csv',
+          rowId: 'def', section: 'finances', screen: 'spending',
           confirmedAt: 1, date: 1, amount: -5, observations: '{}', category: 'mercado', subcategory: 'outros',
         },
       }],

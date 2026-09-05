@@ -101,7 +101,8 @@ function addReadableViews(db: Database, data: DataExportFile) {
   for (const placement of placements) {
     const [section, screen] = placement.split('\u0000')
     db.run(
-      `CREATE VIEW "confirmed__${slug(section)}__${slug(screen)}" AS SELECT * FROM "confirmed_rows" `
+      `CREATE VIEW "confirmed__${slug(section)}__${slug(screen)}" AS SELECT *, `
+      + `json_extract(observations, '$.source_filename') AS "source_filename" FROM "confirmed_rows" `
       + `WHERE section = ${literal(section)} AND screen = ${literal(screen)}`,
     )
   }

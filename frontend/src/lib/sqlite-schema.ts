@@ -93,7 +93,6 @@ export const SQLITE_SCHEMAS: Record<DataTableKey, SqliteTableSchema> = {
       { column: 'row_id', key: 'rowId', type: 'text' },
       { column: 'section', key: 'section', type: 'text' },
       { column: 'screen', key: 'screen', type: 'text' },
-      { column: 'source_filename', key: 'sourceFilename', type: 'text' },
       { column: 'confirmed_at', key: 'confirmedAt', type: 'integer' },
       { column: 'date', key: 'date', type: 'integer' },
       { column: 'amount', key: 'amount', type: 'real' },

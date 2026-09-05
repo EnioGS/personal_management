@@ -163,7 +163,12 @@ Two things it optimizes for:
   of them and four label columns after them. Only the file's own columns can be
   assigned a meaning (date, amount, asset, quantity, price, investment type and
   class); everything unassigned is condensed into one observations column when the
-  row is confirmed, so nothing is dropped and no column has to be invented.
+  row is confirmed, so nothing is dropped and no column has to be invented. **Where a row
+  came from lives in there too**, and nowhere else — the confirmed tables have no
+  filename column repeating it. Duplicate checking, the balances-by-source card and the
+  SQL views all read it back out of the observations, and the exported `.db` exposes it
+  as a derived column, so a query still groups on `source_filename` without the fact
+  being stored twice.
 - Two of the six labels come from the user's own setup and are read first: **account**
   says which account a row moved through and **card** which card it was billed to. Both
   are required and validated against Settings → General, so a row cannot be confirmed

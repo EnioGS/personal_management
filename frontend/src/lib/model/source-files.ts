@@ -3,6 +3,7 @@ import { parseDateValue } from '@/lib/parse-date'
 import { parseNumberValue } from '@/lib/parse-number'
 import { placementsOf, type LabelCatalogue } from './label-catalogue'
 import { DEFAULT_MEANING, ingestionLabelErrors } from './ingestion'
+import { sourceFilenameOf } from './observations'
 import { confirmedRowsTable, ingestionAuditEventsTable, sourceFilesTable, sourceRowsTable } from './model-db'
 import { newRowId } from './row-id'
 import { applySignConvention, shapeOfAmounts } from './sign-convention'
@@ -113,7 +114,9 @@ export async function flagCrossFileDuplicates(sourceId: number): Promise<{ flagg
   }
   for (const stored of await confirmedRowsTable.toArray()) {
     const row = stored.data as ConfirmedRow
-    if (row.sourceFilename === file.originalFilename) continue
+    // Which file a confirmed row came from is in its observations, where the file's own
+    // name was condensed along with everything else no column was assigned to.
+    if (sourceFilenameOf(row.observations) === file.originalFilename) continue
     if (typeof row.date === 'number' && typeof row.amount === 'number') {
       elsewhere.set(`${row.date}|${Math.abs(row.amount).toFixed(2)}`, row.rowId)
     }
@@ -426,7 +429,6 @@ export async function confirmSourceRows(sourceId: number, catalogue: LabelCatalo
     const amount = parseNumberValue(canonicalValue(row, file, 'amount'))
     const base = {
       rowId: row.rowId,
-      sourceFilename: row.values[SOURCE_FILENAME_COLUMN] ?? file.originalFilename,
       confirmedAt,
       date: parseDateValue(canonicalValue(row, file, 'date')) ?? undefined,
       amount: amount ?? undefined,

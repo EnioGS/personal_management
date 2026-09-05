@@ -10,7 +10,6 @@ function row(overrides: Partial<StoredRow<ConfirmedRow>> = {}): StoredRow<Confir
     rowId: 'r1',
     section: 'finances',
     screen: 'investments',
-    sourceFilename: 'corretora.csv',
     confirmedAt: 0,
     date: Date.UTC(2026, 0, 5),
     amount: -500,

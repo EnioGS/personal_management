@@ -124,11 +124,13 @@ describe('confirming', () => {
     await confirmSourceRows(sourceId, catalogue)
 
     const confirmed = (await confirmedRowsTable.toArray())[0].data as ConfirmedRow
+    // The filename is in here and nowhere else: a confirmed row has no column repeating it.
     expect(JSON.parse(confirmed.observations)).toEqual({
       source_filename: 'banco-agosto.csv',
       Descrição: 'MERCADO SAO JORGE',
       Tipo: 'D',
     })
+    expect('sourceFilename' in confirmed).toBe(false)
     expect(confirmed.amount).toBe(-284.9)
     expect(confirmed.date).toBe(Date.UTC(2026, 7, 2))
   })

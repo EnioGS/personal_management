@@ -11,7 +11,7 @@ async function sourceRow(rowId: string) {
 async function confirmedRow(rowId: string) {
   return confirmedRowsTable.add({
     createdAt: 1,
-    data: { rowId, section: 'finances', screen: 'overview', sourceFilename: 'x.csv', confirmedAt: 1, observations: '{}', category: 'outros', subcategory: 'outros' } satisfies ConfirmedRow,
+    data: { rowId, section: 'finances', screen: 'overview', confirmedAt: 1, observations: '{}', category: 'outros', subcategory: 'outros' } satisfies ConfirmedRow,
   })
 }
 
