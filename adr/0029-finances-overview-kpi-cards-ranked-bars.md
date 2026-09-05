@@ -2,8 +2,11 @@
 
 ## Status
 
-Accepted — extends adr/0025's dashboard (filter row, KPI tiles, diverging
-chart), which stays as-is; this adds structure and comparison around it.
+Accepted, except for the delta — extends adr/0025's dashboard (filter row,
+KPI tiles, diverging chart), which stays as-is; this adds structure and
+comparison around it. The delta described below (one ratio against an
+equal-length preceding period) is superseded by adr/0033, which compares
+against last month and against the start of the tile's own sparkline.
 
 ## Context
 

@@ -24,7 +24,7 @@ Two things it optimizes for:
 │   │   │   ├── ui/            # shadcn/ui primitives (button, resizable, table, chart, dropdown-menu, ...)
 │   │   │   ├── charts/        # thin Recharts wrappers (line/bar/pie/diverging-bar) + the shared color palette
 │   │   │   ├── data-table/    # table workspace (selector + "+ Nova tabela") with an inline draft row + CSV
-│   │   │   ├── dashboard/     # filter bar, stat tile (delta+sparkline), dashboard card,
+│   │   │   ├── dashboard/     # filter bar, stat tile (two deltas + sparkline), dashboard card,
 │   │   │   │                  # ranked bar list, category pill (Finances Overview and beyond)
 │   │   │   ├── chat/          # global chat panel (mounted at app root, not a section)
 │   │   │   └── layout/        # activity-bar / secondary-bar / app-shell / chart-table-panel
@@ -46,7 +46,8 @@ Two things it optimizes for:
 │   │   ├── lib/
 │   │   │   ├── local-store/              # generic Dexie-table + Zustand-store factories
 │   │   │   ├── model/                    # accounts/cards, source files, confirmed rows, rules — see adr/0022 and adr/0032
-│   │   │   ├── dashboard/                # date-range presets/resolution (lib side of components/dashboard/)
+│   │   │   ├── dashboard/                # date-range presets, capital evolution and its KPI
+│   │   │   │                             # comparisons, movements analytics — see adr/0033
 │   │   │   ├── table-schema.ts           # column schema driving tables, CSV, and the draft-row inputs
 │   │   │   ├── csv.ts                    # CSV export/import + validation
 │   │   │   ├── aggregations.ts           # chart data-shaping (buckets, running totals, top-N + "Outros" fold)

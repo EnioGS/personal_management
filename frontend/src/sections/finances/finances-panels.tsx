@@ -7,12 +7,13 @@ import { DivergingBarChart } from '@/components/charts/diverging-bar-chart'
 import { CategoryPill } from '@/components/dashboard/category-pill'
 import { DashboardCard } from '@/components/dashboard/dashboard-card'
 import { RankedBarList } from '@/components/dashboard/ranked-bar-list'
-import { StatTile, type StatDelta } from '@/components/dashboard/stat-tile'
+import { StatTile } from '@/components/dashboard/stat-tile'
 import { FilterBar } from '@/components/dashboard/filter-bar'
 import { resolveFilterRange, useDashboardFilters, type DashboardFilters } from '@/components/dashboard/dashboard-filters'
 import { UNLABELLED_LABEL, useDashboardEntries } from '@/components/dashboard/use-dashboard-entries'
 import { formatDateLabel, formatMonthLabel, groupByKey } from '@/lib/aggregations'
-import { capitalEvolution, type CapitalEvolutionPoint } from '@/lib/dashboard/capital-evolution'
+import { capitalEvolution } from '@/lib/dashboard/capital-evolution'
+import { capitalMetric } from '@/lib/dashboard/capital-metric'
 import {
   balanceByAccount,
   incomeByCategory,
@@ -27,37 +28,10 @@ import { averageSpendByCategory, categorySpendChanges, frequentDescriptions, out
 import { FinanceTableDrawer } from './finance-table-drawer'
 
 const currency = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
-
-/** A non-zero change from zero is infinite rather than absent, so every KPI retains its starting-period comparison. */
-function delta(current: number, previous: number, goodDirection: 'up' | 'down', label: string): StatDelta | undefined {
-  if (previous === 0) {
-    if (current === 0) return { value: 0, goodDirection, label }
-    return { value: current > 0 ? Infinity : -Infinity, goodDirection, label }
-  }
-  return { value: (current - previous) / Math.abs(previous), goodDirection, label }
-}
-
-type CapitalMetric = 'capital' | 'investments' | 'income' | 'spending'
-
-/** How many months a tile's own line draws. The card is a glance; the chart below is the history. */
-const TILE_MONTHS = 4
-
-/** The screens the Movements dashboard reads. Spending rows are copies of movements. */
-const MOVEMENTS_SCREEN = 'movements'
-const SPENDING_SCREEN = 'spending'
-const INVESTMENTS_SCREEN = 'investments'
-
-/** The selected period defines the comparison; the tile draws only its last few months. */
-function capitalMetric(points: CapitalEvolutionPoint[], metric: CapitalMetric, goodDirection: 'up' | 'down', label: string) {
-  const values = points.map((point) => point[metric] as number)
-  const current = values.at(-1) ?? 0
-  const starting = values[0] ?? 0
-  return {
-    current,
-    sparkline: values.slice(-TILE_MONTHS),
-    delta: delta(current, starting, goodDirection, label),
-  }
-}
+/** Changes sit under the number in a quarter of its space: R$ 1,2 mil reads at a glance where the cents do not. */
+const compactCurrency = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', notation: 'compact', maximumFractionDigits: 1 })
+/** A comparison names the month it compares against, and four months apart the year is never in doubt. */
+const shortMonth = new Intl.DateTimeFormat('pt-BR', { month: 'short', timeZone: 'UTC' })
 
 /**
  * The Movements dashboard: how the money is doing, in the order it matters.
@@ -89,11 +63,17 @@ export function OverviewPanel() {
     [movementHistory, investmentHistory, spendingHistory, selectedRange],
   )
 
-  const comparisonLabel = t('finances:overview.startingPeriod')
-  const capital = useMemo(() => capitalMetric(capitalData, 'capital', 'up', comparisonLabel), [capitalData, comparisonLabel])
-  const investments = useMemo(() => capitalMetric(capitalData, 'investments', 'up', comparisonLabel), [capitalData, comparisonLabel])
-  const income = useMemo(() => capitalMetric(capitalData, 'income', 'up', comparisonLabel), [capitalData, comparisonLabel])
-  const spent = useMemo(() => capitalMetric(capitalData, 'spending', 'down', comparisonLabel), [capitalData, comparisonLabel])
+  const labels = useMemo(
+    () => ({
+      lastMonth: t('finances:overview.vsLastMonth'),
+      sinceMonth: (month: string) => t('finances:overview.vsMonth', { month: shortMonth.format(new Date(`${month}-01`)) }),
+    }),
+    [t],
+  )
+  const capital = useMemo(() => capitalMetric(capitalData, 'capital', 'up', labels, compactCurrency.format), [capitalData, labels])
+  const investments = useMemo(() => capitalMetric(capitalData, 'investments', 'up', labels, compactCurrency.format), [capitalData, labels])
+  const income = useMemo(() => capitalMetric(capitalData, 'income', 'up', labels, compactCurrency.format), [capitalData, labels])
+  const spent = useMemo(() => capitalMetric(capitalData, 'spending', 'down', labels, compactCurrency.format), [capitalData, labels])
 
   const flow = useMemo(() => monthlyFlow(movements), [movements])
   const averages = useMemo(() => monthlyAverages(flow), [flow])
@@ -129,28 +109,28 @@ export function OverviewPanel() {
               label={t('finances:overview.currentCapital')}
               value={currency.format(capital.current)}
               indicatorColor={DOMAIN_COLOR.balance.light}
-              delta={capital.delta}
+              deltas={capital.deltas}
               sparkline={capital.sparkline}
             />
             <StatTile
               label={t('finances:overview.netMonthlyIncome')}
               value={currency.format(income.current)}
               indicatorColor={DOMAIN_COLOR.contributions.light}
-              delta={income.delta}
+              deltas={income.deltas}
               sparkline={income.sparkline}
             />
             <StatTile
               label={t('common:dashboard.spending')}
               value={currency.format(spent.current)}
               indicatorColor={DIVERGING_PAIR.negative.light}
-              delta={spent.delta}
+              deltas={spent.deltas}
               sparkline={spent.sparkline}
             />
             <StatTile
               label={t('finances:overview.investments')}
               value={currency.format(investments.current)}
               indicatorColor={DOMAIN_COLOR.variableIncome.light}
-              delta={investments.delta}
+              deltas={investments.deltas}
               sparkline={investments.sparkline}
             />
           </div>

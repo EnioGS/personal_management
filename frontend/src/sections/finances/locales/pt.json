@@ -19,7 +19,6 @@
   "overview": {
     "capitalEvolution": "Evolução do capital",
     "currentCapital": "Capital atual",
-    "startingPeriod": "vs. início do período",
     "whereItWent": "Para onde foi",
     "spendingCategories": "Categorias de gastos",
     "entries": "Lançamentos",
@@ -40,7 +39,9 @@
     "byCard": "Por cartão",
     "noCardSpend": "Nada foi lançado em cartão aqui.",
     "averageMonth": "Um mês médio",
-    "largestMovements": "Maiores movimentações"
+    "largestMovements": "Maiores movimentações",
+    "vsLastMonth": "vs. mês anterior",
+    "vsMonth": "vs. {{month}}"
   },
   "spending": {
     "totalSpent": "Total gasto",
