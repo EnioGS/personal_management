@@ -106,7 +106,7 @@ export const assignSourceColumnsTool: ToolDefinition = {
 
 export const setSignConventionTool: ToolDefinition = {
   name: 'set_sign_convention',
-  description: "Makes a file's values mean what this app means: negative left, positive arrived. Acts on the value column only \u2014 amount is units and has no direction. Decide it after the rows are labelled, and sample the destination tables with query_vault first. invertAll for a file that consistently means the opposite; invertWhen for one whose values are all one sign and whose direction lives in another column, naming that column and the entries meaning money left. What the file wrote is kept in the observations. Ask the user if the evidence does not settle it.",
+  description: "Makes a file's values mean what this app means: negative left, positive arrived. Acts on the value column only \u2014 amount is units and has no direction. Decide it after the rows are labelled, and sample the destination tables with run_sql first. invertAll for a file that consistently means the opposite; invertWhen for one whose values are all one sign and whose direction lives in another column, naming that column and the entries meaning money left. What the file wrote is kept in the observations. Ask the user if the evidence does not settle it.",
   parameters: {
     type: 'object',
     properties: {

@@ -40,7 +40,7 @@ export function admits(statement: string, knownTables: string[]): string | null 
 
   const unknown = tablesNamed(skeleton).filter((name) => !knownTables.some((known) => known.toLowerCase() === name))
   if (unknown.length > 0) {
-    return `There is no table called "${unknown[0]}". Call query_vault with no statement for the ones there are.`
+    return `There is no table called "${unknown[0]}". Call run_sql with no statement for the ones there are.`
   }
   return null
 }

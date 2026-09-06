@@ -14,7 +14,7 @@ const REPORT_ABOVE = 200
 
 export const runSqlTool: ToolDefinition = {
   name: 'run_sql',
-  description: "Runs one statement against the user's data: SELECT, INSERT, UPDATE or DELETE, over the tables query_vault lists. A write is planned first and changes nothing — you get the row counts it would touch. Pass apply: true to make it happen; past 200 rows also pass acknowledgedRows with the exact number the plan reported, after telling the user what it will do. Everything a statement changes is one entry in the history, undoable whole. Deleting is allowed here; prefer revise_confirmed_rows when changing a field across many rows, so the correction stays visible as a pair.",
+  description: "Runs one statement against the user's data: SELECT, INSERT, UPDATE or DELETE, over the tables it lists when called with no statement. A write is planned first and changes nothing — you get the row counts it would touch. Pass apply: true to make it happen; past 200 rows also pass acknowledgedRows with the exact number the plan reported, after telling the user what it will do. Everything a statement changes is one entry in the history, undoable whole. Deleting is allowed here; prefer revise_confirmed_rows when changing a field across many rows, so the correction stays visible as a pair.",
   parameters: {
     type: 'object',
     properties: {

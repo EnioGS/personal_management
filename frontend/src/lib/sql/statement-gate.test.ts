@@ -37,3 +37,13 @@ describe('what the gate admits', () => {
     expect(admits('   ', tables)).toMatch(/no statement/)
   })
 })
+
+describe('what a refusal tells the model to do next', () => {
+  it('names a tool it can still call', () => {
+    const refusal = admits('SELECT * FROM "confirmed__finances__nowhere"', tables) ?? ''
+
+    expect(refusal).toContain('run_sql')
+    // The tool it used to name was retired the day SQL replaced it.
+    expect(refusal).not.toContain('query_vault')
+  })
+})
