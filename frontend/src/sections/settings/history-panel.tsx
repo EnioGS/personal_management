@@ -76,7 +76,7 @@ export function HistoryPanel() {
             >
               <div className="min-w-0">
                 <p className="text-xs font-medium">
-                  {WHO[turn.origin]}
+                  {turn.undoOf ? 'Put something back' : WHO[turn.origin]}
                   {turn.profile && <span className="text-muted-foreground font-normal"> · {turn.profile}</span>}
                   <span className="text-muted-foreground font-normal"> · {new Date(turn.at).toLocaleString()}</span>
                 </p>
@@ -96,16 +96,24 @@ export function HistoryPanel() {
                   ))}
                 </p>
               </div>
-              <Button
-                type="button"
-                size="xs"
-                variant="outline"
-                className="shrink-0"
-                disabled={busy === turn.turnId}
-                onClick={() => void undo(turn)}
-              >
-                <Undo2 className="mr-1 size-3.5" /> Undo
-              </Button>
+              {/* Already put back: the button goes rather than staying live, because the
+                  list reorders under the cursor when an undo lands and a second click at
+                  the same spot would otherwise hit the entry that just appeared above. */}
+              {turn.undone ? (
+                <span className="text-muted-foreground shrink-0 pt-1 text-[11px]">Put back</span>
+              ) : (
+                <Button
+                  type="button"
+                  size="xs"
+                  variant="outline"
+                  className="shrink-0"
+                  disabled={busy === turn.turnId}
+                  onClick={() => void undo(turn)}
+                >
+                  <Undo2 className="mr-1 size-3.5" />
+                  {turn.undoOf ? 'Redo' : 'Undo'}
+                </Button>
+              )}
             </div>
           ))}
         </div>

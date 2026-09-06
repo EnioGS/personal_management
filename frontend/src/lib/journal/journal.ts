@@ -21,6 +21,8 @@ export interface JournalEntry {
   label?: string
   /** The message this happened inside, when it happened inside one. */
   parentId?: string
+  /** The turn this one puts back, when that is what it is for. */
+  undoOf?: string
 }
 
 /** Ninety days. Storage is proportional to changes, not to data, so this is cheap. */
@@ -36,6 +38,7 @@ interface Turn {
   statement?: string
   /** The turn this one happened inside, so a message can be read as a whole. */
   parentId?: string
+  undoOf?: string
 }
 
 /**
@@ -113,6 +116,7 @@ export async function record(entries: Omit<JournalEntry, 'turnId' | 'at' | 'orig
       ...(turn.profile ? { profile: turn.profile } : {}),
       ...(turn.statement ? { statement: turn.statement } : {}),
       ...(turn.parentId ? { parentId: turn.parentId } : {}),
+      ...(turn.undoOf ? { undoOf: turn.undoOf } : {}),
     } satisfies JournalEntry,
   })))
   await trim()
@@ -144,6 +148,8 @@ export interface JournalTurn {
   profile?: string
   statement?: string
   parentId?: string
+  /** What this turn puts back, and whether something has already put this one back. */
+  undoOf?: string
   /** Row counts per table, per operation — "deleted 812 rows" without reading anything. */
   counts: Record<string, { insert: number; update: number; delete: number }>
   entries: number
@@ -161,6 +167,7 @@ export async function listTurns(): Promise<JournalTurn[]> {
       profile: entry.profile,
       statement: entry.statement,
       parentId: entry.parentId,
+      undoOf: entry.undoOf,
       counts: {},
       entries: 0,
       undone: false,
@@ -172,6 +179,12 @@ export async function listTurns(): Promise<JournalTurn[]> {
     turn.at = Math.max(turn.at, entry.at)
     byTurn.set(entry.turnId, turn)
   }
+  // A turn somebody has already put back says so, and cannot be put back twice: the undo
+  // of an undo is a redo, and offering both under one word is how a second click undid
+  // the first one's work.
+  const undone = new Set([...byTurn.values()].map((turn) => turn.undoOf).filter(Boolean) as string[])
+  for (const turn of byTurn.values()) turn.undone = undone.has(turn.turnId)
+
   return [...byTurn.values()].sort((left, right) => right.at - left.at)
 }
 
@@ -189,6 +202,9 @@ export async function listTurns(): Promise<JournalTurn[]> {
 export async function undoTurn(turnId: string, tables: Record<string, { get: (id: number) => Promise<unknown>; put: (row: unknown) => Promise<unknown>; delete: (id: number) => Promise<unknown> }>): Promise<{ restored: number; skipped: string[] }> {
   const entries = (await readJournal()).filter((entry) => entry.turnId === turnId)
   if (entries.length === 0) throw new Error('There is no record of that change.')
+  if ((await listTurns()).find((turn) => turn.turnId === turnId)?.undone) {
+    throw new Error('That has already been put back. Undo the entry that put it back, if you want it again.')
+  }
 
   const skipped: string[] = []
   let restored = 0
@@ -212,7 +228,7 @@ export async function undoTurn(turnId: string, tables: Record<string, { get: (id
 
   // The undo is a turn of its own, so what it did is as visible as what it undid — and
   // so it can itself be undone, which is what somebody who undoes the wrong turn needs.
-  beginTurn({ origin: 'system', label: `Undo of ${turnId.slice(0, 8)}` })
+  beginTurn({ origin: 'system', label: `Undo of ${turnId.slice(0, 8)}`, undoOf: turnId })
   await record(entries.map((entry) => ({
     table: entry.table,
     rowId: entry.rowId,

@@ -147,3 +147,29 @@ describe('undoing a turn', () => {
     await expect(undoTurn('nothing', JOURNALLED_TABLES as never)).rejects.toThrow(/no record/)
   })
 })
+
+describe('undoing twice', () => {
+  it('refuses the second time, because the first already put it back', async () => {
+    const id = await confirmedRowsTable.add({ createdAt: 1, data: row('mercado') })
+    const turnId = beginTurn({ origin: 'assistant' })
+    await confirmedRowsTable.update(id, { data: row('wrong') })
+    endTurn()
+
+    await undoTurn(turnId, JOURNALLED_TABLES as never)
+    await expect(undoTurn(turnId, JOURNALLED_TABLES as never)).rejects.toThrow(/already been put back/)
+    expect(((await confirmedRowsTable.get(id))!.data as { category: string }).category).toBe('mercado')
+  })
+
+  it('says which turns have been put back, so the button can go', async () => {
+    const id = await confirmedRowsTable.add({ createdAt: 1, data: row('mercado') })
+    const turnId = beginTurn({ origin: 'assistant' })
+    await confirmedRowsTable.update(id, { data: row('wrong') })
+    endTurn()
+    await undoTurn(turnId, JOURNALLED_TABLES as never)
+
+    const turns = await listTurns()
+    expect(turns.find((turn) => turn.turnId === turnId)?.undone).toBe(true)
+    // The undo itself is offered as a redo rather than as another undo.
+    expect(turns.find((turn) => turn.undoOf === turnId)?.undone).toBe(false)
+  })
+})
