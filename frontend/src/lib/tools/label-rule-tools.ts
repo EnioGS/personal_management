@@ -130,7 +130,8 @@ export const saveLabelRuleTool: ToolDefinition = {
     if (bad) return `Error: ${bad}`
 
     const ruleId = await saveLabelRule(rule)
-    const applied = args.applyNow === false ? null : await applyLabelRulesToRows(stage, context.translate)
+    // Only the rule just saved: the others have already had their chance at every row.
+    const applied = args.applyNow === false ? null : await applyLabelRulesToRows(stage, context.translate, undefined, [ruleId])
     return JSON.stringify({ ruleId, saved: rule, applied })
   },
 }
@@ -207,7 +208,7 @@ export const editLabelRuleTool: ToolDefinition = {
     if (bad) return `Error: ${bad}`
 
     await updateLabelRule(args.ruleId, rewritten, 'assistant')
-    const applied = args.applyNow === false ? null : await applyLabelRulesToRows(existing.context, context.translate)
+    const applied = args.applyNow === false ? null : await applyLabelRulesToRows(existing.context, context.translate, undefined, [existing.id])
     // Read back rather than echoed: the stamp saying who rewrote it is put on by the
     // store, and reporting the version that was sent would leave that out.
     const stored = (await listLabelRules()).find((rule) => rule.id === args.ruleId)

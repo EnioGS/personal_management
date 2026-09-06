@@ -56,8 +56,24 @@ export interface RuleRunResult {
  * a rule that should only touch one narrows itself with a condition on the labels, which
  * keeps "where this applies" in the same place as "what this means".
  */
-export async function applyLabelRulesToRows(context: RuleContext, translate: (key: string) => string, rowIds?: number[]): Promise<RuleRunResult> {
-  const rules = await listLabelRules(context)
+export async function applyLabelRulesToRows(
+  context: RuleContext,
+  translate: (key: string) => string,
+  rowIds?: number[],
+  /**
+   * Which rules to run, when the answer is not "all of them".
+   *
+   * Saving one rule used to run every standing rule over every row — hundreds of rows
+   * touched to fill none, an audit nobody could read, and now a journal entry each. A rule
+   * fills only what a row does not already say, so running the others changes nothing that
+   * running them earlier did not already change.
+   */
+  onlyRuleIds?: number[],
+): Promise<RuleRunResult> {
+  const standing = await listLabelRules(context)
+  const rules = onlyRuleIds && onlyRuleIds.length > 0
+    ? standing.filter((rule) => onlyRuleIds.includes(rule.id))
+    : standing
   const result: RuleRunResult = { rowsTouched: 0, byRule: rules.map((rule) => ({ ruleId: rule.id, name: rule.name || rule.contains, rowsFilled: 0 })) }
   if (rules.length === 0) return result
 

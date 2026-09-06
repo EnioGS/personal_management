@@ -604,3 +604,54 @@ describe('a file whose rows are shorter than its header', () => {
     expect(() => parseSourceCsv('')).toThrow(/no header row/)
   })
 })
+
+describe('re-importing a month already confirmed', () => {
+  beforeEach(async () => { await wipeAllData() })
+
+  it('is noticed, though the file it repeats is long gone', async () => {
+    // A confirmed row remembers where it came from; its source table does not survive.
+    await confirmedRowsTable.add({
+      createdAt: 1,
+      data: {
+        rowId: 'r1', section: 'finances', screen: 'movements', confirmedAt: 1, date: Date.UTC(2026, 7, 1), value: -10,
+        observations: JSON.stringify({ source_filename: 'Nubank_2026-08-08.csv', Descrição: 'MERCADO' }),
+        category: '', subcategory: '',
+      },
+    })
+
+    const sourceId = await createSourceFile('Nubank_2026-08-08 (1).csv', BANK_CSV)
+
+    const file = (await sourceFilesTable.get(sourceId))!.data as SourceFile
+    expect(file.looksLikeConfirmedFile).toBe('Nubank_2026-08-08.csv')
+  })
+
+  it('says nothing about a file whose name is nothing like it', async () => {
+    await confirmedRowsTable.add({
+      createdAt: 1,
+      data: {
+        rowId: 'r1', section: 'finances', screen: 'movements', confirmedAt: 1,
+        observations: JSON.stringify({ source_filename: 'corretora-2023.csv' }), category: '', subcategory: '',
+      },
+    })
+
+    const sourceId = await createSourceFile('Nubank_2026-08-08.csv', BANK_CSV)
+
+    expect(((await sourceFilesTable.get(sourceId))!.data as SourceFile).looksLikeConfirmedFile).toBeUndefined()
+  })
+
+  it('flags the rows themselves against confirmed ones, once the columns are assigned', async () => {
+    const first = await createSourceFile('banco-agosto.csv', BANK_CSV)
+    for (const entry of await rowsOf(first)) await label(entry.id, { sections: ['finances'], screens: ['overview'], account: 'Banco A' })
+    await assignSourceColumns(first, { Data: 'date', Valor: 'price' })
+    await confirmSourceRows(first, catalogue)
+    expect(await confirmedRowsTable.count()).toBeGreaterThan(0)
+
+    // The same statement again, under another name. Before the columns are assigned there
+    // is nothing to compare on; afterwards the rows line up with what was confirmed.
+    const again = await createSourceFile('banco-agosto (1).csv', BANK_CSV, { scanDuplicates: false })
+    for (const entry of await rowsOf(again)) await label(entry.id, { sections: ['finances'], screens: ['overview'] })
+    await assignSourceColumns(again, { Data: 'date', Valor: 'price' })
+
+    expect((await rowsOf(again)).every((entry) => entry.row.duplicateOf)).toBe(true)
+  })
+})

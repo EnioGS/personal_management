@@ -191,6 +191,15 @@ export interface SourceFile {
   signConvention: SignConvention
   /** Which already-imported file this one looks like a repeat of, if any. */
   looksLikeSourceId?: number
+  /**
+   * A file already confirmed whose name this one nearly repeats.
+   *
+   * The commonest duplicate there is: a month imported, confirmed, its source table
+   * retired, and the same statement downloaded again. Nothing is left to compare names
+   * with once the file is gone, so what the confirmed rows remember of where they came
+   * from is compared instead.
+   */
+  looksLikeConfirmedFile?: string
 }
 
 /**

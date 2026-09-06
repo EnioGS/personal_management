@@ -263,6 +263,16 @@ export async function createSourceFile(
     .map((candidate) => ({ ...candidate, similarity: filenameSimilarity(candidate.file.originalFilename, originalFilename) }))
     .sort((left, right) => right.similarity - left.similarity)[0]
 
+  // A file that was confirmed leaves no source table behind, so its name survives only in
+  // what its rows remember. Re-importing a month already confirmed is the commonest
+  // duplicate of all, and comparing against the staged files alone cannot see it.
+  const confirmedNames = new Set(
+    (await confirmedRowsTable.toArray()).map((row) => sourceFilenameOf((row.data as ConfirmedRow).observations)).filter(Boolean),
+  )
+  const looksLikeConfirmed = [...confirmedNames]
+    .map((name) => ({ name, similarity: filenameSimilarity(name, originalFilename) }))
+    .sort((left, right) => right.similarity - left.similarity)[0]
+
   const sourceId = await sourceFilesTable.add({
     createdAt: Date.now(),
     data: {
@@ -276,6 +286,7 @@ export async function createSourceFile(
       // Recorded, never acted on by itself: a near-identical name is a reason to look,
       // not a reason to drop anything.
       looksLikeSourceId: looksLike && looksLike.similarity >= 0.8 ? looksLike.id : undefined,
+      looksLikeConfirmedFile: looksLikeConfirmed && looksLikeConfirmed.similarity >= 0.8 ? looksLikeConfirmed.name : undefined,
     } satisfies SourceFile,
   })
 

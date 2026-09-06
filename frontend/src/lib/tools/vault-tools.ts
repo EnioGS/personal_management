@@ -70,6 +70,8 @@ export const importAsSourceFileTool: ToolDefinition = {
           : undefined,
         labelledByRules: applied.rowsTouched,
         looksLikeSourceId: file?.looksLikeSourceId ?? null,
+        // Named rather than numbered: the file it resembles has no source table left.
+        looksLikeConfirmedFile: file?.looksLikeConfirmedFile ?? null,
       })
     } catch (error) { return `Error: ${error instanceof Error ? error.message : 'that text could not be read as a table.'}` }
   },

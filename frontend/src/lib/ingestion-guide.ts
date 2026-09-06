@@ -58,17 +58,17 @@ sections may offer the same name: ${PROMPT_PLACEHOLDERS.screens}
 
 Class — free text: what kind of thing it is, which is what a balance is sliced by — renda
 fixa, renda variável, cash reserve. What it *is*, never where it came from: interest
-arriving in cash is class \`cash reserve\`, not \`proceeds\`. Investments reads it.
+arriving in cash is \`cash reserve\`, not \`proceeds\`. Investments reads it.
 
-Category — free text, one value, starts empty. Leave it empty rather than writing a word
-like "other": an empty cell asks to be looked at, "other" looks like an answer.
+Category — free text, one value, starts empty. Leave it empty rather than writing "other":
+an empty cell asks to be looked at, "other" looks like an answer.
 
-Subcategory — the detail under it, also free text. Assinatura, membership, parcelado and
-their equivalents are read by the Recurring screen.
+Subcategory — the detail under it, free text. Assinatura, membership, parcelado and their
+equivalents are read by the Recurring screen.
 
 Account — required, and must name one the user set up: every movement sat somewhere.
-Card — optional, and the same vocabulary: a Pix, a salary or a transfer touched none, and
-empty is the true answer rather than a gap to fill.
+Card — optional, same vocabulary: a Pix, a salary or a transfer touched none, and empty is
+the true answer rather than a gap to fill.
 
 ## Signs
 
@@ -103,8 +103,10 @@ before it runs, reported by row count, and undoable whole from Settings → Hist
 ## Duplicates
 
 Two identical rows *inside one file* are two real transactions — banks report them. A row
-is a possible duplicate only when everything it says matches a row from a **different
-file**, or a new file's name is nearly one imported already.
+is a possible duplicate only when everything it says matches one from a **different file**,
+confirmed rows included — comparable only once the columns are assigned, so look again
+after assigning. A name nearly repeating a file already imported or confirmed is flagged
+on arrival.
 
 ## Rules and notes
 

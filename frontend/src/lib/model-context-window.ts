@@ -13,9 +13,18 @@ export interface ModelFacts {
   /** US dollars per prompt token and per completion token, as the catalogue lists them. */
   promptCostPerToken: number | null
   completionCostPerToken: number | null
+  /**
+   * What a prompt token already in the provider's cache costs, where the catalogue says.
+   *
+   * Usually a fraction of the fresh rate, and on a long tool loop most of the prompt is
+   * cached — so charging every token at the fresh rate does not overstate the bill by a
+   * little, it overstates it several times over. Null where the catalogue is silent, and
+   * then the fresh rate stands and the figure is an upper bound.
+   */
+  cachedPromptCostPerToken: number | null
 }
 
-const UNKNOWN: ModelFacts = { contextWindow: null, promptCostPerToken: null, completionCostPerToken: null }
+const UNKNOWN: ModelFacts = { contextWindow: null, promptCostPerToken: null, completionCostPerToken: null, cachedPromptCostPerToken: null }
 
 const cache = new Map<string, ModelFacts>()
 let allModels: Promise<Map<string, ModelFacts>> | null = null
@@ -28,7 +37,9 @@ function price(value: unknown): number | null {
 async function loadModelFacts(): Promise<Map<string, ModelFacts>> {
   const response = await fetch('https://openrouter.ai/api/v1/models')
   if (!response.ok) throw new Error(`models request failed (${response.status})`)
-  const data = (await response.json()) as { data?: { id?: string; context_length?: number; pricing?: { prompt?: string; completion?: string } }[] }
+  const data = (await response.json()) as {
+    data?: { id?: string; context_length?: number; pricing?: { prompt?: string; completion?: string; input_cache_read?: string } }[]
+  }
   const facts = new Map<string, ModelFacts>()
   for (const model of data.data ?? []) {
     if (typeof model.id !== 'string') continue
@@ -36,6 +47,7 @@ async function loadModelFacts(): Promise<Map<string, ModelFacts>> {
       contextWindow: typeof model.context_length === 'number' ? model.context_length : null,
       promptCostPerToken: price(model.pricing?.prompt),
       completionCostPerToken: price(model.pricing?.completion),
+      cachedPromptCostPerToken: price(model.pricing?.input_cache_read),
     })
   }
   return facts

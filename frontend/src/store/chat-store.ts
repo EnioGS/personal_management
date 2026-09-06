@@ -12,6 +12,7 @@ import type { OpenRouterMessage } from '@/lib/openrouter'
 import { toolsForRequest } from '@/lib/tools/registry'
 import { runConversation, type ConversationStatus, type ConversationUsage } from '@/lib/tools/run-conversation'
 import { toolContext } from '@/lib/tools/tool-context'
+import { costOfExchange } from '@/lib/model-cost'
 import { modelFactsFor } from '@/lib/model-context-window'
 import { refreshAllLocalStores } from '@/lib/local-store/create-local-list-store'
 import { recordUsage } from '@/lib/chat/usage-ledger'
@@ -227,8 +228,8 @@ export const useChatStore = create<ChatState>((set, get) => {
           const previous = get().usage
           // Prompt and completion tokens are priced differently, so the cost is built
           // from the two rather than from the total.
-          const cost = facts?.promptCostPerToken !== null && facts?.completionCostPerToken !== null && facts
-            ? usage.promptTokens * facts.promptCostPerToken + usage.completionTokens * facts.completionCostPerToken
+          const cost = facts?.promptCostPerToken != null && facts?.completionCostPerToken != null
+            ? costOfExchange(usage, facts)
             : null
           set({
             usage: {
