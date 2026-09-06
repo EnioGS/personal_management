@@ -49,8 +49,10 @@ export function HistoryPanel() {
   }
 
   return (
-    <div className="flex h-full flex-col gap-3 overflow-auto p-4">
-      <div>
+    // min-h-0 so the list below can be the thing that scrolls: a flex child's implicit
+    // minimum is its content, so without it the panel grows past the screen instead.
+    <div className="flex h-full min-h-0 flex-col gap-3 p-4">
+      <div className="shrink-0">
         <h3 className="text-sm font-medium">What has changed</h3>
         <p className="text-muted-foreground text-xs">
           Every change made through this app, grouped by what made it, kept for{' '}
@@ -59,12 +61,12 @@ export function HistoryPanel() {
         </p>
       </div>
 
-      {message && <p className="text-xs">{message}</p>}
+      {message && <p className="shrink-0 text-xs">{message}</p>}
 
       {turns.length === 0 ? (
         <p className="text-muted-foreground text-xs">Nothing has changed yet.</p>
       ) : (
-        <div className="flex flex-col divide-y overflow-hidden rounded-md border">
+        <div className="min-h-0 flex-1 divide-y overflow-y-auto rounded-md border">
           {turns.map((turn) => (
             <div
               key={turn.turnId}
