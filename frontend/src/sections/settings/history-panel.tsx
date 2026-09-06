@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { refreshAllLocalStores } from '@/lib/local-store/create-local-list-store'
 import { RETENTION_MS, listTurns, undoTurn, type JournalTurn } from '@/lib/journal/journal'
 import { JOURNALLED_TABLES } from '@/lib/model/model-db'
+import { cn } from '@/lib/utils'
 
 const WHO: Record<JournalTurn['origin'], string> = {
   user: 'You',
@@ -65,7 +66,12 @@ export function HistoryPanel() {
       ) : (
         <div className="flex flex-col divide-y overflow-hidden rounded-md border">
           {turns.map((turn) => (
-            <div key={turn.turnId} className="flex items-start justify-between gap-3 p-2.5">
+            <div
+              key={turn.turnId}
+              // Something that happened inside a message is indented under it, so the
+              // message reads as a whole and each thing it did is still its own line.
+              className={cn('flex items-start justify-between gap-3 p-2.5', turn.parentId && 'border-l-2 pl-4')}
+            >
               <div className="min-w-0">
                 <p className="text-xs font-medium">
                   {WHO[turn.origin]}
@@ -73,7 +79,9 @@ export function HistoryPanel() {
                   <span className="text-muted-foreground font-normal"> · {new Date(turn.at).toLocaleString()}</span>
                 </p>
                 {turn.label && <p className="text-muted-foreground truncate text-xs">{turn.label}</p>}
-                {turn.statement && <p className="text-muted-foreground truncate font-mono text-[11px]">{turn.statement}</p>}
+                {turn.statement && (
+                  <p className="text-muted-foreground font-mono text-[11px] break-all">{turn.statement}</p>
+                )}
                 <p className="text-muted-foreground text-[11px]">
                   {Object.entries(turn.counts).map(([table, counts]) => (
                     <span key={table} className="mr-3">

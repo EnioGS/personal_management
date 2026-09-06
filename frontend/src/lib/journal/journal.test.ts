@@ -59,11 +59,31 @@ describe('a turn', () => {
     expect(turn.counts.confirmedRows).toEqual({ insert: 2, update: 1, delete: 0 })
   })
 
-  it('is one per action when nobody opened one', async () => {
+  it('reads a burst of writes with no turn open as the one action it was', async () => {
+    // Deleting a source table is one act and several Dexie calls; a person undoing it
+    // means the act, not the third call inside it.
     await confirmedRowsTable.add({ createdAt: 1, data: row('mercado') })
     await confirmedRowsTable.add({ createdAt: 1, data: row('farmácia') })
 
-    expect(await listTurns()).toHaveLength(2)
+    const turns = await listTurns()
+    expect(turns).toHaveLength(1)
+    expect(turns[0].counts.confirmedRows).toMatchObject({ insert: 2 })
+  })
+
+  it('gives each thing a message did a turn of its own, inside the message', async () => {
+    const message = beginTurn({ origin: 'assistant', label: 'the whole request' })
+    const statement = beginTurn({ origin: 'sql', statement: 'UPDATE confirmed_rows SET class = ?' })
+    await confirmedRowsTable.add({ createdAt: 1, data: row('by sql') })
+    endTurn()
+    await confirmedRowsTable.add({ createdAt: 1, data: row('by a tool') })
+    endTurn()
+
+    const turns = await listTurns()
+    // The statement is undoable on its own, and says which message it belonged to.
+    const inner = turns.find((turn) => turn.turnId === statement)
+    expect(inner).toMatchObject({ origin: 'sql', parentId: message })
+    expect(inner!.statement).toContain('UPDATE')
+    expect(turns.find((turn) => turn.turnId === message)?.origin).toBe('assistant')
   })
 })
 

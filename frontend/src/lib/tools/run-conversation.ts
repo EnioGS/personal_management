@@ -1,5 +1,6 @@
 import { refreshAllLocalStores } from '@/lib/local-store/create-local-list-store'
 import { requestChatMessage, type OpenRouterMessage, type OpenRouterTool } from '@/lib/openrouter'
+import { beginTurn, endTurn } from '@/lib/journal/journal'
 import { findTool, openToolsetTool, toolsForRequest } from './registry'
 import type { ToolContext } from './types'
 
@@ -142,7 +143,10 @@ export async function runConversation({
     for (const toolCall of message.tool_calls) {
       onStatus?.({ type: 'tool', name: toolCall.function.name })
       const calledAt = Date.now()
-      const result = await executeToolCall(toolCall, context)
+      // A turn of its own, inside the message's: "what did that message change" and "put
+      // that one call back" are different questions, and both deserve an answer.
+      beginTurn({ origin: 'assistant', label: toolCall.function.name })
+      const result = await executeToolCall(toolCall, context).finally(endTurn)
       const took = Date.now() - calledAt
 
       // Counted by name: which tools a wording makes the model reach for, how often it is

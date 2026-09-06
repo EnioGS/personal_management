@@ -29,9 +29,15 @@ one thing every write path has in common. A proxy intercepts the seven write
 methods and passes everything else — `where`, `orderBy`, `get` — straight
 through, so nothing that uses Dexie has to know.
 
-**A turn is the unit.** Everything one assistant message did shares a `turnId`,
-because that is what a person undoes: not one row, and not everything since
-Tuesday. A write outside a turn is a turn of one.
+**Turns nest, and a write belongs to the innermost.** A message is a turn and so
+is each tool call and each statement inside it, because those are two different
+questions: "what did that message change" is how the history is read, and "put
+that one statement back" is how a mistake is fixed. Undoing the outer undoes the
+inner ones with it, since they are the same entries.
+
+A write with no turn open joins the last one if it arrived within a moment —
+deleting a source table is one act and several Dexie calls, and a person undoing
+it means the act.
 
 **Undo refuses rather than clobbers.** A row touched since the turn is left
 alone and named. Restoring what somebody lost by discarding what they did

@@ -19,6 +19,8 @@ export interface JournalEntry {
   statement?: string
   profile?: string
   label?: string
+  /** The message this happened inside, when it happened inside one. */
+  parentId?: string
 }
 
 /** Ninety days. Storage is proportional to changes, not to data, so this is cheap. */
@@ -32,31 +34,54 @@ interface Turn {
   label?: string
   profile?: string
   statement?: string
+  /** The turn this one happened inside, so a message can be read as a whole. */
+  parentId?: string
 }
 
-let current: Turn | null = null
-let paused = 0
-
 /**
- * Everything written from here until `endTurn` belongs together.
+ * Turns nest, and a write belongs to the innermost.
  *
- * A turn is what a person undoes: not one row, and not everything since Tuesday, but the
- * whole of what one message or one action did. Nesting is ignored on purpose — an inner
- * call joins the turn already open rather than starting a second one.
+ * A message is a turn and so is each thing it did, because those are two different
+ * questions: "what did that message change" is how you read the history, and "put that one
+ * statement back" is how you fix a mistake. Undoing the outer one undoes the inner ones
+ * with it, since they are the same entries.
  */
-export function beginTurn(turn: Omit<Turn, 'turnId'> & { turnId?: string }): string {
-  if (current) return current.turnId
-  current = { ...turn, turnId: turn.turnId ?? crypto.randomUUID() }
-  return current.turnId
+const stack: Turn[] = []
+let paused = 0
+/** A burst of writes with no turn open is one action of the user's, not eight. */
+let lastAuto: { turn: Turn; at: number } | null = null
+const BURST_MS = 400
+
+export function beginTurn(turn: Omit<Turn, 'turnId' | 'parentId'> & { turnId?: string }): string {
+  const parent = stack[stack.length - 1]
+  const next: Turn = { ...turn, turnId: turn.turnId ?? crypto.randomUUID(), parentId: parent?.turnId }
+  stack.push(next)
+  return next.turnId
 }
 
 export function endTurn(): void {
-  current = null
+  stack.pop()
 }
 
-/** What a write outside a turn belongs to: itself. */
+/**
+ * What a write outside a turn belongs to.
+ *
+ * Deleting a source table is one act and several Dexie calls — the file, then its rows —
+ * so writes arriving within a moment of each other are read as one thing. Anything slower
+ * than that was a second decision.
+ */
 function turnFor(): Turn {
-  return current ?? { turnId: crypto.randomUUID(), origin: 'user' }
+  const open = stack[stack.length - 1]
+  if (open) return open
+
+  const now = Date.now()
+  if (lastAuto && now - lastAuto.at < BURST_MS) {
+    lastAuto.at = now
+    return lastAuto.turn
+  }
+  const turn: Turn = { turnId: crypto.randomUUID(), origin: 'user' }
+  lastAuto = { turn, at: now }
+  return turn
 }
 
 /**
@@ -87,6 +112,7 @@ export async function record(entries: Omit<JournalEntry, 'turnId' | 'at' | 'orig
       ...(turn.label ? { label: turn.label } : {}),
       ...(turn.profile ? { profile: turn.profile } : {}),
       ...(turn.statement ? { statement: turn.statement } : {}),
+      ...(turn.parentId ? { parentId: turn.parentId } : {}),
     } satisfies JournalEntry,
   })))
   await trim()
@@ -117,6 +143,7 @@ export interface JournalTurn {
   label?: string
   profile?: string
   statement?: string
+  parentId?: string
   /** Row counts per table, per operation — "deleted 812 rows" without reading anything. */
   counts: Record<string, { insert: number; update: number; delete: number }>
   entries: number
@@ -133,6 +160,7 @@ export async function listTurns(): Promise<JournalTurn[]> {
       label: entry.label,
       profile: entry.profile,
       statement: entry.statement,
+      parentId: entry.parentId,
       counts: {},
       entries: 0,
       undone: false,
