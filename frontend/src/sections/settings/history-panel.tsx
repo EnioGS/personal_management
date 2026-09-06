@@ -110,8 +110,9 @@ export function HistoryPanel() {
                   disabled={busy === turn.turnId}
                   onClick={() => void undo(turn)}
                 >
-                  <Undo2 className="mr-1 size-3.5" />
-                  {turn.undoOf ? 'Redo' : 'Undo'}
+                  {/* One word everywhere: the button reverses the row it sits on, which is
+                      true at every depth. "Redo" only reads correctly one level in. */}
+                  <Undo2 className="mr-1 size-3.5" /> Undo
                 </Button>
               )}
             </div>
