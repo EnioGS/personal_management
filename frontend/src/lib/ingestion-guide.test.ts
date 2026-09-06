@@ -39,15 +39,21 @@ describe('the ingestion guide', () => {
     // Measured as sent: a placeholder is replaced by the live list before the guide goes
     // anywhere, so its own spelling is not part of what the model is charged for.
     const asSent = DEFAULT_INGESTION_GUIDE.replace(/\[PLACEHOLDER_FOR_[A-Z0-9_]+\]/g, '')
-    // Roughly four characters to a token.
-    expect(asSent.length / 4).toBeLessThan(1400)
+    // Roughly four characters to a token. Raised from 1,400 when SQL replaced eight tools:
+    // the guide says what their schemas used to, once per conversation instead of on every
+    // request, so the accounting across a whole exchange moved sharply the other way.
+    expect(asSent.length / 4).toBeLessThan(1450)
   })
 
-  it('states the one asymmetry between the user and the assistant', () => {
+  it('states the discipline that outlived the restriction: a correction is a pair', () => {
     // The sentence wraps in the guide's own text, so the claim is checked without its
     // line break: what matters is that the guide says it, not how it is set.
-    expect(DEFAULT_INGESTION_GUIDE.replace(/\s+/g, ' ')).toContain("Deleting is the user's alone")
-    expect(DEFAULT_INGESTION_GUIDE).toContain('Never edit a confirmed row in place')
+    const guide = DEFAULT_INGESTION_GUIDE.replace(/\s+/g, ' ')
+
+    expect(guide).toContain('the same row_id')
+    expect(guide).toContain('marking the old one')
+    // Deleting is no longer the user's alone, and the guide says what replaced that.
+    expect(guide).toContain('undoable whole')
   })
 
   it('is reachable: the system prompt tells the model to fetch it before helping', () => {
@@ -63,11 +69,14 @@ describe('the system prompt', () => {
     }
   })
 
-  it('states the two rules that must never bend, and leaves the rest to the guide', () => {
+  it('states the rule that never bends, and leaves the rest to the guide', () => {
     const prompt = DEFAULT_SYSTEM_PROMPT.replace(/\s+/g, ' ')
 
-    expect(prompt).toContain('Never edit a confirmed row in place')
-    expect(prompt).toContain('only the user deletes anything')
+    // What survived opening SQL up: a correction is a pair, because that is about what a
+    // change looks like on screen rather than about what the assistant is trusted with.
+    expect(prompt).toContain('same row_id')
+    expect(prompt).toContain('not an edit in place')
+    expect(prompt).toContain('undoable whole')
     expect(prompt).toContain('read_ingestion_guide')
   })
 

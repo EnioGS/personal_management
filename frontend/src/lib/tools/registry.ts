@@ -2,6 +2,7 @@ import type { OpenRouterTool } from '@/lib/openrouter'
 import { promptText } from '@/lib/prompts/registry'
 import { applyLabelRulesTool, deleteLabelRuleTool, editLabelRuleTool, listLabelRulesTool, saveLabelRuleTool } from './label-rule-tools'
 import { readCsvTool } from './read-csv'
+import { runSqlTool } from './run-sql'
 import { readIngestionGuideTool } from './guide-tool'
 import { setConversationTitleTool } from './conversation-tools'
 import { addClassificationNoteTool, deleteClassificationNoteTool, editClassificationNoteTool, listClassificationNotesTool } from './note-tools'
@@ -29,9 +30,13 @@ import {
   setSourceValuesTool,
 } from './vault-tools'
 
-// Reading is SQL; writing is a small set of functions that validate. Deleting rows is
-// the user's alone — the assistant marks, and a marked row is invisible to every
-// dashboard while staying in its table, which is what makes that division safe.
+// Reading and writing are both SQL now, over the tables the vault builds. What made that
+// safe to open is underneath rather than here: every write is journalled and undoable
+// whole, a write is planned against a copy before it is made, and the labels a row claims
+// are checked wherever the write came from. The few tools that remain are the ones SQL
+// cannot express — a pipeline, a file's metadata — and one that can be expressed but is
+// worth keeping said in one place: revising a confirmed row leaves the correction visible
+// as a pair, which a raw UPDATE cannot.
 
 /** Adding a tool = write one ToolDefinition file + add it here. Nothing else changes. */
 export const toolRegistry: ToolDefinition[] = [
@@ -43,6 +48,7 @@ export const toolRegistry: ToolDefinition[] = [
   addAccountTool,
   addCardTool,
   queryVaultTool,
+  runSqlTool,
   importAsSourceFileTool,
   assignSourceColumnsTool,
   setSignConventionTool,
@@ -89,16 +95,13 @@ export const TOOL_GROUPS: Record<string, { summary: string; tools: string[] }> =
   ingesting: {
     summary: 'Working on an uploaded file: assigning its columns, making its signs agree, labelling its rows, adding or correcting one, and confirming them into their tables.',
     tools: [
-      'import_as_source_file', 'assign_source_columns', 'set_sign_convention', 'set_labels',
-      'label_rows_by_match', 'add_source_row', 'set_source_values', 'confirm_rows', 'drop_source_table',
+      'import_as_source_file', 'assign_source_columns', 'set_sign_convention',
+      'label_rows_by_match', 'add_source_row', 'confirm_rows', 'drop_source_table',
     ],
   },
   confirmed: {
-    summary: 'Changing rows already in their tables: correcting them, moving them between tables, filling in what an import left empty, marking them for elimination.',
-    tools: [
-      'set_confirmed_meaning', 'revise_confirmed_rows', 'place_confirmed_rows',
-      'fill_from_observations', 'add_confirmed_row', 'new_row_id', 'mark_rows',
-    ],
+    summary: 'Changing rows already in their tables: correcting many at once so the correction stays visible, and minting an id for a row that needs one.',
+    tools: ['revise_confirmed_rows', 'new_row_id'],
   },
   rules: {
     summary: 'Standing rules that label rows automatically, and the notes written about this data that a rule cannot express.',
@@ -118,7 +121,19 @@ export const TOOL_GROUPS: Record<string, { summary: string; tools: string[] }> =
 }
 
 /** Always present: reading, asking questions of the data, and finding out how any of it works. */
-const CORE_TOOLS = ['read_text_file', 'read_csv', 'query_vault', 'read_ingestion_guide', 'list_label_options']
+const CORE_TOOLS = ['read_text_file', 'read_csv', 'run_sql', 'read_ingestion_guide', 'list_label_options']
+
+/**
+ * Still here, still working, and no longer offered.
+ *
+ * Each of these is one statement of SQL, and SQL now reaches every one of the tables they
+ * touched. The code stays because switching a tool back on is a line in this list, and
+ * because the metrics say whether anything was lost by taking it away.
+ */
+export const RETIRED_TOOLS = [
+  'query_vault', 'set_labels', 'set_confirmed_meaning', 'place_confirmed_rows',
+  'fill_from_observations', 'add_confirmed_row', 'mark_rows', 'set_source_values',
+]
 
 export const openToolsetTool: ToolDefinition = {
   name: 'open_toolset',
@@ -161,7 +176,7 @@ export function toolsForRequest(openGroups: string[] = []): OpenRouterTool[] {
 
   // Descriptions are read through the active profile rather than off the definition: a
   // tool's wording is prompt text like any other, and this is the one place it is sent.
-  return [openToolsetTool, ...toolRegistry.filter((tool) => names.has(tool.name))].map((tool) => ({
+  return [openToolsetTool, ...toolRegistry.filter((tool) => names.has(tool.name) && !RETIRED_TOOLS.includes(tool.name))].map((tool) => ({
     type: 'function',
     function: { name: tool.name, description: promptText(`tool.${tool.name}`, tool.description), parameters: tool.parameters },
   }))

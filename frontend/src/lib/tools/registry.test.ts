@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { TOOL_GROUPS, findTool, toolRegistry, toolsForRequest } from './registry'
+import { RETIRED_TOOLS, TOOL_GROUPS, findTool, toolRegistry, toolsForRequest } from './registry'
 
 describe('findTool', () => {
   it('finds a registered tool by name', () => {
@@ -20,6 +20,7 @@ describe('findTool', () => {
       'add_account',
       'add_card',
       'query_vault',
+      'run_sql',
       'import_as_source_file',
       'assign_source_columns',
       'set_sign_convention',
@@ -83,9 +84,10 @@ describe('what a request carries', () => {
     const names = toolsForRequest().map((tool) => tool.function.name)
 
     expect(names).toContain('open_toolset')
-    expect(names).toContain('query_vault')
+    expect(names).toContain('run_sql')
     expect(names).toContain('read_ingestion_guide')
-    // Nothing that writes, until somebody says the work needs it.
+    // Nothing that runs a pipeline, until somebody says the work needs it. SQL is core
+    // because reading is, and a write through it is planned before it happens.
     expect(names).not.toContain('confirm_rows')
     expect(names).not.toContain('save_label_rule')
     expect(names.length).toBeLessThan(toolRegistry.length / 2)
@@ -99,12 +101,25 @@ describe('what a request carries', () => {
     expect(names).not.toContain('save_label_rule')
   })
 
-  it('names every tool in the registry in exactly one set, or in the core', () => {
+  it('names every tool it still offers in exactly one set, or in the core', () => {
     const grouped = Object.values(TOOL_GROUPS).flatMap((group) => group.tools)
     const everything = toolsForRequest(Object.keys(TOOL_GROUPS)).map((tool) => tool.function.name)
 
     expect(new Set(grouped).size).toBe(grouped.length)
-    for (const tool of toolRegistry) expect(everything, tool.name).toContain(tool.name)
+    for (const tool of toolRegistry) {
+      if (RETIRED_TOOLS.includes(tool.name)) continue
+      expect(everything, tool.name).toContain(tool.name)
+    }
+  })
+
+  it('offers none of the tools SQL replaced, while keeping them where they are', () => {
+    const everything = toolsForRequest(Object.keys(TOOL_GROUPS)).map((tool) => tool.function.name)
+
+    for (const retired of RETIRED_TOOLS) {
+      expect(everything, retired).not.toContain(retired)
+      // Kept, so switching one back on is a line in a list rather than an archaeology.
+      expect(findTool(retired), retired).toBeDefined()
+    }
   })
 
   it('maps a tool to the OpenRouter function shape', () => {
