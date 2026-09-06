@@ -15,6 +15,7 @@ import {
   sourceRowsTable,
 } from '@/lib/model/model-db'
 import { assistantProfilesTable, conversationsTable, profileUsageTable, usageTotalsTable } from '@/lib/chat/conversations-db'
+import { withoutJournal } from '@/lib/journal/journal'
 import { preferencesTable } from '@/lib/preferences-table'
 import { notesTable } from '@/sections/notes/notes-db'
 
@@ -143,12 +144,17 @@ export function describeImport(file: DataExportFile, knownKeys: readonly string[
  */
 export async function importData(file: DataExportFile): Promise<ImportReport> {
   const report = describeImport(file)
-  for (const key of TABLE_KEYS) {
-    const table = TABLES[key]
-    await table.clear()
-    const rows = file.tables[key] ?? []
-    if (rows.length > 0) await table.bulkPut(rows)
-  }
+  // Not journalled: an import rewrites every table, and a log holding a copy of the whole
+  // vault protects nobody from anything. What an import replaces is recovered from the
+  // file it replaced, which is the thing an import already is.
+  await withoutJournal(async () => {
+    for (const key of TABLE_KEYS) {
+      const table = TABLES[key]
+      await table.clear()
+      const rows = file.tables[key] ?? []
+      if (rows.length > 0) await table.bulkPut(rows)
+    }
+  })
   await refreshAllLocalStores()
   return report
 }

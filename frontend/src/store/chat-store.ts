@@ -5,6 +5,7 @@ import { DEV_API_KEY, useAssistantConfigStore, type AssistantConfig } from '@/li
 import { defaultModelForProvider } from '@/lib/assistant-models'
 import { DEFAULT_SYSTEM_PROMPT, SYSTEM_PROMPT_KEY, enableAppendOnlyTableWrites, useAssistantPromptsStore } from '@/lib/assistant-prompts'
 import { formatAttachmentsForPrompt, isImageAttachment, type ChatAttachment } from '@/lib/chat-attachments'
+import { beginTurn, endTurn } from '@/lib/journal/journal'
 import { activeProfile, activeProfileName, profileConnection } from '@/lib/prompts/profiles'
 import { damagedPrompts, promptText } from '@/lib/prompts/registry'
 import type { OpenRouterMessage } from '@/lib/openrouter'
@@ -210,6 +211,8 @@ export const useChatStore = create<ChatState>((set, get) => {
       // request itself; the line simply says less until they arrive.
       const facts = await modelFactsFor(connection.model).catch(() => null)
       set({ usage: { ...get().usage, contextWindow: facts?.contextWindow ?? null, model: connection.model } })
+      // Everything this message changes belongs together, so it can be undone together.
+      beginTurn({ origin: 'assistant', profile: sentUnder, label: texts[0].slice(0, 80) })
       const replyText = await runConversation({
         apiKey: connection.apiKey,
         model: connection.model,
@@ -244,6 +247,7 @@ export const useChatStore = create<ChatState>((set, get) => {
           })
         },
       })
+      endTurn()
       const assistantMessage: ChatMessage = {
         id: crypto.randomUUID(),
         role: 'assistant',
@@ -273,6 +277,9 @@ export const useChatStore = create<ChatState>((set, get) => {
         if (named) await get().setTitle(named)
       }
     } catch (err) {
+      // A message that failed part way through changed whatever it changed before it
+      // failed, and that is exactly the turn somebody wants to undo.
+      endTurn()
       const message = err instanceof Error ? err.message : 'Something went wrong talking to the assistant.'
       const errorMessage: ChatMessage = { id: crypto.randomUUID(), role: 'assistant', content: message, isError: true }
       set({ messages: [...get().messages, errorMessage], isSending: false, status: { type: 'idle' } })

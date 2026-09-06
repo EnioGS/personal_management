@@ -1,4 +1,5 @@
 import Dexie, { type EntityTable } from 'dexie'
+import { journalled } from '@/lib/journal/journalled-table'
 import { withObservation } from './observations'
 import type { LocalRow } from '@/lib/local-store/create-local-table'
 
@@ -291,13 +292,37 @@ db.version(16).stores({}).upgrade(async (tx) => {
   })
 })
 
-export const accountsTable = db.accounts
-export const cardsTable = db.cards
-export const budgetsTable = db.budgets
-export const allocationTargetsTable = db.allocationTargets
+/**
+ * Every table the app writes to, wrapped so that what it used to hold is remembered.
+ *
+ * The wrapping is here rather than around the store factory because the tools write to
+ * these constants directly: this is the one thing every write path has in common. What
+ * comes back behaves exactly like a Dexie table — the proxy passes everything but the
+ * write methods straight through.
+ *
+ * The audit events are left alone: a log of what happened does not need a log of what
+ * happened to it.
+ */
+export const accountsTable = journalled(db.accounts, 'accounts')
+export const cardsTable = journalled(db.cards, 'cards')
+export const budgetsTable = journalled(db.budgets, 'budgets')
+export const allocationTargetsTable = journalled(db.allocationTargets, 'allocationTargets')
 export const ingestionAuditEventsTable = db.ingestionAuditEvents
-export const labelRulesTable = db.labelRules
-export const classificationNotesTable = db.classificationNotes
-export const sourceFilesTable = db.sourceFiles
-export const sourceRowsTable = db.sourceRows
-export const confirmedRowsTable = db.confirmedRows
+export const labelRulesTable = journalled(db.labelRules, 'labelRules')
+export const classificationNotesTable = journalled(db.classificationNotes, 'classificationNotes')
+export const sourceFilesTable = journalled(db.sourceFiles, 'sourceFiles')
+export const sourceRowsTable = journalled(db.sourceRows, 'sourceRows')
+export const confirmedRowsTable = journalled(db.confirmedRows, 'confirmedRows')
+
+/** The tables an undo may write back to, by the name the journal knows them by. */
+export const JOURNALLED_TABLES = {
+  accounts: db.accounts,
+  cards: db.cards,
+  budgets: db.budgets,
+  allocationTargets: db.allocationTargets,
+  labelRules: db.labelRules,
+  classificationNotes: db.classificationNotes,
+  sourceFiles: db.sourceFiles,
+  sourceRows: db.sourceRows,
+  confirmedRows: db.confirmedRows,
+}

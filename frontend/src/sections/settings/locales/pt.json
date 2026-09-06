@@ -5,7 +5,8 @@
   "items": {
     "general": "Geral",
     "assistant": "Assistente",
-    "ingestion": "Centro de ingestão de dados"
+    "ingestion": "Centro de ingestão de dados",
+    "history": "Histórico"
   },
   "appearance": {
     "themeLabel": "Tema",
