@@ -30,6 +30,8 @@ export interface CapitalEvolutionPoint {
   income: number
   /** What left the accounts that month, as the positive quantity it is. Not cumulative. */
   spending: number
+  /** What arrived that month, likewise positive. `arrived` less `spending` is `income`. */
+  arrived: number
   [key: string]: string | number
 }
 
@@ -87,6 +89,7 @@ export function capitalEvolution(sources: CapitalSources, range: DateRange): Cap
   const movements = sumByMonth(sources.movements)
   const investments = sumByMonth(sources.investments)
   const outgoing = sumByMonth(sources.movements, (value) => value < 0)
+  const incoming = sumByMonth(sources.movements, (value) => value > 0)
 
   const months = [...new Set([...movements.keys(), ...investments.keys()])].sort()
   const first = months[0]
@@ -116,6 +119,7 @@ export function capitalEvolution(sources: CapitalSources, range: DateRange): Cap
         income: roundCurrency(income),
         // Spending is reported as the quantity that left, and the rows are negative.
         spending: roundCurrency(-(outgoing.get(month) ?? 0)),
+        arrived: roundCurrency(incoming.get(month) ?? 0),
       })
     }
     month = nextMonth(month)

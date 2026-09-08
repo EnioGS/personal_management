@@ -99,6 +99,13 @@ rather than in a legend the eye has to carry a colour across the card to read.
 The inner ring says its part by shape and shade, and by hovering; naming those
 too would be four labels for two facts on a card this size.
 
+**One chart, not two stacked.** What a month moved — arrived, netted, left — and
+what it added up to are drawn on one pair of axes: the interesting question is
+whether a good month shows in the total, and two charts made the eye carry a
+month from one to the other to ask it. Spending hangs below the zero line and
+the tooltip gives its magnitude back; income wears violet, because the capital
+line is already green and two greens read as one quantity drawn twice.
+
 ## Consequences
 
 - A tile needs three months of data to show both comparisons and two to show

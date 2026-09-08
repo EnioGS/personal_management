@@ -12,6 +12,7 @@ function points(...capitals: number[]): CapitalEvolutionPoint[] {
     investments: 0,
     income: 0,
     spending: 0,
+    arrived: 0,
   }))
 }
 

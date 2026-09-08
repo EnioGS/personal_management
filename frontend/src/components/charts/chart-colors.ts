@@ -149,4 +149,12 @@ export const DOMAIN_COLOR = {
   cashFlow: CATEGORICAL_PALETTE[4],
   /** Holdings nobody has classed — a colour that is plainly not one of the classes. */
   unclassified: CATEGORICAL_PALETTE[6],
+  /**
+   * Money arriving, opposite the wine that money leaving wears.
+   *
+   * Violet rather than green: green is the brand's, and the capital line already has it —
+   * two greens on one chart, one a line and one a bar, would read as one quantity drawn
+   * twice.
+   */
+  income: CATEGORICAL_PALETTE[6],
 } as const

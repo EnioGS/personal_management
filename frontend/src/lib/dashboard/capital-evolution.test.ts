@@ -12,9 +12,9 @@ describe('capitalEvolution', () => {
     }, range)
 
     expect(points).toEqual([
-      { month: '2026-01', capital: 70, investments: 0, income: 70, spending: 30 },
-      { month: '2026-02', capital: 70, investments: 0, income: 0, spending: 0 },
-      { month: '2026-03', capital: 50, investments: 0, income: -20, spending: 20 },
+      { month: '2026-01', capital: 70, investments: 0, income: 70, spending: 30, arrived: 100 },
+      { month: '2026-02', capital: 70, investments: 0, income: 0, spending: 0, arrived: 0 },
+      { month: '2026-03', capital: 50, investments: 0, income: -20, spending: 20, arrived: 0 },
     ])
   })
 
@@ -43,7 +43,7 @@ describe('capitalEvolution', () => {
       investments: [],
     }, { from: Date.UTC(2026, 0, 1), to: Date.UTC(2026, 0, 31) })
 
-    expect(points).toEqual([{ month: '2026-01', capital: 80, investments: 0, income: -20, spending: 20 }])
+    expect(points).toEqual([{ month: '2026-01', capital: 80, investments: 0, income: -20, spending: 20, arrived: 0 }])
   })
 
   it('says nothing when there is nothing, rather than a row of zeroes', () => {
@@ -56,6 +56,6 @@ describe('capitalEvolution', () => {
       investments: [],
     }, range)
 
-    expect(points).toEqual([{ month: '2026-01', capital: 100, investments: 0, income: 100, spending: 0 }])
+    expect(points).toEqual([{ month: '2026-01', capital: 100, investments: 0, income: 100, spending: 0, arrived: 100 }])
   })
 })

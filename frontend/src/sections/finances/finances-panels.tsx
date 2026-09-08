@@ -148,52 +148,29 @@ export function OverviewPanel() {
             />
           </div>
 
-          {/* The two charts stack on the left; the categories run the full height beside
-              them, where a treemap has room to be read. */}
+          {/* One chart rather than two stacked: what a month moved and what it added up to
+              belong on one pair of axes, or the eye has to carry a month between them. */}
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
-            <div className="flex flex-col gap-3 lg:col-span-2">
-              <DashboardCard className="h-[320px]" bodyClassName="p-2">
-                {capitalData.length === 0 ? (
-                  <p className="text-muted-foreground flex h-full items-center justify-center text-xs">{t('finances:overview.noEntries')}</p>
-                ) : (
-                  <CapitalEvolutionChart
-                    data={capitalData}
-                    xKey="month"
-                    xFormatter={formatMonthLabel}
-                    valueFormatter={(value) => currency.format(value)}
-                    capitalLabel={t('finances:overview.capitalEvolution')}
-                    spendingLabel={t('common:dashboard.spending')}
-                    investmentsLabel={t('finances:overview.investments')}
-                    netCashFlowLabel={t('finances:overview.netCashFlow')}
-                  />
-                )}
-              </DashboardCard>
+            <DashboardCard className="h-[480px] lg:col-span-2" bodyClassName="p-2">
+              {capitalData.length === 0 ? (
+                <p className="text-muted-foreground flex h-full items-center justify-center text-xs">{t('finances:overview.noEntries')}</p>
+              ) : (
+                <CapitalEvolutionChart
+                  data={capitalData}
+                  xKey="month"
+                  xFormatter={formatMonthLabel}
+                  valueFormatter={(value) => currency.format(value)}
+                  capitalLabel={t('finances:overview.capitalEvolution')}
+                  spendingLabel={t('common:dashboard.spending')}
+                  investmentsLabel={t('finances:overview.investments')}
+                  netCashFlowLabel={t('finances:overview.netCashFlow')}
+                  incomeLabel={t('finances:overview.arrived')}
+                />
+              )}
+            </DashboardCard>
 
-              <DashboardCard className="h-[300px]" bodyClassName="p-2">
-                {flow.length === 0 ? (
-                  <p className="text-muted-foreground flex h-full items-center justify-center text-xs">{t('finances:overview.noEntries')}</p>
-                ) : (
-                  <DivergingBarChart
-                    data={flow}
-                    xKey="month"
-                    positiveKey="incoming"
-                    negativeKey="outgoing"
-                    positiveLabel={t('finances:overview.arrived')}
-                    negativeLabel={t('finances:overview.left')}
-                    netKey="net"
-                    netLabel={t('finances:overview.netCashFlow')}
-                    positiveColor={DOMAIN_COLOR.balance}
-                    negativeColor={DIVERGING_PAIR.negative}
-                    netColor={DOMAIN_COLOR.cashFlow}
-                    xFormatter={formatMonthLabel}
-                    valueFormatter={(value) => currency.format(value)}
-                  />
-                )}
-              </DashboardCard>
-            </div>
-
-            <div className="flex flex-col gap-3">
-              <DashboardCard className="h-[320px]">
+            <div className="flex h-[480px] flex-col gap-3">
+              <DashboardCard className="min-h-0 flex-1">
                 <RankedBarList
                   items={spendingCategories}
                   valueFormatter={(v) => currency.format(v)}
@@ -202,7 +179,7 @@ export function OverviewPanel() {
                 />
               </DashboardCard>
 
-              <DashboardCard className="h-[300px]" bodyClassName="p-2">
+              <DashboardCard className="min-h-0 flex-1" bodyClassName="p-2">
                 <HoldingsPie
                   groups={holdings}
                   valueFormatter={(value) => currency.format(value)}
