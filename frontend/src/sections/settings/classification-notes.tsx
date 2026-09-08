@@ -1,10 +1,18 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Pencil, Plus, Trash2 } from 'lucide-react'
+import { ChevronRight, Pencil, Plus, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { addClassificationNote, deleteClassificationNote, editClassificationNote, listClassificationNotes, type StoredNote } from '@/lib/model/classification-notes'
 import { useClassificationNotesStore } from '@/lib/model/model-stores'
+import { MarkdownText } from '@/components/markdown/markdown-text'
+import { cn } from '@/lib/utils'
 import type { RuleContext } from '@/lib/model/types'
+
+/** What a note is called in a list: its title, or the first thing it says. */
+function headline(note: { title?: string; text: string }): string {
+  return note.title?.trim() || note.text.split('\n')[0]
+}
 
 /**
  * What is true of this data, in words.
@@ -15,13 +23,19 @@ import type { RuleContext } from '@/lib/model/types'
  * place. They label nothing by themselves: the assistant is handed them with the guide
  * before it labels anything, so what the user explained once does not have to be
  * explained again next month.
+ *
+ * Shown one line each and opened one at a time. A dozen notes laid out in full is a page
+ * nobody reads to the end of, and the thing a person comes here to do is find the one
+ * note they half remember — which is a list of names, not a wall of prose.
  */
 export function ClassificationNotes({ context }: { context: RuleContext }) {
   const stored = useClassificationNotesStore((store) => store.items)
   const [notes, setNotes] = useState<StoredNote[]>([])
-  const [draft, setDraft] = useState<string | null>(null)
-  /** The note being redrafted, and the text so far. Null while nothing is being edited. */
-  const [editing, setEditing] = useState<{ id: number; text: string } | null>(null)
+  const [draft, setDraft] = useState<{ title: string; text: string } | null>(null)
+  /** The note being redrafted. Null while nothing is being edited. */
+  const [editing, setEditing] = useState<{ id: number; title: string; text: string } | null>(null)
+  /** The one note showing its whole self. Opening another closes this. */
+  const [open, setOpen] = useState<number | null>(null)
 
   const refresh = useCallback(async () => {
     setNotes(await listClassificationNotes(context))
@@ -30,8 +44,8 @@ export function ClassificationNotes({ context }: { context: RuleContext }) {
   useEffect(() => { void refresh() }, [refresh, stored])
 
   async function save() {
-    if (!draft?.trim()) { setDraft(null); return }
-    await addClassificationNote({ context, text: draft, createdBy: 'user' })
+    if (!draft?.text.trim()) { setDraft(null); return }
+    await addClassificationNote({ context, title: draft.title, text: draft.text, createdBy: 'user' })
     setDraft(null)
     await refresh()
   }
@@ -43,7 +57,7 @@ export function ClassificationNotes({ context }: { context: RuleContext }) {
 
   async function saveEdit() {
     if (!editing) return
-    if (editing.text.trim()) await editClassificationNote(editing.id, editing.text, 'user')
+    if (editing.text.trim()) await editClassificationNote(editing.id, editing.text, 'user', editing.title)
     setEditing(null)
     await refresh()
   }
@@ -63,13 +77,19 @@ export function ClassificationNotes({ context }: { context: RuleContext }) {
 
       {draft !== null ? (
         <div className="flex flex-col gap-2 rounded-md border p-3">
-          <Textarea
+          <Input
             autoFocus
-            value={draft}
+            value={draft.title}
+            placeholder="Title — a few words. Left empty, the first line stands in."
+            className="h-8 text-xs"
+            onChange={(event) => setDraft({ ...draft, title: event.target.value })}
+          />
+          <Textarea
+            value={draft.text}
             rows={3}
-            placeholder="e.g. Charme is a market near home — its rows are groceries, not leisure."
+            placeholder="e.g. Charme is a market near home — its rows are groceries, not leisure. Markdown works."
             className="text-xs"
-            onChange={(event) => setDraft(event.target.value)}
+            onChange={(event) => setDraft({ ...draft, text: event.target.value })}
           />
           <div className="flex gap-2">
             <Button type="button" size="xs" onClick={() => void save()}>Save note</Button>
@@ -77,7 +97,7 @@ export function ClassificationNotes({ context }: { context: RuleContext }) {
           </div>
         </div>
       ) : (
-        <Button type="button" size="xs" variant="outline" className="self-start" onClick={() => setDraft('')}>
+        <Button type="button" size="xs" variant="outline" className="self-start" onClick={() => setDraft({ title: '', text: '' })}>
           <Plus className="mr-1 size-3.5" /> New note
         </Button>
       )}
@@ -87,15 +107,21 @@ export function ClassificationNotes({ context }: { context: RuleContext }) {
       ) : (
         <div className="divide-y rounded-md border">
           {notes.map((note) => (
-            <div key={note.id} className="flex items-start justify-between gap-3 p-3 text-xs">
+            <div key={note.id} className="text-xs">
               {editing?.id === note.id ? (
-                <div className="flex min-w-0 flex-1 flex-col gap-2">
-                  <Textarea
+                <div className="flex flex-col gap-2 p-3">
+                  <Input
                     autoFocus
-                    rows={3}
+                    value={editing.title}
+                    placeholder="Title — a few words. Left empty, the first line stands in."
+                    className="h-8 text-xs"
+                    onChange={(event) => setEditing({ ...editing, title: event.target.value })}
+                  />
+                  <Textarea
+                    rows={4}
                     value={editing.text}
                     className="text-xs"
-                    onChange={(event) => setEditing({ id: note.id, text: event.target.value })}
+                    onChange={(event) => setEditing({ ...editing, text: event.target.value })}
                   />
                   <div className="flex gap-2">
                     <Button type="button" size="xs" onClick={() => void saveEdit()}>Save</Button>
@@ -104,25 +130,50 @@ export function ClassificationNotes({ context }: { context: RuleContext }) {
                 </div>
               ) : (
                 <>
-                  <div className="min-w-0">
-                    {/* A note is prose, and prose is got right by redrafting: double-click
-                        it, the way a cell in a table is edited. */}
-                    <p className="whitespace-pre-wrap" onDoubleClick={() => setEditing({ id: note.id, text: note.text })}>
-                      {note.text}
-                    </p>
-                    <p className="text-muted-foreground mt-1">
-                      {`${note.createdBy} · ${new Date(note.createdAt).toISOString().slice(0, 10)}`}
-                      {note.editedBy && ` · edited by ${note.editedBy}`}
-                    </p>
+                  <div className="flex items-center justify-between gap-2 px-3 py-2">
+                    <button
+                      type="button"
+                      className="flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 text-left"
+                      aria-expanded={open === note.id}
+                      onClick={() => setOpen(open === note.id ? null : note.id)}
+                    >
+                      <ChevronRight className={cn('size-3 shrink-0 transition-transform', open === note.id && 'rotate-90')} aria-hidden />
+                      <span className={cn('truncate', !note.title && 'text-muted-foreground')}>{headline(note)}</span>
+                    </button>
+                    <div className="flex shrink-0 gap-1">
+                      <Button
+                        type="button"
+                        size="xs"
+                        variant="ghost"
+                        onClick={() => setEditing({ id: note.id, title: note.title ?? '', text: note.text })}
+                        aria-label="Edit note"
+                      >
+                        <Pencil className="size-3.5" />
+                      </Button>
+                      <Button type="button" size="xs" variant="ghost" className="text-destructive" onClick={() => void remove(note.id)} aria-label="Delete note">
+                        <Trash2 className="size-3.5" />
+                      </Button>
+                    </div>
                   </div>
-                  <div className="flex shrink-0 gap-1">
-                    <Button type="button" size="xs" variant="ghost" onClick={() => setEditing({ id: note.id, text: note.text })} aria-label="Edit note">
-                      <Pencil className="size-3.5" />
-                    </Button>
-                    <Button type="button" size="xs" variant="ghost" className="text-destructive" onClick={() => void remove(note.id)} aria-label="Delete note">
-                      <Trash2 className="size-3.5" />
-                    </Button>
-                  </div>
+
+                  {open === note.id && (
+                    <div className="px-3 pb-3 pl-[26px]">
+                      {/* A note is prose, and prose is got right by redrafting: double-click
+                          it, the way a cell in a table is edited. Written in Markdown and
+                          shown as it was meant to read — a note explaining three cases wants
+                          three bullets, not three lines of asterisks. */}
+                      <div
+                        className="flex flex-col gap-1"
+                        onDoubleClick={() => setEditing({ id: note.id, title: note.title ?? '', text: note.text })}
+                      >
+                        <MarkdownText content={note.text} />
+                      </div>
+                      <p className="text-muted-foreground mt-1">
+                        {`${note.createdBy} · ${new Date(note.createdAt).toISOString().slice(0, 10)}`}
+                        {note.editedBy && ` · edited by ${note.editedBy}`}
+                      </p>
+                    </div>
+                  )}
                 </>
               )}
             </div>

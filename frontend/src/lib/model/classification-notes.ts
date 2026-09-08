@@ -16,7 +16,11 @@ export async function listClassificationNotes(context?: RuleContext): Promise<St
 export async function addClassificationNote(note: Omit<ClassificationNote, 'createdAt'>): Promise<number> {
   const text = note.text.trim()
   if (!text) throw new Error('A note needs something in it.')
-  const id = await classificationNotesTable.add({ createdAt: Date.now(), data: { ...note, text, createdAt: Date.now() } })
+  const title = note.title?.trim()
+  const id = await classificationNotesTable.add({
+    createdAt: Date.now(),
+    data: { ...note, text, ...(title ? { title } : {}), createdAt: Date.now() },
+  })
   await refreshLocalStores('classificationNotes')
   return id
 }
@@ -30,14 +34,28 @@ export async function addClassificationNote(note: Omit<ClassificationNote, 'crea
  * rather than making a correction look like a new discovery, so `createdAt` is untouched
  * and `editedAt` records that it was gone over.
  */
-export async function editClassificationNote(id: number, text: string, editedBy: 'user' | 'assistant'): Promise<void> {
+export async function editClassificationNote(
+  id: number,
+  text: string,
+  editedBy: 'user' | 'assistant',
+  title?: string,
+): Promise<void> {
   const trimmed = text.trim()
   if (!trimmed) throw new Error('A note needs something in it.')
   const stored = await classificationNotesTable.get(id)
   if (!stored) throw new Error(`Note ${id} was not found.`)
+  const note = stored.data as ClassificationNote
 
   await classificationNotesTable.update(id, {
-    data: { ...(stored.data as ClassificationNote), text: trimmed, editedBy, editedAt: Date.now() },
+    data: {
+      ...note,
+      text: trimmed,
+      // Left out means unchanged; emptied means the note goes back to leading with its
+      // first line, which is a thing somebody might genuinely want.
+      ...(title === undefined ? {} : title.trim() ? { title: title.trim() } : { title: undefined }),
+      editedBy,
+      editedAt: Date.now(),
+    },
   })
   await refreshLocalStores('classificationNotes')
 }
@@ -63,7 +81,7 @@ export async function classificationNotesForPrompt(): Promise<string> {
     const own = notes.filter((note) => note.context === stage)
     if (own.length === 0) continue
     lines.push(stage === 'source' ? '**While working on a file:**' : '**About rows already confirmed:**')
-    for (const note of own) lines.push(`- ${note.text} _(${note.createdBy})_`)
+    for (const note of own) lines.push(`- ${note.title ? `**${note.title}** — ` : ''}${note.text} _(${note.createdBy})_`)
     lines.push('')
   }
   return lines.join('\n')

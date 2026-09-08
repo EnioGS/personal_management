@@ -28,6 +28,7 @@ Two things it optimizes for:
 │   │   │   ├── dashboard/     # filter bar, stat tile (two deltas + sparkline), dashboard card,
 │   │   │   │                  # ranked and nested bar lists,
 │   │   │   │                  # category pill (Finances Overview and beyond)
+│   │   │   ├── markdown/      # the Markdown renderer, shared by the chat and the notes
 │   │   │   ├── chat/          # global chat panel (mounted at app root, not a section);
 │   │   │   │                  # attachments are text files for the tools, images for the model
 │   │   │   └── layout/        # activity-bar / secondary-bar / app-shell / chart-table-panel

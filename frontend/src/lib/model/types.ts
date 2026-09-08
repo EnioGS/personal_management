@@ -108,6 +108,14 @@ export type RuleContext = 'source' | 'confirmed'
  */
 export interface ClassificationNote {
   context: RuleContext
+  /**
+   * What the note is about, in a few words.
+   *
+   * Optional, because a note written in a hurry is better than one not written, and the
+   * first line stands in when there is none. But a list of first lines is a list nobody
+   * scans, so a title is worth asking for.
+   */
+  title?: string
   text: string
   createdBy: 'user' | 'assistant'
   createdAt: number

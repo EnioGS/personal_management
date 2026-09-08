@@ -4,19 +4,19 @@ import remarkGfm from 'remark-gfm'
 import { cn } from '@/lib/utils'
 
 /**
- * A chat message, rendered as the Markdown it is written in.
+ * Text rendered as the Markdown it was written in.
  *
  * Models answer in Markdown whether or not anyone asked — headings, tables, fenced
  * code, task lists — and showing the source meant reading `**bold**` and losing the
- * shape of every list and table. The same goes for what the user writes: pasting a
- * table into the composer should look like a table on both sides of the conversation.
+ * shape of every list and table. The same goes for what the user writes: a note or a
+ * pasted table should look like one wherever it is shown.
  *
  * Everything is styled explicitly rather than through a prose plugin, because these
  * bubbles are small, coloured, and have to read on the user's own accent colour as
  * well as on the muted assistant background — so type sizes come from the bubble, and
  * only structure comes from the Markdown.
  */
-function MessageContentView({ content, tone }: { content: string; tone: 'user' | 'assistant' }) {
+function MarkdownTextView({ content, tone = 'assistant' }: { content: string; tone?: 'user' | 'assistant' }) {
   // On the accent-coloured user bubble every part has to inherit that foreground;
   // borders and code backgrounds lean on the current colour instead of the palette.
   const subtle = tone === 'user' ? 'border-current/25 bg-current/10' : 'border-border bg-background/60'
@@ -80,4 +80,4 @@ function MessageContentView({ content, tone }: { content: string; tone: 'user' |
  * twenty documents rebuilt per character typed, which is felt as the typing itself being
  * slow.
  */
-export const MessageContent = memo(MessageContentView)
+export const MarkdownText = memo(MarkdownTextView)

@@ -1,7 +1,7 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState, type ChangeEvent, type DragEvent, type PointerEvent } from 'react'
 import { GripVertical, Hourglass, Paperclip, SendHorizontal, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { MessageContent } from './message-content'
+import { MarkdownText } from '@/components/markdown/markdown-text'
 import { ConversationBar } from './conversation-bar'
 import { ACCEPTED_ATTACHMENTS, readAttachedFile } from '@/lib/chat-attachments'
 import { cn } from '@/lib/utils'
@@ -560,7 +560,7 @@ const MessageBubble = memo(function MessageBubble({ message }: { message: ChatMe
               : 'bg-muted',
         )}
       >
-        <MessageContent content={message.content} tone={message.role} />
+        <MarkdownText content={message.content} tone={message.role} />
         {message.images && message.images.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-2">
             {message.images.map((image) => (

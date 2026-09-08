@@ -11,31 +11,34 @@ export const listClassificationNotesTool: ToolDefinition = {
 
 export const addClassificationNoteTool: ToolDefinition = {
   name: 'add_classification_note',
-  description: "Writes down something worth knowing next time, in the user's own terms: an explanation they gave you, a convention one of their files follows, a judgement you would otherwise have to ask about again. A note labels nothing by itself. Choose the stage: 'source' for what matters while a file is worked on, 'confirmed' for rows already in a table. Quote the user rather than paraphrasing your own reasoning back at them.",
+  description: "Writes down something worth knowing next time, in the user's own terms: an explanation they gave you, a convention one of their files follows, a judgement you would otherwise have to ask about again. A note labels nothing by itself. Choose the stage: 'source' for what matters while a file is worked on, 'confirmed' for rows already in a table. Quote the user rather than paraphrasing your own reasoning back at them. Give it a title of a few words \u2014 the list shows titles, and a note without one is found by reading it.",
   parameters: {
     type: 'object',
     properties: {
       context: { type: 'string', enum: ['source', 'confirmed'] },
+      title: { type: 'string', description: 'A few words naming what this is about, e.g. "Charme is a market".' },
       text: { type: 'string', description: 'One thing, said plainly. Several notes beat one long one.' },
     },
-    required: ['context', 'text'],
+    required: ['context', 'title', 'text'],
     additionalProperties: false,
   },
   execute: async (args) => {
     if (typeof args.text !== 'string' || !args.text.trim()) return 'Error: a note needs something in it.'
     const context: RuleContext = args.context === 'source' ? 'source' : 'confirmed'
-    const id = await addClassificationNote({ context, text: args.text, createdBy: 'assistant' })
+    const title = typeof args.title === 'string' ? args.title : undefined
+    const id = await addClassificationNote({ context, title, text: args.text, createdBy: 'assistant' })
     return JSON.stringify({ id, context, text: args.text.trim() })
   },
 }
 
 export const editClassificationNoteTool: ToolDefinition = {
   name: 'edit_classification_note',
-  description: "Rewrites a note \u2014 when it says two things, or is wrong, or names something by a word the app no longer uses. The whole text is replaced, and the note keeps its place in the list. Rewriting what the user wrote is theirs to ask for.",
+  description: "Rewrites a note \u2014 when it says two things, or is wrong, or names something by a word the app no longer uses. The whole text is replaced, and the note keeps its place in the list. Pass title to rename it, or an empty title to let it lead with its first line again. Rewriting what the user wrote is theirs to ask for.",
   parameters: {
     type: 'object',
     properties: {
       noteId: { type: 'number' },
+      title: { type: 'string', description: 'A few words naming what it is about. Left out, the title it has is kept.' },
       text: { type: 'string', description: 'The note as it should now read, in full.' },
     },
     required: ['noteId', 'text'],
@@ -45,8 +48,9 @@ export const editClassificationNoteTool: ToolDefinition = {
     if (typeof args.noteId !== 'number') return 'Error: noteId is required.'
     if (typeof args.text !== 'string' || !args.text.trim()) return 'Error: a note needs something in it.'
     try {
-      await editClassificationNote(args.noteId, args.text, 'assistant')
-      return JSON.stringify({ noteId: args.noteId, text: args.text.trim() })
+      const title = typeof args.title === 'string' ? args.title : undefined
+      await editClassificationNote(args.noteId, args.text, 'assistant', title)
+      return JSON.stringify({ noteId: args.noteId, title: title?.trim() ?? null, text: args.text.trim() })
     } catch (error) { return `Error: ${error instanceof Error ? error.message : 'that note could not be rewritten.'}` }
   },
 }
