@@ -16,6 +16,14 @@ export interface InvestmentMonth extends MonthlyPoint {
 }
 
 const INCOME_WORDS = ['juros', 'rendimento', 'provento', 'dividend', 'income', 'proceed', 'yield']
+/**
+ * The class names, removed before the words are read.
+ *
+ * "Fixed income" says what a holding is, not that it paid anything out, and it contains
+ * the word this test looks for — so every redemption of a Tesouro paper was being counted
+ * as interest received, which is how a screen reports nine thousand of income nobody had.
+ */
+const CLASS_PHRASES = /fixed income|variable income|renda fixa|renda vari[áa]vel/g
 
 /**
  * A row the holdings paid out rather than one that moved money between pots.
@@ -25,7 +33,9 @@ const INCOME_WORDS = ['juros', 'rendimento', 'provento', 'dividend', 'income', '
  * return. A return needs a valuation, and nothing here has one.
  */
 export function isProceeds(row: FilteredEntry): boolean {
-  const text = `${row.class ?? ''} ${row.subcategory} ${row.category} ${row.observations}`.toLowerCase()
+  const text = `${row.class ?? ''} ${row.subcategory} ${row.category} ${row.observations}`
+    .toLowerCase()
+    .replace(CLASS_PHRASES, ' ')
   return row.value > 0 && INCOME_WORDS.some((word) => text.includes(word))
 }
 

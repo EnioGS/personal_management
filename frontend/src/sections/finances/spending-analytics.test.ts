@@ -54,9 +54,9 @@ describe('spending analytics', () => {
       entry({ date: Date.UTC(2026, 6, 2), category: 'Travel', value: -200 }),
       entry({ date: Date.UTC(2026, 7, 2), category: 'Books', value: -50 }),
     ])).toEqual([
-      { category: 'Travel', increased: 0, decreased: 200 },
-      { category: 'Food', increased: 60, decreased: 0 },
-      { category: 'Books', increased: 50, decreased: 0 },
+      { category: 'Travel', change: -200 },
+      { category: 'Food', change: 60 },
+      { category: 'Books', change: 50 },
     ])
   })
 

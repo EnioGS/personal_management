@@ -6,7 +6,7 @@ import { CapitalEvolutionChart } from '@/components/charts/capital-evolution-cha
 import { CategoryTreemap } from '@/components/charts/category-treemap'
 import { HoldingsPie } from '@/components/charts/holdings-pie'
 import { DIVERGING_PAIR, DOMAIN_COLOR } from '@/components/charts/chart-colors'
-import { DivergingBarChart } from '@/components/charts/diverging-bar-chart'
+import { SignedBarChart } from '@/components/charts/signed-bar-chart'
 import { CategoryPill } from '@/components/dashboard/category-pill'
 import { DashboardCard } from '@/components/dashboard/dashboard-card'
 import { NestedBarList } from '@/components/dashboard/nested-bar-list'
@@ -409,9 +409,12 @@ export function SpendingPanel() {
                   data={soFar}
                   xKey="day"
                   xFormatter={(day: string | number) => String(day)}
+                  valueFormatter={(value) => currency.format(value)}
                   series={[
+                    // The month in progress is the subject; the one before it is the ruler,
+                    // so it is drawn in something quieter than another shade of the same red.
                     { key: 'thisMonth', label: t('finances:spending.thisMonth'), color: DIVERGING_PAIR.negative },
-                    { key: 'lastMonth', label: t('finances:spending.lastMonth'), color: DOMAIN_COLOR.spending },
+                    { key: 'lastMonth', label: t('finances:spending.lastMonth'), color: DOMAIN_COLOR.cards },
                   ]}
                 />
               )}
@@ -421,15 +424,14 @@ export function SpendingPanel() {
               {monthChanges.length === 0 ? (
                 <p className="text-muted-foreground flex h-full items-center justify-center text-xs">{t('finances:spending.noCategoryChanges')}</p>
               ) : (
-                <DivergingBarChart
+                <SignedBarChart
                   data={monthChanges}
                   xKey="category"
-                  positiveKey="increased"
-                  negativeKey="decreased"
-                  positiveLabel={t('finances:spending.moreSpent')}
-                  negativeLabel={t('finances:spending.lessSpent')}
-                  positiveColor={DIVERGING_PAIR.negative}
-                  negativeColor={DOMAIN_COLOR.balance}
+                  valueKey="change"
+                  upLabel={t('finances:spending.moreSpent')}
+                  downLabel={t('finances:spending.lessSpent')}
+                  upColor={DIVERGING_PAIR.negative}
+                  downColor={DOMAIN_COLOR.balance}
                   valueFormatter={(value) => currency.format(value)}
                 />
               )}

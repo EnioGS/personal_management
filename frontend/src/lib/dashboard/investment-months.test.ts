@@ -45,3 +45,15 @@ describe('holdings month by month', () => {
     expect(investmentMonths([])).toEqual([])
   })
 })
+
+describe('a class name is not a payout', () => {
+  it('does not read a redemption of fixed income as interest received', () => {
+    // "fixed income" contains the word, and every redemption was being counted as income.
+    expect(isProceeds(row({ class: 'fixed income', subcategory: 'tesouro - IPCA+', value: 4071.35 }))).toBe(false)
+    expect(isProceeds(row({ class: 'renda fixa', subcategory: 'tesouro', value: 100 }))).toBe(false)
+  })
+
+  it('still reads one that says what it is', () => {
+    expect(isProceeds(row({ class: 'fixed income', subcategory: 'juros', value: 66.49 }))).toBe(true)
+  })
+})

@@ -12,10 +12,14 @@ export interface MonthlySpend {
 
 export interface CategorySpendChange {
   category: string
-  /** Spend that increased since the preceding calendar month. */
-  increased: number
-  /** Spend that decreased since the preceding calendar month. */
-  decreased: number
+  /**
+   * What the category moved by, signed: up is more spent, down is less.
+   *
+   * One number rather than two, because a category did one thing or the other — drawn as
+   * two series it took two slots, one of them always empty, which read as a chart where
+   * every category had a bar missing.
+   */
+  change: number
   [key: string]: string | number
 }
 
@@ -98,11 +102,10 @@ export function categorySpendChanges(rows: FilteredEntry[]): CategorySpendChange
 
   return [...new Set([...current.keys(), ...preceding.keys()])]
     .map((category) => {
-      const change = (current.get(category) ?? 0) - (preceding.get(category) ?? 0)
-      return { category, increased: Math.max(change, 0), decreased: Math.max(-change, 0) }
+      return { category, change: (current.get(category) ?? 0) - (preceding.get(category) ?? 0) }
     })
-    .filter((row) => row.increased > 0 || row.decreased > 0)
-    .sort((a, b) => Math.max(b.increased, b.decreased) - Math.max(a.increased, a.decreased))
+    .filter((row) => row.change !== 0)
+    .sort((a, b) => Math.abs(b.change) - Math.abs(a.change))
 }
 
 export function frequentDescriptions(rows: FilteredEntry[]): DescriptionFrequency[] {

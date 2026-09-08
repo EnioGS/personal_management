@@ -13,6 +13,8 @@ interface AppLineChartProps<T extends Record<string, unknown>> {
   xKey: Extract<keyof T, string>
   series: ChartSeries[]
   xFormatter?: (value: string | number) => string
+  /** Used consistently by the axis and the tooltip when the values are amounts. */
+  valueFormatter?: (value: number) => string
 }
 
 export function AppLineChart<T extends Record<string, unknown>>({
@@ -20,6 +22,7 @@ export function AppLineChart<T extends Record<string, unknown>>({
   xKey,
   series,
   xFormatter,
+  valueFormatter,
 }: AppLineChartProps<T>) {
   // Every entry is keyed twice: once by chartSafeKey(s.key) — what ChartStyle actually
   // emits as `--color-<key>` and what `stroke` below references, since a raw key with
@@ -41,8 +44,19 @@ export function AppLineChart<T extends Record<string, unknown>>({
       <LineChart data={data}>
         <CartesianGrid vertical={false} />
         <XAxis dataKey={xKey} tickLine={false} axisLine={false} tickMargin={8} tickFormatter={xFormatter} />
-        <YAxis tickLine={false} axisLine={false} width={48} />
-        <ChartTooltip content={<ChartTooltipContent />} />
+        <YAxis
+          tickLine={false}
+          axisLine={false}
+          width={valueFormatter ? 56 : 48}
+          tickFormatter={valueFormatter ? (value: number) => valueFormatter(value) : undefined}
+        />
+        <ChartTooltip
+          content={
+            <ChartTooltipContent
+              formatter={valueFormatter ? (value, name) => [valueFormatter(value as number), name] : undefined}
+            />
+          }
+        />
         {series.length > 1 && <ChartLegend content={<ChartLegendContent />} />}
         {series.map((s) => (
           <Line
