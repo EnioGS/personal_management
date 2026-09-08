@@ -1,4 +1,5 @@
 import { monthKey } from '@/lib/aggregations'
+import { monthlyAverageByCategory, type CategoryMonthlyAverage } from './category-averages'
 import { UNLABELLED_LABEL, type FilteredEntry } from '@/components/dashboard/use-dashboard-entries'
 import type { NestedBarGroup } from '@/components/dashboard/nested-bar-list'
 
@@ -16,6 +17,18 @@ export interface RankedItem {
   key: string
   label: string
   value: number
+}
+
+/**
+ * What money came in for, by category and by the subcategories inside it.
+ *
+ * The same reckoning spending gets, and for the same reason: a monthly average rather than
+ * a period total, so a longer window does not make a salary look larger, and a comparison
+ * against the recent quarter, so a raise or a job ending shows as something other than a
+ * bigger bar. Only what arrived counts; a refund on a spending row is not income.
+ */
+export function incomeByCategory(rows: FilteredEntry[], selectedMonths: string[]): CategoryMonthlyAverage[] {
+  return monthlyAverageByCategory(rows, selectedMonths, (row) => (row.value > 0 ? row.value : null))
 }
 
 const named = (value: string | undefined) => value?.trim() || UNLABELLED_LABEL
@@ -38,18 +51,6 @@ export function monthlyFlow(rows: FilteredEntry[]): MonthlyFlow[] {
     months.set(month, flow)
   }
   return [...months.values()].sort((left, right) => left.month.localeCompare(right.month))
-}
-
-/** What money came in for, by category — the other half of the spending breakdown. */
-export function incomeByCategory(rows: FilteredEntry[]): RankedItem[] {
-  const totals = new Map<string, number>()
-  for (const row of rows) {
-    if (row.value <= 0) continue
-    totals.set(named(row.category), (totals.get(named(row.category)) ?? 0) + row.value)
-  }
-  return [...totals.entries()]
-    .map(([label, value]) => ({ key: label, label, value }))
-    .sort((left, right) => right.value - left.value)
 }
 
 /**

@@ -1,15 +1,8 @@
 import { monthKey } from '@/lib/aggregations'
-import { UNLABELLED_LABEL, type FilteredEntry } from '@/components/dashboard/use-dashboard-entries'
+import type { FilteredEntry } from '@/components/dashboard/use-dashboard-entries'
+import { categoryOf, monthlyAverageByCategory, type CategoryMonthlyAverage } from '@/lib/dashboard/category-averages'
 
-/** A row nobody has categorised still has to be counted, and counted under something. */
-function categoryOf(row: FilteredEntry): string {
-  return row.category.trim() || UNLABELLED_LABEL
-}
 
-/** The same for the detail under it, which starts empty far more often than a category does. */
-function subcategoryOf(row: FilteredEntry): string {
-  return row.subcategory.trim() || UNLABELLED_LABEL
-}
 
 export interface MonthlySpend {
   month: string
@@ -32,72 +25,12 @@ export interface DescriptionFrequency {
   total: number
 }
 
-export interface CategoryMonthlyAverage {
-  key: string
-  label: string
-  /** Average monthly spend across every month in the selected range. */
-  value: number
-  /** Latest-quarter monthly average compared with the full selected-period average. */
-  comparison: number
-  /** The same figures for the subcategories inside it, biggest first. */
-  children?: CategoryMonthlyAverage[]
-}
-
 /**
- * Spending categories, normalized to a monthly average so a 24-month view is
- * comparable with a 12-month one. The trend compares the most recent quarter of
- * selected months with that full-period monthly average.
+ * Spending by category, as a monthly average — the shared reckoning, told which rows are
+ * spending and how much of each one left.
  */
 export function averageSpendByCategory(rows: FilteredEntry[], selectedMonths: string[]): CategoryMonthlyAverage[] {
-  const months = [...new Set(selectedMonths)].sort()
-  if (months.length === 0) return []
-
-  const recentMonthCount = Math.max(1, Math.floor(months.length / 4))
-  const recentMonths = new Set(months.slice(-recentMonthCount))
-  const totals = new Map<string, Aggregate>()
-
-  for (const row of rows) {
-    if (!isSpendingRow(row)) continue
-    const recent = recentMonths.has(monthKey(row.date))
-    const amount = -row.value
-    const category = add(totals, categoryOf(row), amount, recent)
-    add(category.children, subcategoryOf(row), amount, recent)
-  }
-
-  const averaged = (entries: Map<string, Aggregate>): CategoryMonthlyAverage[] =>
-    [...entries.entries()]
-      .map(([label, aggregate]) => {
-        const value = aggregate.total / months.length
-        const recentAverage = aggregate.recentTotal / recentMonthCount
-        return {
-          key: label,
-          label,
-          value,
-          comparison: (recentAverage - value) / value,
-          children: aggregate.children.size > 0 ? averaged(aggregate.children).sort((left, right) => right.value - left.value) : undefined,
-        }
-      })
-
-  // A category that gave more back than it took over the period is not a spending
-  // category: refunds, credit adjustments and anything else labelled from the money's
-  // point of view rather than the purchase's. It is left off rather than drawn as a
-  // negative bar among the things that were actually bought.
-  return averaged(totals).filter((category) => category.value > 0)
-}
-
-interface Aggregate {
-  total: number
-  recentTotal: number
-  children: Map<string, Aggregate>
-}
-
-/** Adds an amount to a bucket, creating it the first time anything lands there. */
-function add(buckets: Map<string, Aggregate>, key: string, amount: number, recent: boolean): Aggregate {
-  const aggregate = buckets.get(key) ?? { total: 0, recentTotal: 0, children: new Map<string, Aggregate>() }
-  aggregate.total += amount
-  if (recent) aggregate.recentTotal += amount
-  buckets.set(key, aggregate)
-  return aggregate
+  return monthlyAverageByCategory(rows, selectedMonths, (row) => (isSpendingRow(row) ? -row.value : null))
 }
 
 /** Every row confirmed onto a spending screen, refunds included — their sign undoes them. */

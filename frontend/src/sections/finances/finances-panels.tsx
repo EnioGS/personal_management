@@ -88,7 +88,10 @@ export function OverviewPanel() {
   const averages = useMemo(() => monthlyAverages(flow), [flow])
   const spread = useMemo(() => monthlySpread(flow), [flow])
   const accounts = useMemo(() => accountsWithCards(movements, spending), [movements, spending])
-  const incomeSources = useMemo(() => incomeByCategory(movements), [movements])
+  const incomeSources = useMemo(
+    () => incomeByCategory(movements, capitalData.map((point) => point.month)),
+    [capitalData, movements],
+  )
   const biggest = useMemo(() => largestMovements(movements), [movements])
   const holdings = useMemo(() => {
     const named: Record<string, { label: string; color: typeof DOMAIN_COLOR.balance }> = {

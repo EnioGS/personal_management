@@ -47,11 +47,28 @@ describe('what a month brought in and took out', () => {
 })
 
 describe('where money came from', () => {
-  it('counts only what arrived', () => {
-    expect(incomeByCategory([
-      entry({ category: 'salário', value: 5000 }),
-      entry({ category: 'mercado', value: -300 }),
-    ])).toEqual([{ key: 'salário', label: 'salário', value: 5000 }])
+  const months = ['2026-07', '2026-08']
+
+  it('counts only what arrived, as a month\'s worth of it', () => {
+    const income = incomeByCategory([
+      entry({ category: 'salário', value: 5000, date: Date.UTC(2026, 6, 1) }),
+      entry({ category: 'salário', value: 5000, date: Date.UTC(2026, 7, 1) }),
+      entry({ category: 'mercado', value: -300, date: Date.UTC(2026, 7, 2) }),
+    ], months)
+
+    // Two months of five thousand is five thousand a month, not ten.
+    expect(income.map((category) => [category.label, category.value])).toEqual([['salário', 5000]])
+  })
+
+  it('breaks a category into what arrived under it, and says how the recent months compare', () => {
+    const income = incomeByCategory([
+      entry({ category: 'salário', subcategory: 'fixo', value: 4000, date: Date.UTC(2026, 6, 1) }),
+      entry({ category: 'salário', subcategory: 'bônus', value: 1000, date: Date.UTC(2026, 7, 1) }),
+    ], months)
+
+    expect(income[0].children?.map((child) => child.label)).toEqual(['fixo', 'bônus'])
+    // The latest quarter of two months is the last one, which brought only the bonus.
+    expect(income[0].comparison).toBeCloseTo((1000 - 2500) / 2500, 6)
   })
 })
 

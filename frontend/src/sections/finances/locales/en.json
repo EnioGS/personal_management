@@ -29,7 +29,7 @@
     "investments": "Investments",
     "arrived": "Income",
     "left": "Outflows",
-    "incomeSources": "Where money came from",
+    "incomeSources": "Income by category",
     "noCardSpend": "Nothing billed to a card here.",
     "averageMonth": "An average month",
     "largestMovements": "Largest movements",
