@@ -152,9 +152,10 @@ export const DOMAIN_COLOR = {
   /**
    * Money arriving, opposite the wine that money leaving wears.
    *
-   * Violet rather than green: green is the brand's, and the capital line already has it —
-   * two greens on one chart, one a line and one a bar, would read as one quantity drawn
-   * twice.
+   * The brand's green, deepened: it shares the hue with the capital line on purpose, since
+   * both are money going the same way, and is dark enough that a bar is never mistaken for
+   * the line crossing it. The dark half stops where it still clears the card behind it —
+   * on a dark ground a deeper green is a darker smudge, not a stronger colour.
    */
-  income: CATEGORICAL_PALETTE[6],
+  income: { light: '#20693e', dark: '#2f7a4a' },
 } as const
