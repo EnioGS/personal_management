@@ -1,6 +1,6 @@
 import { Bar, CartesianGrid, ComposedChart, Line, ReferenceLine, XAxis, YAxis } from 'recharts'
 import { ChartContainer, ChartLegend, ChartLegendContent, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart'
-import { alignedDomains, extentOf } from '@/lib/dashboard/axis-domains'
+import { extentOf } from '@/lib/dashboard/axis-domains'
 import { DIVERGING_PAIR, DOMAIN_COLOR } from './chart-colors'
 
 interface CapitalEvolutionChartProps<T extends Record<string, unknown>> {
@@ -67,13 +67,11 @@ export function CapitalEvolutionChart<T extends Record<string, unknown>>({
   // a glance; the axis and the tooltip give the magnitude back.
   const chartData = data.map((row) => ({ ...row, spending: -(row.spending as number) }))
 
-  // Two scales, because these are two magnitudes: a running total in the tens of thousands
-  // and a month's flows in the thousands. On one axis the smaller of them is drawn in a
-  // sliver while half the chart stands empty.
-  const domains = alignedDomains(
-    extentOf(chartData, ['capital', 'investments']),
-    extentOf(chartData, ['arrived', 'income', 'spending']),
-  )
+  // One scale for everything, running from the lowest bar to the highest line rather than
+  // to whichever of them is further from zero. The flows never fall as far as the totals
+  // rise, so a domain mirrored about zero would leave the space below empty and squeeze
+  // everything above into what was left.
+  const extent = extentOf(chartData, ['capital', 'investments', 'arrived', 'income', 'spending'])
 
   return (
     <ChartContainer config={config} className="aspect-auto h-full w-full">
@@ -81,33 +79,23 @@ export function CapitalEvolutionChart<T extends Record<string, unknown>>({
         <CartesianGrid vertical={false} />
         <XAxis dataKey={xKey} tickLine={false} axisLine={false} tickMargin={8} tickFormatter={xFormatter} />
         <YAxis
-          yAxisId="totals"
           tickLine={false}
           axisLine={false}
           width={56}
-          domain={domains.totals}
+          domain={[extent.min, extent.max]}
           tickFormatter={(value: number) => valueFormatter(Math.abs(value))}
         />
-        <YAxis
-          yAxisId="flows"
-          orientation="right"
-          tickLine={false}
-          axisLine={false}
-          width={56}
-          domain={domains.flows}
-          tickFormatter={(value: number) => valueFormatter(Math.abs(value))}
-        />
-        <ReferenceLine yAxisId="flows" y={0} stroke="var(--border)" />
+        <ReferenceLine y={0} stroke="var(--border)" />
         <ChartTooltip
           content={
             <ChartTooltipContent formatter={(value, name) => [valueFormatter(name === 'spending' ? Math.abs(value as number) : (value as number)), name]} />
           }
         />
-        <Bar yAxisId="flows" dataKey="arrived" name={incomeLabel} fill="var(--color-arrived)" radius={[3, 3, 0, 0]} />
-        <Bar yAxisId="flows" dataKey="income" name={netCashFlowLabel} fill="var(--color-income)" radius={2} />
-        <Bar yAxisId="flows" dataKey="spending" name={spendingLabel} fill="var(--color-spending)" radius={[0, 0, 3, 3]} />
-        <Line yAxisId="totals" dataKey="capital" name={capitalLabel} type="linear" stroke="var(--color-capital)" strokeWidth={2} dot={dot('capital')} activeDot={{ r: 4, strokeWidth: 0 }} />
-        <Line yAxisId="totals" dataKey="investments" name={investmentsLabel} type="linear" stroke="var(--color-investments)" strokeWidth={2} dot={dot('investments')} activeDot={{ r: 4, strokeWidth: 0 }} />
+        <Bar dataKey="arrived" name={incomeLabel} fill="var(--color-arrived)" radius={[3, 3, 0, 0]} />
+        <Bar dataKey="income" name={netCashFlowLabel} fill="var(--color-income)" radius={2} />
+        <Bar dataKey="spending" name={spendingLabel} fill="var(--color-spending)" radius={[0, 0, 3, 3]} />
+        <Line dataKey="capital" name={capitalLabel} type="linear" stroke="var(--color-capital)" strokeWidth={2} dot={dot('capital')} activeDot={{ r: 4, strokeWidth: 0 }} />
+        <Line dataKey="investments" name={investmentsLabel} type="linear" stroke="var(--color-investments)" strokeWidth={2} dot={dot('investments')} activeDot={{ r: 4, strokeWidth: 0 }} />
         <ChartLegend content={<ChartLegendContent />} />
       </ComposedChart>
     </ChartContainer>

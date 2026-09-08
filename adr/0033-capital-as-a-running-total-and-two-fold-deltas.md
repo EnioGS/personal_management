@@ -104,7 +104,10 @@ what it added up to are drawn on one pair of axes: the interesting question is
 whether a good month shows in the total, and two charts made the eye carry a
 month from one to the other to ask it. Spending hangs below the zero line and
 the tooltip gives its magnitude back; income wears violet, because the capital
-line is already green and two greens read as one quantity drawn twice.
+line is already green and two greens read as one quantity drawn twice. One axis
+spanning the lowest bar to the highest line, not mirrored about zero: the flows
+never fall as far as the totals rise, and a mirrored domain empties the bottom
+half to make room for a value nothing reaches.
 
 ## Consequences
 
