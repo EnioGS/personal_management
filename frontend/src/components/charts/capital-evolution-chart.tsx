@@ -1,7 +1,9 @@
 import { Bar, CartesianGrid, ComposedChart, Line, ReferenceLine, XAxis, YAxis } from 'recharts'
-import { ChartContainer, ChartLegend, ChartLegendContent, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart'
+import type { CSSProperties } from 'react'
+import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart'
+import { cn } from '@/lib/utils'
 import { extentOf } from '@/lib/dashboard/axis-domains'
-import { DIVERGING_PAIR, DOMAIN_COLOR } from './chart-colors'
+import { DIVERGING_PAIR, DOMAIN_COLOR, type ThemedColor } from './chart-colors'
 
 interface CapitalEvolutionChartProps<T extends Record<string, unknown>> {
   data: T[]
@@ -73,8 +75,21 @@ export function CapitalEvolutionChart<T extends Record<string, unknown>>({
   // everything above into what was left.
   const extent = extentOf(chartData, ['capital', 'investments', 'arrived', 'income', 'spending'])
 
+  // The chart's own legend lists the series in an order of its choosing, which mixes the
+  // bars in among the lines; these are two different kinds of statement — what a month
+  // did, and what it came to — and sorting them apart by eye every time is a small tax on
+  // every reading. Drawn here instead, grouped, bars in the order they sit around zero.
+  const legend: { label: string; color: ThemedColor; kind: 'bar' | 'line' }[] = [
+    { label: incomeLabel, color: DOMAIN_COLOR.income, kind: 'bar' },
+    { label: netCashFlowLabel, color: DOMAIN_COLOR.cashFlow, kind: 'bar' },
+    { label: spendingLabel, color: DIVERGING_PAIR.negative, kind: 'bar' },
+    { label: capitalLabel, color: DOMAIN_COLOR.balance, kind: 'line' },
+    { label: investmentsLabel, color: DOMAIN_COLOR.variableIncome, kind: 'line' },
+  ]
+
   return (
-    <ChartContainer config={config} className="aspect-auto h-full w-full">
+    <div className="flex h-full flex-col">
+    <ChartContainer config={config} className="aspect-auto min-h-0 w-full flex-1">
       <ComposedChart data={chartData}>
         <CartesianGrid vertical={false} />
         <XAxis dataKey={xKey} tickLine={false} axisLine={false} tickMargin={8} tickFormatter={xFormatter} />
@@ -96,9 +111,24 @@ export function CapitalEvolutionChart<T extends Record<string, unknown>>({
         <Bar dataKey="spending" name={spendingLabel} fill="var(--color-spending)" radius={[0, 0, 3, 3]} />
         <Line dataKey="capital" name={capitalLabel} type="linear" stroke="var(--color-capital)" strokeWidth={2} dot={dot('capital')} activeDot={{ r: 4, strokeWidth: 0 }} />
         <Line dataKey="investments" name={investmentsLabel} type="linear" stroke="var(--color-investments)" strokeWidth={2} dot={dot('investments')} activeDot={{ r: 4, strokeWidth: 0 }} />
-        <ChartLegend content={<ChartLegendContent />} />
+
       </ComposedChart>
     </ChartContainer>
+
+    <div className="text-muted-foreground flex flex-wrap items-center justify-center gap-x-4 gap-y-1 pt-2 text-xs">
+      {legend.map((entry, index) => (
+        <span
+          key={entry.label}
+          // A gap where the kinds change, so the grouping is visible without a heading.
+          className={cn('entity flex items-center gap-1.5', index === 3 && 'ml-3 border-l pl-4')}
+          style={{ '--entity-light': entry.color.light, '--entity-dark': entry.color.dark } as CSSProperties}
+        >
+          <span className={cn('entity-fill shrink-0', entry.kind === 'bar' ? 'size-2 rounded-[2px]' : 'h-0.5 w-3.5 rounded-full')} />
+          {entry.label}
+        </span>
+      ))}
+    </div>
+    </div>
   )
 }
 
