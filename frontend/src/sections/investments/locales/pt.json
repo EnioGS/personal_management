@@ -9,7 +9,12 @@
     "contributions": "Aportes",
     "positions": "Posições",
     "dividends": "Proventos",
-    "allocation": "Alocação"
+    "allocation": "Alocação",
+    "held": "Aplicado hoje",
+    "received": "Recebido",
+    "heldOverTime": "Aplicado ao longo do tempo",
+    "allocationTargets": "Metas de alocação",
+    "receivedFootnote": "Juros e proventos, lidos do que as linhas dizem de si. Rentabilidade exigiria uma cotação, e estes arquivos não a trazem."
   },
   "columns": {
     "date": "Data",

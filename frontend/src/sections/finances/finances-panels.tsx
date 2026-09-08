@@ -1,6 +1,7 @@
-import { useMemo } from 'react'
+import { useCallback, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { AppBarChart } from '@/components/charts/bar-chart'
+import { AppLineChart } from '@/components/charts/line-chart'
 import { CapitalEvolutionChart } from '@/components/charts/capital-evolution-chart'
 import { CategoryTreemap } from '@/components/charts/category-treemap'
 import { HoldingsPie } from '@/components/charts/holdings-pie'
@@ -14,9 +15,11 @@ import { StatTile } from '@/components/dashboard/stat-tile'
 import { FilterBar } from '@/components/dashboard/filter-bar'
 import { resolveFilterRange, useDashboardFilters, type DashboardFilters } from '@/components/dashboard/dashboard-filters'
 import { UNLABELLED_LABEL, useDashboardEntries } from '@/components/dashboard/use-dashboard-entries'
-import { formatDateLabel, formatMonthLabel, groupByKey } from '@/lib/aggregations'
+import { formatDateLabel, formatMonthLabel } from '@/lib/aggregations'
 import { capitalEvolution } from '@/lib/dashboard/capital-evolution'
 import { capitalMetric } from '@/lib/dashboard/capital-metric'
+import { spendingMonths, spendingSoFar } from '@/lib/dashboard/spending-months'
+import { declaresRecurrence, detectRecurringEntries } from '@/lib/model/recurring'
 import { heldDelta, holdingsSplit } from '@/lib/dashboard/holdings-split'
 import {
   accountsWithCards,
@@ -276,19 +279,41 @@ export function SpendingPanel() {
   const rows = useDashboardEntries(filters)
   const spending = useMemo(() => outgoingSpending(rows), [rows])
   const monthlySpending = useMemo(() => spendingByMonth(spending), [spending])
+
+  // What repeats is what a month could not have avoided, and the rest is what it chose.
+  const recurringKeys = useMemo(() => {
+    const detected = detectRecurringEntries(spending.map((row) => ({ ...row, amount: -row.value })))
+    return new Set(detected.map((entry) => `${entry.category}\u0000${Math.round(entry.averageAmount)}`))
+  }, [spending])
+  const isCommitted = useCallback(
+    (row: (typeof spending)[number]) =>
+      declaresRecurrence(row.description) || recurringKeys.has(`${row.category}\u0000${Math.round(-row.value)}`),
+    [recurringKeys],
+  )
+  const months = useMemo(() => spendingMonths(spending, isCommitted), [spending, isCommitted])
+  const soFar = useMemo(() => spendingSoFar(spending), [spending])
+
+  const labels = useMemo(
+    () => ({
+      lastMonth: t('finances:overview.vsLastMonth'),
+      sinceMonth: (month: string) => t('finances:overview.vsMonth', { month: shortMonth.format(new Date(`${month}-01`)) }),
+    }),
+    [t],
+  )
+  const spent = useMemo(() => capitalMetric(months, 'spent', 'down', labels, compactCurrency.format), [months, labels])
+  const committed = useMemo(() => capitalMetric(months, 'committed', 'down', labels, compactCurrency.format), [months, labels])
+
   const categorySpending = useMemo(
-    () => groupByKey(spending.map((row) => ({ ...row, amount: -row.value })), 'category', 'amount')
-      .map((group) => ({ key: group.label, label: group.label, value: group.value })),
-    [spending],
+    () => averageSpendByCategory(spending, months.map((month) => month.month)),
+    [months, spending],
   )
   const monthChanges = useMemo(() => categorySpendChanges(spending), [spending])
   const descriptions = useMemo(() => frequentDescriptions(spending), [spending])
 
-  // Spending rows are negative, being money that left; every figure here reports the
-  // magnitude that left, so each one negates.
   const totalSpent = spending.reduce((total, row) => total - row.value, 0)
-  const monthlyAverage = monthlySpending.length > 0 ? totalSpent / monthlySpending.length : 0
-  const largestExpense = spending.reduce((largest, row) => Math.max(largest, -row.value), 0)
+  const monthlyAverage = months.length > 0 ? totalSpent / months.length : 0
+  const perMonth = (value: number) => (months.length > 0 ? value / months.length : 0)
+  const biggest = categorySpending.slice().sort((left, right) => right.value - left.value)[0]
   const byCount = [...descriptions].sort((a, b) => b.count - a.count || b.total - a.total).slice(0, 5)
   const byTotal = [...descriptions].sort((a, b) => b.total - a.total || b.count - a.count).slice(0, 5)
 
@@ -307,25 +332,36 @@ export function SpendingPanel() {
         <div className="flex flex-col gap-3">
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <StatTile
-              label={t('finances:spending.totalSpent')}
-              value={currency.format(totalSpent)}
-              indicator={DOMAIN_COLOR.spending}
-              sparkline={monthlySpending.map((month) => month.amount)}
+              label={t('finances:spending.thisMonth')}
+              value={currency.format(spent.current)}
+              indicator={DIVERGING_PAIR.negative}
+              deltas={spent.deltas}
+              sparkline={spent.sparkline}
             />
             <StatTile
               label={t('finances:spending.monthlyAverage')}
               value={currency.format(monthlyAverage)}
               indicator={DOMAIN_COLOR.spending}
+              sparkline={months.map((month) => month.spent)}
             />
             <StatTile
-              label={t('finances:spending.largestExpense')}
-              value={currency.format(largestExpense)}
-              indicator={DOMAIN_COLOR.spending}
+              label={t('finances:spending.committed')}
+              value={currency.format(committed.current)}
+              indicator={DOMAIN_COLOR.cards}
+              deltas={committed.deltas}
+              sparkline={committed.sparkline}
             />
             <StatTile
-              label={t('finances:spending.entryCount')}
-              value={spending.length.toLocaleString('pt-BR')}
+              label={t('finances:spending.biggestCategory')}
+              value={biggest ? biggest.label : '\u2014'}
               indicator={DOMAIN_COLOR.spending}
+              deltas={biggest ? [{
+                change: compactCurrency.format(biggest.value),
+                percent: Number.isFinite(biggest.comparison) ? biggest.comparison : undefined,
+                direction: biggest.comparison > 0 ? 'up' : biggest.comparison < 0 ? 'down' : 'flat',
+                goodDirection: 'down',
+                label: t('finances:spending.perMonth'),
+              }] : undefined}
             />
           </div>
 
@@ -334,11 +370,7 @@ export function SpendingPanel() {
               title={t('finances:spending.byMonth')}
               className="h-[320px] lg:col-span-2"
               bodyClassName="p-2"
-              footnote={
-                monthlySpending.length > 0
-                  ? t('finances:spending.averageReference', { value: currency.format(monthlyAverage) })
-                  : undefined
-              }
+              footnote={months.length > 0 ? t('finances:spending.averageReference', { value: currency.format(monthlyAverage) }) : undefined}
             >
               {monthlySpending.length === 0 ? (
                 <p className="text-muted-foreground flex h-full items-center justify-center text-xs">{t('finances:spending.noSpending')}</p>
@@ -346,7 +378,7 @@ export function SpendingPanel() {
                 <AppBarChart
                   data={monthlySpending}
                   xKey="month"
-                  series={{ key: 'amount', label: t('finances:spending.totalSpent'), color: DOMAIN_COLOR.spending }}
+                  series={{ key: 'amount', label: t('common:dashboard.spending'), color: DOMAIN_COLOR.spending }}
                   xFormatter={formatMonthLabel}
                   referenceValue={monthlyAverage}
                   valueFormatter={(value) => currency.format(value)}
@@ -354,9 +386,12 @@ export function SpendingPanel() {
               )}
             </DashboardCard>
 
+            {/* Size is how much, colour is which way it is going: the two questions about a
+                category a person already knows the name of. */}
             <DashboardCard title={t('finances:spending.byCategory')} className="h-[320px]" bodyClassName="p-0">
               <CategoryTreemap
                 items={categorySpending}
+                colourBy="drift"
                 valueFormatter={(value) => currency.format(value)}
                 emptyLabel={t('finances:spending.noSpending')}
               />
@@ -364,6 +399,24 @@ export function SpendingPanel() {
           </div>
 
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+            {/* The only chart here that answers "am I over, right now": the fifteenth
+                against the fifteenth, rather than against a month that had thirty days. */}
+            <DashboardCard title={t('finances:spending.soFar')} className="h-[280px]" bodyClassName="p-2">
+              {soFar.length === 0 ? (
+                <p className="text-muted-foreground flex h-full items-center justify-center text-xs">{t('finances:spending.noSpending')}</p>
+              ) : (
+                <AppLineChart
+                  data={soFar}
+                  xKey="day"
+                  xFormatter={(day: string | number) => String(day)}
+                  series={[
+                    { key: 'thisMonth', label: t('finances:spending.thisMonth'), color: DIVERGING_PAIR.negative },
+                    { key: 'lastMonth', label: t('finances:spending.lastMonth'), color: DOMAIN_COLOR.spending },
+                  ]}
+                />
+              )}
+            </DashboardCard>
+
             <DashboardCard title={t('finances:spending.currentVsPrevious')} className="h-[280px]" bodyClassName="p-2">
               {monthChanges.length === 0 ? (
                 <p className="text-muted-foreground flex h-full items-center justify-center text-xs">{t('finances:spending.noCategoryChanges')}</p>
@@ -381,28 +434,30 @@ export function SpendingPanel() {
                 />
               )}
             </DashboardCard>
-
-            <DashboardCard title={t('finances:spending.frequentDescriptions')} className="h-[280px]" bodyClassName="p-0">
-              {descriptions.length === 0 ? (
-                <p className="text-muted-foreground flex h-full items-center justify-center text-xs">{t('finances:spending.noDescriptions')}</p>
-              ) : (
-                <div className="grid h-full grid-cols-2 divide-x">
-                  <DescriptionRankList
-                    title={t('finances:spending.byCount')}
-                    rows={byCount}
-                    valueFormatter={(row) => t('finances:spending.occurrences', { count: row.count })}
-                  />
-                  <DescriptionRankList
-                    title={t('finances:spending.byTotal')}
-                    rows={byTotal}
-                    valueFormatter={(row) => currency.format(row.total)}
-                  />
-                </div>
-              )}
-            </DashboardCard>
           </div>
 
+          {/* Per month, not per window: "eleven times a month" is a habit, "two hundred
+              and sixty-four times" is a number nobody can act on. */}
+          <DashboardCard title={t('finances:spending.frequentDescriptions')} className="h-[280px]" bodyClassName="p-0">
+            {descriptions.length === 0 ? (
+              <p className="text-muted-foreground flex h-full items-center justify-center text-xs">{t('finances:spending.noDescriptions')}</p>
+            ) : (
+              <div className="grid h-full grid-cols-2 divide-x">
+                <DescriptionRankList
+                  title={t('finances:spending.byCount')}
+                  rows={byCount}
+                  valueFormatter={(row) => t('finances:spending.timesPerMonth', { count: Math.max(1, Math.round(perMonth(row.count))) })}
+                />
+                <DescriptionRankList
+                  title={t('finances:spending.byTotal')}
+                  rows={byTotal}
+                  valueFormatter={(row) => `${currency.format(perMonth(row.total))} / ${t('finances:spending.month')}`}
+                />
+              </div>
+            )}
+          </DashboardCard>
         </div>
+
         </FinanceTableDrawer>
       </div>
     </div>

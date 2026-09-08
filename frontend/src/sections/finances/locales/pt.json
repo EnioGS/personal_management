@@ -62,7 +62,15 @@
     "occurrences": "{{count}} ocorrência(s)",
     "noSpending": "Nenhum gasto neste período ainda.",
     "noCategoryChanges": "Ainda não há mudanças por categoria entre os dois últimos meses.",
-    "noDescriptions": "Nenhuma descrição neste período ainda."
+    "noDescriptions": "Nenhuma descrição neste período ainda.",
+    "thisMonth": "Este mês",
+    "lastMonth": "Mês passado",
+    "committed": "Comprometido",
+    "biggestCategory": "Maior categoria",
+    "perMonth": "por mês",
+    "soFar": "Este mês até agora, contra o passado",
+    "timesPerMonth": "{{count}}× por mês",
+    "month": "mês"
   },
   "cards": {
     "noCards": "Adicione um cartão e uma fatura de cartão para ver os detalhes.",

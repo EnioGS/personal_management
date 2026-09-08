@@ -9,7 +9,12 @@
     "contributions": "Contributions",
     "positions": "Positions",
     "dividends": "Dividends",
-    "allocation": "Allocation"
+    "allocation": "Allocation",
+    "held": "Held now",
+    "received": "Received",
+    "heldOverTime": "Held over time",
+    "allocationTargets": "Allocation targets",
+    "receivedFootnote": "Interest and dividends, read from what the rows call themselves. A return would need a valuation, and these files carry none."
   },
   "columns": {
     "date": "Date",

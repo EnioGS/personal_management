@@ -13,6 +13,11 @@ interface CategoryTreemapProps {
   items: TreemapItem[]
   valueFormatter: (value: number) => string
   emptyLabel: string
+  /**
+   * What colour should say. By rank it is decoration that agrees with the areas; by drift
+   * it is a second fact — how much, and which way — in the space of one chart.
+   */
+  colourBy?: 'rank' | 'drift'
 }
 
 /** Recharts hands a cell every field of its datum, plus the rectangle it was given. */
@@ -43,7 +48,34 @@ const RAMP = {
   light: { from: [0.44, 0.15], to: [0.72, 0.07] },
   dark: { from: [0.58, 0.16], to: [0.34, 0.07] },
 } as const
+/**
+ * Wine for a category spending more than its own average, green for one spending less.
+ *
+ * Size already says how much; colour is free to say which way it is going, which is the
+ * question a person actually has about a category they already know the size of. A
+ * category holding steady sits in the middle, neither accused nor congratulated.
+ */
 const RAMP_HUE = 25
+const DRIFT_HUE = { rising: 20, steady: 250, falling: 150 }
+
+/**
+ * The colour for a category's drift against its own average, capped at a half.
+ *
+ * Past fifty per cent the colour has said everything it can; going further would only
+ * make one category louder than another for a difference nobody can read.
+ */
+function driftColor(comparison: number | undefined): { light: string; dark: string } {
+  if (comparison === undefined || !Number.isFinite(comparison)) {
+    return { light: `oklch(0.55 0.02 ${DRIFT_HUE.steady})`, dark: `oklch(0.5 0.02 ${DRIFT_HUE.steady})` }
+  }
+  const strength = Math.min(1, Math.abs(comparison) / 0.5)
+  const hue = comparison >= 0 ? DRIFT_HUE.rising : DRIFT_HUE.falling
+  const chroma = 0.03 + strength * 0.11
+  return {
+    light: `oklch(${(0.68 - strength * 0.2).toFixed(3)} ${chroma.toFixed(3)} ${hue})`,
+    dark: `oklch(${(0.5 + strength * 0.1).toFixed(3)} ${chroma.toFixed(3)} ${hue})`,
+  }
+}
 
 function rampColor(position: number): { light: string; dark: string } {
   const at = (ends: { from: readonly [number, number] | number[]; to: readonly [number, number] | number[] }) => {
@@ -68,7 +100,7 @@ function rampColor(position: number): { light: string; dark: string } {
  * treemap is one shape divided, and a border around every piece turns a surface into a
  * grid of tiles.
  */
-export function CategoryTreemap({ items, valueFormatter, emptyLabel }: CategoryTreemapProps) {
+export function CategoryTreemap({ items, valueFormatter, emptyLabel, colourBy = 'rank' }: CategoryTreemapProps) {
   const positive = items.filter((item) => item.value > 0)
   if (positive.length === 0) {
     return <p className="text-muted-foreground flex h-full items-center justify-center text-xs">{emptyLabel}</p>
@@ -81,7 +113,10 @@ export function CategoryTreemap({ items, valueFormatter, emptyLabel }: CategoryT
   const config: ChartConfig = Object.fromEntries(
     data.map((item, index) => [
       item.slot,
-      { label: item.label, theme: rampColor(ranked.length < 2 ? 0 : index / (ranked.length - 1)) },
+      {
+        label: item.label,
+        theme: colourBy === 'drift' ? driftColor(item.comparison) : rampColor(ranked.length < 2 ? 0 : index / (ranked.length - 1)),
+      },
     ]),
   )
 

@@ -6,7 +6,10 @@ import type { ChartSeries } from './line-chart'
 interface AppBarChartProps<T extends Record<string, unknown>> {
   data: T[]
   xKey: Extract<keyof T, string>
-  series: ChartSeries
+  /** One bar, or several stacked into the whole they add up to. */
+  series: ChartSeries | ChartSeries[]
+  /** Stacks several series into one bar: composition and total in one shape. */
+  stacked?: boolean
   xFormatter?: (value: string | number) => string
   /** A same-axis benchmark such as a monthly average — deliberately not another series. */
   referenceValue?: number
@@ -18,16 +21,18 @@ export function AppBarChart<T extends Record<string, unknown>>({
   data,
   xKey,
   series,
+  stacked,
   xFormatter,
   referenceValue,
   valueFormatter,
 }: AppBarChartProps<T>) {
   // See chartSafeKey's docstring — the config/CSS-var key is sanitized; series.key
   // itself stays the real dataKey recharts reads off each row.
-  const safeKey = chartSafeKey(series.key)
-  const config: ChartConfig = {
-    [safeKey]: { label: series.label, theme: { light: series.color.light, dark: series.color.dark } },
-  }
+  const bars = Array.isArray(series) ? series : [series]
+  const config: ChartConfig = Object.fromEntries(bars.map((bar) => [
+    chartSafeKey(bar.key),
+    { label: bar.label, theme: { light: bar.color.light, dark: bar.color.dark } },
+  ]))
 
   return (
     <ChartContainer config={config} className="aspect-auto h-full w-full">
@@ -45,7 +50,18 @@ export function AppBarChart<T extends Record<string, unknown>>({
         {referenceValue !== undefined && (
           <ReferenceLine y={referenceValue} stroke="var(--muted-foreground)" strokeDasharray="4 4" />
         )}
-        <Bar dataKey={series.key} name={series.label} fill={`var(--color-${safeKey})`} radius={[4, 4, 0, 0]} />
+        {bars.map((bar, index) => (
+          <Bar
+            key={bar.key}
+            dataKey={bar.key}
+            name={bar.label}
+            // Stacked: one bar is the whole, and its bands are what the whole is made of.
+            // Only the topmost band is rounded, or a stack reads as a pile of lozenges.
+            stackId={stacked ? 'stack' : undefined}
+            fill={`var(--color-${chartSafeKey(bar.key)})`}
+            radius={!stacked || index === bars.length - 1 ? [4, 4, 0, 0] : 0}
+          />
+        ))}
       </BarChart>
     </ChartContainer>
   )

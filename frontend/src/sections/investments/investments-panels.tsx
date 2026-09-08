@@ -11,10 +11,20 @@ import { isWithinRange } from '@/lib/dashboard/date-range'
 import { RankedBarList } from '@/components/dashboard/ranked-bar-list'
 import { StatTile } from '@/components/dashboard/stat-tile'
 import { bucketByMonth, foldTopCategories, formatDateLabel, formatMonthLabel, runningPositionOverTime } from '@/lib/aggregations'
-import { computePositions, getCurrentValue, type Transaction } from '@/lib/current-value'
-import { asTransaction, isFixedIncome, isVariableIncome, useInvestmentRows } from '@/lib/model/investment-rows'
+import { getCurrentValue, type Transaction } from '@/lib/current-value'
+import { asTransaction, INVESTMENTS_SCREEN, isFixedIncome, isVariableIncome, useInvestmentRows } from '@/lib/model/investment-rows'
+import { useDashboardEntries } from '@/components/dashboard/use-dashboard-entries'
+import { capitalMetric } from '@/lib/dashboard/capital-metric'
+import { holdingsSplit } from '@/lib/dashboard/holdings-split'
+import { investmentMonths } from '@/lib/dashboard/investment-months'
+import { HoldingsPie } from '@/components/charts/holdings-pie'
 import type { ConfirmedRow } from '@/lib/model/types'
 import { AllocationPanel } from './allocation-panel'
+
+const currency = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
+/** Changes sit under the number in a quarter of its space, the way they do on Movements. */
+const compactCurrency = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', notation: 'compact', maximumFractionDigits: 1 })
+const shortMonth = new Intl.DateTimeFormat('pt-BR', { month: 'short', timeZone: 'UTC' })
 
 export function OverviewPanel() {
   const { t } = useTranslation(['investments', 'common'])
@@ -43,40 +53,60 @@ export function OverviewPanel() {
  * overview, positions, allocation, transaction classes, contributions and
  * dividends; the drawer below remains the place to add and edit every ledger.
  */
+/**
+ * What is held, in what, and what it has paid out.
+ *
+ * Built on the same holdings model the Movements screen reads — a row's class says which
+ * pot it is about, and the running total of those is what is held — rather than on
+ * positions computed from an asset column that no longer exists.
+ *
+ * What is deliberately absent is a return. These files are cash flows: they say what was
+ * put in and taken out, never what a holding is worth today. Cost basis, what was received
+ * and how the composition moved are all honest; "up 7%" would not be.
+ */
 export function InvestmentsPanel() {
-  const { t } = useTranslation(['investments', 'common'])
+  const { t } = useTranslation(['investments', 'common', 'finances'])
   const { filters, setPreset, setCustomFrom, setCustomTo, toggleCategory, clearCategories } = useDashboardFilters()
-  const all = useInvestmentRows()
-  // Scoped like every other screen: the period on the bar above is what the numbers are
-  // about, so a position here is what the chosen window bought and sold.
-  const investmentRows = useMemo(() => {
-    const range = resolveFilterRange(filters)
-    return all.filter((row) => (
-      (typeof row.date !== 'number' || isWithinRange(row.date, range))
-      && (filters.categories.length === 0 || filters.categories.includes(row.category))
-    ))
-  }, [all, filters])
-  const transactions = useMemo(() => investmentRows.map(asTransaction), [investmentRows])
-  // Contributions and dividends are the same ledger read two ways — money put in, and
-  // money the holdings paid out.
-  const contributionRows = transactions.filter((row) => row.type === 'buy').map(withInvestedAmount)
-  const dividendRows = transactions.filter((row) => row.type === 'income').map(withInvestedAmount)
-  const positions = useMemo(() => computePositions(transactions), [transactions])
-  const totalValue = positions.reduce((sum, position) => sum + position.currentValue, 0)
-  // The class is a property of the investment, not of any table it lives in: the rows
-  // sit on one screen, and each says which class it is.
-  const classValue = (belongs: (row: (typeof investmentRows)[number]) => boolean) =>
-    computePositions(investmentRows.filter(belongs).map(asTransaction))
-      .reduce((sum, position) => sum + position.currentValue, 0)
-  const variableValue = classValue(isVariableIncome)
-  const fixedValue = classValue(isFixedIncome)
-  const contributions = contributionRows.reduce((sum, row) => sum + row.amount, 0)
-  const dividends = dividendRows.reduce((sum, row) => sum + row.amount, 0)
-  const contributionData = bucketByMonth(contributionRows, 'date', 'amount').map((row) => ({ month: row.month, amount: row.total }))
-  const dividendData = bucketByMonth(dividendRows, 'date', 'amount').map((row) => ({ month: row.month, amount: row.total }))
-  const lineData = runningPositionOverTime(transactions)
-  const allocation = allocationPieData(transactions, t('common:chart.other'))
-  const positionItems = positions.map((position) => ({ key: position.asset, label: position.asset, value: position.currentValue }))
+
+  // The whole history, because a holding is a running total: the window says what to draw,
+  // never where the accumulation starts.
+  const historyFilters = useMemo(() => ({ ...filters, preset: 'custom' as const, customFrom: '', customTo: '' }), [filters])
+  const rows = useDashboardEntries(historyFilters, INVESTMENTS_SCREEN)
+  const range = useMemo(() => resolveFilterRange(filters), [filters])
+
+  const allMonths = useMemo(() => investmentMonths(rows), [rows])
+  const months = useMemo(
+    () => allMonths.filter((month) => isWithinRange(Date.parse(`${month.month}-01`), range)),
+    [allMonths, range],
+  )
+  const holdings = useMemo(() => {
+    const named: Record<string, { label: string; color: typeof DOMAIN_COLOR.balance }> = {
+      cash: { label: t('finances:overview.cashReserve'), color: DOMAIN_COLOR.balance },
+      fixedIncome: { label: t('items.fixedIncome'), color: DOMAIN_COLOR.fixedIncome },
+      variableIncome: { label: t('items.variableIncome'), color: DOMAIN_COLOR.variableIncome },
+      unclassified: { label: t('finances:overview.unclassifiedHoldings'), color: DOMAIN_COLOR.unclassified },
+    }
+    return holdingsSplit(rows).map((group) => ({ ...group, ...named[group.key] }))
+  }, [rows, t])
+
+  const labels = useMemo(
+    () => ({
+      lastMonth: t('finances:overview.vsLastMonth'),
+      sinceMonth: (month: string) => t('finances:overview.vsMonth', { month: shortMonth.format(new Date(`${month}-01`)) }),
+    }),
+    [t],
+  )
+  const held = useMemo(() => capitalMetric(months, 'held', 'up', labels, compactCurrency.format), [months, labels])
+  const cash = useMemo(() => capitalMetric(months, 'cash', 'up', labels, compactCurrency.format), [months, labels])
+  const fixed = useMemo(() => capitalMetric(months, 'fixedIncome', 'up', labels, compactCurrency.format), [months, labels])
+  const received = useMemo(() => capitalMetric(months, 'received', 'up', labels, compactCurrency.format), [months, labels])
+  const receivedTotal = months.reduce((sum, month) => sum + month.received, 0)
+
+  // Every paper and pot by name, which is what a class is made of.
+  const instruments = useMemo(
+    () => holdings.flatMap((group) => group.children.map((child) => ({ ...child, key: child.key, label: child.label }))),
+    [holdings],
+  )
 
   return (
     <div className="flex h-full flex-col">
@@ -88,47 +118,110 @@ export function InvestmentsPanel() {
         toggleCategory={toggleCategory}
         clearCategories={clearCategories}
       />
-      <div className="min-h-0 flex-1">
-        
-            <div className="h-full overflow-auto p-4">
-              <div className="flex flex-col gap-3">
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-                  <StatTile label={t('items.overview')} value={new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalValue)} indicator={DOMAIN_COLOR.balance} />
-                  <StatTile label={t('items.variableIncome')} value={new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(variableValue)} indicator={DOMAIN_COLOR.variableIncome} />
-                  <StatTile label={t('items.fixedIncome')} value={new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(fixedValue)} indicator={DOMAIN_COLOR.fixedIncome} />
-                  <StatTile label={t('items.contributions')} value={new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(contributions)} indicator={DOMAIN_COLOR.contributions} />
-                  <StatTile label={t('items.dividends')} value={new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(dividends)} indicator={DOMAIN_COLOR.dividends} />
-                </div>
-                <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
-                  <DashboardCard title={t('items.overview')} className="h-[320px] lg:col-span-2" bodyClassName="p-2">
-                    <AppLineChart data={lineData} xKey="date" xFormatter={formatDateLabel} series={[{ key: 'value', label: t('items.overview'), color: DOMAIN_COLOR.balance }]} />
-                  </DashboardCard>
-                  <DashboardCard title={t('items.allocation')} className="h-[320px]" bodyClassName="p-2">
-                    <AppPieChart data={allocation} />
-                  </DashboardCard>
-                </div>
-                <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
-                  <DashboardCard title={t('items.positions')} className="h-[260px] lg:col-span-2">
-                    <RankedBarList items={positionItems} valueFormatter={(value) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)} emptyLabel={t('positions.noPositions')} />
-                  </DashboardCard>
-                  <DashboardCard title={t('items.allocation')} className="h-[260px]" bodyClassName="overflow-auto p-3">
-                    <AllocationPanel embedded />
-                  </DashboardCard>
-                </div>
-                <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-                  <DashboardCard title={t('items.contributions')} className="h-[260px]" bodyClassName="p-2">
-                    <AppBarChart data={contributionData} xKey="month" xFormatter={formatMonthLabel} series={{ key: 'amount', label: t('items.contributions'), color: DOMAIN_COLOR.contributions }} />
-                  </DashboardCard>
-                  <DashboardCard title={t('items.dividends')} className="h-[260px]" bodyClassName="p-2">
-                    <AppBarChart data={dividendData} xKey="month" xFormatter={formatMonthLabel} series={{ key: 'amount', label: t('items.dividends'), color: DOMAIN_COLOR.dividends }} />
-                  </DashboardCard>
-                </div>
-              </div>
-            </div>
+      <div className="min-h-0 flex-1 overflow-auto p-4">
+        <div className="flex flex-col gap-3">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <StatTile
+              label={t('items.held')}
+              value={currency.format(held.current)}
+              indicator={DOMAIN_COLOR.balance}
+              deltas={held.deltas}
+              sparkline={held.sparkline}
+            />
+            <StatTile
+              label={t('items.fixedIncome')}
+              value={currency.format(fixed.current)}
+              indicator={DOMAIN_COLOR.fixedIncome}
+              deltas={fixed.deltas}
+              sparkline={fixed.sparkline}
+            />
+            <StatTile
+              label={t('finances:overview.cashReserve')}
+              value={currency.format(cash.current)}
+              indicator={DOMAIN_COLOR.income}
+              deltas={cash.deltas}
+              sparkline={cash.sparkline}
+            />
+            <StatTile
+              label={t('items.received')}
+              value={currency.format(receivedTotal)}
+              indicator={DOMAIN_COLOR.dividends}
+              deltas={received.deltas}
+              sparkline={received.sparkline}
+            />
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+            {/* Composition and its history in one shape: the stack is what is held, and
+                each band is what it is held as. */}
+            <DashboardCard title={t('items.heldOverTime')} className="h-[360px] lg:col-span-2" bodyClassName="p-2">
+              {months.length === 0 ? (
+                <p className="text-muted-foreground flex h-full items-center justify-center text-xs">{t('positions.noPositions')}</p>
+              ) : (
+                <AppBarChart
+                  data={months}
+                  xKey="month"
+                  stacked
+                  series={[
+                    { key: 'cash', label: t('finances:overview.cashReserve'), color: DOMAIN_COLOR.balance },
+                    { key: 'fixedIncome', label: t('items.fixedIncome'), color: DOMAIN_COLOR.fixedIncome },
+                    { key: 'variableIncome', label: t('items.variableIncome'), color: DOMAIN_COLOR.variableIncome },
+                    { key: 'unclassified', label: t('finances:overview.unclassifiedHoldings'), color: DOMAIN_COLOR.unclassified },
+                  ]}
+                  xFormatter={formatMonthLabel}
+                  valueFormatter={(value) => currency.format(value)}
+                />
+              )}
+            </DashboardCard>
+
+            <DashboardCard title={t('items.allocation')} className="h-[360px]" bodyClassName="p-2">
+              <HoldingsPie
+                groups={holdings}
+                valueFormatter={(value) => currency.format(value)}
+                emptyLabel={t('positions.noPositions')}
+              />
+            </DashboardCard>
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+            <DashboardCard title={t('items.positions')} className="h-[280px]">
+              <RankedBarList
+                items={instruments}
+                valueFormatter={(value) => currency.format(value)}
+                emptyLabel={t('positions.noPositions')}
+                variant="underlined"
+              />
+            </DashboardCard>
+
+            <DashboardCard
+              title={t('items.received')}
+              className="h-[280px]"
+              bodyClassName="p-2"
+              footnote={t('items.receivedFootnote')}
+            >
+              {months.length === 0 ? (
+                <p className="text-muted-foreground flex h-full items-center justify-center text-xs">{t('positions.noPositions')}</p>
+              ) : (
+                <AppBarChart
+                  data={months}
+                  xKey="month"
+                  series={{ key: 'received', label: t('items.received'), color: DOMAIN_COLOR.dividends }}
+                  xFormatter={formatMonthLabel}
+                  valueFormatter={(value) => currency.format(value)}
+                />
+              )}
+            </DashboardCard>
+          </div>
+
+          <DashboardCard title={t('items.allocationTargets')} className="h-[280px]" bodyClassName="overflow-auto p-3">
+            <AllocationPanel embedded />
+          </DashboardCard>
+        </div>
       </div>
     </div>
   )
 }
+
 
 function allocationPieData(items: Transaction[], otherLabel: string) {
   const visibleItems = items.filter((t) => !t.deleted)

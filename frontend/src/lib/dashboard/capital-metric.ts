@@ -1,7 +1,15 @@
 import type { StatDelta } from '@/components/dashboard/stat-tile'
-import type { CapitalEvolutionPoint } from './capital-evolution'
 
-export type CapitalMetric = 'capital' | 'investments' | 'income' | 'spending'
+/**
+ * Anything measured month by month: a point with a month and some numbers on it.
+ *
+ * Kept this loose because every screen wants the same tile — the latest month, what it was
+ * before, and the line under it — and none of them wants to write that three times.
+ */
+export interface MonthlyPoint {
+  month: string
+  [key: string]: string | number
+}
 
 /** How many months a tile's own line draws. The card is a glance; the chart below is the history. */
 export const TILE_MONTHS = 4
@@ -45,8 +53,8 @@ export interface MetricLabels {
  * are answerable from the tile itself rather than from the period on the filter bar.
  */
 export function capitalMetric(
-  points: CapitalEvolutionPoint[],
-  metric: CapitalMetric,
+  points: MonthlyPoint[],
+  metric: string,
   goodDirection: 'up' | 'down',
   labels: MetricLabels,
   format: (value: number) => string,
