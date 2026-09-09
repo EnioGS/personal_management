@@ -287,7 +287,9 @@ Two things it optimizes for:
   field at once, and an entry is capped at 1200 characters. Each of those was something a
   written instruction asked for and did not get. The instruction to keep the record at all
   lives in the system prompt rather than the guide, because a model that does not know it
-  keeps one has no reason to read the document that would have said so.
+  keeps one has no reason to read the document that would have said so. Titles name their
+  subject — "PagHiper — payment intermediary, buyer unknown", not "Reference facts" — since
+  a list of entries is read by its titles.
 - What was worked out once becomes a **standing labelling rule**, and rules belong
   to one of two stages that never cross: a *source* rule runs as a file arrives, so
   an import can land already labelled, and a *confirmed* rule fills in meaning on

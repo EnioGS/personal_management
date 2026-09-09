@@ -19,6 +19,32 @@ const SCOPE_PROPERTIES = {
   lines: { type: 'string', description: 'Which rows inside that table, e.g. "the 14 Uber rows in March".' },
 } as const
 
+/**
+ * What a title is for.
+ *
+ * Not decoration: with entries split by scope there are many of them, and the list is
+ * read by its titles. A title naming the kind of entry rather than its subject —
+ * "Reference facts — confirmed finance data" — sorts every subject under one heading and
+ * makes the list say nothing, which is how one entry became a filing cabinet.
+ */
+const TITLE_RULE = 'The subject first, then what is said about it, e.g. "PagHiper — payment intermediary, buyer unknown" or "Nubank Main — card-bill payments". The list of entries is read by its titles, so name the thing itself: not the kind of entry it is ("reference facts", "notes", "unlabelled rows"), not when it was written, and specific enough that no two entries could share it.'
+
+/** Titles that name the kind of entry rather than its subject, and so name nothing. */
+const EMPTY_TITLES = [
+  'reference', 'reference facts', 'facts', 'notes', 'note', 'memory', 'memories', 'misc',
+  'miscellaneous', 'general', 'info', 'information', 'data', 'summary', 'confirmed data',
+  'confirmed finance data', 'finance data', 'labelling', 'labeling', 'other', 'various',
+]
+
+function titleRefusal(title: string | undefined): string | null {
+  const text = (title ?? '').trim().toLowerCase().replace(/[—–-]/g, ' ').replace(/\s+/g, ' ')
+  if (!text) return 'an entry needs a title: it is how the entry is found in a list of them.'
+  if (EMPTY_TITLES.includes(text)) {
+    return `"${title}" names the kind of entry rather than its subject, so a list of entries titled that way says nothing. Name what this one is about.`
+  }
+  return null
+}
+
 const SCOPE_RULE = " Every scope field is required and must say something: a few words, or the word 'global' where it genuinely is not restricted — a blank means nobody has said yet, not that it applies everywhere. They narrow independently, so one class with everything else global is about that class in every table."
 
 /**
@@ -42,7 +68,7 @@ export const addAgentMemoryTool: ToolDefinition = {
     type: 'object',
     properties: {
       context: { type: 'string', enum: ['source', 'confirmed'], description: 'Where this came up. It does not hide the entry: memory is read whole.' },
-      title: { type: 'string', description: 'A few words naming what this covers, and how it is found again, e.g. "unlabelled — Nubank card, March".' },
+      title: { type: 'string', description: TITLE_RULE },
       text: { type: 'string', description: 'The fact, as short as it can be said. Markdown lists are read.' },
       ...SCOPE_PROPERTIES,
     },
@@ -53,6 +79,8 @@ export const addAgentMemoryTool: ToolDefinition = {
     if (typeof args.text !== 'string' || !args.text.trim()) return 'Error: an entry needs something in it.'
     const tooLong = lengthRefusal(args.text)
     if (tooLong) return `Error: ${tooLong}`
+    const badTitle = titleRefusal(typeof args.title === 'string' ? args.title : undefined)
+    if (badTitle) return `Error: ${badTitle}`
     const scope = scopeFrom(args)
     const refusal = await scopeProblem(scope, context.translate)
     if (refusal) return `Error: ${refusal}`
@@ -79,7 +107,7 @@ export const editAgentMemoryTool: ToolDefinition = {
     type: 'object',
     properties: {
       memoryId: { type: 'number' },
-      title: { type: 'string' },
+      title: { type: 'string', description: TITLE_RULE },
       text: { type: 'string', description: 'The entry as it should now read, in full.' },
       ...SCOPE_PROPERTIES,
     },
@@ -91,6 +119,10 @@ export const editAgentMemoryTool: ToolDefinition = {
     if (typeof args.text !== 'string' || !args.text.trim()) return 'Error: an entry needs something in it.'
     const tooLong = lengthRefusal(args.text)
     if (tooLong) return `Error: ${tooLong}`
+    if (typeof args.title === 'string') {
+      const badTitle = titleRefusal(args.title)
+      if (badTitle) return `Error: ${badTitle}`
+    }
     const scope = NOTE_SCOPE_FIELDS.some((field) => typeof args[field] === 'string') ? scopeFrom(args) : undefined
     if (scope) {
       const refusal = await scopeProblem(scope, context.translate)

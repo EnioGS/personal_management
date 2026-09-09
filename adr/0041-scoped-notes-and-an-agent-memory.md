@@ -137,3 +137,15 @@ it: `open_toolset` says to open memory the moment the user explains something,
 `add_classification_note` says that the user's notes are not the assistant's
 record and copying one into the other leaves the same fact in two places, and
 the guide says to read memory before labelling and write as work goes.
+
+## Amendment: a title names its subject
+
+Splitting by scope makes many entries, and a list of many entries is read by
+its titles. The first one titled itself "Reference facts — confirmed finance
+data", which says what kind of entry it is and nothing about what is in it; a
+list titled that way has to be read in full to be searched.
+
+`add_agent_memory` and `edit_agent_memory` now say what a title is for — the
+subject first, then what is said about it, specific enough that no two entries
+could share one — and refuse a title that names only the kind of entry
+("reference facts", "notes", "misc", "confirmed finance data").

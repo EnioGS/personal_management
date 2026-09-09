@@ -77,7 +77,7 @@ describe('the assistant writing to its own record', () => {
   it('refuses a scope that narrows nothing, which is how one entry becomes the place everything goes', async () => {
     const result = await addAgentMemoryTool.execute(
       {
-        context: 'confirmed', title: 'reference facts', text: 'everything known about everything',
+        context: 'confirmed', title: 'PagHiper — payment intermediary', text: 'everything known about everything',
         account: 'global', card: 'global', section: 'global', screen: 'global',
         class: 'global', category: 'global', subcategory: 'global', lines: 'global',
       },
@@ -102,12 +102,31 @@ describe('the assistant writing to its own record', () => {
 
   it('refuses an entry long enough to be a filing cabinet, and says to split it by scope', async () => {
     const result = await addAgentMemoryTool.execute(
-      { context: 'confirmed', title: 'reference facts', text: 'merchant. '.repeat(200), ...SCOPE },
+      { context: 'confirmed', title: 'PagHiper — payment intermediary', text: 'merchant. '.repeat(200), ...SCOPE },
       { attachments: [], translate: (key: string) => key },
     )
 
     expect(result).toContain('split it')
     expect(await listClassificationNotes(undefined, 'memory')).toEqual([])
+  })
+
+  it('refuses a title that names the kind of entry rather than its subject', async () => {
+    // The title the first real memory gave itself. A list of entries titled that way is a
+    // list that has to be read in full to be searched, which is no list at all.
+    for (const title of ['Reference facts', 'confirmed finance data', 'notes', 'Misc']) {
+      const result = await addAgentMemoryTool.execute(
+        { context: 'confirmed', title, text: 'something worth keeping', ...SCOPE },
+        { attachments: [], translate: (key: string) => key },
+      )
+      expect(result, title).toContain('names the kind of entry')
+    }
+    expect(await listClassificationNotes(undefined, 'memory')).toEqual([])
+  })
+
+  it('takes a title that names its subject, however it is punctuated', async () => {
+    const { memoryId } = await remember({ title: 'PagHiper — payment intermediary, buyer unknown' })
+
+    expect(memoryId).toBeGreaterThan(0)
   })
 
   it('refuses a second entry under a title already in use, naming the one to rewrite', async () => {
