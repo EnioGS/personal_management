@@ -280,7 +280,9 @@ Two things it optimizes for:
   appended to the guide — it reads it when it
   needs it. It writes there tersely what it could not label and what was missing, what it
   could label once the user explained, and anything said to it that will matter again, so
-  the next conversation does not ask the same questions.
+  the next conversation does not ask the same questions. **One entry per scope**, enforced:
+  a scope or a title an entry already holds is refused, naming the entry to rewrite. What
+  organises the memory is what a fact is about, not what kind of fact it is.
 - What was worked out once becomes a **standing labelling rule**, and rules belong
   to one of two stages that never cross: a *source* rule runs as a file arrives, so
   an import can land already labelled, and a *confirmed* rule fills in meaning on

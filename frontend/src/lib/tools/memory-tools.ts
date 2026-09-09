@@ -37,7 +37,7 @@ export const readAgentMemoryTool: ToolDefinition = {
 
 export const addAgentMemoryTool: ToolDefinition = {
   name: 'add_agent_memory',
-  description: "Writes something down for next time. Read the memory first: if an entry already covers this subject, edit that one instead. Record: anything the user tells you that will matter again; rows you could not label and exactly what was missing; and, separately, rows you could label once they explained. One subject, one entry — a title already in use is refused. Write as tersely as the meaning allows — this is a working log, not prose, and every word is paid for on the request that reads it." + SCOPE_RULE,
+  description: "Writes something down for next time: anything the user tells you that will matter again, what you could not label and exactly what was missing, what you could label once they explained, a convention you worked out. Read the memory first — one entry per scope, and a scope or a title already in use is refused, because what you were about to write belongs in the entry that already covers it. The scope is what organises this: let it decide where a fact goes rather than sorting facts by what kind of fact they are. Write as tersely as the meaning allows — this is a working log, not prose, and every word is paid for on the request that reads it." + SCOPE_RULE,
   parameters: {
     type: 'object',
     properties: {
@@ -57,11 +57,13 @@ export const addAgentMemoryTool: ToolDefinition = {
     const context: RuleContext = args.context === 'source' ? 'source' : 'confirmed'
     const title = typeof args.title === 'string' ? args.title : undefined
 
-    // One subject, one entry. The failure this prevents is the assistant writing what it
-    // already knows a second time under the same heading, which reads as two facts.
-    const existing = (await listClassificationNotes(undefined, 'memory'))
-      .find((entry) => entry.title?.trim().toLowerCase() === title?.trim().toLowerCase() && !!title)
-    if (existing) return `Error: entry ${existing.id} is already titled "${existing.title}". Rewrite it with edit_agent_memory — in full, keeping what still holds — or give this one a title of its own.`
+    // One entry per scope, and per title. The failure this prevents is the same fact
+    // stored twice, which reads back as two facts and cannot be corrected in one place.
+    const entries = await listClassificationNotes(undefined, 'memory')
+    const sameTitle = title ? entries.find((entry) => same(entry.title, title)) : undefined
+    if (sameTitle) return `Error: entry ${sameTitle.id} is already titled "${sameTitle.title}". Rewrite it with edit_agent_memory — in full, keeping what still holds — or give this one a title of its own.`
+    const sameScope = entries.find((entry) => entry.scope && NOTE_SCOPE_FIELDS.every((field) => same(entry.scope![field], scope[field])))
+    if (sameScope) return `Error: entry ${sameScope.id} ("${sameScope.title ?? 'untitled'}") already covers exactly this scope. Add what you were going to say to it with edit_agent_memory, rewriting it in full — or narrow this scope, if it is really about something else.`
 
     const id = await addClassificationNote({ context, title, text: args.text, scope, createdBy: 'assistant' }, 'memory')
     return JSON.stringify({ memoryId: id, context, title, scope })
@@ -116,6 +118,11 @@ export const deleteAgentMemoryTool: ToolDefinition = {
     await deleteClassificationNote(args.memoryId, 'memory')
     return JSON.stringify({ memoryId: args.memoryId, deleted: true })
   },
+}
+
+/** Two pieces of scope or two titles saying the same thing, whatever the spacing or case. */
+function same(left: string | undefined, right: string | undefined): boolean {
+  return (left ?? '').trim().toLowerCase() === (right ?? '').trim().toLowerCase()
 }
 
 /** The eight scope fields, gathered off a flat argument object. */

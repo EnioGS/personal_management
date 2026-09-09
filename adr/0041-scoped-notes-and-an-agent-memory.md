@@ -66,3 +66,23 @@ time; then deleted one of the two, and could not say which.
 Memory is now read whole. `context` is still stored, saying where the entry came
 up, and never filters. `add_agent_memory` additionally refuses a title already
 in use, naming the entry to rewrite instead — one subject, one entry.
+
+## Amendment: the scope organises the memory, not a hierarchy
+
+The original instruction asked for entries filed under three headings: what the
+user explained, what could not be labelled and why, and what could be labelled
+once explained. That was specified before we had watched it used, and it did not
+survive contact. Asked to remember four merchants, the assistant made one entry
+called "Reference facts — confirmed finance data" and put everything in it —
+including a wholesale copy of a classification note, so the same facts then lived
+in two places with no rule saying which won.
+
+The reason is visible in the shape of the request: filing a fact under one of
+three headings means deciding what kind of fact it is before deciding what it is
+about, and a fact about a merchant is all three at once depending on when you
+ask. So it made one pile. The scope, meanwhile, was used correctly throughout.
+
+The heading hierarchy is dropped. The rule is now **one entry per scope**,
+enforced: `add_agent_memory` refuses a scope, or a title, that an existing entry
+already holds, and names the entry to rewrite instead. What organises the memory
+is what a thing is about, which the assistant was already getting right.
