@@ -149,3 +149,22 @@ list titled that way has to be read in full to be searched.
 subject first, then what is said about it, specific enough that no two entries
 could share one — and refuse a title that names only the kind of entry
 ("reference facts", "notes", "misc", "confirmed finance data").
+
+## Amendment: it tidies what it finds, unasked
+
+Every guard above stops a bad entry being written. None of them touches the ones
+already stored — and a vault in use has those, written before the guards
+existed. An assistant reading a wall of undifferentiated text has no reason to
+think anything is wrong with it.
+
+So `read_agent_memory` says what is wrong. It returns the entries and, alongside
+them, whichever of them holds several subjects at once, is titled after no
+subject, or is scoped to everything — each by id, with what to do: add the
+entries it should have been, one subject each, then delete the one it was, and
+say in a line what was reorganised. The system prompt carries the same duty in
+five words, since that is the text always read: *put right what you find
+disordered*.
+
+This is the same reasoning as the rest of this record. An instruction the
+assistant reads once and a state it can see are not the same thing; the state
+has to be handed to it at the moment it is holding the tool.

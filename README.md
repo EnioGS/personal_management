@@ -289,7 +289,9 @@ Two things it optimizes for:
   lives in the system prompt rather than the guide, because a model that does not know it
   keeps one has no reason to read the document that would have said so. Titles name their
   subject — "PagHiper — payment intermediary, buyer unknown", not "Reference facts" — since
-  a list of entries is read by its titles.
+  a list of entries is read by its titles. Reading the memory back also reports whatever in
+  it is disordered — an entry holding several subjects, titled after none, or scoped to
+  everything — so the assistant puts it right unasked rather than adding to the mess.
 - What was worked out once becomes a **standing labelling rule**, and rules belong
   to one of two stages that never cross: a *source* rule runs as a file arrives, so
   an import can land already labelled, and a *confirmed* rule fills in meaning on

@@ -24,7 +24,7 @@ const LEGACY_ROW_ACCESS_PROMPTS = [
  * with nothing on screen to say why. Matched on a fragment rather than the whole text so
  * an edited version of the paragraph is left alone.
  */
-const MEMORY_PROMPT = "Keep your own record, unasked: when the user explains something you did not know, open the memory toolset and write it down before answering, and read it back before asking what they may have answered already. Short entries, each scoped to what it is about. Nothing else you learn survives this conversation."
+const MEMORY_PROMPT = "Keep your own record, unasked: when the user explains something you did not know, open the memory toolset and write it down before answering, and read it back before asking what they may have answered already. Short entries, each scoped to its subject; put right what you find disordered. Nothing else you learn survives this conversation."
 const MEMORY_PROMPT_MARK = 'Keep your own record, unasked'
 
 /**

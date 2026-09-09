@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { wipeAllData } from '@/lib/data-file'
 import { accountsTable } from '@/lib/model/model-db'
-import { listClassificationNotes } from '@/lib/model/classification-notes'
+import { addClassificationNote, listClassificationNotes } from '@/lib/model/classification-notes'
 import { addAgentMemoryTool, deleteAgentMemoryTool, editAgentMemoryTool, readAgentMemoryTool } from './memory-tools'
 
 /** Said in full, because the tools require every field to say something. */
@@ -48,7 +48,7 @@ describe('the assistant writing to its own record', () => {
     // The stage split belongs to the user's notes, which are sent per stage. Splitting the
     // assistant's own record hid an entry from the table it was needed at, and an empty
     // memory is answered by writing the entry again.
-    const entries = JSON.parse(await readAgentMemoryTool.execute({}, { attachments: [], translate: (key: string) => key }))
+    const { entries } = JSON.parse(await readAgentMemoryTool.execute({}, { attachments: [], translate: (key: string) => key }))
     expect(entries.map((entry: { title: string }) => entry.title)).toEqual(['unlabelled — Nubank March', 'later'])
   })
 
@@ -160,5 +160,31 @@ describe('the assistant writing to its own record', () => {
 
     await deleteAgentMemoryTool.execute({ memoryId, confirmed: true }, { attachments: [], translate: (key: string) => key })
     expect(await listClassificationNotes(undefined, 'memory')).toEqual([])
+  })
+
+  it('says what is disordered in what it reads back, rather than leaving it to be noticed', async () => {
+    // Written the way the tools no longer allow, which is the state a vault is actually in.
+    await addClassificationNote(
+      { context: 'confirmed', title: 'Reference facts', text: 'merchant. '.repeat(200), scope: { ...SCOPE, account: 'global', section: 'global', screen: 'global', lines: 'global' }, createdBy: 'assistant' },
+      'memory',
+    )
+
+    const result = JSON.parse(await readAgentMemoryTool.execute({}, { attachments: [], translate: (key: string) => key }))
+
+    expect(result.disordered[0].problems).toEqual([
+      'holds several subjects at once',
+      'the title names no subject',
+      'scoped to everything, so about nothing',
+    ])
+    expect(result.putRight).toContain('before the work you were doing')
+  })
+
+  it('says nothing about tidying when there is nothing to tidy', async () => {
+    await remember()
+
+    const result = JSON.parse(await readAgentMemoryTool.execute({}, { attachments: [], translate: (key: string) => key }))
+
+    expect(result.entries).toHaveLength(1)
+    expect(result.disordered).toBeUndefined()
   })
 })

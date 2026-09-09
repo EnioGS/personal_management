@@ -56,9 +56,31 @@ const SCOPE_RULE = " Every scope field is required and must say something: a few
  */
 export const readAgentMemoryTool: ToolDefinition = {
   name: 'read_agent_memory',
-  description: "Your own record of this vault, whole: rows you could not label and what was missing, rows you could once the user explained, conventions you worked out. Read it before asking the user something, before labelling a file of a kind you have seen before, and always before writing to it — an entry that already covers the subject is edited, never added again. Not the user's notes, which arrive with the guide.",
+  description: "Your own record of this vault, whole: rows you could not label and what was missing, rows you could once the user explained, conventions you worked out. Read it before asking the user something, before labelling a file of a kind you have seen before, and always before writing to it — an entry that already covers the subject is edited, never added again. Not the user's notes, which arrive with the guide.\n\nYou keep this in order yourself, without being asked. If what you read back is disordered — one entry holding several subjects, a title naming no subject, a scope that narrows nothing or names something that does not exist, an entry too long to take in — put it right there and then, before the work you were doing: add the entries it should have been, each scoped and titled by its own subject, then delete the one it was. Say in a line what you reorganised. An entry left in that state is one you cannot add to, correct, or find anything in later.",
   parameters: { type: 'object', properties: {}, additionalProperties: false },
-  execute: async () => JSON.stringify(await listClassificationNotes(undefined, 'memory')),
+  execute: async () => {
+    const entries = await listClassificationNotes(undefined, 'memory')
+    // Said rather than left to be noticed. What the tools refuse on the way in, an entry
+    // written before they refused it is still holding, and an assistant reading a wall of
+    // text has no reason to think anything is wrong with it.
+    const disordered = entries.flatMap((entry) => {
+      const problems = [
+        lengthRefusal(entry.text) ? 'holds several subjects at once' : '',
+        titleRefusal(entry.title) ? 'the title names no subject' : '',
+        !entry.scope ? 'no scope' : NOTE_SCOPE_FIELDS.every((field) => same(entry.scope![field], 'global')) ? 'scoped to everything, so about nothing' : '',
+      ].filter(Boolean)
+      return problems.length > 0 ? [{ memoryId: entry.id, title: entry.title ?? null, problems }] : []
+    })
+    return JSON.stringify({
+      entries,
+      ...(disordered.length > 0
+        ? {
+            disordered,
+            putRight: 'Do this before the work you were doing: add the entries each of these should have been, one subject each, scoped and titled by its own subject, then delete the one it was. Say in a line what you reorganised.',
+          }
+        : {}),
+    })
+  },
 }
 
 export const addAgentMemoryTool: ToolDefinition = {
@@ -138,7 +160,7 @@ export const editAgentMemoryTool: ToolDefinition = {
 
 export const deleteAgentMemoryTool: ToolDefinition = {
   name: 'delete_agent_memory',
-  description: 'Removes one of your entries — when what it recorded has been dealt with entirely, rather than when it has merely shrunk. Pass confirmed: true, having said what it holds.',
+  description: 'Removes one of your entries — when what it recorded has been dealt with entirely, or when you have just split it into the entries it should have been. Pass confirmed: true, having said what it holds.',
   parameters: {
     type: 'object',
     properties: {
