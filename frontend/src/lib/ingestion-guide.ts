@@ -26,7 +26,7 @@ and move into confirmed tables when they are ready — one phase, not two.
 columns. Everything starts empty: nothing is claimed before somebody claims it.
 
 Only the file's own columns can be assigned, to three: **date**, **price** (the money,
-signed) and **amount** (how many). What a row moved is amount x price; a file silent about
+signed), **amount** (how many). What a row moved is amount x price; a file silent about
 quantity describes one thing — amount 1, price the money itself. Price is per unit, so a
 total covering several units has to be divided. Value and amount are never
 interchangeable: money is a value, a holding is an amount. Anything unassigned is condensed
@@ -45,7 +45,7 @@ nobody notices.
    (amount to Investments alone), and placement locks while anything is assigned — to
    re-place, unassign first.
 3. **Label the rest.** Read which accounts and cards exist, and register what the file
-   plainly needs and nobody has set up.
+   plainly needs and nobody set up.
 4. **Only then decide the sign** — it depends on where the rows are going.
 
 ## The labels
@@ -56,15 +56,15 @@ ${PROMPT_PLACEHOLDERS.sections}
 Screens — the pages inside them, validated *within* the sections the row names, since two
 sections may offer the same name: ${PROMPT_PLACEHOLDERS.screens}
 
-Class — free text: what kind of thing it is, which is what a balance is sliced by — renda
+Class — free text: what kind of thing it is, and what a balance is sliced by — renda
 fixa, renda variável, cash reserve. What it *is*, never where it came from: interest
 arriving in cash is \`cash reserve\`, not \`proceeds\`. Investments reads it.
 
 Category — free text, one value, empty at first. Leave it empty rather than "other":
 an empty cell asks to be looked at, "other" looks like an answer.
 
-Subcategory — the detail under it, free text. Assinatura, membership, parcelado and their
-equivalents are read by the Recurring screen.
+Subcategory — the detail under it, free text. Assinatura, membership, parcelado and the
+like are read by the Recurring screen.
 
 Account — required, and must name one the user set up: every movement sat somewhere.
 Card — optional, same vocabulary: a Pix, a salary or a transfer touched none, and empty is
@@ -102,7 +102,7 @@ Settings → History.
 
 ## Duplicates
 
-Two identical rows *inside one file* are two real transactions — banks report them. A row
+Two identical rows *inside one file* are two real transactions; banks report them. A row
 is a possible duplicate only when everything it says matches one from a **different file**,
 confirmed rows included — comparable only after the columns are assigned, so look again
 then. A filename nearly repeating one already imported is flagged on arrival.
@@ -115,9 +115,10 @@ already in a table says about itself — class, category, subcategory, account, 
 where it belongs. A rule fills only what a row does not already say, so it cannot overwrite
 a judgement. Write the rationale, and read the standing rules first.
 
-Notes are the rest: what a rule cannot say — that a shop nobody would recognise sells food,
-that one file's March rows were a rebalance. Appended below when there are any: the user
-talking about their own data. Memory is your own record and is *not* appended — open the
-memory toolset and read it, and write there tersely what you could not label and what was
-missing. Both take a scope, every field a few words or \`global\`; a blank is refused.
+Notes are the rest: what a rule cannot say — that an unrecognisable shop sells food, that
+one file's March rows were a rebalance. Appended below when there are any: the user talking
+about their own data. Memory is your own record and is *not* appended — read it before
+labelling, and write there as you go: what you could not label and what was missing, what
+the user explained. A scope names things that exist, each field a few words or \`global\`,
+never all of them.
 `

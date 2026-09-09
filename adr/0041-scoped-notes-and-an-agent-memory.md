@@ -114,3 +114,26 @@ something. It relabelled sixteen rows from a long explanation and wrote none of
 it down. `label_rows_by_match` and `revise_confirmed_rows` now say, in their own
 descriptions, to write down what made the labelling possible — those are the
 tools in hand when the learning happens, and the guide is read before it.
+
+## Amendment: the instruction has to be where it is always read
+
+The tools were right and nothing reached the assistant at the moment it
+mattered. Memory lived in the ingestion guide and in its own tool descriptions,
+which are read only once work is already under way and the memory toolset is
+already open — so a conversation that explained thirty merchants and relabelled
+sixteen rows wrote nothing down, and none of it survived.
+
+A short paragraph now sits in the system prompt, which is sent with every
+request: keep your own record unasked, write before answering, read it back
+before asking something already answered. That raises the system prompt's own
+budget from 360 tokens to 440, deliberately. Everything else in that prompt can
+be fetched on demand, because something in the prompt says to fetch it. This one
+cannot: a model that does not know it keeps a record has no reason to read the
+document that would have told it.
+
+The paragraph is also appended to prompts saved before it existed, since the
+alternative is a vault whose assistant silently never learns anything. Alongside
+it: `open_toolset` says to open memory the moment the user explains something,
+`add_classification_note` says that the user's notes are not the assistant's
+record and copying one into the other leaves the same fact in two places, and
+the guide says to read memory before labelling and write as work goes.

@@ -16,6 +16,18 @@ const LEGACY_ROW_ACCESS_PROMPTS = [
 ]
 
 /**
+ * The paragraph that makes the assistant keep its own record, and the mark that says a
+ * prompt already has it.
+ *
+ * Kept separate from the default so a vault whose prompt was saved before this existed
+ * gets it too: the alternative is a user whose assistant silently never learns anything,
+ * with nothing on screen to say why. Matched on a fragment rather than the whole text so
+ * an edited version of the paragraph is left alone.
+ */
+const MEMORY_PROMPT = "Keep your own record, unasked: when the user explains something you did not know, open the memory toolset and write it down before answering, and read it back before asking what they may have answered already. Short entries, each scoped to what it is about. Nothing else you learn survives this conversation."
+const MEMORY_PROMPT_MARK = 'Keep your own record, unasked'
+
+/**
  * Not translated (en/pt) like the rest of the app's UI strings — this is data sent
  * to the model, not a UI label, so it stays in one language regardless of locale.
  * See adr/0016-assistant-prompts-not-translated.md.
@@ -29,11 +41,19 @@ One rule never bends: a correction is an added row with the same row_id and the 
 
 Before doing or explaining anything about importing, assigning columns, labelling, signs, rules or confirming — including a plain request for help with it — call read_ingestion_guide and follow it. It carries the labels, the order of the work, and the notes written about this particular vault. It is fetched rather than repeated here, so a conversation that never touches data never pays for it.
 
+${MEMORY_PROMPT}
+
 Do the work rather than describing what you are about to do: a turn that says what you will look at next, and stops, has done nothing. Keep calling tools until the task is finished or you need the user, and when several calls do not depend on each other, ask for them in one turn. Preserve raw source values, explain every judgement, and ask the user when the evidence does not settle something rather than guessing. Be concise.`
 
-/** Upgrades persisted copies of a prior default without overwriting unrelated custom prompt text. */
+/**
+ * Upgrades persisted copies of a prior default without overwriting unrelated custom prompt
+ * text: a sentence that has been superseded is replaced, and the memory paragraph is
+ * appended if it is missing entirely. A prompt the user has rewritten keeps everything
+ * they wrote — only the parts they left alone are brought forward.
+ */
 export function enableAppendOnlyTableWrites(prompt: string): string {
-  return LEGACY_ROW_ACCESS_PROMPTS.reduce((text, legacy) => text.replace(legacy, ROW_ACCESS_PROMPT), prompt)
+  const upgraded = LEGACY_ROW_ACCESS_PROMPTS.reduce((text, legacy) => text.replace(legacy, ROW_ACCESS_PROMPT), prompt)
+  return upgraded.includes(MEMORY_PROMPT_MARK) ? upgraded : `${upgraded}\n\n${MEMORY_PROMPT}`
 }
 
 export const useAssistantPromptsStore = createLocalListStore<AssistantPrompt>(assistantPromptsTable)

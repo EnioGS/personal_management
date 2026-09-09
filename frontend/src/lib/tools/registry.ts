@@ -120,7 +120,7 @@ export const TOOL_GROUPS: Record<string, { summary: string; tools: string[] }> =
     tools: ['list_accounts_and_cards', 'add_account', 'add_card'],
   },
   memory: {
-    summary: "Your own record of this vault: what you could not label and why, what you could once the user explained, and anything they told you that will matter again.",
+    summary: "Your own record of this vault: what you could not label and why, what you could once the user explained, and anything they told you that will matter again. Open it the moment the user explains something you did not know, without being asked to — and before asking them something they may already have answered in an earlier conversation.",
     tools: ['read_agent_memory', 'add_agent_memory', 'edit_agent_memory', 'delete_agent_memory'],
   },
   conversation: {

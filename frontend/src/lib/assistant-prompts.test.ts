@@ -21,3 +21,20 @@ describe('enableAppendOnlyTableWrites', () => {
     expect(enableAppendOnlyTableWrites(DEFAULT_SYSTEM_PROMPT)).toBe(DEFAULT_SYSTEM_PROMPT)
   })
 })
+
+describe('a prompt saved before the assistant kept a record', () => {
+  it('gets the paragraph appended, keeping every word the user wrote', () => {
+    const theirs = 'You are the assistant. Always answer in Portuguese, and never touch the broker file.'
+
+    const upgraded = enableAppendOnlyTableWrites(theirs)
+
+    expect(upgraded).toContain(theirs)
+    expect(upgraded).toContain('Keep your own record, unasked')
+  })
+
+  it('is left alone once it has it, however the paragraph was edited afterwards', () => {
+    const edited = `${DEFAULT_SYSTEM_PROMPT}`.replace('before you answer', 'at the end of your answer')
+
+    expect(enableAppendOnlyTableWrites(edited)).toBe(edited)
+  })
+})

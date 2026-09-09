@@ -83,6 +83,12 @@ describe('the system prompt', () => {
   it('is short, because everything it repeats is fetched on demand and paid for twice', () => {
     // Roughly four characters to a token: a prompt sent with every single request has to
     // earn its length, and the guide already says what this used to say.
-    expect(DEFAULT_SYSTEM_PROMPT.length / 4).toBeLessThan(360)
+    //
+    // Raised from 360 for the one instruction that cannot be fetched on demand. A model
+    // that does not know it keeps a record has no reason to read the document that would
+    // have told it, and the whole of what it learns is lost with the conversation — which
+    // is what happened: an hour of explanation, sixteen rows relabelled, nothing written
+    // down. Everything else here can wait to be looked up; this cannot.
+    expect(DEFAULT_SYSTEM_PROMPT.length / 4).toBeLessThan(440)
   })
 })
