@@ -168,3 +168,20 @@ disordered*.
 This is the same reasoning as the rest of this record. An instruction the
 assistant reads once and a state it can see are not the same thing; the state
 has to be handed to it at the moment it is holding the tool.
+
+## Amendment: reorganising is not deleting
+
+Told to tidy the memory, the assistant read the one disordered entry, wrote the
+entries it should have been, and deleted the original. That is the right shape,
+and it is also the shape in which everything is lost if the reading was partial:
+nothing checks that what went in matches what came out, and the original is gone.
+
+`delete_agent_memory` now takes `carriedBy` — the ids of the entries that hold
+what this one held. They must already exist; an id for an entry not yet written
+is refused, which forces write-then-check-then-delete rather than the reverse.
+An entry nothing carries can still go, but only with a `reason` saying why
+nothing is lost. And the result hands back the deleted title and text in full,
+with a line telling the assistant to read the carrying entries and write down
+anything that did not survive the move — so the content is still in the
+conversation that removed it, recoverable by rewriting, and visible to the user
+in the transcript. The journal already made it undoable; this makes it legible.

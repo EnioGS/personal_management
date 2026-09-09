@@ -56,7 +56,7 @@ const SCOPE_RULE = " Every scope field is required and must say something: a few
  */
 export const readAgentMemoryTool: ToolDefinition = {
   name: 'read_agent_memory',
-  description: "Your own record of this vault, whole: rows you could not label and what was missing, rows you could once the user explained, conventions you worked out. Read it before asking the user something, before labelling a file of a kind you have seen before, and always before writing to it — an entry that already covers the subject is edited, never added again. Not the user's notes, which arrive with the guide.\n\nYou keep this in order yourself, without being asked. If what you read back is disordered — one entry holding several subjects, a title naming no subject, a scope that narrows nothing or names something that does not exist, an entry too long to take in — put it right there and then, before the work you were doing: add the entries it should have been, each scoped and titled by its own subject, then delete the one it was. Say in a line what you reorganised. An entry left in that state is one you cannot add to, correct, or find anything in later.",
+  description: "Your own record of this vault, whole: rows you could not label and what was missing, rows you could once the user explained, conventions you worked out. Read it before asking the user something, before labelling a file of a kind you have seen before, and always before writing to it — an entry that already covers the subject is edited, never added again. Not the user's notes, which arrive with the guide.\n\nYou keep this in order yourself, without being asked. If what you read back is disordered — one entry holding several subjects, a title naming no subject, a scope that narrows nothing or names something that does not exist, an entry too long to take in — put it right there and then, before the work you were doing: add the entries it should have been, each scoped and titled by its own subject; read them back and check that every fact in the old one is now in them; only then delete it, naming the new ones. Never the other way round — a deletion is the one thing here that loses something. Say in a line what you reorganised. An entry left in that state is one you cannot add to, correct, or find anything in later.",
   parameters: { type: 'object', properties: {}, additionalProperties: false },
   execute: async () => {
     const entries = await listClassificationNotes(undefined, 'memory')
@@ -76,7 +76,7 @@ export const readAgentMemoryTool: ToolDefinition = {
       ...(disordered.length > 0
         ? {
             disordered,
-            putRight: 'Do this before the work you were doing: add the entries each of these should have been, one subject each, scoped and titled by its own subject, then delete the one it was. Say in a line what you reorganised.',
+            putRight: 'Do this before the work you were doing: add the entries each of these should have been, one subject each, scoped and titled by its own subject; read the memory back and check every fact survived the move; only then delete the old one, naming the new ones in carriedBy. Say in a line what you reorganised.',
           }
         : {}),
     })
@@ -160,21 +160,55 @@ export const editAgentMemoryTool: ToolDefinition = {
 
 export const deleteAgentMemoryTool: ToolDefinition = {
   name: 'delete_agent_memory',
-  description: 'Removes one of your entries — when what it recorded has been dealt with entirely, or when you have just split it into the entries it should have been. Pass confirmed: true, having said what it holds.',
+  description: "Removes one of your entries. Reorganising is never a deletion on its own: write the entries this one should have been first, read them back, satisfy yourself that every fact in the old one is in the new ones — then delete it, naming those entries in carriedBy. An entry nothing carries can only go when what it recorded is genuinely spent, and then reason has to say why nothing is lost. What was deleted comes back in the result, so say what is in it before you go on.",
   parameters: {
     type: 'object',
     properties: {
       memoryId: { type: 'number' },
       confirmed: { type: 'boolean', description: 'Say what the entry records before removing it, and only then.' },
+      carriedBy: {
+        type: 'array',
+        items: { type: 'number' },
+        description: 'The entries that now hold what this one held, by id. They must exist already — write them first. Empty only for an entry whose content is genuinely spent, which then needs a reason.',
+      },
+      reason: { type: 'string', description: 'Why nothing is lost by removing this, when no other entry carries it.' },
     },
-    required: ['memoryId', 'confirmed'],
+    required: ['memoryId', 'confirmed', 'carriedBy'],
     additionalProperties: false,
   },
   execute: async (args) => {
     if (typeof args.memoryId !== 'number') return 'Error: memoryId is required.'
     if (args.confirmed !== true) return 'Error: say what this entry records, then call again with confirmed: true.'
+
+    const entries = await listClassificationNotes(undefined, 'memory')
+    const going = entries.find((entry) => entry.id === args.memoryId)
+    if (!going) return `Error: there is no entry ${args.memoryId}. Read the memory for the ones there are.`
+
+    const carriedBy = Array.isArray(args.carriedBy) ? args.carriedBy.map(Number).filter((id) => id !== args.memoryId) : []
+    const missing = carriedBy.filter((id) => !entries.some((entry) => entry.id === id))
+    if (missing.length > 0) {
+      return `Error: no entry ${missing.join(', ')}. What carries this has to exist before this goes — write it first, read the memory back, and pass the ids it comes back with.`
+    }
+    // The failure this exists for: a pile of facts read once, said to have been
+    // redistributed, and deleted — with nothing anywhere saying where any of it went.
+    const reason = typeof args.reason === 'string' ? args.reason.trim() : ''
+    if (carriedBy.length === 0 && !reason) {
+      return `Error: nothing is named as carrying what entry ${args.memoryId} holds. Write those entries first and name them in carriedBy — or, if what it recorded is genuinely spent, say in reason why nothing is lost.`
+    }
+
     await deleteClassificationNote(args.memoryId, 'memory')
-    return JSON.stringify({ memoryId: args.memoryId, deleted: true })
+    // Handed back rather than merely confirmed: what was in it is now in this conversation,
+    // recoverable by rewriting it, and visible to the user in the transcript.
+    return JSON.stringify({
+      memoryId: args.memoryId,
+      deleted: true,
+      title: going.title ?? null,
+      text: going.text,
+      carriedBy,
+      check: carriedBy.length > 0
+        ? `Read entries ${carriedBy.join(', ')} now and say whether every fact above is in them. Anything that is not, write down before you go on.`
+        : 'Nothing carries this. If any of the text above still matters, write it down now.',
+    })
   },
 }
 

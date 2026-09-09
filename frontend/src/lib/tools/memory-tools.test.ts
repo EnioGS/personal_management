@@ -158,7 +158,7 @@ describe('the assistant writing to its own record', () => {
     expect(await deleteAgentMemoryTool.execute({ memoryId }, { attachments: [], translate: (key: string) => key })).toContain('confirmed: true')
     expect(await listClassificationNotes(undefined, 'memory')).toHaveLength(1)
 
-    await deleteAgentMemoryTool.execute({ memoryId, confirmed: true }, { attachments: [], translate: (key: string) => key })
+    await deleteAgentMemoryTool.execute({ memoryId, confirmed: true, carriedBy: [], reason: 'the rows it was about are all labelled now' }, { attachments: [], translate: (key: string) => key })
     expect(await listClassificationNotes(undefined, 'memory')).toEqual([])
   })
 
@@ -186,5 +186,43 @@ describe('the assistant writing to its own record', () => {
 
     expect(result.entries).toHaveLength(1)
     expect(result.disordered).toBeUndefined()
+  })
+
+  it('will not let a pile of facts be deleted with nothing named as carrying them', async () => {
+    const { memoryId } = await remember()
+
+    const result = await deleteAgentMemoryTool.execute(
+      { memoryId, confirmed: true, carriedBy: [] },
+      { attachments: [], translate: (key: string) => key },
+    )
+
+    expect(result).toContain('nothing is named as carrying')
+    expect(await listClassificationNotes(undefined, 'memory')).toHaveLength(1)
+  })
+
+  it('will not accept entries that do not exist as carrying it: they are written first, not promised', async () => {
+    const { memoryId } = await remember()
+
+    const result = await deleteAgentMemoryTool.execute(
+      { memoryId, confirmed: true, carriedBy: [98, 99] },
+      { attachments: [], translate: (key: string) => key },
+    )
+
+    expect(result).toContain('no entry 98, 99')
+    expect(await listClassificationNotes(undefined, 'memory')).toHaveLength(1)
+  })
+
+  it('hands back what it deleted, so nothing is gone from the conversation that made it go', async () => {
+    const { memoryId } = await remember()
+    const { memoryId: replacement } = await remember({ title: 'unlabelled — Nubank April', lines: 'the 3 April rows' })
+
+    const result = JSON.parse(await deleteAgentMemoryTool.execute(
+      { memoryId, confirmed: true, carriedBy: [replacement] },
+      { attachments: [], translate: (key: string) => key },
+    ))
+
+    expect(result.text).toBe('14 rows: no merchant name.')
+    expect(result.check).toContain(`entries ${replacement}`)
+    expect(await listClassificationNotes(undefined, 'memory')).toHaveLength(1)
   })
 })
