@@ -64,7 +64,6 @@
     "noDescriptions": "Nenhuma descrição neste período ainda.",
     "thisMonth": "Este mês",
     "lastMonth": "Mês passado",
-    "committed": "Comprometido",
     "perMonth": "por mês",
     "soFar": "Este mês até agora, contra o passado",
     "timesPerMonth": "{{count}}× por mês",
@@ -75,7 +74,12 @@
     "vsAverage_other": "Últimos {{count}} meses vs. média mensal",
     "monthsBack": "{{count}}m",
     "dayOfMonth": "dia {{day}}/{{days}}",
-    "atThisRate": "no ritmo deste mês"
+    "newThisMonth": "Novo neste mês",
+    "thingsCount_one": "{{count}} coisa",
+    "thingsCount_other": "{{count}} coisas",
+    "ofThisMonth": "do gasto deste mês",
+    "vsUsualMonth": "vs. um mês normal",
+    "spentSoFar": "{{value}} até agora"
   },
   "cards": {
     "noCards": "Adicione um cartão e uma fatura de cartão para ver os detalhes.",

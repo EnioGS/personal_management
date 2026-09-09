@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { FilteredEntry } from '@/components/dashboard/use-dashboard-entries'
-import { averageSpendByCategory, categoryVsAverage, frequentDescriptions, outgoingSpending, spendingByMonth } from './spending-analytics'
+import { averageSpendByCategory, categoryVsAverage, frequentDescriptions, outgoingSpending, recentlyNewSpending, spendingByMonth } from './spending-analytics'
 
 /** Amounts are signed the way the app means them, so a spending row is negative. */
 function entry(overrides: Partial<FilteredEntry>): FilteredEntry {
@@ -159,5 +159,27 @@ describe('a purchase paid straight from the bank', () => {
 
     expect(outgoingSpending([pix])).toEqual([pix])
     expect(spendingByMonth(outgoingSpending([pix]))[0].amount).toBe(284.9)
+  })
+
+  it('counts what a month bought that it was not buying before, and only that', () => {
+    const rows = [
+      entry({ date: Date.UTC(2026, 5, 3), description: 'Mercado', value: -100 }),
+      entry({ date: Date.UTC(2026, 6, 3), description: 'Mercado', value: -100 }),
+      entry({ date: Date.UTC(2026, 7, 3), description: 'Mercado', value: -100 }),
+      entry({ date: Date.UTC(2026, 7, 4), description: 'Some New Subscription', value: -40 }),
+      entry({ date: Date.UTC(2026, 7, 5), description: 'A Restaurant', value: -60 }),
+    ]
+
+    // August: the market has been bought for months, the other two have not.
+    expect(recentlyNewSpending(rows, new Date(2026, 7, 20))).toMatchObject({ total: 100, count: 2, monthTotal: 200 })
+  })
+
+  it('says a month bought nothing new when it bought nothing new', () => {
+    const rows = [
+      entry({ date: Date.UTC(2026, 6, 3), description: 'Mercado', value: -100 }),
+      entry({ date: Date.UTC(2026, 7, 3), description: 'Mercado', value: -100 }),
+    ]
+
+    expect(recentlyNewSpending(rows, new Date(2026, 7, 20))).toMatchObject({ total: 0, count: 0 })
   })
 })

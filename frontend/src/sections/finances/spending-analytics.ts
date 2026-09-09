@@ -120,6 +120,58 @@ export function categoryVsAverage(rows: FilteredEntry[], months: SpendingWindow)
     .sort((left, right) => Math.abs(right.change) - Math.abs(left.change))
 }
 
+export interface NewSpending {
+  /** What went to things not bought in the months before this one. */
+  total: number
+  /** How many distinct such things. */
+  count: number
+  /** What the whole month spent, so the share can be read off. */
+  monthTotal: number
+  /** The same figure for each of the recent months, oldest first: is this a habit or a month. */
+  history: number[]
+}
+
+/**
+ * What a month spent on things it had not bought before.
+ *
+ * Everything else on this screen reports the shape of ordinary spending — categories, a
+ * rate, what repeats. This is the part that is none of those: a merchant appearing for the
+ * first time in months. It is where an unnoticed subscription, a one-off that became a
+ * habit, or a month that simply went somewhere new all show up first, and no other tile or
+ * chart here can show it, because they all aggregate the thing that makes it visible.
+ */
+export function recentlyNewSpending(rows: FilteredEntry[], today: Date = new Date(), lookback = 3): NewSpending {
+  const current = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`
+  const monthsPresent = [...new Set(rows.map((row) => monthKey(row.date)))].sort()
+  const months = [...new Set([...monthsPresent, current])].sort().filter((month) => month <= current)
+
+  const forMonth = (month: string) => {
+    const index = months.indexOf(month)
+    const before = new Set(
+      rows.filter((row) => {
+        const key = monthKey(row.date)
+        const age = index - months.indexOf(key)
+        return age > 0 && age <= lookback
+      }).map(nameOf),
+    )
+    const own = rows.filter((row) => monthKey(row.date) === month)
+    const fresh = own.filter((row) => !before.has(nameOf(row)))
+    return {
+      total: fresh.reduce((sum, row) => sum - row.value, 0),
+      count: new Set(fresh.map(nameOf)).size,
+      monthTotal: own.reduce((sum, row) => sum - row.value, 0),
+    }
+  }
+
+  const now = forMonth(current)
+  return { ...now, history: months.slice(-4).map((month) => forMonth(month).total) }
+}
+
+/** What a row is "the same thing" as, for the purpose of having been bought before. */
+function nameOf(row: FilteredEntry): string {
+  return (row.description.trim() || categoryOf(row)).toLowerCase()
+}
+
 export function frequentDescriptions(rows: FilteredEntry[]): DescriptionFrequency[] {
   const totals = new Map<string, DescriptionFrequency>()
   for (const row of rows) {

@@ -92,6 +92,55 @@ export function trailingAverages(
   })
 }
 
+export interface MonthEndProjection {
+  /** What the month is expected to close at: what has been spent, plus what is left to come. */
+  monthEnd: number
+  spentSoFar: number
+  /** The rate the remaining days are costed at, per month — the trailing average. */
+  baseline: number
+  dayOfMonth: number
+  daysInMonth: number
+  /** How much of the estimate is the month's own rate rather than the baseline, 0 to 1. */
+  weight: number
+}
+
+/**
+ * Where the month in progress ends up.
+ *
+ * The days that have happened are not estimated — they are what was spent. Only the days
+ * left are, and the rate they are costed at is a blend: the month's own rate so far, and
+ * the trailing four-month average, weighted by how much of the month has actually
+ * happened. On the second of the month one restaurant bill would otherwise project to a
+ * catastrophe, and the history is the better evidence; on the twenty-eighth the month is
+ * its own evidence and the history says almost nothing. The estimate walks from one to the
+ * other as the month fills in, and lands exactly on the truth on the last day.
+ */
+export function projectMonthEnd(months: SpendingMonth[], today: Date = new Date()): MonthEndProjection | null {
+  const current = months.at(-1)
+  if (!current || current.month !== currentMonthKey(today)) return null
+
+  const dayOfMonth = today.getDate()
+  const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate()
+  // The trailing average ending at the last full month: the same number the tile beside
+  // this one draws, so the two agree about what a normal month costs.
+  const baseline = trailingAverages(months.slice(0, -1), 'spent', 1)[0] ?? 0
+  if (baseline === 0 && current.spent === 0) return null
+
+  const weight = dayOfMonth / daysInMonth
+  const ownRate = current.spent / dayOfMonth
+  const baselineRate = baseline / daysInMonth
+  const rate = weight * ownRate + (1 - weight) * baselineRate
+
+  return {
+    monthEnd: current.spent + rate * (daysInMonth - dayOfMonth),
+    spentSoFar: current.spent,
+    baseline,
+    dayOfMonth,
+    daysInMonth,
+    weight,
+  }
+}
+
 /**
  * What a month has spent by each day, against the month before it, day for day.
  *
