@@ -14,7 +14,7 @@ export const INVESTMENTS_SCREEN = 'investments'
  * file called it, since "compra"/"buy"/"aporte" all mean the same purchase; anything
  * that mentions a payout is income, anything that mentions a sale is a sell, and the
  * rest is a purchase, which is what an investment row usually is. The unit price is
- * derived from the amount when the file gave a total instead of a price. And the
+ * always derived — value over amount — since a table holds the money and the units. And the
  * amount's sign, which is how direction is expressed everywhere else in the app, is
  * dropped here — a position is a size, not a direction.
  */
@@ -22,7 +22,9 @@ export function asTransaction(row: ConfirmedRow): Transaction {
   // `amount` is units and `value` is money — the two an investment row is made of.
   const units = typeof row.amount === 'number' ? Math.abs(row.amount) : 0
   const money = typeof row.value === 'number' ? Math.abs(row.value) : 0
-  const price = typeof row.price === 'number' ? Math.abs(row.price) : units > 0 ? money / units : money
+  // Derived, never stored: a row says what it moved and how many units moved, and one
+  // unit's worth is those two divided. A row with no units is one thing, priced at itself.
+  const price = units > 0 ? money / units : money
   return {
     date: Number.isFinite(row.date) ? (row.date as number) : 0,
     // What the position is in: the row's own name for the thing, which is its subcategory

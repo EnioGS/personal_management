@@ -185,9 +185,11 @@ Two things it optimizes for:
   to it (adr/0032, superseding adr/0030, adr/0031, adr/0018 and adr/0021). A dropped CSV becomes its
   own table, keeping every column the file wrote, with `source_filename` in front
   of them and four label columns after them. Only the file's own columns can be
-  assigned a meaning (date, amount, asset, quantity, price, investment type and
-  class); **value** is the money that moved and **amount** is how many units of a thing
-  changed hands, which are different numbers and never interchangeable. A row is not
+  assigned a meaning — **date**, **price** (money, per unit) and **amount** (how many).
+  A table keeps neither of the last two as the file wrote them: confirming multiplies them
+  into **value**, the money the row moved, which is the only place a table holds money
+  (adr/0042). **amount** stays alongside it as the units, and what one unit was worth is
+  those two divided rather than a third column to disagree with them. A row is not
   confirmed until its file says which column holds the ones its destination needs — every
   row a date, a money row its value, an investment row its amount — because a row that
   lands with those empty sits in its table and appears on no dashboard, which is the one

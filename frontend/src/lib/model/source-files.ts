@@ -616,7 +616,6 @@ export async function confirmSourceRows(sourceId: number, catalogue: LabelCatalo
       value: value ?? undefined,
       observations: observationsFor(row, file, row.importedValue),
       amount: units,
-      price: price ?? undefined,
       class: row.labels.class?.trim() || undefined,
       category: row.labels.category?.trim() ?? '',
       subcategory: row.labels.subcategory?.trim() ?? '',

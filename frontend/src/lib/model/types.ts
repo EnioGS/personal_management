@@ -62,7 +62,14 @@ export type IngestionTargetField =
   | 'value'
   /** How much of a thing changed hands: units of an investment, not money. */
   | 'amount'
-  /** What one unit was worth. `amount` x `price` is the money an investment row moved. */
+  /**
+   * What one unit was worth, on a file that quotes per unit — a broker's does.
+   *
+   * An assignment only: `amount` x `price` is worked out when the row is confirmed, and
+   * what lands in the table is `value`. A confirmed row has no price of its own, because
+   * it would be the quotient of two columns beside it and a third place for money to
+   * disagree with itself.
+   */
   | 'price'
 
 export interface IngestionRowLabels {
@@ -289,7 +296,6 @@ export interface ConfirmedRow {
   subcategory: string
   /** Units of the thing, for an investment row. */
   amount?: number
-  price?: number
   /** The account and card labels the row was confirmed with, by name. */
   account?: string
   card?: string

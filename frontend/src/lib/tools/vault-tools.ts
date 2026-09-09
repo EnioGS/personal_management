@@ -519,7 +519,7 @@ export const newRowIdTool: ToolDefinition = {
 
 export const addConfirmedRowTool: ToolDefinition = {
   name: 'add_confirmed_row',
-  description: "Adds a row to a confirmed table. Two uses only: correcting a row \u2014 pass the row_id of the one you replace, then mark that one \u2014 or recording something the files never carried. Value is money, signed (negative left, positive arrived); amount is units; price is what one unit was worth; class is what kind of thing it is.",
+  description: "Adds a row to a confirmed table. Two uses only: correcting a row \u2014 pass the row_id of the one you replace, then mark that one \u2014 or recording something the files never carried. Value is money, signed (negative left, positive arrived); amount is units; class is what kind of thing it is. A table has no price column: a row that is so many units at so much each is stored as their product in value.",
   parameters: {
     type: 'object',
     properties: {
@@ -529,7 +529,6 @@ export const addConfirmedRowTool: ToolDefinition = {
       date: { type: 'string', description: 'Any readable date; day-first is understood.' },
       value: { type: 'number', description: 'Money that moved, signed: negative left, positive arrived.' },
       amount: { type: 'number', description: 'Units of the thing, for an investment row. Not money.' },
-      price: { type: 'number', description: 'What one unit was worth.' },
       class: { type: 'string', description: 'What kind of thing it is: renda fixa, renda variável, cash reserve.' },
       observations: { type: 'string' },
       category: { type: 'string' },
@@ -555,7 +554,6 @@ export const addConfirmedRowTool: ToolDefinition = {
       date: parseDateValue(args.date) ?? undefined,
       value: typeof args.value === 'number' ? args.value : undefined,
       amount: typeof args.amount === 'number' ? args.amount : undefined,
-      price: typeof args.price === 'number' ? args.price : undefined,
       class: typeof args.class === 'string' && args.class.trim() ? args.class.trim() : undefined,
       // Where the row came from belongs in the observations with everything else a file
       // said; there is no column of its own repeating it.

@@ -25,12 +25,12 @@ and move into confirmed tables when they are ready — one phase, not two.
 \`source_filename\` first, the file's own columns exactly as written, then seven label
 columns. Everything starts empty: nothing is claimed before somebody claims it.
 
-Only the file's own columns can be assigned, to three: **date**, **price** (the money,
-signed), **amount** (how many). What a row moved is amount x price; a file silent about
-quantity describes one thing — amount 1, price the money itself. Price is per unit, so a
-total covering several units has to be divided. Value and amount are never
-interchangeable: money is a value, a holding is an amount. Anything unassigned is condensed
-into each confirmed row's observations, where a description ends up.
+Only the file's own columns can be assigned, to three: **date**, **price** (money per unit,
+signed), **amount** (how many). A file silent about quantity describes one thing — amount
+1, price the money itself. Price is a file's word, because a broker quotes per unit: **a
+table has no price**. Confirming multiplies the two into **value**, which is the only place
+a table keeps money. Anything unassigned is condensed into each row's observations, where a
+description ends up.
 
 A row is not confirmed until its file says where its numbers are: every row a date and a
 price, a row going to Investments an amount too. Confirming without them is refused and

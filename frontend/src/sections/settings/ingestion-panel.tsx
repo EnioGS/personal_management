@@ -63,15 +63,14 @@ const LABEL_HINT: Record<LabelColumn, string> = {
   subcategory: 'free text',
 }
 
-const CONFIRMED_COLUMNS = ['account', 'card', 'section', 'screen', 'class', 'category', 'subcategory', 'date', 'value', 'amount', 'price', 'row_id', 'observations'] as const
+const CONFIRMED_COLUMNS = ['account', 'card', 'section', 'screen', 'class', 'category', 'subcategory', 'date', 'value', 'amount', 'row_id', 'observations'] as const
 
 /**
  * What the simplified view puts away.
  *
  * The row id and the observations everywhere: one is lineage and the other is the whole
- * file kept verbatim, both things to consult rather than to read past. And the two numbers
- * only an investment row fills — elsewhere they are a column of ones and a column
- * repeating the money beside it.
+ * file kept verbatim, both things to consult rather than to read past. And the units, which
+ * only an investment row fills — elsewhere it is a column of ones.
  */
 function hiddenColumns(simplified: boolean, tableKey: string | null): Set<string> {
   if (!simplified) return new Set()
@@ -79,7 +78,7 @@ function hiddenColumns(simplified: boolean, tableKey: string | null): Set<string
   // The row id goes too: it is the thread tying a correction to what it corrects, which
   // matters when reading lineage and never when reading the rows themselves.
   const always = ['row_id', 'observations']
-  return new Set(investments ? always : [...always, 'amount', 'price'])
+  return new Set(investments ? always : [...always, 'amount'])
 }
 
 function confirmedTableKey(row: ConfirmedRow): string {
@@ -740,7 +739,7 @@ const ConfirmedRowLine = memo(function ConfirmedRowLine({
       {/* Money, then units, then what a unit was worth: the three numbers a row moves.
           An investment row is the one that fills all three, and it could not be checked
           from here while two of them were only in the export. */}
-      {(['value', 'amount', 'price'] as const).filter((column) => !hidden.has(column)).map((column) => (
+      {(['value', 'amount'] as const).filter((column) => !hidden.has(column)).map((column) => (
         <EditableCell
           key={column}
           className="tabular-nums"

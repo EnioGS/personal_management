@@ -126,7 +126,6 @@ async function writeConfirmed(change: RowChange): Promise<void> {
     ...optionalNumber('date', after.date),
     ...optionalNumber('value', after.value),
     ...optionalNumber('amount', after.amount),
-    ...optionalNumber('price', after.price),
     ...optionalText('class', after.class),
     ...optionalText('account', after.account),
     ...optionalText('card', after.card),

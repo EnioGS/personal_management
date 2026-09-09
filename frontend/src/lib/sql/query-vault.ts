@@ -111,7 +111,7 @@ export async function buildVaultSnapshot(): Promise<VaultSnapshot> {
     const key = confirmedTableName(row.section, row.screen)
     byPlacement.set(key, [...(byPlacement.get(key) ?? []), { id: stored.id, data: row }])
   }
-  const confirmedColumns = ['id', 'row_id', 'section', 'screen', 'source_filename', 'date', 'value', 'observations', 'class', 'category', 'subcategory', 'account', 'card', 'amount', 'price', 'marked_for_elimination']
+  const confirmedColumns = ['id', 'row_id', 'section', 'screen', 'source_filename', 'date', 'value', 'observations', 'class', 'category', 'subcategory', 'account', 'card', 'amount', 'marked_for_elimination']
   for (const [name, rows] of byPlacement) {
     createAndFill(db, name, rows.map(({ id, data }) => ({
       id,
@@ -128,7 +128,6 @@ export async function buildVaultSnapshot(): Promise<VaultSnapshot> {
       category: data.category,
       subcategory: data.subcategory,
       amount: data.amount ?? null,
-      price: data.price ?? null,
       account: data.account ?? null,
       card: data.card ?? null,
       marked_for_elimination: data.markedForElimination ? 1 : 0,

@@ -73,7 +73,6 @@ export function filterConfirmedRows({ rows, filters, screen }: FilterParams): Fi
       sourceFilename: sourceFilenameOf(row.observations),
       class: row.class,
       amount: row.amount,
-      price: row.price,
     })
   }
   return result

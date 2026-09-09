@@ -101,7 +101,6 @@ export const SQLITE_SCHEMAS: Record<DataTableKey, SqliteTableSchema> = {
       { column: 'category', key: 'category', type: 'text' },
       { column: 'subcategory', key: 'subcategory', type: 'text' },
       { column: 'amount', key: 'amount', type: 'real' },
-      { column: 'price', key: 'price', type: 'real' },
       { column: 'account', key: 'account', type: 'text' },
       { column: 'card', key: 'card', type: 'text' },
       { column: 'marked_for_elimination', key: 'markedForElimination', type: 'boolean' },

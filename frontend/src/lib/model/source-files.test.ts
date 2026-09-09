@@ -525,7 +525,9 @@ describe('the money a row moved', () => {
   it('is the price when the file counts one of something, which is most rows', async () => {
     const confirmed = await confirmOne('Data,Valor\n01/08/2026,"-284,90"', { Data: 'date', Valor: 'price' }, ['overview'])
 
-    expect(confirmed).toMatchObject({ value: -284.9, price: -284.9, amount: 1 })
+    expect(confirmed).toMatchObject({ value: -284.9, amount: 1 })
+    // Multiplied out at confirmation: what a file quotes per unit, a table holds as money.
+    expect(confirmed).not.toHaveProperty('price')
   })
 
   it('is the price times the quantity when the file says how many', async () => {
@@ -536,7 +538,8 @@ describe('the money a row moved', () => {
       investing,
     )
 
-    expect(confirmed).toMatchObject({ value: -150.75, price: -50.25, amount: 3 })
+    expect(confirmed).toMatchObject({ value: -150.75, amount: 3 })
+    expect(confirmed).not.toHaveProperty('price')
   })
 })
 

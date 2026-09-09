@@ -21,12 +21,12 @@ function row(overrides: Partial<StoredRow<ConfirmedRow>> = {}): StoredRow<Confir
 }
 
 describe('reading a confirmed row as a portfolio transaction', () => {
-  it('recovers the unit price from the amount when the file only gave a total', () => {
-    expect(asTransaction(row({ amount: 10, price: undefined, value: -500 }))).toMatchObject({ quantity: 10, price: 50 })
+  it('works one unit out from the money and the units, since a table holds only those two', () => {
+    expect(asTransaction(row({ amount: 10, value: -500 }))).toMatchObject({ quantity: 10, price: 50 })
   })
 
   it('drops the sign, because a position is a size and not a direction', () => {
-    expect(asTransaction(row({ amount: -3, price: -20 }))).toMatchObject({ quantity: 3, price: 20 })
+    expect(asTransaction(row({ amount: -3 }))).toMatchObject({ quantity: 3 })
   })
 
   it('reads the kind from whatever the row was labelled, in either language', () => {

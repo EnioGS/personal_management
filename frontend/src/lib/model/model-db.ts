@@ -314,6 +314,22 @@ db.version(16).stores({}).upgrade(async (tx) => {
  */
 db.version(17).stores({ agentMemory: '++id, createdAt' })
 
+/**
+ * Price leaves the confirmed rows.
+ *
+ * A table holds the money a row moved and how many units moved it; what one unit was
+ * worth is those two divided. Keeping it as well gave money two places to live and
+ * disagree, and an assistant writing SQL a choice it had no way to make correctly — it
+ * wrote to whichever the question mentioned. A file may still quote per unit; that is an
+ * assignment, multiplied out when the row is confirmed. Dropped rather than left in
+ * place, since a column nothing reads is a column somebody will write to.
+ */
+db.version(18).stores({}).upgrade(async (tx) => {
+  await tx.table('confirmedRows').toCollection().modify((row: { data?: Record<string, unknown> }) => {
+    if (row.data) delete row.data.price
+  })
+})
+
 export const accountsTable = journalled(db.accounts, 'accounts')
 export const cardsTable = journalled(db.cards, 'cards')
 export const budgetsTable = journalled(db.budgets, 'budgets')
