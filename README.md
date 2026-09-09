@@ -276,7 +276,8 @@ Two things it optimizes for:
   — each field a few words or the word `global`; a blank is refused, because a blank says
   nobody has decided rather than that it holds everywhere.
 - The assistant keeps its own **memory** below the notes: the same shape, the same scope,
-  its own table and its own tools, and *not* appended to the guide — it reads it when it
+  its own table and its own tools, read whole rather than split by stage, and *not*
+  appended to the guide — it reads it when it
   needs it. It writes there tersely what it could not label and what was missing, what it
   could label once the user explained, and anything said to it that will matter again, so
   the next conversation does not ask the same questions.
