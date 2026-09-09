@@ -5,6 +5,7 @@ import { DEV_API_KEY, useAssistantConfigStore, type AssistantConfig } from '@/li
 import { defaultModelForProvider } from '@/lib/assistant-models'
 import { DEFAULT_SYSTEM_PROMPT, SYSTEM_PROMPT_KEY, enableAppendOnlyTableWrites, useAssistantPromptsStore } from '@/lib/assistant-prompts'
 import { formatAttachmentsForPrompt, isImageAttachment, type ChatAttachment } from '@/lib/chat-attachments'
+import { adoptDraft } from '@/lib/chat/draft'
 import { beginTurn, endTurn } from '@/lib/journal/journal'
 import { activeProfile, activeProfileName, profileConnection } from '@/lib/prompts/profiles'
 import { damagedPrompts, promptText } from '@/lib/prompts/registry'
@@ -442,6 +443,11 @@ async function persist(set: (partial: Partial<ChatState>) => void, get: () => Ch
       model: usage.model,
     },
   })
-  if (id !== conversationId) set({ conversationId: id })
+  if (id !== conversationId) {
+    // The first message is typed before the conversation exists, so whatever else was
+    // left in the box moves onto the conversation it turned out to be.
+    if (id !== null) adoptDraft(id)
+    set({ conversationId: id })
+  }
   await refreshAllLocalStores()
 }

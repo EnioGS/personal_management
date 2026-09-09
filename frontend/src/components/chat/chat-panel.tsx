@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { MarkdownText } from '@/components/markdown/markdown-text'
 import { ConversationBar } from './conversation-bar'
 import { ACCEPTED_ATTACHMENTS, readAttachedFile } from '@/lib/chat-attachments'
+import { readDraft, writeDraft } from '@/lib/chat/draft'
 import { cn } from '@/lib/utils'
 import { GRIP_WIDTH, MAX_PANEL_WIDTH, MIN_PANEL_WIDTH, useChatPanelStore } from '@/store/chat-panel-store'
 import { useChatStore, type ChatMessage } from '@/store/chat-store'
@@ -43,7 +44,19 @@ export function ChatPanel() {
   const usage = useChatStore((s) => s.usage)
   const queued = useChatStore((s) => s.queued)
 
-  const [draft, setDraft] = useState('')
+  // Read once per conversation and written on every keystroke: a sentence someone is
+  // halfway through is work, and a reload should not be able to take it.
+  const conversationId = useChatStore((s) => s.conversationId)
+  const [draft, setDraft] = useState(() => readDraft(conversationId))
+  const [draftFor, setDraftFor] = useState(conversationId)
+  if (draftFor !== conversationId) {
+    setDraftFor(conversationId)
+    setDraft(readDraft(conversationId))
+  }
+  const write = useCallback((text: string) => {
+    setDraft(text)
+    writeDraft(conversationId, text)
+  }, [conversationId])
   /** Anything typed hands the composer the whole width until it is sent or cleared. */
   const isComposing = draft.trim().length > 0
   /**
@@ -286,7 +299,7 @@ export function ChatPanel() {
   function submitDraft() {
     if (!draft.trim()) return
     void sendMessage(draft.trim())
-    setDraft('')
+    write('')
     // Sent from the closed panel, the message and its reply would land out of sight and
     // the panel would look like it had swallowed them. Sending opens it.
     if (panelWidth === 0) togglePanel()
@@ -494,7 +507,7 @@ export function ChatPanel() {
               rows={1}
               placeholder={t('panel.inputPlaceholder')}
               value={draft}
-              onChange={(e) => setDraft(e.target.value)}
+              onChange={(e) => write(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault()
