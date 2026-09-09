@@ -6,6 +6,17 @@ export interface ChartSeries {
   key: string
   label: string
   color: ThemedColor
+  /**
+   * How present the line is, 0 to 1. Absent means fully.
+   *
+   * For a chart with a subject and its rulers: the comparisons are drawn back so the line
+   * being read sits in front of them, without spending four more hues on saying which one
+   * matters. The legend keeps the full colour — a faded key is harder to match, and it is
+   * the line's identity rather than its emphasis.
+   */
+  opacity?: number
+  /** How heavy the stroke is. Absent means the chart's usual 2px. */
+  width?: number
 }
 
 interface AppLineChartProps<T extends Record<string, unknown>> {
@@ -86,7 +97,8 @@ export function AppLineChart<T extends Record<string, unknown>>({
             name={s.label}
             type="monotone"
             stroke={`var(--color-${chartSafeKey(s.key)})`}
-            strokeWidth={2}
+            strokeOpacity={s.opacity ?? 1}
+            strokeWidth={s.width ?? 2}
             dot={false}
           />
         ))}
