@@ -75,3 +75,43 @@ export function holdingsSplit(investments: FilteredEntry[]): HoldingGroup[] {
 function sum(group: Map<string, number>): number {
   return [...group.values()].reduce((total, value) => total + value, 0)
 }
+
+export interface HoldingCategory {
+  key: string
+  label: string
+  value: number
+  children?: HoldingCategory[]
+}
+
+/**
+ * What is held, by category and by the subcategories inside it.
+ *
+ * The class split says what kind of thing a holding is; this says what the user calls it,
+ * which is the other question a list of positions is read for. Balances rather than
+ * averages — a position is a running total of what went in and out of it, and a position
+ * that has been closed is not a position, so anything that nets to nothing is left off.
+ */
+export function holdingsByCategory(investments: FilteredEntry[]): HoldingCategory[] {
+  const totals = new Map<string, Map<string, number>>()
+
+  for (const row of investments) {
+    const category = row.category.trim() || UNLABELLED_LABEL
+    const subcategory = row.subcategory.trim() || UNLABELLED_LABEL
+    const group = totals.get(category) ?? new Map<string, number>()
+    group.set(subcategory, (group.get(subcategory) ?? 0) + heldDelta(row))
+    totals.set(category, group)
+  }
+
+  return [...totals.entries()]
+    .map(([category, group]) => ({
+      key: category,
+      label: category,
+      value: sum(group),
+      children: [...group.entries()]
+        .map(([label, value]) => ({ key: `${category}:${label}`, label, value }))
+        .filter((child) => child.value > 0.005)
+        .sort((left, right) => right.value - left.value),
+    }))
+    .filter((category) => category.value > 0.005)
+    .sort((left, right) => right.value - left.value)
+}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { heldDelta, holdingsSplit } from './holdings-split'
+import { heldDelta, holdingsByCategory, holdingsSplit } from './holdings-split'
 import type { FilteredEntry } from '@/components/dashboard/use-dashboard-entries'
 
 function investment(overrides: Partial<FilteredEntry>): FilteredEntry {
@@ -67,5 +67,27 @@ describe('holdingsSplit', () => {
 
   it('floors a class that has given back more than it ever held', () => {
     expect(groupFor([investment({ category: 'fixed income', value: 900 })], 'fixedIncome')?.value).toBe(0)
+  })
+})
+
+describe('what is held, by what the user calls it', () => {
+  it('groups by category with the subcategories under it, biggest first', () => {
+    const held = holdingsByCategory([
+      investment({ category: 'tesouro', subcategory: 'IPCA+ 2029', value: -1000, class: 'renda fixa' }),
+      investment({ category: 'tesouro', subcategory: 'prefixado 2029', value: -400, class: 'renda fixa' }),
+      investment({ category: 'ações', subcategory: 'PETR4', value: -600, class: 'renda variável' }),
+    ])
+
+    expect(held.map((group) => [group.label, group.value])).toEqual([['tesouro', 1400], ['ações', 600]])
+    expect(held[0].children?.map((child) => child.label)).toEqual(['IPCA+ 2029', 'prefixado 2029'])
+  })
+
+  it('leaves out a position that has been closed, which is not a position', () => {
+    const held = holdingsByCategory([
+      investment({ category: 'tesouro', subcategory: 'selic', value: -500, class: 'renda fixa' }),
+      investment({ category: 'tesouro', subcategory: 'selic', value: 500, class: 'renda fixa' }),
+    ])
+
+    expect(held).toEqual([])
   })
 })

@@ -13,8 +13,12 @@
     "held": "Held now",
     "received": "Received",
     "heldOverTime": "Held over time",
-    "allocationTargets": "Allocation targets",
-    "receivedFootnote": "Interest and dividends, read from what the rows call themselves. A return would need a valuation, and these files carry none."
+    "receivedFootnote": "Interest and dividends, read from what the rows call themselves. A return would need a valuation, and these files carry none.",
+    "currentInvestments": "Current investments",
+    "putInTakenOut": "Put in and taken out",
+    "putIn": "Put in",
+    "takenOut": "Taken out",
+    "putInTakenOutFootnote": "Money moved into and out of holdings. Payouts are not contributions and are drawn above."
   },
   "columns": {
     "date": "Date",

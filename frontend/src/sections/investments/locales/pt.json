@@ -13,8 +13,12 @@
     "held": "Aplicado hoje",
     "received": "Recebido",
     "heldOverTime": "Aplicado ao longo do tempo",
-    "allocationTargets": "Metas de alocação",
-    "receivedFootnote": "Juros e proventos, lidos do que as linhas dizem de si. Rentabilidade exigiria uma cotação, e estes arquivos não a trazem."
+    "receivedFootnote": "Juros e proventos, lidos do que as linhas dizem de si. Rentabilidade exigiria uma cotação, e estes arquivos não a trazem.",
+    "currentInvestments": "Investimentos atuais",
+    "putInTakenOut": "Aportes e resgates",
+    "putIn": "Aportado",
+    "takenOut": "Resgatado",
+    "putInTakenOutFootnote": "Dinheiro que entrou e saiu das posições. Proventos não são aportes e aparecem acima."
   },
   "columns": {
     "date": "Data",

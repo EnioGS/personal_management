@@ -116,8 +116,11 @@ export function HoldingsPie({ groups, valueFormatter, emptyLabel }: HoldingsPieP
             show: true,
             position: 'outer',
             alignTo: 'labelLine',
-            formatter: (params: { name: string; value: number }) =>
-              `{name|${params.name}}\n{value|${valueFormatter(params.value)}}`,
+            // The share, not the amount: what a slice is *for* is the proportion, which
+            // the eye reads off the angle and the label then confirms. The money itself is
+            // one hover away, and is what every other card on this screen already says.
+            formatter: (params: { name: string; percent: number }) =>
+              `{name|${params.name}}\n{value|${params.percent.toFixed(1)}%}`,
             rich: {
               name: { fontSize: 13, fontWeight: 500, color: foreground, lineHeight: 17 },
               value: { fontSize: 12, color: muted, lineHeight: 15 },

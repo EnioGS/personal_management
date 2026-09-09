@@ -15,11 +15,11 @@ import { getCurrentValue, type Transaction } from '@/lib/current-value'
 import { asTransaction, INVESTMENTS_SCREEN, isFixedIncome, isVariableIncome, useInvestmentRows } from '@/lib/model/investment-rows'
 import { useDashboardEntries } from '@/components/dashboard/use-dashboard-entries'
 import { capitalMetric } from '@/lib/dashboard/capital-metric'
-import { holdingsSplit } from '@/lib/dashboard/holdings-split'
-import { investmentMonths } from '@/lib/dashboard/investment-months'
+import { holdingsByCategory, holdingsSplit } from '@/lib/dashboard/holdings-split'
+import { investmentFlows, investmentMonths } from '@/lib/dashboard/investment-months'
 import { HoldingsPie } from '@/components/charts/holdings-pie'
+import { HoldingsOverTimeChart } from '@/components/charts/holdings-over-time-chart'
 import type { ConfirmedRow } from '@/lib/model/types'
-import { AllocationPanel } from './allocation-panel'
 
 const currency = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
 /** Changes sit under the number in a quarter of its space, the way they do on Movements. */
@@ -99,13 +99,18 @@ export function InvestmentsPanel() {
   const held = useMemo(() => capitalMetric(months, 'held', 'up', labels, compactCurrency.format), [months, labels])
   const cash = useMemo(() => capitalMetric(months, 'cash', 'up', labels, compactCurrency.format), [months, labels])
   const fixed = useMemo(() => capitalMetric(months, 'fixedIncome', 'up', labels, compactCurrency.format), [months, labels])
-  const received = useMemo(() => capitalMetric(months, 'received', 'up', labels, compactCurrency.format), [months, labels])
-  const receivedTotal = months.reduce((sum, month) => sum + month.received, 0)
+  const variable = useMemo(() => capitalMetric(months, 'variableIncome', 'up', labels, compactCurrency.format), [months, labels])
 
-  // Every paper and pot by name, which is what a class is made of.
-  const instruments = useMemo(
-    () => holdings.flatMap((group) => group.children.map((child) => ({ ...child, key: child.key, label: child.label }))),
-    [holdings],
+  const positions = useMemo(() => holdingsByCategory(rows), [rows])
+  const flows = useMemo(
+    () => investmentFlows(rows).filter((month) => isWithinRange(Date.parse(`${month.month}-01`), range)),
+    [range, rows],
+  )
+  // Every third month, so two years of months do not overlap into a grey band. The series
+  // itself stays monthly: this thins the axis, not the data.
+  const quarterTicks = useMemo(
+    () => months.filter((_, index) => (months.length - 1 - index) % 3 === 0).map((month) => month.month),
+    [months],
   )
 
   return (
@@ -122,7 +127,7 @@ export function InvestmentsPanel() {
         <div className="flex flex-col gap-3">
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <StatTile
-              label={t('items.held')}
+              label={t('items.currentInvestments')}
               value={currency.format(held.current)}
               indicator={DOMAIN_COLOR.balance}
               deltas={held.deltas}
@@ -135,6 +140,16 @@ export function InvestmentsPanel() {
               deltas={fixed.deltas}
               sparkline={fixed.sparkline}
             />
+            {/* Fixed and variable side by side: the two halves of the same question, which
+                is what a portfolio is mostly made of. Cash sits after them, because it is
+                what is not invested rather than a third way of investing. */}
+            <StatTile
+              label={t('items.variableIncome')}
+              value={currency.format(variable.current)}
+              indicator={DOMAIN_COLOR.variableIncome}
+              deltas={variable.deltas}
+              sparkline={variable.sparkline}
+            />
             <StatTile
               label={t('finances:overview.cashReserve')}
               value={currency.format(cash.current)}
@@ -142,34 +157,26 @@ export function InvestmentsPanel() {
               deltas={cash.deltas}
               sparkline={cash.sparkline}
             />
-            <StatTile
-              label={t('items.received')}
-              value={currency.format(receivedTotal)}
-              indicator={DOMAIN_COLOR.dividends}
-              deltas={received.deltas}
-              sparkline={received.sparkline}
-            />
           </div>
 
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
-            {/* Composition and its history in one shape: the stack is what is held, and
-                each band is what it is held as. */}
+            {/* Levels as lines and months as bars: a running total and a month's dividend
+                are not the same kind of quantity, and the stack said they were. */}
             <DashboardCard title={t('items.heldOverTime')} className="h-[360px] lg:col-span-2" bodyClassName="p-2">
               {months.length === 0 ? (
                 <p className="text-muted-foreground flex h-full items-center justify-center text-xs">{t('positions.noPositions')}</p>
               ) : (
-                <AppBarChart
+                <HoldingsOverTimeChart
                   data={months}
                   xKey="month"
-                  stacked
-                  series={[
-                    { key: 'cash', label: t('finances:overview.cashReserve'), color: DOMAIN_COLOR.balance },
-                    { key: 'fixedIncome', label: t('items.fixedIncome'), color: DOMAIN_COLOR.fixedIncome },
-                    { key: 'variableIncome', label: t('items.variableIncome'), color: DOMAIN_COLOR.variableIncome },
-                    { key: 'unclassified', label: t('finances:overview.unclassifiedHoldings'), color: DOMAIN_COLOR.unclassified },
-                  ]}
                   xFormatter={formatMonthLabel}
+                  xTicks={quarterTicks}
                   valueFormatter={(value) => currency.format(value)}
+                  heldLabel={t('items.currentInvestments')}
+                  fixedLabel={t('items.fixedIncome')}
+                  variableLabel={t('items.variableIncome')}
+                  receivedLabel={t('items.received')}
+                  cashLabel={t('finances:overview.cashReserve')}
                 />
               )}
             </DashboardCard>
@@ -184,38 +191,41 @@ export function InvestmentsPanel() {
           </div>
 
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+            {/* By what the user calls it, with the detail underneath on a click — the same
+                shape the spending and income categories are read in. */}
             <DashboardCard title={t('items.positions')} className="h-[280px]">
               <RankedBarList
-                items={instruments}
+                items={positions}
                 valueFormatter={(value) => currency.format(value)}
                 emptyLabel={t('positions.noPositions')}
                 variant="underlined"
               />
             </DashboardCard>
 
+            {/* The movement behind the level: a flat line is either an untouched portfolio
+                or a busy one, and nothing else here can tell the two apart. */}
             <DashboardCard
-              title={t('items.received')}
+              title={t('items.putInTakenOut')}
               className="h-[280px]"
               bodyClassName="p-2"
-              footnote={t('items.receivedFootnote')}
+              footnote={t('items.putInTakenOutFootnote')}
             >
-              {months.length === 0 ? (
+              {flows.length === 0 ? (
                 <p className="text-muted-foreground flex h-full items-center justify-center text-xs">{t('positions.noPositions')}</p>
               ) : (
                 <AppBarChart
-                  data={months}
+                  data={flows}
                   xKey="month"
-                  series={{ key: 'received', label: t('items.received'), color: DOMAIN_COLOR.dividends }}
+                  series={[
+                    { key: 'added', label: t('items.putIn'), color: DOMAIN_COLOR.contributions },
+                    { key: 'removed', label: t('items.takenOut'), color: DOMAIN_COLOR.spending },
+                  ]}
                   xFormatter={formatMonthLabel}
                   valueFormatter={(value) => currency.format(value)}
                 />
               )}
             </DashboardCard>
           </div>
-
-          <DashboardCard title={t('items.allocationTargets')} className="h-[280px]" bodyClassName="overflow-auto p-3">
-            <AllocationPanel embedded />
-          </DashboardCard>
         </div>
       </div>
     </div>

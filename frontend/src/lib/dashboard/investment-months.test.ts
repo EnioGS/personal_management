@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { investmentMonths, isProceeds } from './investment-months'
+import { investmentFlows, investmentMonths, isProceeds } from './investment-months'
 import type { FilteredEntry } from '@/components/dashboard/use-dashboard-entries'
 
 function row(over: Partial<FilteredEntry>): FilteredEntry {
@@ -55,5 +55,22 @@ describe('a class name is not a payout', () => {
 
   it('still reads one that says what it is', () => {
     expect(isProceeds(row({ class: 'fixed income', subcategory: 'juros', value: 66.49 }))).toBe(true)
+  })
+})
+
+describe('what was put in and taken out', () => {
+  it('splits a month into what went in and what came out, leaving payouts alone', () => {
+    const flows = investmentFlows([
+      row({ date: Date.UTC(2026, 6, 3), value: -1000 }),
+      row({ date: Date.UTC(2026, 6, 20), value: 400, subcategory: 'resgate' }),
+      // A payout is not a contribution: it is drawn beside the levels instead.
+      row({ date: Date.UTC(2026, 6, 28), value: 25, subcategory: 'rendimento' }),
+      row({ date: Date.UTC(2026, 7, 2), value: -500 }),
+    ])
+
+    expect(flows).toEqual([
+      { month: '2026-07', added: 1000, removed: -400 },
+      { month: '2026-08', added: 500, removed: 0 },
+    ])
   })
 })

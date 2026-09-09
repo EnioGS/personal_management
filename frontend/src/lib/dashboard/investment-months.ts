@@ -91,3 +91,39 @@ function nextMonth(month: string): string {
 function round(value: number): number {
   return Math.round((value + Number.EPSILON) * 100) / 100
 }
+
+export interface InvestmentFlowMonth {
+  month: string
+  /** What went into the holdings that month, and what came out of them, as it moved. */
+  added: number
+  removed: number
+  [key: string]: string | number
+}
+
+/**
+ * What was put in and taken out, month by month.
+ *
+ * The lines above are levels — where the pot stood at the end of each month — and a level
+ * moves for two reasons a cash-flow file cannot tell apart on sight: money was added, or
+ * money was withdrawn. This is the movement itself, drawn around zero, and it is the only
+ * thing on this screen that says whether a flat portfolio was untouched or busy.
+ *
+ * Payouts are left out: what a holding pays is not a contribution to it, and it is already
+ * drawn beside the levels.
+ */
+export function investmentFlows(rows: FilteredEntry[]): InvestmentFlowMonth[] {
+  const byMonth = new Map<string, InvestmentFlowMonth>()
+
+  for (const row of rows) {
+    if (!Number.isFinite(row.date) || isProceeds(row)) continue
+    const delta = heldDelta(row)
+    if (delta === 0) continue
+    const key = monthKey(row.date)
+    const month = byMonth.get(key) ?? { month: key, added: 0, removed: 0 }
+    if (delta > 0) month.added += delta
+    else month.removed += delta
+    byMonth.set(key, month)
+  }
+
+  return [...byMonth.values()].sort((left, right) => left.month.localeCompare(right.month))
+}
