@@ -30,23 +30,19 @@ const SCOPE_RULE = " Every scope field is required and must say something: a few
  */
 export const readAgentMemoryTool: ToolDefinition = {
   name: 'read_agent_memory',
-  description: "Your own record of this vault: rows you could not label and what was missing, rows you could once the user explained, conventions you worked out. Read it before asking the user something, and before labelling a file of a kind you have seen before — the answer may already be here. Not the user's notes, which arrive with the guide.",
-  parameters: {
-    type: 'object',
-    properties: { context: { type: 'string', enum: ['source', 'confirmed'] } },
-    additionalProperties: false,
-  },
-  execute: async (args) => JSON.stringify(await listClassificationNotes(args.context as RuleContext | undefined, 'memory')),
+  description: "Your own record of this vault, whole: rows you could not label and what was missing, rows you could once the user explained, conventions you worked out. Read it before asking the user something, before labelling a file of a kind you have seen before, and always before writing to it — an entry that already covers the subject is edited, never added again. Not the user's notes, which arrive with the guide.",
+  parameters: { type: 'object', properties: {}, additionalProperties: false },
+  execute: async () => JSON.stringify(await listClassificationNotes(undefined, 'memory')),
 }
 
 export const addAgentMemoryTool: ToolDefinition = {
   name: 'add_agent_memory',
-  description: "Writes something down for next time. Record: anything the user tells you that will matter again; rows you could not label and exactly what was missing; and, separately, rows you could label once they explained. Keep one entry per scope and update it rather than adding a second about the same rows. Write as tersely as the meaning allows — this is a working log, not prose, and every word is paid for on the request that reads it." + SCOPE_RULE,
+  description: "Writes something down for next time. Read the memory first: if an entry already covers this subject, edit that one instead. Record: anything the user tells you that will matter again; rows you could not label and exactly what was missing; and, separately, rows you could label once they explained. One subject, one entry — a title already in use is refused. Write as tersely as the meaning allows — this is a working log, not prose, and every word is paid for on the request that reads it." + SCOPE_RULE,
   parameters: {
     type: 'object',
     properties: {
-      context: { type: 'string', enum: ['source', 'confirmed'] },
-      title: { type: 'string', description: 'A few words naming what this covers, e.g. "unlabelled — Nubank card, March".' },
+      context: { type: 'string', enum: ['source', 'confirmed'], description: 'Where this came up. It does not hide the entry: memory is read whole.' },
+      title: { type: 'string', description: 'A few words naming what this covers, and how it is found again, e.g. "unlabelled — Nubank card, March".' },
       text: { type: 'string', description: 'The fact, as short as it can be said. Markdown lists are read.' },
       ...SCOPE_PROPERTIES,
     },
@@ -60,6 +56,13 @@ export const addAgentMemoryTool: ToolDefinition = {
     if (refusal) return `Error: ${refusal}`
     const context: RuleContext = args.context === 'source' ? 'source' : 'confirmed'
     const title = typeof args.title === 'string' ? args.title : undefined
+
+    // One subject, one entry. The failure this prevents is the assistant writing what it
+    // already knows a second time under the same heading, which reads as two facts.
+    const existing = (await listClassificationNotes(undefined, 'memory'))
+      .find((entry) => entry.title?.trim().toLowerCase() === title?.trim().toLowerCase() && !!title)
+    if (existing) return `Error: entry ${existing.id} is already titled "${existing.title}". Rewrite it with edit_agent_memory — in full, keeping what still holds — or give this one a title of its own.`
+
     const id = await addClassificationNote({ context, title, text: args.text, scope, createdBy: 'assistant' }, 'memory')
     return JSON.stringify({ memoryId: id, context, title, scope })
   },

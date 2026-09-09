@@ -36,12 +36,27 @@ describe('the assistant writing to its own record', () => {
     expect(await listClassificationNotes(undefined, 'memory')).toEqual([])
   })
 
-  it('reads back what it wrote, filtered by the stage it belongs to', async () => {
+  it('reads back everything it wrote, whatever stage each entry came up in', async () => {
     await remember()
     await remember({ context: 'confirmed', title: 'later' })
 
-    const source = JSON.parse(await readAgentMemoryTool.execute({ context: 'source' }, { attachments: [], translate: (key: string) => key }))
-    expect(source.map((entry: { title: string }) => entry.title)).toEqual(['unlabelled — Nubank March'])
+    // The stage split belongs to the user's notes, which are sent per stage. Splitting the
+    // assistant's own record hid an entry from the table it was needed at, and an empty
+    // memory is answered by writing the entry again.
+    const entries = JSON.parse(await readAgentMemoryTool.execute({}, { attachments: [], translate: (key: string) => key }))
+    expect(entries.map((entry: { title: string }) => entry.title)).toEqual(['unlabelled — Nubank March', 'later'])
+  })
+
+  it('refuses a second entry under a title already in use, naming the one to rewrite', async () => {
+    const { memoryId } = await remember()
+
+    const result = await addAgentMemoryTool.execute(
+      { context: 'confirmed', title: 'unlabelled — Nubank March', text: 'the same thing again', ...SCOPE },
+      { attachments: [], translate: (key: string) => key },
+    )
+
+    expect(result).toContain(`entry ${memoryId}`)
+    expect(await listClassificationNotes(undefined, 'memory')).toHaveLength(1)
   })
 
   it('shrinks an entry by rewriting it, which is what happens as the user explains rows', async () => {

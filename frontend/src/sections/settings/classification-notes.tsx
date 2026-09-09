@@ -103,12 +103,12 @@ export function ClassificationNotes({ context, kind = 'note' }: { context: RuleC
       <div>
         <h3 className="text-sm font-medium">
           {kind === 'memory'
-            ? (context === 'source' ? 'Memory about files being worked on' : 'Memory about the data already imported')
+            ? 'Agent memory'
             : (context === 'source' ? 'Notes for files being worked on' : 'Notes on the data already imported')}
         </h3>
         <p className="text-muted-foreground text-xs">
           {kind === 'memory'
-            ? "The assistant's own working record: what it could not label and why, and what it labelled once somebody explained. It writes here itself, and reads it back when it needs to; you can correct or delete anything in it."
+            ? "The assistant's own working record, kept whole rather than split by stage: what it could not label and why, and what it labelled once somebody explained. It writes here itself and reads it back when it needs to; you can correct or delete anything in it."
             : "Not rules — nothing here labels anything by itself. Write what a rule cannot say: what an unrecognisable merchant actually is, what a file's own quirks mean, how you want a borderline case treated. The assistant is given these before it labels anything, so an explanation lands once and holds."}
         </p>
       </div>

@@ -53,3 +53,16 @@ told, at the cost of one tool call in the conversations where that matters.
 Whether that hierarchy is the right one is not yet known — it was specified
 before we watched it used. AGENTS.md carries a temporary section asking for it
 to be revisited, and instructing its own deletion once it has been.
+
+## Amendment: memory is not split by stage
+
+The first implementation gave memory the same `source`/`confirmed` split as
+notes, in the read tool and in the panel. That split is right for notes — they
+are appended to the guide per stage — and wrong for memory. Watching it used,
+the assistant wrote an entry while a file was open, read the memory later from a
+confirmed table, was handed an empty list, and wrote the same entry a second
+time; then deleted one of the two, and could not say which.
+
+Memory is now read whole. `context` is still stored, saying where the entry came
+up, and never filters. `add_agent_memory` additionally refuses a title already
+in use, naming the entry to rewrite instead — one subject, one entry.

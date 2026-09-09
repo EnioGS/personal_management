@@ -29,12 +29,20 @@ function meaningful(value: string | undefined): boolean {
   return text.length > 0 && !['-', '--', 'n/a', 'na', '?', '.', 'none', 'null', 'undefined'].includes(text)
 }
 
-/** Oldest first: the notes read as a list of things established over time. */
+/**
+ * Oldest first: the notes read as a list of things established over time.
+ *
+ * A stage filter applies to notes and never to memory. Notes are split because they are
+ * sent to the assistant per stage; memory is one record it keeps and reads whole, and
+ * splitting it meant an entry written while a file was open was invisible from a confirmed
+ * table — which the assistant read as an empty memory, and answered by writing the entry
+ * a second time. `context` is still stored on a memory entry, saying where it came up.
+ */
 export async function listClassificationNotes(context?: RuleContext, kind: NoteKind = 'note'): Promise<StoredNote[]> {
   const rows = await TABLES[kind].toArray()
   return rows
     .map((row) => ({ id: row.id, ...(row.data as ClassificationNote) }))
-    .filter((note) => !context || note.context === context)
+    .filter((note) => kind === 'memory' || !context || note.context === context)
     .sort((left, right) => left.createdAt - right.createdAt)
 }
 
