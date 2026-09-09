@@ -5,7 +5,7 @@ import { AppLineChart } from '@/components/charts/line-chart'
 import { CapitalEvolutionChart } from '@/components/charts/capital-evolution-chart'
 import { CategoryTreemap } from '@/components/charts/category-treemap'
 import { HoldingsPie } from '@/components/charts/holdings-pie'
-import { DIVERGING_PAIR, DOMAIN_COLOR } from '@/components/charts/chart-colors'
+import { CATEGORICAL_PALETTE, DIVERGING_PAIR, DOMAIN_COLOR } from '@/components/charts/chart-colors'
 import { SignedBarChart } from '@/components/charts/signed-bar-chart'
 import { Button } from '@/components/ui/button'
 import { CategoryPill } from '@/components/dashboard/category-pill'
@@ -456,15 +456,18 @@ export function SpendingPanel() {
                   valueFormatter={(value) => currency.format(value)}
                   series={[
                     // The month in progress keeps the red it is reported in everywhere on
-                    // this screen. The three rulers take a hue each, far enough apart to be
-                    // told apart where they cross — which, being averages of each other's
-                    // months, they do constantly.
+                    // this screen, and the three rulers are then chosen to be nothing like
+                    // it: yellow, violet and aqua, which is four hues around the wheel
+                    // rather than four points along the warm half of it. They are averages
+                    // partly made of each other's months, so they cross constantly — and
+                    // orange or magenta beside that red are one line as far as the eye is
+                    // concerned, whatever a palette says about their being different slots.
                     { key: 'thisMonth', label: t('finances:spending.thisMonth'), color: DIVERGING_PAIR.negative },
-                    { key: 'lastMonth', label: t('finances:spending.lastMonth'), color: DOMAIN_COLOR.spending },
-                    { key: 'threeMonths', label: t('finances:spending.threeMonthAverage'), color: DOMAIN_COLOR.cards },
+                    { key: 'lastMonth', label: t('finances:spending.lastMonth'), color: CATEGORICAL_PALETTE[4] },
+                    { key: 'threeMonths', label: t('finances:spending.threeMonthAverage'), color: CATEGORICAL_PALETTE[6] },
                     // The window the filter is on, whatever it is set to — so this line is
                     // "a normal month" by the reader's own definition of normal.
-                    { key: 'period', label: t('finances:spending.periodAverage'), color: DOMAIN_COLOR.contributions },
+                    { key: 'period', label: t('finances:spending.periodAverage'), color: CATEGORICAL_PALETTE[3] },
                   ]}
                 />
               )}
