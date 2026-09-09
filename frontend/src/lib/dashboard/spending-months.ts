@@ -149,7 +149,19 @@ export function projectMonthEnd(months: SpendingMonth[], today: Date = new Date(
  * the last, not with a whole month that had thirty days to accumulate. Both months are the
  * calendar's, so the line stops at today rather than at the last row imported.
  */
-export function spendingSoFar(rows: FilteredEntry[], today: Date = new Date()): { day: number; thisMonth: number | null; lastMonth: number }[] {
+export interface SpendingDay {
+  day: number
+  /** Cumulative spend by that day of the month in progress; null past today. */
+  thisMonth: number | null
+  lastMonth: number
+  /** The same curve averaged over the three complete months before this one. */
+  threeMonths: number
+  /** And over every complete month the filter holds, which is the period the screen is on. */
+  period: number
+  [key: string]: string | number | null
+}
+
+export function spendingSoFar(rows: FilteredEntry[], today: Date = new Date()): SpendingDay[] {
   const byMonth = new Map<string, Map<number, number>>()
   for (const row of rows) {
     if (row.value >= 0) continue
@@ -166,6 +178,7 @@ export function spendingSoFar(rows: FilteredEntry[], today: Date = new Date()): 
   // against the month before it. Two empty months are nothing to draw.
   if (!byMonth.has(current) && !byMonth.has(previous)) return []
 
+  /** The running total by day of one month, as a 31-long array. */
   const running = (key: string | undefined) => {
     const days = key ? byMonth.get(key) ?? new Map<number, number>() : new Map<number, number>()
     let total = 0
@@ -175,8 +188,29 @@ export function spendingSoFar(rows: FilteredEntry[], today: Date = new Date()): 
     })
   }
 
+  /**
+   * Several months' curves averaged day by day.
+   *
+   * Day for day, like everything else on this chart: the mean of what each of those months
+   * had spent by the fifteenth, not their monthly total divided by thirty. A month is not
+   * spent evenly — rent lands on the first and a salary's worth of shopping follows it —
+   * and a straight line through the total would flatter the first half of every month.
+   */
+  const averaged = (keys: string[]) => {
+    if (keys.length === 0) return Array.from({ length: 31 }, () => 0)
+    const curves = keys.map(running)
+    return Array.from({ length: 31 }, (_, index) => curves.reduce((sum, curve) => sum + curve[index], 0) / curves.length)
+  }
+
+  // Complete months only, and never the one in progress: an average that included a month
+  // three days old would be dragged down by it and stop being a comparison.
+  const complete = [...byMonth.keys()].filter((month) => month < current).sort()
+  const lastThree = complete.slice(-3)
+
   const thisMonth = running(current)
   const lastMonth = running(previous)
+  const threeMonths = averaged(lastThree)
+  const period = averaged(complete)
   // The month in progress stops on today: drawing it flat to the thirty-first would say
   // the spending stopped rather than that the month has not finished. Which also means the
   // line is short against a full previous month, by design.
@@ -186,5 +220,7 @@ export function spendingSoFar(rows: FilteredEntry[], today: Date = new Date()): 
     day: index + 1,
     thisMonth: index + 1 <= dayOfMonth ? thisMonth[index] : null,
     lastMonth: lastMonth[index],
+    threeMonths: threeMonths[index],
+    period: period[index],
   }))
 }

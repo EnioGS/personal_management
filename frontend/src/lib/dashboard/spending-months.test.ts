@@ -41,8 +41,8 @@ describe('this month against the last, day for day', () => {
   it('accumulates each month separately and lines the days up', () => {
     const days = spendingSoFar(rows, today)
 
-    expect(days[0]).toEqual({ day: 1, thisMonth: 60, lastMonth: 100 })
-    expect(days[4]).toEqual({ day: 5, thisMonth: 100, lastMonth: 100 })
+    expect(days[0]).toMatchObject({ day: 1, thisMonth: 60, lastMonth: 100 })
+    expect(days[4]).toMatchObject({ day: 5, thisMonth: 100, lastMonth: 100 })
   })
 
   it('stops on today, rather than on the last row or at the end of the month', () => {
@@ -61,11 +61,23 @@ describe('this month against the last, day for day', () => {
     const days = spendingSoFar(rows, new Date(2026, 9, 4))
 
     expect(days).toEqual([])
-    expect(spendingSoFar(rows, new Date(2026, 8, 4))[3]).toEqual({ day: 4, thisMonth: 0, lastMonth: 60 })
+    expect(spendingSoFar(rows, new Date(2026, 8, 4))[3]).toMatchObject({ day: 4, thisMonth: 0, lastMonth: 60 })
   })
 
   it('says nothing when there is nothing', () => {
     expect(spendingSoFar([], today)).toEqual([])
+  })
+
+  it('averages the complete months day for day, and leaves the month in progress out', () => {
+    // July ran to 200 and June to 90; August is in progress and is not an average of
+    // anything. Day 5: July had 100 by then and June 90, so the pair average is 95.
+    const withJune = [...rows, row({ value: -90, date: Date.UTC(2026, 5, 2) })]
+    const days = spendingSoFar(withJune, today)
+
+    expect(days[4].period).toBe(95)
+    expect(days[30].period).toBe(145)
+    // Only two complete months exist, so three-month and period averages agree.
+    expect(days[4].threeMonths).toBe(95)
   })
 })
 

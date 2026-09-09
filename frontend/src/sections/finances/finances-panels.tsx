@@ -455,10 +455,14 @@ export function SpendingPanel() {
                   xTicks={[1, 8, 15, 22, 29]}
                   valueFormatter={(value) => currency.format(value)}
                   series={[
-                    // The month in progress is the subject; the one before it is the ruler,
-                    // so it is drawn in something quieter than another shade of the same red.
+                    // The month in progress is the subject; everything else is a ruler, so
+                    // they are drawn in something quieter than another shade of the same red.
                     { key: 'thisMonth', label: t('finances:spending.thisMonth'), color: DIVERGING_PAIR.negative },
                     { key: 'lastMonth', label: t('finances:spending.lastMonth'), color: DOMAIN_COLOR.cards },
+                    { key: 'threeMonths', label: t('finances:spending.threeMonthAverage'), color: DOMAIN_COLOR.contributions },
+                    // The window the filter is on, whatever it is set to — so this line is
+                    // "a normal month" by the reader's own definition of normal.
+                    { key: 'period', label: t('finances:spending.periodAverage'), color: DOMAIN_COLOR.unclassified },
                   ]}
                 />
               )}

@@ -71,7 +71,14 @@ export function AppLineChart<T extends Record<string, unknown>>({
             />
           }
         />
-        {series.length > 1 && <ChartLegend content={<ChartLegendContent />} />}
+        {/* A legend of squares under a chart of lines makes the reader match a colour
+            twice. Drawn as short strokes instead, in the mark's own shape. */}
+        {series.length > 1 && (
+          <ChartLegend
+            verticalAlign="bottom"
+            content={<ChartLegendContent className="[&>*>div:first-child]:h-0.5 [&>*>div:first-child]:w-3.5 [&>*>div:first-child]:rounded-full" />}
+          />
+        )}
         {series.map((s) => (
           <Line
             key={s.key}

@@ -79,7 +79,9 @@
     "thingsCount_other": "{{count}} coisas",
     "ofThisMonth": "do gasto deste mês",
     "vsUsualMonth": "vs. um mês normal",
-    "spentSoFar": "{{value}} até agora"
+    "spentSoFar": "{{value}} até agora",
+    "threeMonthAverage": "Média dos últimos 3 meses",
+    "periodAverage": "Média do período selecionado"
   },
   "cards": {
     "noCards": "Adicione um cartão e uma fatura de cartão para ver os detalhes.",

@@ -79,7 +79,9 @@
     "thingsCount_other": "{{count}} things",
     "ofThisMonth": "of this month's spending",
     "vsUsualMonth": "vs. a usual month",
-    "spentSoFar": "{{value}} so far"
+    "spentSoFar": "{{value}} so far",
+    "threeMonthAverage": "Last 3 months, average",
+    "periodAverage": "Selected period, average"
   },
   "cards": {
     "noCards": "Add a card and a card ledger to see its invoice details.",
