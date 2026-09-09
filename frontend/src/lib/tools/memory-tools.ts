@@ -3,8 +3,8 @@ import {
   deleteClassificationNote,
   editClassificationNote,
   listClassificationNotes,
-  scopeRefusal,
 } from '@/lib/model/classification-notes'
+import { scopeProblem } from './note-scope'
 import { NOTE_SCOPE_FIELDS, type NoteScope, type RuleContext } from '@/lib/model/types'
 import type { ToolDefinition } from './types'
 
@@ -49,12 +49,14 @@ export const addAgentMemoryTool: ToolDefinition = {
     required: ['context', 'title', 'text', ...NOTE_SCOPE_FIELDS],
     additionalProperties: false,
   },
-  execute: async (args) => {
+  execute: async (args, context) => {
     if (typeof args.text !== 'string' || !args.text.trim()) return 'Error: an entry needs something in it.'
+    const tooLong = lengthRefusal(args.text)
+    if (tooLong) return `Error: ${tooLong}`
     const scope = scopeFrom(args)
-    const refusal = scopeRefusal(scope)
+    const refusal = await scopeProblem(scope, context.translate)
     if (refusal) return `Error: ${refusal}`
-    const context: RuleContext = args.context === 'source' ? 'source' : 'confirmed'
+    const stage: RuleContext = args.context === 'source' ? 'source' : 'confirmed'
     const title = typeof args.title === 'string' ? args.title : undefined
 
     // One entry per scope, and per title. The failure this prevents is the same fact
@@ -65,8 +67,8 @@ export const addAgentMemoryTool: ToolDefinition = {
     const sameScope = entries.find((entry) => entry.scope && NOTE_SCOPE_FIELDS.every((field) => same(entry.scope![field], scope[field])))
     if (sameScope) return `Error: entry ${sameScope.id} ("${sameScope.title ?? 'untitled'}") already covers exactly this scope. Add what you were going to say to it with edit_agent_memory, rewriting it in full — or narrow this scope, if it is really about something else.`
 
-    const id = await addClassificationNote({ context, title, text: args.text, scope, createdBy: 'assistant' }, 'memory')
-    return JSON.stringify({ memoryId: id, context, title, scope })
+    const id = await addClassificationNote({ context: stage, title, text: args.text, scope, createdBy: 'assistant' }, 'memory')
+    return JSON.stringify({ memoryId: id, context: stage, title, scope })
   },
 }
 
@@ -84,12 +86,14 @@ export const editAgentMemoryTool: ToolDefinition = {
     required: ['memoryId', 'text'],
     additionalProperties: false,
   },
-  execute: async (args) => {
+  execute: async (args, context) => {
     if (typeof args.memoryId !== 'number') return 'Error: memoryId is required.'
     if (typeof args.text !== 'string' || !args.text.trim()) return 'Error: an entry needs something in it.'
+    const tooLong = lengthRefusal(args.text)
+    if (tooLong) return `Error: ${tooLong}`
     const scope = NOTE_SCOPE_FIELDS.some((field) => typeof args[field] === 'string') ? scopeFrom(args) : undefined
     if (scope) {
-      const refusal = scopeRefusal(scope)
+      const refusal = await scopeProblem(scope, context.translate)
       if (refusal) return `Error: ${refusal}`
     }
     try {
@@ -118,6 +122,22 @@ export const deleteAgentMemoryTool: ToolDefinition = {
     await deleteClassificationNote(args.memoryId, 'memory')
     return JSON.stringify({ memoryId: args.memoryId, deleted: true })
   },
+}
+
+/**
+ * How long one entry may be.
+ *
+ * Not a storage limit — a shape one. An entry with no ceiling becomes the place everything
+ * goes: the first one written under this design grew to four thousand characters covering
+ * merchants, counterparties, tax, investments and a dated caveat, all scoped `global`, and
+ * nothing in it could be found, corrected or trusted separately. The cap is what makes
+ * "one entry per scope" mean splitting the facts rather than concatenating them.
+ */
+const MAX_ENTRY_CHARS = 1200
+
+function lengthRefusal(text: string): string | null {
+  if (text.trim().length <= MAX_ENTRY_CHARS) return null
+  return `that entry is ${text.trim().length} characters and the limit is ${MAX_ENTRY_CHARS}. This is not a place to keep everything at once: split it into entries that each cover one scope — one account, one screen, one category, one set of lines — and put each fact where it belongs.`
 }
 
 /** Two pieces of scope or two titles saying the same thing, whatever the spacing or case. */

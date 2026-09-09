@@ -86,3 +86,31 @@ The heading hierarchy is dropped. The rule is now **one entry per scope**,
 enforced: `add_agent_memory` refuses a scope, or a title, that an existing entry
 already holds, and names the entry to rewrite instead. What organises the memory
 is what a thing is about, which the assistant was already getting right.
+
+## Amendment: a scope has to name something, and an entry has a ceiling
+
+The first memory written under the rule above scoped itself `section: finances,
+screen: confirmed finance data` and everything else `global`, and grew to four
+thousand characters covering merchants, counterparties, withholding tax,
+investment accounts and a dated caveat. "One entry per scope" had produced one
+entry, because everything had been given the same scope — and `confirmed finance
+data` is not a screen, so nothing could be looked up by it either.
+
+Three things were missing, all of them enforcement rather than instruction:
+
+- **The scope must name things that exist.** `section`, `screen`, `account` and
+  `card` are checked against the label catalogue, and a wrong one is refused with
+  the list of what there is. `class`, `category`, `subcategory` and `lines` stay
+  free text, which is what they are elsewhere.
+- **A scope of all `global` is refused.** A scope that narrows nothing says
+  nothing about what the entry is about, and it is what turns one entry into the
+  place everything goes.
+- **An entry is capped at 1200 characters**, with a refusal that says to split it
+  by scope. Without a ceiling, "one entry per scope" is satisfied by
+  concatenation, which is what happened.
+
+Separately, nothing brought the assistant back to memory at the moment it learned
+something. It relabelled sixteen rows from a long explanation and wrote none of
+it down. `label_rows_by_match` and `revise_confirmed_rows` now say, in their own
+descriptions, to write down what made the labelling possible — those are the
+tools in hand when the learning happens, and the guide is read before it.

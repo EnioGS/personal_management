@@ -1,4 +1,5 @@
-import { addClassificationNote, deleteClassificationNote, editClassificationNote, listClassificationNotes, scopeRefusal } from '@/lib/model/classification-notes'
+import { addClassificationNote, deleteClassificationNote, editClassificationNote, listClassificationNotes } from '@/lib/model/classification-notes'
+import { scopeProblem } from './note-scope'
 import { NOTE_SCOPE_FIELDS, type NoteScope, type RuleContext } from '@/lib/model/types'
 import type { ToolDefinition } from './types'
 
@@ -30,15 +31,15 @@ export const addClassificationNoteTool: ToolDefinition = {
     required: ['context', 'title', 'text', 'account', 'card', 'section', 'screen', 'class', 'category', 'subcategory', 'lines'],
     additionalProperties: false,
   },
-  execute: async (args) => {
+  execute: async (args, context) => {
     if (typeof args.text !== 'string' || !args.text.trim()) return 'Error: a note needs something in it.'
-    const context: RuleContext = args.context === 'source' ? 'source' : 'confirmed'
+    const stage: RuleContext = args.context === 'source' ? 'source' : 'confirmed'
     const title = typeof args.title === 'string' ? args.title : undefined
     const scope = scopeFrom(args)
-    const refusal = scopeRefusal(scope)
+    const refusal = await scopeProblem(scope, context.translate)
     if (refusal) return `Error: ${refusal}`
-    const id = await addClassificationNote({ context, title, text: args.text, scope, createdBy: 'assistant' })
-    return JSON.stringify({ id, context, text: args.text.trim() })
+    const id = await addClassificationNote({ context: stage, title, text: args.text, scope, createdBy: 'assistant' })
+    return JSON.stringify({ id, context: stage, text: args.text.trim() })
   },
 }
 
@@ -63,7 +64,7 @@ export const editClassificationNoteTool: ToolDefinition = {
     required: ['noteId', 'text'],
     additionalProperties: false,
   },
-  execute: async (args) => {
+  execute: async (args, context) => {
     if (typeof args.noteId !== 'number') return 'Error: noteId is required.'
     if (typeof args.text !== 'string' || !args.text.trim()) return 'Error: a note needs something in it.'
     try {
@@ -71,7 +72,7 @@ export const editClassificationNoteTool: ToolDefinition = {
       // Left out entirely, the scope stands; given at all, it has to say something.
       const scope = NOTE_SCOPE_FIELDS.some((field) => typeof args[field] === 'string') ? scopeFrom(args) : undefined
       if (scope) {
-        const refusal = scopeRefusal(scope)
+        const refusal = await scopeProblem(scope, context.translate)
         if (refusal) return `Error: ${refusal}`
       }
       await editClassificationNote(args.noteId, args.text, 'assistant', title, scope)

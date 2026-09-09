@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { wipeAllData } from '@/lib/data-file'
+import { accountsTable } from '@/lib/model/model-db'
 import { listClassificationNotes } from '@/lib/model/classification-notes'
 import { addAgentMemoryTool, deleteAgentMemoryTool, editAgentMemoryTool, readAgentMemoryTool } from './memory-tools'
 
@@ -17,7 +18,11 @@ async function remember(overrides: Record<string, unknown> = {}) {
 }
 
 describe('the assistant writing to its own record', () => {
-  beforeEach(async () => { await wipeAllData() })
+  beforeEach(async () => {
+    await wipeAllData()
+    // A scope names things that exist, so the thing it names has to exist.
+    await accountsTable.add({ createdAt: 1, data: { name: 'Nubank', kind: 'checking' } })
+  })
 
   it('keeps it apart from the notes the user reads with the guide', async () => {
     await remember()
@@ -67,6 +72,42 @@ describe('the assistant writing to its own record', () => {
     await remember({ title: 'unlabelled — Nubank April', lines: 'the 3 April rows' })
 
     expect(await listClassificationNotes(undefined, 'memory')).toHaveLength(2)
+  })
+
+  it('refuses a scope that narrows nothing, which is how one entry becomes the place everything goes', async () => {
+    const result = await addAgentMemoryTool.execute(
+      {
+        context: 'confirmed', title: 'reference facts', text: 'everything known about everything',
+        account: 'global', card: 'global', section: 'global', screen: 'global',
+        class: 'global', category: 'global', subcategory: 'global', lines: 'global',
+      },
+      { attachments: [], translate: (key: string) => key },
+    )
+
+    expect(result).toContain('scoped to everything')
+    expect(await listClassificationNotes(undefined, 'memory')).toEqual([])
+  })
+
+  it('refuses a scope naming a screen or an account that does not exist, and says what does', async () => {
+    const result = await addAgentMemoryTool.execute(
+      { context: 'confirmed', title: 't', text: 'something', ...SCOPE, screen: 'confirmed finance data' },
+      { attachments: [], translate: (key: string) => key },
+    )
+
+    // The wording the first real memory entry scoped itself with. A scope that names
+    // nothing real cannot be looked up by, which is the only thing a scope is for.
+    expect(result).toContain('confirmed finance data')
+    expect(await listClassificationNotes(undefined, 'memory')).toEqual([])
+  })
+
+  it('refuses an entry long enough to be a filing cabinet, and says to split it by scope', async () => {
+    const result = await addAgentMemoryTool.execute(
+      { context: 'confirmed', title: 'reference facts', text: 'merchant. '.repeat(200), ...SCOPE },
+      { attachments: [], translate: (key: string) => key },
+    )
+
+    expect(result).toContain('split it')
+    expect(await listClassificationNotes(undefined, 'memory')).toEqual([])
   })
 
   it('refuses a second entry under a title already in use, naming the one to rewrite', async () => {

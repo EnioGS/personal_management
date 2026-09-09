@@ -219,7 +219,7 @@ export const setLabelsTool: ToolDefinition = {
 
 export const labelRowsByMatchTool: ToolDefinition = {
   name: 'label_rows_by_match',
-  description: "Labels every source row whose chosen field contains a piece of text, in one call \u2014 the one-off half of labelling, where save_label_rule is for a pattern worth keeping. Only matching rows are touched, and it reports the count with a sample of what matched, so a match wider than you meant shows immediately.",
+  description: "Labels every source row whose chosen field contains a piece of text, in one call \u2014 the one-off half of labelling, where save_label_rule is for a pattern worth keeping. Only matching rows are touched, and it reports the count with a sample of what matched, so a match wider than you meant shows immediately. When what made a labelling possible was something the user told you, write it down with add_agent_memory before you answer \u2014 the next conversation starts from nothing, and this is the only thing that carries.",
   parameters: {
     type: 'object',
     properties: {
@@ -365,7 +365,7 @@ export const fillFromObservationsTool: ToolDefinition = {
 
 export const reviseConfirmedRowsTool: ToolDefinition = {
   name: 'revise_confirmed_rows',
-  description: "Corrects many confirmed rows at once, keeping the discipline: for every row it adds the corrected version with the same row_id and marks the old one. Nothing is overwritten or deleted. Pick rows with selectIds (a SELECT returning an id column) or list them, and name only the fields that change \u2014 one left out, or passed empty, stays as it was. clearCard: true removes a card and clearClass: true a class; an empty name does neither. Money cannot be changed here: a wrong amount is a fact about one transaction, corrected with add_confirmed_row. Placement is place_confirmed_rows. Already-marked rows are skipped.",
+  description: "Corrects many confirmed rows at once, keeping the discipline: for every row it adds the corrected version with the same row_id and marks the old one. Nothing is overwritten or deleted. Pick rows with selectIds (a SELECT returning an id column) or list them, and name only the fields that change \u2014 one left out, or passed empty, stays as it was. clearCard: true removes a card and clearClass: true a class; an empty name does neither. Money cannot be changed here: a wrong amount is a fact about one transaction, corrected with add_confirmed_row. Placement is place_confirmed_rows. Already-marked rows are skipped. When what made a labelling possible was something the user told you, write it down with add_agent_memory before you answer \u2014 the next conversation starts from nothing, and this is the only thing that carries.",
   parameters: {
     type: 'object',
     properties: {

@@ -2,9 +2,10 @@ import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { DEFAULT_SYSTEM_PROMPT, enableAppendOnlyTableWrites } from '@/lib/assistant-prompts'
 import { wipeAllData } from '@/lib/data-file'
 import { listClassificationNotes } from '@/lib/model/classification-notes'
-import { accountsTable, sourceFilesTable, sourceRowsTable } from '@/lib/model/model-db'
+import { accountsTable, confirmedRowsTable, sourceFilesTable, sourceRowsTable } from '@/lib/model/model-db'
 import type { SourceFile, SourceRow } from '@/lib/model/types'
-import type { OpenRouterMessage } from '@/lib/openrouter'
+import { requestOpenAiChatMessage } from '@/lib/openai-client'
+import { requestChatMessage, type OpenRouterMessage } from '@/lib/openrouter'
 import { runConversation, type ConversationUsage } from './run-conversation'
 import { toolsForRequest } from './registry'
 
@@ -21,7 +22,12 @@ import { toolsForRequest } from './registry'
  * It costs money and it can fail without anything being broken, so it is skipped unless
  * AGENT_E2E is set, and it is the last thing run rather than the first:
  *
- *     AGENT_E2E=1 OPENROUTER_KEY=sk-… npx vitest run agent-e2e
+ *     set -a && . ./.env && set +a
+ *     docker compose exec -T -e AGENT_E2E=1 -e OPENAI_API_KEY frontend npx vitest run agent-e2e
+ *
+ * The container mounts frontend/ alone, so the key is passed in rather than read: the
+ * repo's .env is git-ignored and holds it. OPENROUTER_KEY runs through OpenRouter,
+ * OPENAI_API_KEY straight at OpenAI, and AGENT_E2E_MODEL picks the model.
  *
  * Rules for anything added here:
  *
@@ -31,10 +37,35 @@ import { toolsForRequest } from './registry'
  *   between runs; row counts do not. A test that greps the reply tests the model.
  * - **Write scenarios any competent model should pass.** Then a failure means the app
  *   misled it, which is the only thing this is here to find.
+ * - **Read a failure against the model that produced it.** The default is small and cheap,
+ *   which is what makes it a good detector of confusing wording and a bad judge of
+ *   anything subtle: it can talk itself into a mistake nothing in the app caused. Before
+ *   changing code over a failure, re-run the one scenario on a larger model.
  */
-const KEY = process.env.OPENROUTER_KEY ?? process.env.OPENAI_API_KEY ?? ''
-/** Cheap by default: most of these check that a schema can be followed, not that it can be reasoned about. */
-const MODEL = process.env.AGENT_E2E_MODEL ?? 'openai/gpt-5.6-terra'
+/** Whichever key is around, and the client that key belongs to. */
+const ROUTED = process.env.OPENROUTER_KEY ?? ''
+const KEY = ROUTED || (process.env.OPENAI_API_KEY ?? '')
+const client = ROUTED ? requestChatMessage : requestOpenAiChatMessage
+/**
+ * With AGENT_E2E_TRACE=1, what the tools said back.
+ *
+ * Every request carries the whole conversation so far, tool results included, so the
+ * client wrapper can read them without runConversation having to report them. A refusal
+ * is the thing worth reading: it is the app telling the model something, in wording
+ * nobody has watched a model read.
+ */
+const request: typeof requestChatMessage = async (apiKey, model, messages, tools) => {
+  if (process.env.AGENT_E2E_TRACE === '1') {
+    for (const message of messages.slice(-4)) {
+      if (message.role === 'tool' && typeof message.content === 'string') {
+        console.info(`  → ${message.content.slice(0, 400)}`)
+      }
+    }
+  }
+  return await client(apiKey, model, messages, tools)
+}
+/** OpenRouter namespaces its ids; OpenAI's own API wants the bare one. */
+const MODEL = process.env.AGENT_E2E_MODEL ?? (ROUTED ? 'openai/gpt-5.6-luna' : 'gpt-5.6-luna')
 const enabled = process.env.AGENT_E2E === '1' && KEY !== ''
 
 const spent: ConversationUsage[] = []
@@ -50,6 +81,7 @@ async function ask(text: string): Promise<string> {
     ] as OpenRouterMessage[],
     context: { attachments: [], translate: (key: string) => key },
     tools: toolsForRequest(),
+    requestFn: request,
     onUsage: (usage) => { spent[spent.length - 1] = usage },
   })
 }
@@ -67,7 +99,8 @@ describe.skipIf(!enabled)('the assistant, against a real vault', () => {
 
   it('imports a pasted table and gets its columns onto the three that matter', async () => {
     await ask(
-      'Here is a bank export. Import it as a source file called "e2e-bank.csv" and assign its columns.\n\n'
+      'Here is a bank export. Import it as a source file called "e2e-bank.csv", put its rows where they '
+      + 'belong and get its columns assigned. Stop before confirming anything — I want to look at it first.\n\n'
       + 'Data,Descrição,Valor\n'
       + '2026-03-01,Mercado Sao Jorge,-120.50\n'
       + '2026-03-02,Salario,4200.00\n'
@@ -75,7 +108,10 @@ describe.skipIf(!enabled)('the assistant, against a real vault', () => {
     )
 
     const stored = (await sourceFilesTable.toArray())[0]
-    expect(stored, 'no source file was created').toBeDefined()
+    // A file emptied by confirmation retires itself, so an absent file means either that
+    // nothing was imported or that it was carried further than the message asked.
+    const confirmed = await confirmedRowsTable.count()
+    expect(stored, confirmed > 0 ? `nothing was imported; ${confirmed} rows went straight to confirmed` : 'no source file was created').toBeDefined()
     const file = stored.data as SourceFile
     expect(file.originalColumns).toEqual(['Data', 'Descrição', 'Valor'])
     // The assignable columns, however the model phrased its way there.
@@ -120,8 +156,18 @@ describe.skipIf(!enabled)('the assistant, against a real vault', () => {
   afterAll(() => {
     if (!enabled) return
     const total = spent.filter((usage) => usage.totalTokens)
-    console.info(`\nagent-e2e: ${total.length} scenarios, ${total.reduce((sum, usage) => sum + usage.totalTokens, 0)} tokens, `
+    // Which tool refused is the whole point: a refusal the model recovered from is a
+    // wording that cost a round, and one it did not recover from is a bug in the making.
+    const byTool = new Map<string, { calls: number; errors: number }>()
+    for (const usage of total) {
+      for (const [name, tool] of Object.entries(usage.tools)) {
+        const seen = byTool.get(name) ?? { calls: 0, errors: 0 }
+        byTool.set(name, { calls: seen.calls + tool.calls, errors: seen.errors + tool.errors })
+      }
+    }
+    console.info(`\nagent-e2e (${MODEL}): ${total.length} scenarios, ${total.reduce((sum, usage) => sum + usage.totalTokens, 0)} tokens, `
       + `${total.reduce((sum, usage) => sum + usage.toolCalls, 0)} tool calls, `
-      + `${total.reduce((sum, usage) => sum + usage.toolErrors, 0)} of them refused.\n`)
+      + `${total.reduce((sum, usage) => sum + usage.toolErrors, 0)} of them refused.\n`
+      + [...byTool].map(([name, tool]) => `  ${name}: ${tool.calls}${tool.errors ? ` (${tool.errors} refused)` : ''}`).join('\n') + '\n')
   })
 })

@@ -282,7 +282,10 @@ Two things it optimizes for:
   could label once the user explained, and anything said to it that will matter again, so
   the next conversation does not ask the same questions. **One entry per scope**, enforced:
   a scope or a title an entry already holds is refused, naming the entry to rewrite. What
-  organises the memory is what a fact is about, not what kind of fact it is.
+  organises the memory is what a fact is about, not what kind of fact it is — so a scope
+  must name a section, screen, account and card that exist, may not be `global` in every
+  field at once, and an entry is capped at 1200 characters. Each of those was something a
+  written instruction asked for and did not get.
 - What was worked out once becomes a **standing labelling rule**, and rules belong
   to one of two stages that never cross: a *source* rule runs as a file arrives, so
   an import can land already labelled, and a *confirmed* rule fills in meaning on
