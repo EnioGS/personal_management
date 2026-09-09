@@ -97,7 +97,7 @@ describe.skipIf(!enabled)('the assistant, against a real vault', () => {
     }
   }, 180_000)
 
-  it('keeps one memory entry per subject instead of writing the same thing twice', async () => {
+  it('keeps one memory entry per scope instead of writing the same thing twice', async () => {
     await ask('Remember for next time: "Paygo*Baita Tche" on the confirmed data is a restaurant. Put it in your memory.')
     expect(await listClassificationNotes(undefined, 'memory')).toHaveLength(1)
 
@@ -106,9 +106,15 @@ describe.skipIf(!enabled)('the assistant, against a real vault', () => {
     startAccounting()
     await ask('Remember too: "San Paolo - Salvador S" on the confirmed data is an ice cream shop. Put it in your memory with anything already there.')
 
+    // Two merchants in the same section and screen: the assistant may hold them in one
+    // entry or in two scoped apart, but neither fact may be lost to the other, and the
+    // same scope may not appear twice.
     const entries = await listClassificationNotes(undefined, 'memory')
-    expect(entries.length, `${entries.length} entries: ${entries.map((entry) => entry.title).join(' | ')}`).toBeLessThanOrEqual(2)
-    expect(entries.map((entry) => entry.text).join('\n')).toContain('Baita Tche')
+    const written = entries.map((entry) => entry.text).join('\n')
+    expect(written, 'the first fact was lost when the second arrived').toContain('Baita Tche')
+    expect(written, 'the second fact was not written down').toContain('San Paolo')
+    const scopes = entries.map((entry) => JSON.stringify(entry.scope))
+    expect(new Set(scopes).size, `two entries share one scope: ${entries.map((entry) => entry.title).join(' | ')}`).toBe(entries.length)
   }, 240_000)
 
   afterAll(() => {
