@@ -15,6 +15,11 @@ interface AppLineChartProps<T extends Record<string, unknown>> {
   xFormatter?: (value: string | number) => string
   /** Used consistently by the axis and the tooltip when the values are amounts. */
   valueFormatter?: (value: number) => string
+  /**
+   * The x values to label, when labelling all of them would be unreadable. The line is
+   * still drawn from every point — this thins the axis, not the data.
+   */
+  xTicks?: (string | number)[]
 }
 
 export function AppLineChart<T extends Record<string, unknown>>({
@@ -23,6 +28,7 @@ export function AppLineChart<T extends Record<string, unknown>>({
   series,
   xFormatter,
   valueFormatter,
+  xTicks,
 }: AppLineChartProps<T>) {
   // Every entry is keyed twice: once by chartSafeKey(s.key) — what ChartStyle actually
   // emits as `--color-<key>` and what `stroke` below references, since a raw key with
@@ -43,7 +49,15 @@ export function AppLineChart<T extends Record<string, unknown>>({
     <ChartContainer config={config} className="aspect-auto h-full w-full">
       <LineChart data={data}>
         <CartesianGrid vertical={false} />
-        <XAxis dataKey={xKey} tickLine={false} axisLine={false} tickMargin={8} tickFormatter={xFormatter} />
+        <XAxis
+          dataKey={xKey}
+          tickLine={false}
+          axisLine={false}
+          tickMargin={8}
+          tickFormatter={xFormatter}
+          ticks={xTicks}
+          interval={xTicks ? 0 : undefined}
+        />
         <YAxis
           tickLine={false}
           axisLine={false}

@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { AppBarChart } from '@/components/charts/bar-chart'
 import { AppLineChart } from '@/components/charts/line-chart'
@@ -7,6 +7,7 @@ import { CategoryTreemap } from '@/components/charts/category-treemap'
 import { HoldingsPie } from '@/components/charts/holdings-pie'
 import { DIVERGING_PAIR, DOMAIN_COLOR } from '@/components/charts/chart-colors'
 import { SignedBarChart } from '@/components/charts/signed-bar-chart'
+import { Button } from '@/components/ui/button'
 import { CategoryPill } from '@/components/dashboard/category-pill'
 import { DashboardCard } from '@/components/dashboard/dashboard-card'
 import { NestedBarList } from '@/components/dashboard/nested-bar-list'
@@ -18,7 +19,7 @@ import { UNLABELLED_LABEL, useDashboardEntries } from '@/components/dashboard/us
 import { formatDateLabel, formatMonthLabel } from '@/lib/aggregations'
 import { capitalEvolution } from '@/lib/dashboard/capital-evolution'
 import { capitalMetric } from '@/lib/dashboard/capital-metric'
-import { spendingMonths, spendingSoFar } from '@/lib/dashboard/spending-months'
+import { monthsThroughToday, spendingMonths, spendingSoFar, trailingAverages } from '@/lib/dashboard/spending-months'
 import { declaresRecurrence, detectRecurringEntries } from '@/lib/model/recurring'
 import { heldDelta, holdingsSplit } from '@/lib/dashboard/holdings-split'
 import {
@@ -29,7 +30,7 @@ import {
   monthlyFlow,
   monthlySpread,
 } from '@/lib/dashboard/movements-analytics'
-import { averageSpendByCategory, categorySpendChanges, frequentDescriptions, outgoingSpending, spendingByMonth } from './spending-analytics'
+import { averageSpendByCategory, categoryVsAverage, frequentDescriptions, outgoingSpending, spendingByMonth, type SpendingWindow } from './spending-analytics'
 import { FinanceTableDrawer } from './finance-table-drawer'
 
 const currency = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
@@ -290,7 +291,9 @@ export function SpendingPanel() {
       declaresRecurrence(row.description) || recurringKeys.has(`${row.category}\u0000${Math.round(-row.value)}`),
     [recurringKeys],
   )
-  const months = useMemo(() => spendingMonths(spending, isCommitted), [spending, isCommitted])
+  // Through to the calendar month it actually is: the month in progress is the month,
+  // not the last one the data reaches.
+  const months = useMemo(() => monthsThroughToday(spendingMonths(spending, isCommitted)), [spending, isCommitted])
   const soFar = useMemo(() => spendingSoFar(spending), [spending])
 
   const labels = useMemo(
@@ -307,13 +310,37 @@ export function SpendingPanel() {
     () => averageSpendByCategory(spending, months.map((month) => month.month)),
     [months, spending],
   )
-  const monthChanges = useMemo(() => categorySpendChanges(spending), [spending])
+  const [monthsBack, setMonthsBack] = useState<SpendingWindow>(3)
+  const monthChanges = useMemo(() => categoryVsAverage(spending, monthsBack), [spending, monthsBack])
   const descriptions = useMemo(() => frequentDescriptions(spending), [spending])
 
   const totalSpent = spending.reduce((total, row) => total - row.value, 0)
   const monthlyAverage = months.length > 0 ? totalSpent / months.length : 0
   const perMonth = (value: number) => (months.length > 0 ? value / months.length : 0)
-  const biggest = categorySpending.slice().sort((left, right) => right.value - left.value)[0]
+  /**
+   * The month in progress, run to its end at the rate it has managed so far.
+   *
+   * Only meaningful once a month has a few days in it: on the second, one large purchase
+   * projects to a catastrophe. Below three days it says nothing rather than something
+   * alarming and wrong.
+   */
+  const projected = useMemo(() => {
+    const today = new Date()
+    const dayOfMonth = today.getDate()
+    const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate()
+    const current = months.at(-1)
+    if (!current || dayOfMonth < 3) return null
+    const lastMonth = months.at(-2)?.spent ?? 0
+    const monthEnd = (current.spent / dayOfMonth) * daysInMonth
+    return {
+      monthEnd,
+      lastMonth,
+      dayOfMonth,
+      daysInMonth,
+      // A fraction, which is what StatTile renders as a percentage.
+      comparison: lastMonth > 0 ? (monthEnd - lastMonth) / lastMonth : null,
+    }
+  }, [months])
   const byCount = [...descriptions].sort((a, b) => b.count - a.count || b.total - a.total).slice(0, 5)
   const byTotal = [...descriptions].sort((a, b) => b.total - a.total || b.count - a.count).slice(0, 5)
 
@@ -332,7 +359,7 @@ export function SpendingPanel() {
         <div className="flex flex-col gap-3">
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <StatTile
-              label={t('finances:spending.thisMonth')}
+              label={t('finances:spending.currentMonth')}
               value={currency.format(spent.current)}
               indicator={DIVERGING_PAIR.negative}
               deltas={spent.deltas}
@@ -342,7 +369,9 @@ export function SpendingPanel() {
               label={t('finances:spending.monthlyAverage')}
               value={currency.format(monthlyAverage)}
               indicator={DOMAIN_COLOR.spending}
-              sparkline={months.map((month) => month.spent)}
+              // Four points, each the average of its own month and the three before it:
+              // where the level is going, rather than what the last month happened to be.
+              sparkline={trailingAverages(months)}
             />
             <StatTile
               label={t('finances:spending.committed')}
@@ -351,17 +380,30 @@ export function SpendingPanel() {
               deltas={committed.deltas}
               sparkline={committed.sparkline}
             />
+            {/* Where the month ends up if the rest of it looks like the part that has
+                happened — the one thing a month in progress can say that a finished month
+                cannot, and the question the incomplete first tile raises. */}
             <StatTile
-              label={t('finances:spending.biggestCategory')}
-              value={biggest ? biggest.label : '\u2014'}
-              indicator={DOMAIN_COLOR.spending}
-              deltas={biggest ? [{
-                change: compactCurrency.format(biggest.value),
-                percent: Number.isFinite(biggest.comparison) ? biggest.comparison : undefined,
-                direction: biggest.comparison > 0 ? 'up' : biggest.comparison < 0 ? 'down' : 'flat',
-                goodDirection: 'down',
-                label: t('finances:spending.perMonth'),
-              }] : undefined}
+              label={t('finances:spending.projected')}
+              value={projected === null ? '\u2014' : currency.format(projected.monthEnd)}
+              indicator={DIVERGING_PAIR.negative}
+              deltas={projected ? [
+                ...(projected.comparison !== null ? [{
+                  change: compactCurrency.format(Math.abs(projected.monthEnd - projected.lastMonth)),
+                  percent: projected.comparison,
+                  direction: (projected.comparison > 0 ? 'up' : projected.comparison < 0 ? 'down' : 'flat') as 'up' | 'down' | 'flat',
+                  goodDirection: 'down' as const,
+                  label: t('finances:overview.vsLastMonth'),
+                }] : []),
+                // What the projection is standing on, said plainly: a rate read off eight
+                // days is not the same claim as one read off twenty-five.
+                {
+                  change: t('finances:spending.dayOfMonth', { day: projected.dayOfMonth, days: projected.daysInMonth }),
+                  direction: 'flat' as const,
+                  goodDirection: 'down' as const,
+                  label: t('finances:spending.atThisRate'),
+                },
+              ] : undefined}
             />
           </div>
 
@@ -409,6 +451,9 @@ export function SpendingPanel() {
                   data={soFar}
                   xKey="day"
                   xFormatter={(day: string | number) => String(day)}
+                  // Daily line, weekly labels: thirty-one numbers along an axis this wide
+                  // overlap into a grey band.
+                  xTicks={[1, 8, 15, 22, 29]}
                   valueFormatter={(value) => currency.format(value)}
                   series={[
                     // The month in progress is the subject; the one before it is the ruler,
@@ -420,7 +465,26 @@ export function SpendingPanel() {
               )}
             </DashboardCard>
 
-            <DashboardCard title={t('finances:spending.currentVsPrevious')} className="h-[280px]" bodyClassName="p-2">
+            <DashboardCard
+              title={t('finances:spending.vsAverage', { count: monthsBack })}
+              className="h-[280px]"
+              bodyClassName="p-2"
+              action={
+                <span className="flex gap-0.5">
+                  {([1, 3, 6] as const).map((option) => (
+                    <Button
+                      key={option}
+                      type="button"
+                      size="xs"
+                      variant={monthsBack === option ? 'secondary' : 'ghost'}
+                      onClick={() => setMonthsBack(option)}
+                    >
+                      {t('finances:spending.monthsBack', { count: option })}
+                    </Button>
+                  ))}
+                </span>
+              }
+            >
               {monthChanges.length === 0 ? (
                 <p className="text-muted-foreground flex h-full items-center justify-center text-xs">{t('finances:spending.noCategoryChanges')}</p>
               ) : (

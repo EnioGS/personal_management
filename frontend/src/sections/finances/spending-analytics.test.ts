@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { FilteredEntry } from '@/components/dashboard/use-dashboard-entries'
-import { averageSpendByCategory, categorySpendChanges, frequentDescriptions, outgoingSpending, spendingByMonth } from './spending-analytics'
+import { averageSpendByCategory, categoryVsAverage, frequentDescriptions, outgoingSpending, spendingByMonth } from './spending-analytics'
 
 /** Amounts are signed the way the app means them, so a spending row is negative. */
 function entry(overrides: Partial<FilteredEntry>): FilteredEntry {
@@ -47,17 +47,33 @@ describe('spending analytics', () => {
     ])).toEqual([{ month: '2026-07', amount: 50 }])
   })
 
-  it('compares the latest month to the preceding month and sorts by absolute movement', () => {
-    expect(categorySpendChanges([
-      entry({ date: Date.UTC(2026, 6, 1), category: 'Food', value: -40 }),
-      entry({ date: Date.UTC(2026, 7, 1), category: 'Food', value: -100 }),
-      entry({ date: Date.UTC(2026, 6, 2), category: 'Travel', value: -200 }),
-      entry({ date: Date.UTC(2026, 7, 2), category: 'Books', value: -50 }),
-    ])).toEqual([
-      { category: 'Travel', change: -200 },
-      { category: 'Food', change: 60 },
-      { category: 'Books', change: 50 },
+  it("puts a category's recent rate against its own long-run rate, sorted by the gap", () => {
+    // Four months of data ending 1 Aug; the one-month window is the last thirty days of it.
+    const rows = [
+      entry({ date: Date.UTC(2026, 4, 1), category: 'Food', value: -100 }),
+      entry({ date: Date.UTC(2026, 5, 1), category: 'Food', value: -100 }),
+      entry({ date: Date.UTC(2026, 6, 1), category: 'Food', value: -100 }),
+      entry({ date: Date.UTC(2026, 7, 1), category: 'Food', value: -400 }),
+      entry({ date: Date.UTC(2026, 4, 2), category: 'Books', value: -40 }),
+    ]
+
+    // Food: 400 in the last thirty days against 700/4 = 175 a month across the data.
+    // Books: nothing recent, against 10 a month — a category gone quiet, said as such.
+    expect(categoryVsAverage(rows, 1)).toEqual([
+      { category: 'Food', change: 225 },
+      { category: 'Books', change: -10 },
     ])
+  })
+
+  it('reads a longer window as a rate, so three months of it is comparable with one', () => {
+    const rows = [
+      entry({ date: Date.UTC(2026, 5, 1), category: 'Food', value: -300 }),
+      entry({ date: Date.UTC(2026, 6, 1), category: 'Food', value: -300 }),
+      entry({ date: Date.UTC(2026, 7, 1), category: 'Food', value: -300 }),
+    ]
+
+    // Ninety days back from 1 Aug takes all three months: 900/3 against 900/3.
+    expect(categoryVsAverage(rows, 3)).toEqual([])
   })
 
   it('ranks descriptions by occurrence, then by total', () => {
