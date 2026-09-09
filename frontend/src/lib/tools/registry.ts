@@ -1,6 +1,7 @@
 import type { OpenRouterTool } from '@/lib/openrouter'
 import { promptText } from '@/lib/prompts/registry'
 import { applyLabelRulesTool, deleteLabelRuleTool, editLabelRuleTool, listLabelRulesTool, saveLabelRuleTool } from './label-rule-tools'
+import { addAgentMemoryTool, deleteAgentMemoryTool, editAgentMemoryTool, readAgentMemoryTool } from './memory-tools'
 import { readCsvTool } from './read-csv'
 import { runSqlTool } from './run-sql'
 import { readIngestionGuideTool } from './guide-tool'
@@ -65,6 +66,10 @@ export const toolRegistry: ToolDefinition[] = [
   addConfirmedRowTool,
   confirmRowsTool,
   dropSourceTableTool,
+  readAgentMemoryTool,
+  addAgentMemoryTool,
+  editAgentMemoryTool,
+  deleteAgentMemoryTool,
   listLabelRulesTool,
   saveLabelRuleTool,
   editLabelRuleTool,
@@ -113,6 +118,10 @@ export const TOOL_GROUPS: Record<string, { summary: string; tools: string[] }> =
   settings: {
     summary: "The accounts and credit cards a row can be labelled with, and registering one that does not exist yet.",
     tools: ['list_accounts_and_cards', 'add_account', 'add_card'],
+  },
+  memory: {
+    summary: "Your own record of this vault: what you could not label and why, what you could once the user explained, and anything they told you that will matter again.",
+    tools: ['read_agent_memory', 'add_agent_memory', 'edit_agent_memory', 'delete_agent_memory'],
   },
   conversation: {
     summary: 'This conversation itself — renaming it.',

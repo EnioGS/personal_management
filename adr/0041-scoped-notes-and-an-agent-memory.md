@@ -1,0 +1,55 @@
+# Scoped notes, and a memory the assistant keeps itself
+
+## Status
+
+Accepted.
+
+## Context
+
+Classification notes were free text with nothing saying what they were about. A
+note reading "sells food, not leisure" is true of one merchant on one card in
+one section, but it arrived with every request regardless, and the assistant had
+to guess how far it reached. Notes about a single file competed with notes that
+held everywhere.
+
+Separately, the assistant had nowhere to put what it learned. Everything it
+worked out — which rows it could not label and what was missing, what a user's
+explanation unlocked — lived only in a conversation, and was gone when that
+conversation was. The next conversation asked the same questions.
+
+## Decision
+
+Both problems take the same shape, so they take the same solution.
+
+Every note and every memory entry carries a **scope** of eight fields: account,
+card, section, screen, class, category, subcategory, and `lines` for which rows
+inside a table. Each field is a few words or the literal word `global`. A blank
+is refused — by the tools and by the panel — because a blank says nobody has
+decided, which is not the same as saying it applies everywhere. Fields narrow
+independently, so one class with everything else `global` is a statement about
+that class in every table. Rendering omits the `global` fields: repeating the
+word eight times says nothing.
+
+**Agent memory** is a second store of the same shape, in its own Dexie table
+(`agentMemory`, model-db v17), with its own section in the Data ingestion centre
+and its own toolset (`read_agent_memory`, `add`, `edit`, `delete`). It is *not*
+appended to the guide. The guide says it exists and the assistant reads it when
+it needs it — a working log grows, and sending all of it on every request would
+cost more than it saves. Deletion is guarded by `confirmed: true`, like the
+other destructive tools the assistant can reach; editing is how an entry shrinks
+as the user explains its rows.
+
+The assistant is told to write there tersely and hierarchically: what the user
+explained that will matter again, what it could not label and exactly what was
+missing, and — its own entry — what it could label once explained. As
+explanations arrive the second shrinks and the third grows.
+
+## Consequences
+
+A note now says what it governs, so a note about one file stops reading as a
+rule about everything. The assistant stops re-asking what it has already been
+told, at the cost of one tool call in the conversations where that matters.
+
+Whether that hierarchy is the right one is not yet known — it was specified
+before we watched it used. AGENTS.md carries a temporary section asking for it
+to be revisited, and instructing its own deletion once it has been.

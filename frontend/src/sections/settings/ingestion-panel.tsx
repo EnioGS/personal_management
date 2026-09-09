@@ -552,8 +552,13 @@ export function IngestionPanel() {
             {selectedConfirmed && <LabellingRules context="confirmed" />}
           </div>
           {/* Below the rules, and separate from them: what a rule cannot say. */}
-          <div className="mt-[2.25rem] border-t pt-6 pb-6">
+          <div className="mt-[2.25rem] border-t pt-6">
             <ClassificationNotes context={selectedConfirmed ? 'confirmed' : 'source'} />
+          </div>
+          {/* Below the notes, set apart the same way: the assistant's own record of what it
+              could not do and why, which it keeps and reads back itself. */}
+          <div className="mt-[2.25rem] border-t pt-6 pb-6">
+            <ClassificationNotes context={selectedConfirmed ? 'confirmed' : 'source'} kind="memory" />
           </div>
         </>
       )}

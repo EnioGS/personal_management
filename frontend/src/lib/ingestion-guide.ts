@@ -30,7 +30,7 @@ signed) and **amount** (how many). What a row moved is amount x price; a file si
 quantity describes one thing — amount 1, price the money itself. Price is per unit, so a
 total covering several units has to be divided. Value and amount are never
 interchangeable: money is a value, a holding is an amount. Anything unassigned is condensed
-into the observations of each confirmed row, which is where a description ends up.
+into each confirmed row's observations, where a description ends up.
 
 A row is not confirmed until its file says where its numbers are: every row a date and a
 price, a row going to Investments an amount too. Confirming without them is refused and
@@ -60,7 +60,7 @@ Class — free text: what kind of thing it is, which is what a balance is sliced
 fixa, renda variável, cash reserve. What it *is*, never where it came from: interest
 arriving in cash is \`cash reserve\`, not \`proceeds\`. Investments reads it.
 
-Category — free text, one value, starts empty. Leave it empty rather than writing "other":
+Category — free text, one value, empty at first. Leave it empty rather than "other":
 an empty cell asks to be looked at, "other" looks like an answer.
 
 Subcategory — the detail under it, free text. Assinatura, membership, parcelado and their
@@ -79,7 +79,7 @@ the convention back undoes it.
 
 Before deciding, **sample the destination tables**: run_sql with no statement reports how
 many values in each are negative and how many positive. Do that even where a convention is
-recorded — a recorded reference is a shortcut, not evidence. Invert everything for a file
+already recorded — that is a shortcut, not evidence. Invert everything for a file
 that consistently means the opposite; invert by condition for one whose values are all one
 sign and whose direction lives in another column. If the evidence does not settle it, ask
 the user.
@@ -96,17 +96,16 @@ elimination, which leaves every dashboard and stays in its table.
 
 Correct by adding the corrected row with **the same row_id** and marking the old one — the
 pair is what makes a change visible on the screen it happened on. revise_confirmed_rows
-does that for many rows at once; prefer it over an UPDATE when changing a field across
-rows. SQL can do anything to these tables, deleting included: every statement is planned
-before it runs, reported by row count, and undoable whole from Settings → History.
+does that for many rows at once; prefer it over an UPDATE. SQL can do anything to these
+tables, deleting included: every statement is planned first and undoable whole from
+Settings → History.
 
 ## Duplicates
 
 Two identical rows *inside one file* are two real transactions — banks report them. A row
 is a possible duplicate only when everything it says matches one from a **different file**,
-confirmed rows included — comparable only once the columns are assigned, so look again
-after assigning. A name nearly repeating a file already imported or confirmed is flagged
-on arrival.
+confirmed rows included — comparable only after the columns are assigned, so look again
+then. A filename nearly repeating one already imported is flagged on arrival.
 
 ## Rules and notes
 
@@ -116,8 +115,9 @@ already in a table says about itself — class, category, subcategory, account, 
 where it belongs. A rule fills only what a row does not already say, so it cannot overwrite
 a judgement. Write the rationale, and read the standing rules first.
 
-Notes are the rest: free text saying what a rule cannot — that a shop nobody would
-recognise sells food, that one file's March rows were a rebalance. Appended below when
-there are any. Treat them as the user talking about their own data, and write one yourself
-whenever they explain something you would otherwise ask about twice.
+Notes are the rest: what a rule cannot say — that a shop nobody would recognise sells food,
+that one file's March rows were a rebalance. Appended below when there are any: the user
+talking about their own data. Memory is your own record and is *not* appended — open the
+memory toolset and read it, and write there tersely what you could not label and what was
+missing. Both take a scope, every field a few words or \`global\`; a blank is refused.
 `

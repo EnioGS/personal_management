@@ -146,6 +146,20 @@ export const SQLITE_SCHEMAS: Record<DataTableKey, SqliteTableSchema> = {
       { column: 'connections', key: 'connections', type: 'json' },
     ],
   },
+  agentMemory: {
+    sqlName: 'agent_memory',
+    columns: [
+      { column: 'context', key: 'context', type: 'text' },
+      { column: 'title', key: 'title', type: 'text' },
+      { column: 'text', key: 'text', type: 'text' },
+      { column: 'scope', key: 'scope', type: 'json' },
+      { column: 'created_by', key: 'createdBy', type: 'text' },
+      // Every table already carries a created_at of its own; this is the note's.
+      { column: 'note_created_at', key: 'createdAt', type: 'integer' },
+      { column: 'edited_by', key: 'editedBy', type: 'text' },
+      { column: 'edited_at', key: 'editedAt', type: 'integer' },
+    ],
+  },
   labelRules: {
     sqlName: 'label_rules',
     columns: [
@@ -170,7 +184,9 @@ export const SQLITE_SCHEMAS: Record<DataTableKey, SqliteTableSchema> = {
     sqlName: 'classification_notes',
     columns: [
       { column: 'context', key: 'context', type: 'text' },
+      { column: 'title', key: 'title', type: 'text' },
       { column: 'text', key: 'text', type: 'text' },
+      { column: 'scope', key: 'scope', type: 'json' },
       { column: 'created_by', key: 'createdBy', type: 'text' },
       { column: 'note_created_at', key: 'createdAt', type: 'integer' },
       { column: 'edited_by', key: 'editedBy', type: 'text' },

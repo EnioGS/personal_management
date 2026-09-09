@@ -23,6 +23,7 @@ const db = new Dexie('app-model-db') as Dexie & {
   sourceRows: EntityTable<LocalRow, 'id'>
   confirmedRows: EntityTable<LocalRow, 'id'>
   classificationNotes: EntityTable<LocalRow, 'id'>
+  agentMemory: EntityTable<LocalRow, 'id'>
 }
 
 db.version(1).stores({
@@ -303,6 +304,16 @@ db.version(16).stores({}).upgrade(async (tx) => {
  * The audit events are left alone: a log of what happened does not need a log of what
  * happened to it.
  */
+/**
+ * What the assistant has worked out and wants back later.
+ *
+ * The same shape as a classification note and a different table on purpose. A note is the
+ * user explaining their own data; memory is the assistant's working record — what it could
+ * not label and why, what it labelled once somebody explained. Mixing the two would bury
+ * the dozen sentences a person wrote under the hundreds a machine did.
+ */
+db.version(17).stores({ agentMemory: '++id, createdAt' })
+
 export const accountsTable = journalled(db.accounts, 'accounts')
 export const cardsTable = journalled(db.cards, 'cards')
 export const budgetsTable = journalled(db.budgets, 'budgets')
@@ -310,6 +321,7 @@ export const allocationTargetsTable = journalled(db.allocationTargets, 'allocati
 export const ingestionAuditEventsTable = db.ingestionAuditEvents
 export const labelRulesTable = journalled(db.labelRules, 'labelRules')
 export const classificationNotesTable = journalled(db.classificationNotes, 'classificationNotes')
+export const agentMemoryTable = journalled(db.agentMemory, 'agentMemory')
 export const sourceFilesTable = journalled(db.sourceFiles, 'sourceFiles')
 export const sourceRowsTable = journalled(db.sourceRows, 'sourceRows')
 export const confirmedRowsTable = journalled(db.confirmedRows, 'confirmedRows')
@@ -322,6 +334,7 @@ export const JOURNALLED_TABLES = {
   allocationTargets: db.allocationTargets,
   labelRules: db.labelRules,
   classificationNotes: db.classificationNotes,
+  agentMemory: db.agentMemory,
   sourceFiles: db.sourceFiles,
   sourceRows: db.sourceRows,
   confirmedRows: db.confirmedRows,

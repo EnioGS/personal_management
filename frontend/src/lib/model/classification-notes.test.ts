@@ -4,9 +4,18 @@ import {
   addClassificationNote,
   classificationNotesForPrompt,
   deleteClassificationNote,
+  describeScope,
   editClassificationNote,
   listClassificationNotes,
+  scopeRefusal,
 } from './classification-notes'
+import type { NoteScope } from './types'
+
+/** Unrestricted in every direction, which is what the word is for. */
+const GLOBAL_SCOPE: NoteScope = {
+  account: 'global', card: 'global', section: 'global', screen: 'global',
+  class: 'global', category: 'global', subcategory: 'global', lines: 'global',
+}
 
 describe('notes on how to classify', () => {
   beforeEach(async () => { await wipeAllData() })
@@ -23,14 +32,35 @@ describe('notes on how to classify', () => {
     await expect(addClassificationNote({ context: 'source', text: '   ', createdBy: 'user' })).rejects.toThrow(/needs something/)
   })
 
-  it('reaches the assistant grouped by stage, saying who wrote each', async () => {
-    await addClassificationNote({ context: 'confirmed', text: 'Charme is a market.', createdBy: 'user' })
+  it('reaches the assistant grouped by stage, saying what each is about', async () => {
+    await addClassificationNote({
+      context: 'confirmed',
+      title: 'Charme',
+      text: 'Charme is a market.',
+      scope: { ...GLOBAL_SCOPE, category: 'food', lines: 'anything from Charme' },
+      createdBy: 'user',
+    })
 
     const rendered = await classificationNotesForPrompt()
 
     expect(rendered).toContain('## Notes on this data')
     expect(rendered).toContain('About rows already confirmed:')
-    expect(rendered).toContain('- Charme is a market. _(user)_')
+    expect(rendered).toContain('**Charme** — Charme is a market.')
+    // Only the fields that narrow anything: repeating "global" eight times says nothing.
+    expect(rendered).toContain('_(category: food, lines: anything from Charme)_')
+  })
+
+  it('describes a scope by what it narrows, and says nothing when it narrows nothing', () => {
+    expect(describeScope({ ...GLOBAL_SCOPE })).toBe('')
+    expect(describeScope({ ...GLOBAL_SCOPE, account: 'Nubank' })).toBe('account: Nubank')
+    expect(describeScope(undefined)).toBe('')
+  })
+
+  it('refuses a scope that says nothing, a dash being no more an answer than a blank', () => {
+    expect(scopeRefusal(undefined)).toContain('needs a scope')
+    expect(scopeRefusal({ ...GLOBAL_SCOPE, account: '' })).toContain('account')
+    expect(scopeRefusal({ ...GLOBAL_SCOPE, card: ' - ' })).toContain('card')
+    expect(scopeRefusal({ ...GLOBAL_SCOPE })).toBeNull()
   })
 
   it('says nothing at all when nothing is written down', async () => {

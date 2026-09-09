@@ -4,6 +4,7 @@ import {
   allocationTargetsTable,
   budgetsTable,
   cardsTable,
+  agentMemoryTable,
   classificationNotesTable,
   ingestionAuditEventsTable,
   labelRulesTable,
@@ -30,6 +31,7 @@ export const useBudgetsStore = createLocalListStore<Budget>(budgetsTable)
 export const useAllocationTargetsStore = createLocalListStore<AllocationTarget>(allocationTargetsTable)
 export const useLabelRulesStore = createLocalListStore<LabelRule>(labelRulesTable)
 export const useClassificationNotesStore = createLocalListStore<ClassificationNote>(classificationNotesTable)
+export const useAgentMemoryStore = createLocalListStore<ClassificationNote>(agentMemoryTable)
 export const useIngestionAuditEventsStore = createLocalListStore<IngestionAuditEvent>(ingestionAuditEventsTable)
 
 export const useSourceFilesStore = createLocalListStore<SourceFile>(sourceFilesTable)

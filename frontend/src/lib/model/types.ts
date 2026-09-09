@@ -106,6 +106,31 @@ export type RuleContext = 'source' | 'confirmed'
  * is that place. The assistant is given the notes of a stage before it labels anything
  * in it, and treats them as the user talking about their own data.
  */
+/**
+ * Which rows a note or a memory is about.
+ *
+ * Every field is free text and meant to be a few words. An empty field does not mean "all
+ * of them": it means nobody has said yet, which makes the note incomplete — the word
+ * `global` is how a field says it is genuinely unrestricted.
+ *
+ * They narrow independently, which is the thing to be careful about: a note scoped to one
+ * class but global in section and screen is a note about that class *everywhere*, which is
+ * rarely what somebody meant.
+ */
+export interface NoteScope {
+  account: string
+  card: string
+  section: string
+  screen: string
+  class: string
+  category: string
+  subcategory: string
+  /** Which rows inside the table the fields above single out — "the three in March", say. */
+  lines: string
+}
+
+export const NOTE_SCOPE_FIELDS = ['account', 'card', 'section', 'screen', 'class', 'category', 'subcategory', 'lines'] as const
+
 export interface ClassificationNote {
   context: RuleContext
   /**
@@ -117,6 +142,8 @@ export interface ClassificationNote {
    */
   title?: string
   text: string
+  /** What it is about. Absent on notes written before scopes existed. */
+  scope?: NoteScope
   createdBy: 'user' | 'assistant'
   createdAt: number
   /** Set when the note has been redrafted since. The note keeps its place in the list. */

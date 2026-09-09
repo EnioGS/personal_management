@@ -1,27 +1,52 @@
 import { refreshLocalStores } from '@/lib/local-store/create-local-list-store'
-import { classificationNotesTable } from './model-db'
-import type { ClassificationNote, RuleContext } from './types'
+import { agentMemoryTable, classificationNotesTable } from './model-db'
+import { NOTE_SCOPE_FIELDS, type ClassificationNote, type NoteScope, type RuleContext } from './types'
 
 export type StoredNote = ClassificationNote & { id: number }
 
+/**
+ * The two records of what is known about this data, kept apart.
+ *
+ * Notes are the user explaining their own vault; memory is the assistant's working record.
+ * Same shape, same operations, different tables — so a dozen sentences a person wrote are
+ * not buried under the hundreds a machine did.
+ */
+export type NoteKind = 'note' | 'memory'
+
+const TABLES = { note: classificationNotesTable, memory: agentMemoryTable }
+
+/** Whether a scope says anything at all. A field left blank means nobody has said yet. */
+export function scopeRefusal(scope: Partial<NoteScope> | undefined): string | null {
+  if (!scope) return 'This needs a scope: which account, card, section, screen, class, category, subcategory and lines it is about. Write "global" where it genuinely is not restricted.'
+  const empty = NOTE_SCOPE_FIELDS.filter((field) => !meaningful(scope[field]))
+  if (empty.length === 0) return null
+  return `These say nothing: ${empty.join(', ')}. Each needs a few words, or the word "global" where it is genuinely unrestricted — a blank means nobody has said yet, not that it applies everywhere.`
+}
+
+/** A dash is not an answer, and neither is a space. */
+function meaningful(value: string | undefined): boolean {
+  const text = (value ?? '').trim().toLowerCase()
+  return text.length > 0 && !['-', '--', 'n/a', 'na', '?', '.', 'none', 'null', 'undefined'].includes(text)
+}
+
 /** Oldest first: the notes read as a list of things established over time. */
-export async function listClassificationNotes(context?: RuleContext): Promise<StoredNote[]> {
-  const rows = await classificationNotesTable.toArray()
+export async function listClassificationNotes(context?: RuleContext, kind: NoteKind = 'note'): Promise<StoredNote[]> {
+  const rows = await TABLES[kind].toArray()
   return rows
     .map((row) => ({ id: row.id, ...(row.data as ClassificationNote) }))
     .filter((note) => !context || note.context === context)
     .sort((left, right) => left.createdAt - right.createdAt)
 }
 
-export async function addClassificationNote(note: Omit<ClassificationNote, 'createdAt'>): Promise<number> {
+export async function addClassificationNote(note: Omit<ClassificationNote, 'createdAt'>, kind: NoteKind = 'note'): Promise<number> {
   const text = note.text.trim()
   if (!text) throw new Error('A note needs something in it.')
   const title = note.title?.trim()
-  const id = await classificationNotesTable.add({
+  const id = await TABLES[kind].add({
     createdAt: Date.now(),
     data: { ...note, text, ...(title ? { title } : {}), createdAt: Date.now() },
   })
-  await refreshLocalStores('classificationNotes')
+  await refreshLocalStores(kind === 'note' ? 'classificationNotes' : 'agentMemory')
   return id
 }
 
@@ -39,17 +64,20 @@ export async function editClassificationNote(
   text: string,
   editedBy: 'user' | 'assistant',
   title?: string,
+  scope?: NoteScope,
+  kind: NoteKind = 'note',
 ): Promise<void> {
   const trimmed = text.trim()
   if (!trimmed) throw new Error('A note needs something in it.')
-  const stored = await classificationNotesTable.get(id)
+  const stored = await TABLES[kind].get(id)
   if (!stored) throw new Error(`Note ${id} was not found.`)
   const note = stored.data as ClassificationNote
 
-  await classificationNotesTable.update(id, {
+  await TABLES[kind].update(id, {
     data: {
       ...note,
       text: trimmed,
+      ...(scope ? { scope } : {}),
       // Left out means unchanged; emptied means the note goes back to leading with its
       // first line, which is a thing somebody might genuinely want.
       ...(title === undefined ? {} : title.trim() ? { title: title.trim() } : { title: undefined }),
@@ -57,12 +85,21 @@ export async function editClassificationNote(
       editedAt: Date.now(),
     },
   })
-  await refreshLocalStores('classificationNotes')
+  await refreshLocalStores(kind === 'note' ? 'classificationNotes' : 'agentMemory')
 }
 
-export async function deleteClassificationNote(id: number): Promise<void> {
-  await classificationNotesTable.delete(id)
-  await refreshLocalStores('classificationNotes')
+export async function deleteClassificationNote(id: number, kind: NoteKind = 'note'): Promise<void> {
+  await TABLES[kind].delete(id)
+  await refreshLocalStores(kind === 'note' ? 'classificationNotes' : 'agentMemory')
+}
+
+/** A scope as one line, for the places that show or send a note rather than edit it. */
+export function describeScope(scope: NoteScope | undefined): string {
+  if (!scope) return ''
+  return NOTE_SCOPE_FIELDS
+    .filter((field) => scope[field]?.trim() && scope[field].trim().toLowerCase() !== 'global')
+    .map((field) => `${field}: ${scope[field].trim()}`)
+    .join(', ')
 }
 
 /**
@@ -81,7 +118,10 @@ export async function classificationNotesForPrompt(): Promise<string> {
     const own = notes.filter((note) => note.context === stage)
     if (own.length === 0) continue
     lines.push(stage === 'source' ? '**While working on a file:**' : '**About rows already confirmed:**')
-    for (const note of own) lines.push(`- ${note.title ? `**${note.title}** — ` : ''}${note.text} _(${note.createdBy})_`)
+    for (const note of own) {
+      const scope = describeScope(note.scope)
+      lines.push(`- ${note.title ? `**${note.title}** — ` : ''}${note.text}${scope ? ` _(${scope})_` : ''}`)
+    }
     lines.push('')
   }
   return lines.join('\n')

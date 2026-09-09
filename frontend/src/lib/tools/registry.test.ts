@@ -37,6 +37,10 @@ describe('findTool', () => {
       'add_confirmed_row',
       'confirm_rows',
       'drop_source_table',
+      'read_agent_memory',
+      'add_agent_memory',
+      'edit_agent_memory',
+      'delete_agent_memory',
       'list_label_rules',
       'save_label_rule',
       'edit_label_rule',
@@ -66,11 +70,11 @@ describe('what the user can do and the assistant cannot', () => {
     expect(findTool('mark_rows')).toBeDefined()
     expect(findTool('mark_rows')!.parameters).toMatchObject({ properties: { marked: { type: 'boolean' } } })
     expect(toolRegistry.filter((tool) => /delete|remove|drop/.test(tool.name)).map((tool) => tool.name))
-      .toEqual(['drop_source_table', 'delete_label_rule', 'delete_classification_note'])
+      .toEqual(['drop_source_table', 'delete_agent_memory', 'delete_label_rule', 'delete_classification_note'])
   })
 
   it('guards the destructive things it can reach behind an explicit confirmation', () => {
-    for (const name of ['delete_label_rule', 'delete_classification_note', 'confirm_rows']) {
+    for (const name of ['delete_label_rule', 'delete_classification_note', 'delete_agent_memory', 'confirm_rows']) {
       expect(findTool(name)!.parameters, name).toMatchObject({ properties: { confirmed: { type: 'boolean' } } })
     }
     // Dropping a source table needs no confirmation because it can only ever remove an

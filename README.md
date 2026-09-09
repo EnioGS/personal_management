@@ -271,7 +271,15 @@ Two things it optimizes for:
   keeps working. Notes belong to a stage the way rules do, and sit below them in the panel.
   Either of you can redraft one — double-click it, or `edit_classification_note` — and a
   rewritten note keeps its place in the list, recording who went over it, because prose is
-  got right by redrafting and a correction is not a new discovery.
+  got right by redrafting and a correction is not a new discovery. Every note carries a
+  **scope** — account, card, section, screen, class, category, subcategory, and which lines
+  — each field a few words or the word `global`; a blank is refused, because a blank says
+  nobody has decided rather than that it holds everywhere.
+- The assistant keeps its own **memory** below the notes: the same shape, the same scope,
+  its own table and its own tools, and *not* appended to the guide — it reads it when it
+  needs it. It writes there tersely what it could not label and what was missing, what it
+  could label once the user explained, and anything said to it that will matter again, so
+  the next conversation does not ask the same questions.
 - What was worked out once becomes a **standing labelling rule**, and rules belong
   to one of two stages that never cross: a *source* rule runs as a file arrives, so
   an import can land already labelled, and a *confirmed* rule fills in meaning on
