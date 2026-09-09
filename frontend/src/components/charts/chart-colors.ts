@@ -134,7 +134,32 @@ export const DOMAIN_COLOR = {
   balance: CATEGORICAL_PALETTE[0],
   spending: CATEGORICAL_PALETTE[2],
   variableIncome: CATEGORICAL_PALETTE[1],
-  fixedIncome: CATEGORICAL_PALETTE[4],
+  /**
+   * Fixed income: a deep cyan, off the validated palette on purpose.
+   *
+   * It used to share the yellow slot with `cashFlow`, on the argument that a holding and
+   * a flow never meet on one chart. They do now — the holdings chart draws fixed income
+   * as a line beside bars for cash and dividends — and a cyan is what sits between the
+   * variable-income blue and the cash amber without being mistaken for either. Deep
+   * rather than bright: a pale cyan line disappears on a light card.
+   */
+  fixedIncome: { light: '#0d6f8a', dark: '#2ba0bf' },
+  /**
+   * What is held altogether: the brand green, taken down.
+   *
+   * It is the sum of the lines under it, so it has to read as the same family and still
+   * be the one the eye lands on first. A darker green does both; the brand green beside
+   * its own components looked like a fourth component.
+   */
+  held: { light: '#175c34', dark: '#2f8a4d' },
+  /**
+   * Cash held as cash — amber, and the one warm colour on a holdings chart.
+   *
+   * Distinct from the spending orange (redder, `CATEGORICAL_PALETTE[2]`), which it meets
+   * on Movements: cash reserve is a level that sits there and spending is money leaving,
+   * and reading them as one quantity is the mistake worth spending a hue to prevent.
+   */
+  cashReserve: { light: '#c07a08', dark: '#e0a02c' },
   contributions: CATEGORICAL_PALETTE[5],
   cards: CATEGORICAL_PALETTE[6],
   dividends: CATEGORICAL_PALETTE[7],

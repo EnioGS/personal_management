@@ -80,6 +80,8 @@ export interface HoldingCategory {
   key: string
   label: string
   value: number
+  /** Which class most of it is, so a category is drawn in the colour of what it holds. */
+  holdingClass: HoldingClass
   children?: HoldingCategory[]
 }
 
@@ -93,6 +95,7 @@ export interface HoldingCategory {
  */
 export function holdingsByCategory(investments: FilteredEntry[]): HoldingCategory[] {
   const totals = new Map<string, Map<string, number>>()
+  const classes = new Map<string, Map<HoldingClass, number>>()
 
   for (const row of investments) {
     const category = row.category.trim() || UNLABELLED_LABEL
@@ -100,6 +103,12 @@ export function holdingsByCategory(investments: FilteredEntry[]): HoldingCategor
     const group = totals.get(category) ?? new Map<string, number>()
     group.set(subcategory, (group.get(subcategory) ?? 0) + heldDelta(row))
     totals.set(category, group)
+
+    // A category is usually all one class; where it is not, it is drawn as whichever
+    // holds most of it, which is what somebody reading the list would call it.
+    const byClass = classes.get(category) ?? new Map<HoldingClass, number>()
+    byClass.set(classOf(row), (byClass.get(classOf(row)) ?? 0) + Math.abs(heldDelta(row)))
+    classes.set(category, byClass)
   }
 
   return [...totals.entries()]
@@ -107,11 +116,17 @@ export function holdingsByCategory(investments: FilteredEntry[]): HoldingCategor
       key: category,
       label: category,
       value: sum(group),
+      holdingClass: dominantClass(classes.get(category)),
       children: [...group.entries()]
-        .map(([label, value]) => ({ key: `${category}:${label}`, label, value }))
+        .map(([label, value]) => ({ key: `${category}:${label}`, label, value, holdingClass: dominantClass(classes.get(category)) }))
         .filter((child) => child.value > 0.005)
         .sort((left, right) => right.value - left.value),
     }))
     .filter((category) => category.value > 0.005)
     .sort((left, right) => right.value - left.value)
+}
+
+function dominantClass(byClass: Map<HoldingClass, number> | undefined): HoldingClass {
+  if (!byClass) return 'unclassified'
+  return [...byClass.entries()].sort((left, right) => right[1] - left[1])[0][0]
 }

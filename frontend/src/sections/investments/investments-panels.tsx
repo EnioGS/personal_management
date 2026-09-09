@@ -81,7 +81,7 @@ export function InvestmentsPanel() {
   )
   const holdings = useMemo(() => {
     const named: Record<string, { label: string; color: typeof DOMAIN_COLOR.balance }> = {
-      cash: { label: t('finances:overview.cashReserve'), color: DOMAIN_COLOR.balance },
+      cash: { label: t('finances:overview.cashReserve'), color: DOMAIN_COLOR.cashReserve },
       fixedIncome: { label: t('items.fixedIncome'), color: DOMAIN_COLOR.fixedIncome },
       variableIncome: { label: t('items.variableIncome'), color: DOMAIN_COLOR.variableIncome },
       unclassified: { label: t('finances:overview.unclassifiedHoldings'), color: DOMAIN_COLOR.unclassified },
@@ -101,7 +101,25 @@ export function InvestmentsPanel() {
   const fixed = useMemo(() => capitalMetric(months, 'fixedIncome', 'up', labels, compactCurrency.format), [months, labels])
   const variable = useMemo(() => capitalMetric(months, 'variableIncome', 'up', labels, compactCurrency.format), [months, labels])
 
-  const positions = useMemo(() => holdingsByCategory(rows), [rows])
+  // Coloured by what each category holds rather than by its rank, so the list and the
+  // chart above it are saying the same thing about the same colour.
+  const classColour = useMemo(
+    () => ({
+      cash: DOMAIN_COLOR.cashReserve,
+      fixedIncome: DOMAIN_COLOR.fixedIncome,
+      variableIncome: DOMAIN_COLOR.variableIncome,
+      unclassified: DOMAIN_COLOR.unclassified,
+    }),
+    [],
+  )
+  const positions = useMemo(
+    () => holdingsByCategory(rows).map((category) => ({
+      ...category,
+      color: classColour[category.holdingClass],
+      children: category.children?.map((child) => ({ ...child, color: classColour[category.holdingClass] })),
+    })),
+    [classColour, rows],
+  )
   const flows = useMemo(
     () => investmentFlows(rows).filter((month) => isWithinRange(Date.parse(`${month.month}-01`), range)),
     [range, rows],
@@ -129,7 +147,7 @@ export function InvestmentsPanel() {
             <StatTile
               label={t('items.currentInvestments')}
               value={currency.format(held.current)}
-              indicator={DOMAIN_COLOR.balance}
+              indicator={DOMAIN_COLOR.held}
               deltas={held.deltas}
               sparkline={held.sparkline}
             />
@@ -153,7 +171,7 @@ export function InvestmentsPanel() {
             <StatTile
               label={t('finances:overview.cashReserve')}
               value={currency.format(cash.current)}
-              indicator={DOMAIN_COLOR.income}
+              indicator={DOMAIN_COLOR.cashReserve}
               deltas={cash.deltas}
               sparkline={cash.sparkline}
             />

@@ -1,6 +1,8 @@
 import { Bar, CartesianGrid, ComposedChart, Line, XAxis, YAxis } from 'recharts'
-import { ChartContainer, ChartLegend, ChartLegendContent, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart'
-import { DOMAIN_COLOR } from './chart-colors'
+import type { CSSProperties } from 'react'
+import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart'
+import { cn } from '@/lib/utils'
+import { DOMAIN_COLOR, type ThemedColor } from './chart-colors'
 
 interface HoldingsOverTimeChartProps<T extends Record<string, unknown>> {
   data: T[]
@@ -47,14 +49,26 @@ export function HoldingsOverTimeChart<T extends Record<string, unknown>>({
 }: HoldingsOverTimeChartProps<T>) {
   const config: ChartConfig = {
     received: { label: receivedLabel, theme: DOMAIN_COLOR.dividends },
-    cash: { label: cashLabel, theme: DOMAIN_COLOR.contributions },
-    held: { label: heldLabel, theme: DOMAIN_COLOR.balance },
+    cash: { label: cashLabel, theme: DOMAIN_COLOR.cashReserve },
+    held: { label: heldLabel, theme: DOMAIN_COLOR.held },
     fixedIncome: { label: fixedLabel, theme: DOMAIN_COLOR.fixedIncome },
     variableIncome: { label: variableLabel, theme: DOMAIN_COLOR.variableIncome },
   }
 
+  // Grouped by kind rather than by the order the chart happens to draw in: the bars say
+  // what a month did and the lines say what it came to, and sorting the two apart by eye
+  // is a tax on every reading. Same shape as the capital chart, for the same reason.
+  const legend: { label: string; color: ThemedColor; kind: 'bar' | 'line' }[] = [
+    { label: receivedLabel, color: DOMAIN_COLOR.dividends, kind: 'bar' },
+    { label: cashLabel, color: DOMAIN_COLOR.cashReserve, kind: 'bar' },
+    { label: heldLabel, color: DOMAIN_COLOR.held, kind: 'line' },
+    { label: fixedLabel, color: DOMAIN_COLOR.fixedIncome, kind: 'line' },
+    { label: variableLabel, color: DOMAIN_COLOR.variableIncome, kind: 'line' },
+  ]
+
   return (
-    <ChartContainer config={config} className="aspect-auto h-full w-full">
+    <div className="flex h-full flex-col">
+    <ChartContainer config={config} className="aspect-auto min-h-0 w-full flex-1">
       <ComposedChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
         <CartesianGrid vertical={false} />
         <XAxis
@@ -68,14 +82,29 @@ export function HoldingsOverTimeChart<T extends Record<string, unknown>>({
         />
         <YAxis tickLine={false} axisLine={false} width={64} tickFormatter={(value: number) => valueFormatter(value)} />
         <ChartTooltip content={<ChartTooltipContent formatter={(value, name) => [valueFormatter(value as number), name]} />} />
-        <ChartLegend content={<ChartLegendContent />} />
-        {/* Bars first, so the lines are drawn over them rather than behind. */}
-        <Bar dataKey="received" name={receivedLabel} fill="var(--color-received)" radius={2} maxBarSize={14} />
-        <Bar dataKey="cash" name={cashLabel} fill="var(--color-cash)" radius={2} maxBarSize={14} />
-        <Line dataKey="held" name={heldLabel} type="linear" stroke="var(--color-held)" strokeWidth={2} dot={dot('held')} />
-        <Line dataKey="fixedIncome" name={fixedLabel} type="linear" stroke="var(--color-fixedIncome)" strokeWidth={2} dot={dot('fixedIncome')} />
-        <Line dataKey="variableIncome" name={variableLabel} type="linear" stroke="var(--color-variableIncome)" strokeWidth={2} dot={dot('variableIncome')} />
+        <Line dataKey="held" name={heldLabel} type="linear" stroke="var(--color-held)" strokeWidth={2} dot={dot('held')} activeDot={{ r: 4, strokeWidth: 0 }} />
+        <Line dataKey="fixedIncome" name={fixedLabel} type="linear" stroke="var(--color-fixedIncome)" strokeWidth={2} dot={dot('fixedIncome')} activeDot={{ r: 4, strokeWidth: 0 }} />
+        <Line dataKey="variableIncome" name={variableLabel} type="linear" stroke="var(--color-variableIncome)" strokeWidth={2} dot={dot('variableIncome')} activeDot={{ r: 4, strokeWidth: 0 }} />
+        {/* Drawn last so they sit over the lines, and translucent so the line a bar
+            crosses is read through it rather than cut in two. */}
+        <Bar dataKey="received" name={receivedLabel} fill="var(--color-received)" fillOpacity={0.55} radius={2} maxBarSize={14} />
+        <Bar dataKey="cash" name={cashLabel} fill="var(--color-cash)" fillOpacity={0.55} radius={2} maxBarSize={14} />
       </ComposedChart>
     </ChartContainer>
+
+    <div className="text-muted-foreground flex flex-wrap items-center justify-center gap-x-4 gap-y-1 pt-2 text-xs">
+      {legend.map((entry, index) => (
+        <span
+          key={entry.label}
+          // A gap where the kinds change, so the grouping is visible without a heading.
+          className={cn('entity flex items-center gap-1.5', index === 2 && 'ml-3 border-l pl-4')}
+          style={{ '--entity-light': entry.color.light, '--entity-dark': entry.color.dark } as CSSProperties}
+        >
+          <span className={cn('entity-fill shrink-0', entry.kind === 'bar' ? 'size-2 rounded-[2px]' : 'h-0.5 w-3.5 rounded-full')} />
+          {entry.label}
+        </span>
+      ))}
+    </div>
+    </div>
   )
 }

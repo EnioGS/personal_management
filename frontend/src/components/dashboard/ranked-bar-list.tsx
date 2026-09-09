@@ -11,6 +11,16 @@ export interface RankedBarItem {
   comparison?: number
   /** What this one is made of — revealed by clicking it, in the roomier variant. */
   children?: RankedBarItem[]
+  /**
+   * The entity's own colour, where it has one.
+   *
+   * A rank colour is right for a list of things with nothing in common but their size. It
+   * is wrong for a list whose members already belong to something the reader knows the
+   * colour of — a holding is fixed income or variable income before it is the third-largest
+   * of anything, and drawing it by rank makes the list argue with the chart above it. The
+   * children keep it and fade, so a group stays one colour as it opens.
+   */
+  color?: ThemedColor
 }
 
 interface RankedBarListProps {
@@ -45,7 +55,7 @@ export function RankedBarList({ items, valueFormatter, emptyLabel, variant = 'in
             <UnderlinedRow
               key={item.key}
               item={item}
-              color={colorForRank(rank)}
+              color={item.color ?? colorForRank(rank)}
               share={Math.max(0, item.value) / max}
               rank={rank}
               valueFormatter={valueFormatter}
@@ -53,7 +63,7 @@ export function RankedBarList({ items, valueFormatter, emptyLabel, variant = 'in
           )
         }
 
-        const color = colorForKey(item.key)
+        const color = item.color ?? colorForKey(item.key)
         const share = total > 0 ? (item.value / total) * 100 : 0
         return (
           <div key={item.key} className="flex items-center gap-2 text-xs">

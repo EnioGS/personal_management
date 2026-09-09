@@ -99,7 +99,7 @@ export function OverviewPanel() {
   const biggest = useMemo(() => largestMovements(movements), [movements])
   const holdings = useMemo(() => {
     const named: Record<string, { label: string; color: typeof DOMAIN_COLOR.balance }> = {
-      cash: { label: t('finances:overview.cashReserve'), color: DOMAIN_COLOR.balance },
+      cash: { label: t('finances:overview.cashReserve'), color: DOMAIN_COLOR.cashReserve },
       fixedIncome: { label: t('investments:items.fixedIncome'), color: DOMAIN_COLOR.fixedIncome },
       variableIncome: { label: t('investments:items.variableIncome'), color: DOMAIN_COLOR.variableIncome },
       unclassified: { label: t('finances:overview.unclassifiedHoldings'), color: DOMAIN_COLOR.unclassified },
